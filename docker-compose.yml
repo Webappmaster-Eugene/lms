@@ -29,7 +29,7 @@ services:
     build:
       context: .
       args:
-        - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-https://lms.mentorcareer.ru}
+        - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-https://lms.nadtocheev.ru}
     restart: unless-stopped
     depends_on:
       db:
@@ -42,7 +42,7 @@ services:
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
-      - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS:-noreply@mentorcareer.ru}
+      - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS:-noreply@nadtocheev.ru}
       - EMAIL_FROM_NAME=${EMAIL_FROM_NAME:-MentorCareer LMS}
     volumes:
       - lms-media:/app/media
@@ -65,7 +65,7 @@ services:
         max-file: "5"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.lms.rule=Host(`${LMS_DOMAIN:-lms.mentorcareer.ru}`)"
+      - "traefik.http.routers.lms.rule=Host(`${LMS_DOMAIN:-lms.nadtocheev.ru}`)"
       - "traefik.http.routers.lms.entrypoints=websecure"
       - "traefik.http.routers.lms.tls.certresolver=letsencrypt"
       - "traefik.http.services.lms.loadbalancer.server.port=3000"
