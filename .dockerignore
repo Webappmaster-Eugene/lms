@@ -1,0 +1,39 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build artifacts
+.next
+out
+dist
+build
+tsconfig.tsbuildinfo
+
+# Git
+.git
+.gitignore
+
+# Environment files (secrets injected at runtime)
+.env
+.env.*
+
+# IDE
+.idea
+.vscode
+.cursor
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploaded media (mounted as volume)
+media
+
+# Logs
+*.log
+
+# Documentation & misc
+*.md
+LICENSE
