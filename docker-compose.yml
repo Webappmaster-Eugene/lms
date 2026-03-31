@@ -44,6 +44,9 @@ services:
       - SMTP_PASS=${SMTP_PASS:-}
       - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS:-noreply@nadtocheev.ru}
       - EMAIL_FROM_NAME=${EMAIL_FROM_NAME:-MentorCareer LMS}
+      # OpenTelemetry
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-lms-platform}
     volumes:
       - lms-media:/app/media
     networks:

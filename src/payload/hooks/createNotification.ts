@@ -1,4 +1,5 @@
 import type { CollectionAfterChangeHook } from 'payload'
+import { withSpan, logger } from '@/lib/telemetry'
 
 /**
  * Hook: создаёт in-app уведомление при важных событиях.
@@ -30,25 +31,27 @@ export const createPointsNotification: CollectionAfterChangeHook = async ({
   const config = notificationMap[reason]
   if (!config) return doc
 
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (req.payload as any).create({
-      collection: 'notifications',
-      data: {
-        user: userId,
-        title: config.title,
-        message: doc.description ?? `+${doc.amount} баллов`,
-        type: config.type,
-        link: config.link,
-        isRead: false,
-      },
-      context: { skipHooks: true },
-    })
-  } catch (err) {
-    console.warn('[LMS] Failed to create notification:', err)
-  }
+  return withSpan('hook.createPointsNotification', { 'user.id': userId, 'notification.type': config.type }, async () => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (req.payload as any).create({
+        collection: 'notifications',
+        data: {
+          user: userId,
+          title: config.title,
+          message: doc.description ?? `+${doc.amount} баллов`,
+          type: config.type,
+          link: config.link,
+          isRead: false,
+        },
+        context: { skipHooks: true },
+      })
+    } catch (err) {
+      logger.error('Failed to create notification', err, { 'user.id': userId, 'notification.type': config.type })
+    }
 
-  return doc
+    return doc
+  })
 }
 
 export const createAchievementNotification: CollectionAfterChangeHook = async ({
@@ -61,31 +64,33 @@ export const createAchievementNotification: CollectionAfterChangeHook = async ({
 
   const userId = String(typeof doc.user === 'object' ? doc.user.id : doc.user)
 
-  try {
-    const achievementId = String(
-      typeof doc.achievement === 'object' ? doc.achievement.id : doc.achievement,
-    )
-    const achievement = await req.payload.findByID({
-      collection: 'achievements',
-      id: achievementId,
-    })
+  return withSpan('hook.createAchievementNotification', { 'user.id': userId }, async () => {
+    try {
+      const achievementId = String(
+        typeof doc.achievement === 'object' ? doc.achievement.id : doc.achievement,
+      )
+      const achievement = await req.payload.findByID({
+        collection: 'achievements',
+        id: achievementId,
+      })
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (req.payload as any).create({
-      collection: 'notifications',
-      data: {
-        user: userId,
-        title: `Достижение: ${achievement.title}`,
-        message: achievement.description ?? '',
-        type: 'achievement',
-        link: '/profile',
-        isRead: false,
-      },
-      context: { skipHooks: true },
-    })
-  } catch (err) {
-    console.warn('[LMS] Failed to create achievement notification:', err)
-  }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (req.payload as any).create({
+        collection: 'notifications',
+        data: {
+          user: userId,
+          title: `Достижение: ${achievement.title}`,
+          message: achievement.description ?? '',
+          type: 'achievement',
+          link: '/profile',
+          isRead: false,
+        },
+        context: { skipHooks: true },
+      })
+    } catch (err) {
+      logger.error('Failed to create achievement notification', err, { 'user.id': userId })
+    }
 
-  return doc
+    return doc
+  })
 }

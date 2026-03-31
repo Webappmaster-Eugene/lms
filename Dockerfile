@@ -28,6 +28,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Ensure public dir exists even if git doesn't track it (no files inside)
+RUN mkdir -p public
+
 # Payload reads PAYLOAD_SECRET during next build (type generation / import map).
 # Dummy value here; real secret is injected at runtime via docker-compose env.
 ARG PAYLOAD_SECRET=build-time-placeholder-secret-min-32-chars
