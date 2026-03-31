@@ -7,20 +7,33 @@ import type { Payload } from 'payload'
 export const seed = async (payload: Payload) => {
   console.log('Seeding LMS database...')
 
-  // 1. Создаём admin-пользователя
-  const admin = await payload.create({
+  const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@mentorcareer.ru'
+  const adminPassword = process.env.ADMIN_PASSWORD ?? 'admin123'
+
+  // 1. Создаём admin-пользователя (если ещё не существует)
+  const { totalDocs: existingAdmins } = await payload.count({
     collection: 'users',
-    data: {
-      email: 'admin@mentorcareer.ru',
-      password: 'admin123',
-      firstName: 'Admin',
-      lastName: 'MentorCareer',
-      role: 'admin',
-      isActive: true,
-    },
-    context: { skipHooks: true },
+    where: { email: { equals: adminEmail } },
   })
-  console.log('Admin user created:', admin.email)
+
+  let admin
+  if (existingAdmins === 0) {
+    admin = await payload.create({
+      collection: 'users',
+      data: {
+        email: adminEmail,
+        password: adminPassword,
+        firstName: 'Admin',
+        lastName: 'MentorCareer',
+        role: 'admin',
+        isActive: true,
+      },
+      context: { skipHooks: true },
+    })
+    console.log('Admin user created:', admin.email)
+  } else {
+    console.log('Admin user already exists:', adminEmail)
+  }
 
   // 2. Создаём тестовых студентов
   const student1 = await payload.create({

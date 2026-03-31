@@ -90,4 +90,34 @@ export default buildConfig({
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
+
+  onInit: async (payload) => {
+    const { totalDocs } = await payload.count({ collection: 'users' })
+
+    if (totalDocs > 0) return
+
+    const email = process.env.ADMIN_EMAIL
+    const password = process.env.ADMIN_PASSWORD
+
+    if (!email || !password) {
+      payload.logger.error(
+        'No users in DB and ADMIN_EMAIL / ADMIN_PASSWORD env vars not set. Cannot create initial admin.',
+      )
+      return
+    }
+
+    await payload.create({
+      collection: 'users',
+      data: {
+        email,
+        password,
+        firstName: 'Admin',
+        lastName: 'System',
+        role: 'admin',
+        isActive: true,
+      },
+    })
+
+    payload.logger.info(`Initial admin user created: ${email}`)
+  },
 })
