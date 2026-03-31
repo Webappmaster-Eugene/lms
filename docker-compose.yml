@@ -66,12 +66,6 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.lms.rule=Host(`${LMS_DOMAIN:-lms.nadtocheev.ru}`)"
-      - "traefik.http.routers.lms.entrypoints=websecure"
-      - "traefik.http.routers.lms.tls.certresolver=letsencrypt"
-      - "traefik.http.services.lms.loadbalancer.server.port=3000"
 
 volumes:
   pgdata:
