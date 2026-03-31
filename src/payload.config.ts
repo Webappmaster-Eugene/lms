@@ -8,6 +8,7 @@ import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
 import nodemailer from 'nodemailer'
 import sharp from 'sharp'
 
+import { migrations } from './migrations'
 import { Users } from '@/payload/collections/Users'
 import { Roadmaps } from '@/payload/collections/Roadmaps'
 import { Courses } from '@/payload/collections/Courses'
@@ -64,6 +65,7 @@ export default buildConfig({
     pool: {
       connectionString: process.env.DATABASE_URL,
     },
+    prodMigrations: migrations,
   }),
 
   sharp,

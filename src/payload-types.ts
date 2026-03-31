@@ -76,6 +76,11 @@ export interface Config {
     achievements: Achievement;
     'user-achievements': UserAchievement;
     'points-transactions': PointsTransaction;
+    notes: Note;
+    comments: Comment;
+    notifications: Notification;
+    certificates: Certificate;
+    streaks: Streak;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
@@ -91,6 +96,11 @@ export interface Config {
     achievements: AchievementsSelect<false> | AchievementsSelect<true>;
     'user-achievements': UserAchievementsSelect<false> | UserAchievementsSelect<true>;
     'points-transactions': PointsTransactionsSelect<false> | PointsTransactionsSelect<true>;
+    notes: NotesSelect<false> | NotesSelect<true>;
+    comments: CommentsSelect<false> | CommentsSelect<true>;
+    notifications: NotificationsSelect<false> | NotificationsSelect<true>;
+    certificates: CertificatesSelect<false> | CertificatesSelect<true>;
+    streaks: StreaksSelect<false> | StreaksSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -440,6 +450,79 @@ export interface PointsTransaction {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notes".
+ */
+export interface Note {
+  id: number;
+  user: number | User;
+  lesson: number | Lesson;
+  content: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "comments".
+ */
+export interface Comment {
+  id: number;
+  user: number | User;
+  lesson: number | Lesson;
+  content: string;
+  /**
+   * Оставьте пустым для корневого комментария
+   */
+  parentComment?: (number | null) | Comment;
+  isResolved?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notifications".
+ */
+export interface Notification {
+  id: number;
+  user: number | User;
+  title: string;
+  message: string;
+  type: 'info' | 'achievement' | 'course_completed' | 'roadmap_completed' | 'comment';
+  link?: string | null;
+  isRead?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "certificates".
+ */
+export interface Certificate {
+  id: number;
+  user: number | User;
+  type: 'course' | 'roadmap';
+  title: string;
+  relatedEntity: string;
+  issuedAt: string;
+  certificateNumber: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "streaks".
+ */
+export interface Streak {
+  id: number;
+  user: number | User;
+  currentStreak: number;
+  longestStreak: number;
+  lastActivityDate?: string | null;
+  totalActiveDays?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-locked-documents".
  */
 export interface PayloadLockedDocument {
@@ -480,6 +563,26 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'points-transactions';
         value: number | PointsTransaction;
+      } | null)
+    | ({
+        relationTo: 'notes';
+        value: number | Note;
+      } | null)
+    | ({
+        relationTo: 'comments';
+        value: number | Comment;
+      } | null)
+    | ({
+        relationTo: 'notifications';
+        value: number | Notification;
+      } | null)
+    | ({
+        relationTo: 'certificates';
+        value: number | Certificate;
+      } | null)
+    | ({
+        relationTo: 'streaks';
+        value: number | Streak;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -760,6 +863,71 @@ export interface PointsTransactionsSelect<T extends boolean = true> {
   reason?: T;
   relatedEntity?: T;
   description?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notes_select".
+ */
+export interface NotesSelect<T extends boolean = true> {
+  user?: T;
+  lesson?: T;
+  content?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "comments_select".
+ */
+export interface CommentsSelect<T extends boolean = true> {
+  user?: T;
+  lesson?: T;
+  content?: T;
+  parentComment?: T;
+  isResolved?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notifications_select".
+ */
+export interface NotificationsSelect<T extends boolean = true> {
+  user?: T;
+  title?: T;
+  message?: T;
+  type?: T;
+  link?: T;
+  isRead?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "certificates_select".
+ */
+export interface CertificatesSelect<T extends boolean = true> {
+  user?: T;
+  type?: T;
+  title?: T;
+  relatedEntity?: T;
+  issuedAt?: T;
+  certificateNumber?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "streaks_select".
+ */
+export interface StreaksSelect<T extends boolean = true> {
+  user?: T;
+  currentStreak?: T;
+  longestStreak?: T;
+  lastActivityDate?: T;
+  totalActiveDays?: T;
   updatedAt?: T;
   createdAt?: T;
 }

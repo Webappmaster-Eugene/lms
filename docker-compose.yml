@@ -1,5 +1,6 @@
 services:
-  db:
+  lms-db:
+    container_name: lms-db
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -7,7 +8,7 @@ services:
       POSTGRES_USER: lms
       POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - lms-pgdata:/var/lib/postgresql/data
     networks:
       - dokploy-network
     healthcheck:
@@ -25,19 +26,20 @@ services:
         limits:
           memory: 512M
 
-  lms:
+  lms-app:
+    container_name: lms-app
     build:
       context: .
       args:
         - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-https://lms.nadtocheev.ru}
     restart: unless-stopped
     depends_on:
-      db:
+      lms-db:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://lms:${DB_PASSWORD:-changeme}@db:5432/lms_platform
+      - DATABASE_URL=postgresql://lms:${DB_PASSWORD:-changeme}@lms-db:5432/lms_platform
       - PAYLOAD_SECRET=${PAYLOAD_SECRET}
-      - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-https://lms.mentorcareer.ru}
+      - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-https://lms.nadtocheev.ru}
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER:-}
@@ -68,7 +70,7 @@ services:
         max-file: "5"
 
 volumes:
-  pgdata:
+  lms-pgdata:
   lms-media:
 
 networks:
