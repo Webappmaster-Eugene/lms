@@ -75,7 +75,7 @@ services:
   landing:
     container_name: lms-landing
     build:
-      context: ../landing
+      context: ./landing
     restart: unless-stopped
     networks:
       - dokploy-network

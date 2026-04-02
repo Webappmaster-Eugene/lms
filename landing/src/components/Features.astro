@@ -1,0 +1,53 @@
+---
+import FeatureCard from './FeatureCard.astro'
+
+const features = [
+  {
+    icon: 'book-open',
+    title: 'Структурированные курсы',
+    description: 'Роадмапы → Курсы → Секции → Уроки. Чёткий путь обучения с пререквизитами. Не потеряешься — всегда знаешь что дальше.',
+  },
+  {
+    icon: 'play-circle',
+    title: 'Видео с Яндекс.Диска',
+    description: 'Просмотр видеоуроков прямо на платформе. Под каждым видео — ссылка для скачивания. Хранение в облаке, не на сервере.',
+  },
+  {
+    icon: 'code',
+    title: 'Тренажёр кода',
+    description: 'Встроенный JavaScript-редактор с выполнением в браузере. Задачи по темам, подсказки, авто-проверка результата.',
+  },
+  {
+    icon: 'trophy',
+    title: 'Геймификация',
+    description: 'Баллы за уроки и задачи, достижения, стрики, лидерборд и сертификаты. Учёба — это ещё и соревнование с самим собой.',
+  },
+  {
+    icon: 'bar-chart',
+    title: 'Отслеживание прогресса',
+    description: 'Прогресс-бары на каждом уровне. Видишь что пройдено, что осталось. Возвращайся в любой момент — прогресс сохранён.',
+  },
+  {
+    icon: 'message-circle',
+    title: 'Приватные комментарии',
+    description: 'Задавай вопросы под уроком — видишь только ты и наставник. Плюс личные заметки к каждому уроку.',
+  },
+]
+---
+
+<section id="features" class="section-padding border-t border-white/5">
+  <div class="container-narrow">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl font-bold text-white sm:text-4xl">
+        Всё для эффективного обучения
+      </h2>
+      <p class="mt-4 text-lg text-gray-400 max-w-2xl mx-auto">
+        Платформа продумана до мелочей — от структуры курсов до мотивации через игровые механики
+      </p>
+    </div>
+
+    <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {features.map((f) => <FeatureCard {...f} />)}
+    </div>
+  </div>
+</section>

@@ -1,0 +1,57 @@
+---
+const steps = [
+  {
+    number: '01',
+    title: 'Выбери роадмап',
+    description: 'Frontend React или Backend Node.js — выбирай направление. Каждый роадмап включает интерактивную Miro-карту навыков.',
+  },
+  {
+    number: '02',
+    title: 'Проходи курсы по порядку',
+    description: 'Курсы разбиты на секции и уроки. Каждый урок — видео с Яндекс.Диска + учебные материалы. Всё по порядку.',
+  },
+  {
+    number: '03',
+    title: 'Отмечай прогресс',
+    description: 'Посмотрел урок — ставь галочку. Прогресс-бар покажет сколько осталось. Вернулся через неделю — продолжаешь с того же места.',
+  },
+  {
+    number: '04',
+    title: 'Практикуйся в тренажёре',
+    description: 'Задачи по темам с разными уровнями сложности. Пишешь код, запускаешь, получаешь результат. Есть подсказки если застрял.',
+  },
+  {
+    number: '05',
+    title: 'Набирай очки и достижения',
+    description: '10 XP за урок, бонусы за курсы и роадмапы, баллы за задачи тренажёра. Открывай достижения, поднимайся в лидерборде.',
+  },
+  {
+    number: '06',
+    title: 'Получай сертификат',
+    description: 'Завершил курс или роадмап — автоматически получаешь сертификат с уникальным номером. Подтверждение твоих знаний.',
+  },
+]
+---
+
+<section id="how-it-works" class="section-padding border-t border-white/5">
+  <div class="container-narrow">
+    <div class="text-center mb-16">
+      <h2 class="text-3xl font-bold text-white sm:text-4xl">
+        Как устроено обучение
+      </h2>
+      <p class="mt-4 text-lg text-gray-400">
+        Простой и понятный процесс — от выбора направления до сертификата
+      </p>
+    </div>
+
+    <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+      {steps.map((step) => (
+        <div class="relative">
+          <span class="text-5xl font-extrabold text-brand-600/20">{step.number}</span>
+          <h3 class="mt-2 text-lg font-semibold text-white">{step.title}</h3>
+          <p class="mt-2 text-sm text-gray-400 leading-relaxed">{step.description}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

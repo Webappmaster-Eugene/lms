@@ -1,0 +1,53 @@
+<section class="section-padding border-t border-white/5">
+  <div class="container-narrow">
+    <div class="grid gap-12 lg:grid-cols-2">
+      <!-- Problem -->
+      <div>
+        <div class="inline-flex items-center gap-2 rounded-full bg-red-500/10 border border-red-500/20 px-3 py-1 text-xs font-medium text-red-400 mb-4">
+          Проблема
+        </div>
+        <h2 class="text-2xl font-bold text-white sm:text-3xl">
+          Почему обычные курсы не работают?
+        </h2>
+        <ul class="mt-6 space-y-4">
+          {[
+            'Нет структуры — набор видео без логики прохождения',
+            'Нет прогресса — забыл где остановился, начинаешь заново',
+            'Нет практики — смотришь, но не пишешь код',
+            'Нет мотивации — скучно, нет обратной связи и соревнования',
+            'Нет персонализации — один формат для всех',
+          ].map((text) => (
+            <li class="flex items-start gap-3 text-gray-400">
+              <svg class="h-5 w-5 flex-shrink-0 text-red-400 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+              {text}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <!-- Solution -->
+      <div>
+        <div class="inline-flex items-center gap-2 rounded-full bg-green-500/10 border border-green-500/20 px-3 py-1 text-xs font-medium text-green-400 mb-4">
+          Решение
+        </div>
+        <h2 class="text-2xl font-bold text-white sm:text-3xl">
+          MentorCareer — всё иначе
+        </h2>
+        <ul class="mt-6 space-y-4">
+          {[
+            'Чёткий путь: роадмап → курс → секция → урок',
+            'Прогресс сохраняется — вернись когда угодно',
+            'Тренажёр кода — пишешь и запускаешь JS прямо в браузере',
+            'Баллы, достижения, стрики и лидерборд — учёба как игра',
+            'Приватные комментарии — задай вопрос наставнику лично',
+          ].map((text) => (
+            <li class="flex items-start gap-3 text-gray-300">
+              <svg class="h-5 w-5 flex-shrink-0 text-green-400 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"></path></svg>
+              {text}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
