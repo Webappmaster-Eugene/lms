@@ -1,6 +1,5 @@
 services:
   db:
-    container_name: lms-db
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -27,7 +26,6 @@ services:
           memory: 512M
 
   lms:
-    container_name: lms-app
     build:
       context: .
       args:
@@ -37,7 +35,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://lms:${DB_PASSWORD:-changeme}@lms-db:5432/lms_platform
+      - DATABASE_URL=postgresql://lms:${DB_PASSWORD:-changeme}@db:5432/lms_platform
       - PAYLOAD_SECRET=${PAYLOAD_SECRET}
       - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-https://lms.nadtocheev.ru}
       # Initial admin (required on first launch with empty DB)
@@ -73,10 +71,11 @@ services:
         max-file: "5"
 
   landing:
-    container_name: lms-landing
     build:
       context: ./landing
     restart: unless-stopped
+    ports:
+      - "3001:80"
     networks:
       - dokploy-network
     healthcheck:
