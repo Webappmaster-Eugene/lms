@@ -72,6 +72,28 @@ services:
         max-size: "50m"
         max-file: "5"
 
+  landing:
+    container_name: lms-landing
+    build:
+      context: ../landing
+    restart: unless-stopped
+    networks:
+      - dokploy-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   lms-pgdata:
   lms-media:
