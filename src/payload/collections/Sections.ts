@@ -4,11 +4,11 @@ import { isAdmin } from '@/payload/access/isAdmin'
 import { isAuthenticated } from '@/payload/access/isAuthenticated'
 import { generateSlug } from '@/payload/hooks/generateSlug'
 
-export const Roadmaps: CollectionConfig = {
-  slug: 'roadmaps',
+export const Sections: CollectionConfig = {
+  slug: 'sections',
   admin: {
     useAsTitle: 'title',
-    defaultColumns: ['title', 'order', 'isPublished', 'updatedAt'],
+    defaultColumns: ['title', 'course', 'order', 'isPublished', 'updatedAt'],
     group: 'Контент',
   },
   access: {
@@ -25,7 +25,7 @@ export const Roadmaps: CollectionConfig = {
       name: 'title',
       type: 'text',
       required: true,
-      label: 'Название',
+      label: 'Название секции',
     },
     {
       name: 'slug',
@@ -39,21 +39,17 @@ export const Roadmaps: CollectionConfig = {
       },
     },
     {
-      name: 'description',
-      type: 'richText',
-      label: 'Описание',
-    },
-    {
-      name: 'coverImage',
-      type: 'upload',
-      relationTo: 'media',
-      label: 'Обложка',
+      name: 'course',
+      type: 'relationship',
+      relationTo: 'courses',
+      required: true,
+      label: 'Курс',
     },
     {
       name: 'order',
       type: 'number',
       defaultValue: 0,
-      label: 'Порядок сортировки',
+      label: 'Порядок в курсе',
       admin: {
         position: 'sidebar',
       },
@@ -62,18 +58,16 @@ export const Roadmaps: CollectionConfig = {
       name: 'isPublished',
       type: 'checkbox',
       defaultValue: false,
-      label: 'Опубликован',
+      label: 'Опубликована',
       admin: {
         position: 'sidebar',
       },
     },
     {
-      name: 'miroEmbedUrl',
-      type: 'text',
-      label: 'Ссылка для встраивания Miro-доски',
-      admin: {
-        description: 'Формат: https://miro.com/app/board/... или https://miro.com/app/embed/... Если указана — отображается на странице роадмапа.',
-      },
+      name: 'description',
+      type: 'textarea',
+      label: 'Описание секции',
+      maxLength: 500,
     },
   ],
 }

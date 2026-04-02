@@ -11,7 +11,12 @@ export const Comments: CollectionConfig = {
   },
   access: {
     create: isAuthenticated,
-    read: isAuthenticated,
+    read: ({ req: { user } }) => {
+      if (!user) return false
+      if (user.role === 'admin') return true
+      // Студент видит только свои комментарии
+      return { user: { equals: user.id } }
+    },
     update: ({ req: { user } }) => {
       if (!user) return false
       if (user.role === 'admin') return true

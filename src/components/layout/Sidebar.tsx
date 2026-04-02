@@ -5,29 +5,52 @@ import { usePathname } from 'next/navigation'
 import {
   Award,
   BookOpen,
+  Code2,
+  GraduationCap,
+  HelpCircle,
   LayoutDashboard,
   Map,
+  MessageCircle,
   Trophy,
+  Upload,
   User,
   LogOut,
   Menu,
   X,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ThemeToggle } from './ThemeToggle'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Дашборд', icon: LayoutDashboard },
+  { href: '/courses', label: 'Курсы', icon: GraduationCap },
   { href: '/roadmaps', label: 'Роадмапы', icon: Map },
-  { href: '/certificates', label: 'Сертификаты', icon: Award },
+  { href: '/trainer', label: 'Тренажёр', icon: Code2 },
   { href: '/leaderboard', label: 'Лидерборд', icon: Trophy },
+  { href: '/certificates', label: 'Сертификаты', icon: Award },
   { href: '/profile', label: 'Профиль', icon: User },
+  { href: '/contacts', label: 'Контакты', icon: MessageCircle },
+  { href: '/help', label: 'Помощь', icon: HelpCircle },
+] as const
+
+const ADMIN_NAV_ITEMS = [
+  { href: '/admin/import-yandex', label: 'Импорт из YD', icon: Upload },
 ] as const
 
 export function Sidebar() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/users/me', { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.user?.role === 'admin') setIsAdmin(true)
+      })
+      .catch(() => {})
+  }, [])
 
   async function handleLogout() {
     await fetch('/api/users/logout', { method: 'POST', credentials: 'include' })
@@ -65,6 +88,32 @@ export function Sidebar() {
             </Link>
           )
         })}
+
+        {/* Admin-only links */}
+        {isAdmin && (
+          <>
+            <div className="my-2 border-t border-border" />
+            {ADMIN_NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+              const isActive = pathname.startsWith(href)
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                  {label}
+                </Link>
+              )
+            })}
+          </>
+        )}
       </nav>
 
       {/* Footer */}

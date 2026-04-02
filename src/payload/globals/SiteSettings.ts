@@ -55,6 +55,46 @@ export const SiteSettings: GlobalConfig = {
           required: true,
           label: 'Бонус за роадмап',
         },
+        {
+          name: 'trainerTaskCompleted',
+          type: 'number',
+          defaultValue: 10,
+          required: true,
+          label: 'Баллы за задачу тренажёра',
+        },
+      ],
+    },
+    {
+      type: 'group',
+      name: 'contacts',
+      label: 'Контактная информация',
+      fields: [
+        {
+          name: 'telegramChannel',
+          type: 'text',
+          label: 'Telegram-канал',
+          admin: {
+            description: 'Ссылка на Telegram-канал (например: https://t.me/your_channel)',
+          },
+        },
+        {
+          name: 'telegramGroup',
+          type: 'text',
+          label: 'Telegram-группа',
+          admin: {
+            description: 'Ссылка на Telegram-группу для учеников',
+          },
+        },
+        {
+          name: 'website',
+          type: 'text',
+          label: 'Веб-сайт',
+        },
+        {
+          name: 'email',
+          type: 'text',
+          label: 'Email для связи',
+        },
       ],
     },
   ],

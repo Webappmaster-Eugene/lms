@@ -70,6 +70,7 @@ export interface Config {
     users: User;
     roadmaps: Roadmap;
     courses: Course;
+    sections: Section;
     lessons: Lesson;
     media: Media;
     'user-progress': UserProgress;
@@ -81,6 +82,11 @@ export interface Config {
     notifications: Notification;
     certificates: Certificate;
     streaks: Streak;
+    'trainer-topics': TrainerTopic;
+    'trainer-tasks': TrainerTask;
+    'user-trainer-progress': UserTrainerProgress;
+    'faq-items': FaqItem;
+    'yandex-disk-imports': YandexDiskImport;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
@@ -90,6 +96,7 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     roadmaps: RoadmapsSelect<false> | RoadmapsSelect<true>;
     courses: CoursesSelect<false> | CoursesSelect<true>;
+    sections: SectionsSelect<false> | SectionsSelect<true>;
     lessons: LessonsSelect<false> | LessonsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     'user-progress': UserProgressSelect<false> | UserProgressSelect<true>;
@@ -101,6 +108,11 @@ export interface Config {
     notifications: NotificationsSelect<false> | NotificationsSelect<true>;
     certificates: CertificatesSelect<false> | CertificatesSelect<true>;
     streaks: StreaksSelect<false> | StreaksSelect<true>;
+    'trainer-topics': TrainerTopicsSelect<false> | TrainerTopicsSelect<true>;
+    'trainer-tasks': TrainerTasksSelect<false> | TrainerTasksSelect<true>;
+    'user-trainer-progress': UserTrainerProgressSelect<false> | UserTrainerProgressSelect<true>;
+    'faq-items': FaqItemsSelect<false> | FaqItemsSelect<true>;
+    'yandex-disk-imports': YandexDiskImportsSelect<false> | YandexDiskImportsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -231,6 +243,10 @@ export interface Roadmap {
   coverImage?: (number | null) | Media;
   order?: number | null;
   isPublished?: boolean | null;
+  /**
+   * Формат: https://miro.com/app/board/... или https://miro.com/app/embed/... Если указана — отображается на странице роадмапа.
+   */
+  miroEmbedUrl?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -274,6 +290,24 @@ export interface Course {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sections".
+ */
+export interface Section {
+  id: number;
+  title: string;
+  /**
+   * Генерируется автоматически из названия
+   */
+  slug: string;
+  course: number | Course;
+  order?: number | null;
+  isPublished?: boolean | null;
+  description?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "lessons".
  */
 export interface Lesson {
@@ -285,6 +319,10 @@ export interface Lesson {
   slug: string;
   description?: string | null;
   course: number | Course;
+  /**
+   * Секция внутри курса. Если не указана — урок отображается без группировки.
+   */
+  section?: (number | null) | Section;
   order?: number | null;
   isPublished?: boolean | null;
   estimatedMinutes?: number | null;
@@ -406,7 +444,7 @@ export interface Achievement {
   description: string;
   icon?: (number | null) | Media;
   pointsReward?: number | null;
-  criteriaType: 'lesson_count' | 'course_completion' | 'roadmap_completion' | 'total_points';
+  criteriaType: 'lesson_count' | 'course_completion' | 'roadmap_completion' | 'total_points' | 'trainer_task_count';
   /**
    * Для lesson_count: кол-во уроков. Для total_points: кол-во баллов. Для completion: 1.
    */
@@ -439,7 +477,13 @@ export interface PointsTransaction {
   id: number;
   user: number | User;
   amount: number;
-  reason: 'lesson_completed' | 'course_completed' | 'roadmap_completed' | 'achievement_unlocked' | 'admin_adjustment';
+  reason:
+    | 'lesson_completed'
+    | 'course_completed'
+    | 'roadmap_completed'
+    | 'achievement_unlocked'
+    | 'admin_adjustment'
+    | 'trainer_task_completed';
   /**
    * ID урока, курса, роадмапа или достижения
    */
@@ -486,7 +530,14 @@ export interface Notification {
   user: number | User;
   title: string;
   message: string;
-  type: 'info' | 'achievement' | 'course_completed' | 'roadmap_completed' | 'comment';
+  type:
+    | 'info'
+    | 'achievement'
+    | 'course_completed'
+    | 'roadmap_completed'
+    | 'comment'
+    | 'trainer_task'
+    | 'support_message';
   link?: string | null;
   isRead?: boolean | null;
   updatedAt: string;
@@ -523,6 +574,137 @@ export interface Streak {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trainer-topics".
+ */
+export interface TrainerTopic {
+  id: number;
+  title: string;
+  /**
+   * Генерируется автоматически из названия
+   */
+  slug: string;
+  description?: string | null;
+  /**
+   * Emoji или имя иконки lucide (например: "code", "braces", "terminal")
+   */
+  icon?: string | null;
+  order?: number | null;
+  isPublished?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trainer-tasks".
+ */
+export interface TrainerTask {
+  id: number;
+  title: string;
+  /**
+   * Генерируется автоматически из названия
+   */
+  slug: string;
+  topic: number | TrainerTopic;
+  order?: number | null;
+  difficulty: 'easy' | 'medium' | 'hard';
+  description: {
+    root: {
+      type: string;
+      children: {
+        type: string;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  };
+  /**
+   * Шаблон кода, который увидит пользователь. Используйте комментарии для подсказок.
+   */
+  starterCode: string;
+  /**
+   * Ожидаемый вывод console.log. Каждая строка — один вызов console.log.
+   */
+  expectedOutput: string;
+  hints?:
+    | {
+        hint: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Только для администратора. Не показывается пользователям.
+   */
+  solutionCode?: string | null;
+  pointsReward?: number | null;
+  isPublished?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user-trainer-progress".
+ */
+export interface UserTrainerProgress {
+  id: number;
+  user: number | User;
+  task: number | TrainerTask;
+  isCompleted?: boolean | null;
+  userCode?: string | null;
+  completedAt?: string | null;
+  attempts?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "faq-items".
+ */
+export interface FaqItem {
+  id: number;
+  question: string;
+  answer: {
+    root: {
+      type: string;
+      children: {
+        type: string;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  };
+  order?: number | null;
+  isPublished?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "yandex-disk-imports".
+ */
+export interface YandexDiskImport {
+  id: number;
+  publicUrl: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  course: number | Course;
+  sectionsCreated?: number | null;
+  lessonsCreated?: number | null;
+  errorLog?: string | null;
+  importedBy: number | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-locked-documents".
  */
 export interface PayloadLockedDocument {
@@ -539,6 +721,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'courses';
         value: number | Course;
+      } | null)
+    | ({
+        relationTo: 'sections';
+        value: number | Section;
       } | null)
     | ({
         relationTo: 'lessons';
@@ -583,6 +769,26 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'streaks';
         value: number | Streak;
+      } | null)
+    | ({
+        relationTo: 'trainer-topics';
+        value: number | TrainerTopic;
+      } | null)
+    | ({
+        relationTo: 'trainer-tasks';
+        value: number | TrainerTask;
+      } | null)
+    | ({
+        relationTo: 'user-trainer-progress';
+        value: number | UserTrainerProgress;
+      } | null)
+    | ({
+        relationTo: 'faq-items';
+        value: number | FaqItem;
+      } | null)
+    | ({
+        relationTo: 'yandex-disk-imports';
+        value: number | YandexDiskImport;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -659,6 +865,7 @@ export interface RoadmapsSelect<T extends boolean = true> {
   coverImage?: T;
   order?: T;
   isPublished?: T;
+  miroEmbedUrl?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -681,6 +888,20 @@ export interface CoursesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sections_select".
+ */
+export interface SectionsSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  course?: T;
+  order?: T;
+  isPublished?: T;
+  description?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "lessons_select".
  */
 export interface LessonsSelect<T extends boolean = true> {
@@ -688,6 +909,7 @@ export interface LessonsSelect<T extends boolean = true> {
   slug?: T;
   description?: T;
   course?: T;
+  section?: T;
   order?: T;
   isPublished?: T;
   estimatedMinutes?: T;
@@ -933,6 +1155,86 @@ export interface StreaksSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trainer-topics_select".
+ */
+export interface TrainerTopicsSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  description?: T;
+  icon?: T;
+  order?: T;
+  isPublished?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trainer-tasks_select".
+ */
+export interface TrainerTasksSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  topic?: T;
+  order?: T;
+  difficulty?: T;
+  description?: T;
+  starterCode?: T;
+  expectedOutput?: T;
+  hints?:
+    | T
+    | {
+        hint?: T;
+        id?: T;
+      };
+  solutionCode?: T;
+  pointsReward?: T;
+  isPublished?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user-trainer-progress_select".
+ */
+export interface UserTrainerProgressSelect<T extends boolean = true> {
+  user?: T;
+  task?: T;
+  isCompleted?: T;
+  userCode?: T;
+  completedAt?: T;
+  attempts?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "faq-items_select".
+ */
+export interface FaqItemsSelect<T extends boolean = true> {
+  question?: T;
+  answer?: T;
+  order?: T;
+  isPublished?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "yandex-disk-imports_select".
+ */
+export interface YandexDiskImportsSelect<T extends boolean = true> {
+  publicUrl?: T;
+  status?: T;
+  course?: T;
+  sectionsCreated?: T;
+  lessonsCreated?: T;
+  errorLog?: T;
+  importedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-locked-documents_select".
  */
 export interface PayloadLockedDocumentsSelect<T extends boolean = true> {
@@ -976,6 +1278,19 @@ export interface SiteSetting {
     lessonCompleted: number;
     courseCompleted: number;
     roadmapCompleted: number;
+    trainerTaskCompleted: number;
+  };
+  contacts?: {
+    /**
+     * Ссылка на Telegram-канал (например: https://t.me/your_channel)
+     */
+    telegramChannel?: string | null;
+    /**
+     * Ссылка на Telegram-группу для учеников
+     */
+    telegramGroup?: string | null;
+    website?: string | null;
+    email?: string | null;
   };
   updatedAt?: string | null;
   createdAt?: string | null;
@@ -994,6 +1309,15 @@ export interface SiteSettingsSelect<T extends boolean = true> {
         lessonCompleted?: T;
         courseCompleted?: T;
         roadmapCompleted?: T;
+        trainerTaskCompleted?: T;
+      };
+  contacts?:
+    | T
+    | {
+        telegramChannel?: T;
+        telegramGroup?: T;
+        website?: T;
+        email?: T;
       };
   updatedAt?: T;
   createdAt?: T;

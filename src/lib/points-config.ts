@@ -6,6 +6,7 @@ export const DEFAULT_POINTS = {
   LESSON_COMPLETED: 10,
   COURSE_COMPLETED: 50,
   ROADMAP_COMPLETED: 200,
+  TRAINER_TASK_COMPLETED: 10,
 } as const
 
 export type PointsReason =
@@ -14,3 +15,4 @@ export type PointsReason =
   | 'roadmap_completed'
   | 'achievement_unlocked'
   | 'admin_adjustment'
+  | 'trainer_task_completed'

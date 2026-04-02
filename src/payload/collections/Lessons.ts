@@ -58,10 +58,19 @@ export const Lessons: CollectionConfig = {
       label: 'Курс',
     },
     {
+      name: 'section',
+      type: 'relationship',
+      relationTo: 'sections',
+      label: 'Секция',
+      admin: {
+        description: 'Секция внутри курса. Если не указана — урок отображается без группировки.',
+      },
+    },
+    {
       name: 'order',
       type: 'number',
       defaultValue: 0,
-      label: 'Порядок в курсе',
+      label: 'Порядок в секции',
       admin: {
         position: 'sidebar',
       },

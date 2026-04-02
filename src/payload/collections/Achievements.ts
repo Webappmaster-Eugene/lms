@@ -56,6 +56,7 @@ export const Achievements: CollectionConfig = {
         { label: 'Завершение курса', value: 'course_completion' },
         { label: 'Завершение роадмапа', value: 'roadmap_completion' },
         { label: 'Общее количество баллов', value: 'total_points' },
+        { label: 'Количество решённых задач тренажёра', value: 'trainer_task_count' },
       ],
     },
     {

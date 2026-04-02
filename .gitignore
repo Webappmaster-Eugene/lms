@@ -26,6 +26,9 @@ Thumbs.db
 dist/
 build/
 
+# Claude Code secrets
+.env.claude.local
+
 # Misc
 *.log
 npm-debug.log*

@@ -46,6 +46,7 @@ export const PointsTransactions: CollectionConfig = {
         { label: 'Роадмап завершён', value: 'roadmap_completed' },
         { label: 'Достижение получено', value: 'achievement_unlocked' },
         { label: 'Корректировка администратором', value: 'admin_adjustment' },
+        { label: 'Задача тренажёра решена', value: 'trainer_task_completed' },
       ],
     },
     {

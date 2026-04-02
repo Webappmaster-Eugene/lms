@@ -4,12 +4,12 @@ import { isAdmin } from '@/payload/access/isAdmin'
 import { isAuthenticated } from '@/payload/access/isAuthenticated'
 import { generateSlug } from '@/payload/hooks/generateSlug'
 
-export const Roadmaps: CollectionConfig = {
-  slug: 'roadmaps',
+export const TrainerTopics: CollectionConfig = {
+  slug: 'trainer-topics',
   admin: {
     useAsTitle: 'title',
     defaultColumns: ['title', 'order', 'isPublished', 'updatedAt'],
-    group: 'Контент',
+    group: 'Тренажёр',
   },
   access: {
     create: isAdmin,
@@ -25,7 +25,7 @@ export const Roadmaps: CollectionConfig = {
       name: 'title',
       type: 'text',
       required: true,
-      label: 'Название',
+      label: 'Название темы',
     },
     {
       name: 'slug',
@@ -40,20 +40,23 @@ export const Roadmaps: CollectionConfig = {
     },
     {
       name: 'description',
-      type: 'richText',
-      label: 'Описание',
+      type: 'textarea',
+      label: 'Описание темы',
+      maxLength: 500,
     },
     {
-      name: 'coverImage',
-      type: 'upload',
-      relationTo: 'media',
-      label: 'Обложка',
+      name: 'icon',
+      type: 'text',
+      label: 'Иконка',
+      admin: {
+        description: 'Emoji или имя иконки lucide (например: "code", "braces", "terminal")',
+      },
     },
     {
       name: 'order',
       type: 'number',
       defaultValue: 0,
-      label: 'Порядок сортировки',
+      label: 'Порядок',
       admin: {
         position: 'sidebar',
       },
@@ -62,17 +65,9 @@ export const Roadmaps: CollectionConfig = {
       name: 'isPublished',
       type: 'checkbox',
       defaultValue: false,
-      label: 'Опубликован',
+      label: 'Опубликована',
       admin: {
         position: 'sidebar',
-      },
-    },
-    {
-      name: 'miroEmbedUrl',
-      type: 'text',
-      label: 'Ссылка для встраивания Miro-доски',
-      admin: {
-        description: 'Формат: https://miro.com/app/board/... или https://miro.com/app/embed/... Если указана — отображается на странице роадмапа.',
       },
     },
   ],

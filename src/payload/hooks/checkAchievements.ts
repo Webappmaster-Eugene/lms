@@ -24,7 +24,7 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
 
   return withSpan('hook.checkAchievements', { 'user.id': userId }, async () => {
     // Загружаем данные параллельно
-    const [achievements, userAchievements, user, completedLessons, courseTransactions, roadmapTransactions] =
+    const [achievements, userAchievements, user, completedLessons, courseTransactions, roadmapTransactions, trainerProgress] =
       await Promise.all([
         req.payload.find({
           collection: 'achievements',
@@ -61,6 +61,14 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
           },
           limit: 1000,
         }),
+        req.payload.find({
+          collection: 'user-trainer-progress',
+          where: {
+            user: { equals: userId },
+            isCompleted: { equals: true },
+          },
+          limit: 0, // только totalDocs
+        }),
       ])
 
     const unlockedIds = new Set(
@@ -86,6 +94,7 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
       completedLessonCount: completedLessons.totalDocs,
       completedCourseCount: courseTransactions.totalDocs,
       completedRoadmapCount: roadmapTransactions.totalDocs,
+      completedTrainerTaskCount: trainerProgress.totalDocs,
       totalPoints: user.totalPoints ?? 0,
       completedCourseEntityIds,
       completedRoadmapEntityIds,
@@ -154,6 +163,7 @@ type UserStats = {
   completedLessonCount: number
   completedCourseCount: number
   completedRoadmapCount: number
+  completedTrainerTaskCount: number
   totalPoints: number
   completedCourseEntityIds: Set<string>
   completedRoadmapEntityIds: Set<string>
@@ -183,6 +193,9 @@ function checkCriteria(
 
     case 'total_points':
       return stats.totalPoints >= criteriaValue
+
+    case 'trainer_task_count':
+      return stats.completedTrainerTaskCount >= criteriaValue
 
     default:
       return false

@@ -12,6 +12,7 @@ import { migrations } from './migrations'
 import { Users } from '@/payload/collections/Users'
 import { Roadmaps } from '@/payload/collections/Roadmaps'
 import { Courses } from '@/payload/collections/Courses'
+import { Sections } from '@/payload/collections/Sections'
 import { Lessons } from '@/payload/collections/Lessons'
 import { Media } from '@/payload/collections/Media'
 import { UserProgress } from '@/payload/collections/UserProgress'
@@ -23,6 +24,11 @@ import { Comments } from '@/payload/collections/Comments'
 import { Notifications } from '@/payload/collections/Notifications'
 import { Certificates } from '@/payload/collections/Certificates'
 import { Streaks } from '@/payload/collections/Streaks'
+import { TrainerTopics } from '@/payload/collections/TrainerTopics'
+import { TrainerTasks } from '@/payload/collections/TrainerTasks'
+import { UserTrainerProgress } from '@/payload/collections/UserTrainerProgress'
+import { FaqItems } from '@/payload/collections/FaqItems'
+import { YandexDiskImports } from '@/payload/collections/YandexDiskImports'
 import { SiteSettings } from '@/payload/globals/SiteSettings'
 
 const filename = fileURLToPath(import.meta.url)
@@ -44,6 +50,7 @@ export default buildConfig({
     Users,
     Roadmaps,
     Courses,
+    Sections,
     Lessons,
     Media,
     UserProgress,
@@ -55,6 +62,11 @@ export default buildConfig({
     Notifications,
     Certificates,
     Streaks,
+    TrainerTopics,
+    TrainerTasks,
+    UserTrainerProgress,
+    FaqItems,
+    YandexDiskImports,
   ],
 
   globals: [SiteSettings],

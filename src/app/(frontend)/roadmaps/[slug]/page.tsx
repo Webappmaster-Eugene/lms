@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, BookOpen, CheckCircle2, Clock, Lock } from 'lucide-react'
+import { MiroEmbed } from '@/components/lesson/MiroEmbed'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -164,6 +165,18 @@ export default async function RoadmapDetailPage({ params }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Miro embed */}
+      {roadmap.miroEmbedUrl && typeof roadmap.miroEmbedUrl === 'string' && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <h2 className="text-lg font-semibold text-foreground mb-3">Карта навыков</h2>
+          <MiroEmbed
+            title={`${roadmap.title} — Карта навыков`}
+            embedUrl={roadmap.miroEmbedUrl}
+            height={600}
+          />
+        </div>
+      )}
 
       <div className="space-y-3">
         {coursesWithProgress.map((course) => {

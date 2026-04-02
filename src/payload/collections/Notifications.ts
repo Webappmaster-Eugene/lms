@@ -47,6 +47,8 @@ export const Notifications: CollectionConfig = {
         { label: 'Курс завершён', value: 'course_completed' },
         { label: 'Роадмап завершён', value: 'roadmap_completed' },
         { label: 'Комментарий', value: 'comment' },
+        { label: 'Задача тренажёра', value: 'trainer_task' },
+        { label: 'Обращение в поддержку', value: 'support_message' },
       ],
     },
     {
