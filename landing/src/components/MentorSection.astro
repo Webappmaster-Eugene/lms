@@ -1,0 +1,80 @@
+<section class="section-padding border-t border-white/5 relative overflow-hidden">
+  <div class="absolute top-1/2 right-0 -translate-y-1/2 h-[400px] w-[400px] rounded-full bg-brand-600/10 blur-[120px] -z-10"></div>
+
+  <div class="container-narrow">
+    <div class="grid gap-12 lg:grid-cols-5 items-start">
+      <!-- Photo placeholder + credentials -->
+      <div class="lg:col-span-2 flex flex-col items-center text-center">
+        <div class="h-32 w-32 rounded-full bg-gradient-to-br from-brand-500 to-blue-600 flex items-center justify-center text-4xl font-bold text-white mb-4">
+          ЕН
+        </div>
+        <h3 class="text-xl font-bold text-white">Евгений Надточеев</h3>
+        <p class="text-sm text-brand-400 mt-1">Fullstack Developer</p>
+        <p class="text-sm text-gray-500 mt-1">5+ лет коммерческой разработки</p>
+
+        <div class="mt-6 flex flex-wrap justify-center gap-2">
+          {['React', 'Next.js', 'TypeScript', 'Node.js', 'NestJS', 'Go', 'PostgreSQL', 'Redis', 'Kafka', 'Kubernetes', 'Docker'].map((tech) => (
+            <span class="rounded-full bg-white/5 border border-white/10 px-2.5 py-0.5 text-xs text-gray-400">{tech}</span>
+          ))}
+        </div>
+
+        <a href="https://nadtocheev.ru" target="_blank" rel="noopener noreferrer" class="mt-4 text-sm text-brand-400 hover:text-brand-300 transition-colors inline-flex items-center gap-1">
+          nadtocheev.ru
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" x2="21" y1="14" y2="3"></line></svg>
+        </a>
+      </div>
+
+      <!-- Experience details -->
+      <div class="lg:col-span-3">
+        <div class="inline-flex items-center gap-2 rounded-full bg-brand-500/10 border border-brand-500/20 px-3 py-1 text-xs font-medium text-brand-400 mb-4">
+          О менторе
+        </div>
+        <h2 class="text-3xl font-bold text-white sm:text-4xl">
+          Практик, а не теоретик
+        </h2>
+        <p class="mt-4 text-lg text-gray-400">
+          Не просто преподаватель — действующий разработчик, который каждый день пишет
+          production-код и знает, что реально нужно на рынке.
+        </p>
+
+        <div class="mt-8 grid gap-4 sm:grid-cols-2">
+          {[
+            {
+              value: '5+',
+              label: 'лет в разработке',
+              desc: 'Enterprise, fintech, стартапы',
+            },
+            {
+              value: '30+',
+              label: 'консультаций',
+              desc: 'Карьерные и технические',
+            },
+            {
+              value: '2 года',
+              label: 'преподавания',
+              desc: 'Purple School, Sberbank School 21',
+            },
+            {
+              value: '10+',
+              label: 'микросервисов',
+              desc: 'В production, с мониторингом',
+            },
+          ].map(({ value, label, desc }) => (
+            <div class="rounded-xl border border-white/5 bg-white/5 p-4">
+              <p class="text-2xl font-bold text-brand-400">{value}</p>
+              <p class="text-sm font-medium text-white mt-1">{label}</p>
+              <p class="text-xs text-gray-500 mt-0.5">{desc}</p>
+            </div>
+          ))}
+        </div>
+
+        <div class="mt-6 rounded-xl border border-white/5 bg-white/5 p-4">
+          <p class="text-sm text-gray-400">
+            <span class="text-white font-medium">Ключевой проект:</span> bnmap.pro — сервис с 40 000+ DAU
+            и нагрузкой 5 000 req/sec. Полный цикл: от архитектуры до Kubernetes-деплоя.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

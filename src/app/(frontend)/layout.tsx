@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     template: '%s — MentorCareer LMS',
     default: 'MentorCareer LMS',
   },
-  description: 'Платформа обучения MentorCareer',
+  description: 'Платформа обучения MentorCareer — курсы Frontend и Backend с тренажёром кода, геймификацией и сертификатами',
 }
 
 export default function FrontendLayout({ children }: { children: React.ReactNode }) {

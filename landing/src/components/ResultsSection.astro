@@ -1,0 +1,94 @@
+<section class="section-padding border-t border-white/5 relative overflow-hidden">
+  <div class="absolute bottom-0 right-0 h-[400px] w-[400px] rounded-full bg-yellow-500/10 blur-[120px] -z-10"></div>
+
+  <div class="container-narrow">
+    <div class="text-center mb-12">
+      <div class="inline-flex items-center gap-2 rounded-full bg-yellow-500/10 border border-yellow-500/20 px-3 py-1 text-xs font-medium text-yellow-400 mb-4">
+        Результаты
+      </div>
+      <h2 class="text-3xl font-bold text-white sm:text-4xl">
+        Цифры говорят сами
+      </h2>
+      <p class="mt-4 text-lg text-gray-400 max-w-2xl mx-auto">
+        Реальные результаты менторства — от первого урока до оффера
+      </p>
+    </div>
+
+    <!-- Key metrics -->
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-12">
+      {[
+        { value: '6-7', unit: 'мес', label: 'До трудоустройства', desc: 'Средний срок до оффера' },
+        { value: '30+', unit: '', label: 'Консультаций', desc: 'Платных карьерных сессий' },
+        { value: '50+', unit: 'ч', label: 'Менторинга', desc: 'Часов индивидуальной работы' },
+        { value: '50K→320K', unit: '₽', label: 'Рост дохода', desc: 'Результат карьерного пути' },
+      ].map(({ value, unit, label, desc }) => (
+        <div class="rounded-xl border border-white/5 bg-white/5 p-5 text-center">
+          <p class="text-3xl font-extrabold text-white">
+            {value}<span class="text-lg text-gray-500 ml-1">{unit}</span>
+          </p>
+          <p class="text-sm font-medium text-white mt-2">{label}</p>
+          <p class="text-xs text-gray-500 mt-0.5">{desc}</p>
+        </div>
+      ))}
+    </div>
+
+    <!-- Career programs -->
+    <div class="grid gap-6 sm:grid-cols-2">
+      <div class="rounded-2xl border border-brand-500/20 bg-gradient-to-b from-brand-500/5 to-transparent p-6">
+        <div class="inline-flex items-center gap-2 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-400 mb-4">
+          Программа
+        </div>
+        <h3 class="text-xl font-bold text-white">Смена профессии в IT</h3>
+        <p class="mt-2 text-sm text-gray-400">
+          Для тех, кто хочет войти в IT с нуля. Полный цикл подготовки:
+          от основ программирования до успешного прохождения собеседований.
+        </p>
+        <ul class="mt-4 space-y-2">
+          {[
+            'Индивидуальная программа обучения',
+            'Реальные проекты в портфолио',
+            'Подготовка к техническим интервью',
+            'Сопровождение до получения оффера',
+          ].map((text) => (
+            <li class="flex items-start gap-2 text-sm text-gray-300">
+              <svg class="h-4 w-4 flex-shrink-0 text-brand-400 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"></path></svg>
+              {text}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div class="rounded-2xl border border-green-500/20 bg-gradient-to-b from-green-500/5 to-transparent p-6">
+        <div class="inline-flex items-center gap-2 rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400 mb-4">
+          Программа
+        </div>
+        <h3 class="text-xl font-bold text-white">Рост junior-разработчика</h3>
+        <p class="mt-2 text-sm text-gray-400">
+          Для тех, кто уже в IT, но хочет вырасти. Углубление знаний,
+          прокачка архитектурного мышления и подготовка к middle-позициям.
+        </p>
+        <ul class="mt-4 space-y-2">
+          {[
+            'Ревью кода и архитектурных решений',
+            'Практика на production-задачах',
+            'Разбор сложных концепций 1-на-1',
+            'Карьерная стратегия и рост оклада',
+          ].map((text) => (
+            <li class="flex items-start gap-2 text-sm text-gray-300">
+              <svg class="h-4 w-4 flex-shrink-0 text-green-400 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"></path></svg>
+              {text}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="mt-12 text-center">
+      <a href="https://nadtocheev.ru" target="_blank" rel="noopener noreferrer" class="btn-secondary text-base px-8 py-4 inline-flex items-center gap-2">
+        Подробнее на сайте
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" x2="21" y1="14" y2="3"></line></svg>
+      </a>
+    </div>
+  </div>
+</section>

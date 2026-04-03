@@ -75,10 +75,10 @@ export const seed = async (payload: Payload) => {
         trainerTaskCompleted: 10,
       },
       contacts: {
-        telegramChannel: 'https://t.me/mentorcareer',
+        telegramChannel: 'https://t.me/eugene_nadtocheev',
         telegramGroup: 'https://t.me/mentorcareer_chat',
-        website: 'https://mentorcareer.ru',
-        email: 'support@mentorcareer.ru',
+        website: 'https://nadtocheev.ru',
+        email: 'johnn.hotmail@mail.ru',
       },
     },
   })

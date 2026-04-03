@@ -84,7 +84,7 @@ export default buildConfig({
 
   email: process.env.SMTP_HOST
     ? nodemailerAdapter({
-        defaultFromAddress: process.env.EMAIL_FROM_ADDRESS ?? 'noreply@mentorcareer.ru',
+        defaultFromAddress: process.env.EMAIL_FROM_ADDRESS ?? 'noreply@nadtocheev.ru',
         defaultFromName: process.env.EMAIL_FROM_NAME ?? 'MentorCareer LMS',
         transport: nodemailer.createTransport({
           host: process.env.SMTP_HOST,

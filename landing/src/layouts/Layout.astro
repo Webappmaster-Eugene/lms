@@ -5,9 +5,12 @@ interface Props {
 }
 
 const {
-  title = 'MentorCareer — Обучающая платформа с тренажёром кода',
-  description = 'Курсы, видеоуроки, тренажёр JavaScript, достижения и сертификаты. Персональная LMS с геймификацией и отслеживанием прогресса.',
+  title = 'MentorCareer — Обучение Frontend и Backend с менторством | Трудоустройство в IT',
+  description = 'Персональное менторство по Frontend (React, TypeScript, Next.js) и Backend (Node.js, NestJS, SQL). Трудоустройство за 6-7 месяцев. LMS-платформа с тренажёром кода, геймификацией и сертификатами. Москва.',
 } = Astro.props
+
+const siteUrl = 'https://promo.nadtocheev.ru'
+const canonicalUrl = new URL(Astro.url.pathname, siteUrl).href
 ---
 
 <!doctype html>
@@ -18,17 +21,101 @@ const {
     <meta name="description" content={description} />
     <meta name="theme-color" content="#0f172a" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={canonicalUrl} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+    <!-- GEO meta -->
+    <meta name="geo.region" content="RU-MOW" />
+    <meta name="geo.placename" content="Moscow" />
+    <meta name="geo.position" content="55.7558;37.6173" />
+    <meta name="ICBM" content="55.7558, 37.6173" />
 
     <!-- Open Graph -->
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="ru_RU" />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:site_name" content="MentorCareer" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
 
     <title>{title}</title>
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "EducationalOrganization",
+          "name": "MentorCareer",
+          "url": siteUrl,
+          "description": "Персональное менторство по Frontend и Backend разработке с гарантией трудоустройства",
+          "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "Москва",
+            "addressCountry": "RU"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 55.7558,
+            "longitude": 37.6173
+          },
+          "areaServed": {
+            "@type": "Country",
+            "name": "Russia"
+          },
+          "sameAs": [
+            "https://nadtocheev.ru",
+            "https://t.me/eugene_nadtocheev"
+          ]
+        },
+        {
+          "@type": "Person",
+          "name": "Евгений Надточеев",
+          "jobTitle": "Fullstack Developer, Ментор",
+          "url": "https://nadtocheev.ru",
+          "knowsAbout": ["React", "TypeScript", "Next.js", "Node.js", "NestJS", "PostgreSQL", "Kubernetes", "Docker"],
+          "sameAs": [
+            "https://nadtocheev.ru",
+            "https://t.me/eugene_nadtocheev"
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "name": "MentorCareer",
+          "url": siteUrl,
+          "inLanguage": "ru"
+        },
+        {
+          "@type": "Course",
+          "name": "Frontend React",
+          "description": "Полный курс Frontend-разработки: React, TypeScript, Next.js — от основ до production-уровня",
+          "provider": {
+            "@type": "EducationalOrganization",
+            "name": "MentorCareer"
+          },
+          "educationalLevel": "Beginner to Intermediate",
+          "inLanguage": "ru"
+        },
+        {
+          "@type": "Course",
+          "name": "Backend Node.js",
+          "description": "Курс Backend-разработки: Node.js, NestJS, PostgreSQL, Docker, Kubernetes",
+          "provider": {
+            "@type": "EducationalOrganization",
+            "name": "MentorCareer"
+          },
+          "educationalLevel": "Beginner to Intermediate",
+          "inLanguage": "ru"
+        }
+      ]
+    })} />
   </head>
   <body>
     <slot />
