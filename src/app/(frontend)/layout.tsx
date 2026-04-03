@@ -29,11 +29,11 @@ export default function FrontendLayout({ children }: { children: React.ReactNode
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           <ToastProvider>
             <SidebarProvider>
-              <div className="flex min-h-screen">
+              <div className="flex min-h-screen overflow-x-hidden">
                 <Sidebar />
-                <div className="flex flex-1 flex-col lg:ml-64">
+                <div className="flex min-w-0 flex-1 flex-col lg:ml-64">
                   <Header />
-                  <main className="flex-1 px-4 py-6 pb-24 lg:px-8 lg:pb-6">{children}</main>
+                  <main className="flex-1 overflow-x-hidden px-4 py-6 pb-24 lg:px-8 lg:pb-6">{children}</main>
                 </div>
                 <BottomNav />
               </div>
