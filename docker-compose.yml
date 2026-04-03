@@ -1,5 +1,5 @@
 services:
-  db:
+  lms-mentor-db:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -25,17 +25,17 @@ services:
         limits:
           memory: 512M
 
-  lms:
+  lms-mentor-app:
     build:
       context: .
       args:
         - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-https://lms.nadtocheev.ru}
     restart: unless-stopped
     depends_on:
-      db:
+      lms-mentor-db:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://lms:${DB_PASSWORD:-changeme}@db:5432/lms_platform
+      - DATABASE_URL=postgresql://lms:${DB_PASSWORD:-changeme}@lms-mentor-db:5432/lms_platform
       - PAYLOAD_SECRET=${PAYLOAD_SECRET}
       - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-https://lms.nadtocheev.ru}
       # Initial admin (required on first launch with empty DB)
@@ -70,12 +70,10 @@ services:
         max-size: "50m"
         max-file: "5"
 
-  landing:
+  lms-mentor-landing:
     build:
       context: ./landing
     restart: unless-stopped
-    ports:
-      - "3001:80"
     networks:
       - dokploy-network
     healthcheck:
