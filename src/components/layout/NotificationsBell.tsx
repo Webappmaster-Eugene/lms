@@ -74,7 +74,7 @@ export function NotificationsBell() {
     <div ref={dropdownRef} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="relative flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        className="relative flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         aria-label="Уведомления"
       >
         <Bell className="h-5 w-5" />
@@ -86,7 +86,7 @@ export function NotificationsBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-card shadow-xl z-50">
+        <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] rounded-xl border border-border bg-card shadow-xl z-50 sm:w-80">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h4 className="text-sm font-semibold text-foreground">Уведомления</h4>
             {unreadCount > 0 && (

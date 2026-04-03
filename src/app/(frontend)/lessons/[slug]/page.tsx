@@ -219,7 +219,7 @@ export default async function LessonPage({ params }: Props) {
 
         {/* Заголовок */}
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-foreground">{lesson.title}</h1>
+          <h1 className="text-xl font-bold text-foreground sm:text-2xl">{lesson.title}</h1>
           {lesson.description && (
             <p className="text-muted-foreground">{lesson.description}</p>
           )}
@@ -278,20 +278,34 @@ export default async function LessonPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Course Sidebar */}
+      {/* Course Sidebar — visible on mobile as drawer, desktop as sticky sidebar */}
       {hasSidebar && (
-        <div className="hidden lg:block w-72 flex-shrink-0">
-          {/* key forces remount when lesson changes to update expandedSections */}
-          <CourseSidebar
-            key={String(lesson.id)}
-            courseTitle={course?.title ?? ''}
-            sections={sidebarSections}
-            completedLessonIds={completedLessonIds}
-            currentLessonId={String(lesson.id)}
-            totalLessons={totalLessons}
-            totalCompleted={totalCompleted}
-          />
-        </div>
+        <>
+          {/* Desktop wrapper */}
+          <div className="hidden lg:block w-72 flex-shrink-0">
+            <CourseSidebar
+              key={`desktop-${String(lesson.id)}`}
+              courseTitle={course?.title ?? ''}
+              sections={sidebarSections}
+              completedLessonIds={completedLessonIds}
+              currentLessonId={String(lesson.id)}
+              totalLessons={totalLessons}
+              totalCompleted={totalCompleted}
+            />
+          </div>
+          {/* Mobile drawer — rendered outside the flex layout */}
+          <div className="lg:hidden">
+            <CourseSidebar
+              key={`mobile-${String(lesson.id)}`}
+              courseTitle={course?.title ?? ''}
+              sections={sidebarSections}
+              completedLessonIds={completedLessonIds}
+              currentLessonId={String(lesson.id)}
+              totalLessons={totalLessons}
+              totalCompleted={totalCompleted}
+            />
+          </div>
+        </>
       )}
     </div>
   )

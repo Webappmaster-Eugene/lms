@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { Star } from 'lucide-react'
 import { NotificationsBell } from './NotificationsBell'
 import { SearchBar } from './SearchBar'
+import { MobileSearchOverlay } from './MobileSearchOverlay'
 
 export async function Header() {
   const payload = await getPayload()
@@ -38,14 +39,18 @@ export async function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border bg-card/80 px-6 backdrop-blur-sm lg:px-8">
-      {/* Поиск */}
-      <div className="flex-1 max-w-md">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur-sm lg:px-8">
+      {/* Search — desktop inline, mobile icon+overlay */}
+      <div className="hidden flex-1 lg:block lg:max-w-md">
         <SearchBar />
       </div>
+      <MobileSearchOverlay />
 
-      {/* Правая часть */}
-      <div className="flex items-center gap-3">
+      {/* Spacer on mobile to push items right */}
+      <div className="flex-1 lg:hidden" />
+
+      {/* Right side */}
+      <div className="flex items-center gap-2 sm:gap-3">
         {/* Streak */}
         {streakDays > 0 && (
           <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-[hsl(var(--streak)_/_0.1)] px-3 py-1.5 text-sm font-medium text-[hsl(var(--streak))]">
@@ -55,7 +60,7 @@ export async function Header() {
 
         {/* Points */}
         {userName && (
-          <div className="flex items-center gap-1.5 rounded-full bg-warning/10 px-3 py-1.5 text-sm font-medium text-warning">
+          <div className="flex items-center gap-1.5 rounded-full bg-warning/10 px-2.5 py-1.5 text-sm font-medium text-warning sm:px-3">
             <Star className="h-4 w-4" />
             {totalPoints}
           </div>

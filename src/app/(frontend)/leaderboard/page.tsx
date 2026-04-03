@@ -25,7 +25,7 @@ export default async function LeaderboardPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-2xl font-bold text-foreground">Лидерборд</h1>
+      <h1 className="text-xl font-bold text-foreground sm:text-2xl">Лидерборд</h1>
 
       <div className="space-y-2">
         {users.docs.map((user, index) => {

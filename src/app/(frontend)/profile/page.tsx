@@ -46,7 +46,7 @@ export default async function ProfilePage() {
     <div className="mx-auto max-w-4xl space-y-8">
       {/* Профиль */}
       <div className="rounded-xl border border-border bg-card p-6">
-        <div className="flex items-center gap-6">
+        <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:gap-6 sm:text-left">
           {user.avatar && typeof user.avatar === 'object' && user.avatar.url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -61,7 +61,7 @@ export default async function ProfilePage() {
             </div>
           )}
           <div>
-            <h1 className="text-2xl font-bold text-foreground">
+            <h1 className="text-xl font-bold text-foreground sm:text-2xl">
               {user.firstName} {user.lastName}
             </h1>
             <p className="text-sm text-muted-foreground">{user.email}</p>

@@ -37,7 +37,7 @@ export default async function CertificatesPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <h1 className="text-2xl font-bold text-foreground">Мои сертификаты</h1>
+      <h1 className="text-xl font-bold text-foreground sm:text-2xl">Мои сертификаты</h1>
 
       {docs.length === 0 ? (
         <div className="flex flex-col items-center gap-4 py-16">

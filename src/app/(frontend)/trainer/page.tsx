@@ -70,7 +70,7 @@ export default async function TrainerPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex items-center gap-3">
         <Code2 className="h-7 w-7 text-primary" />
-        <h1 className="text-2xl font-bold text-foreground">Тренажёр кода</h1>
+        <h1 className="text-xl font-bold text-foreground sm:text-2xl">Тренажёр кода</h1>
       </div>
 
       <p className="text-muted-foreground">

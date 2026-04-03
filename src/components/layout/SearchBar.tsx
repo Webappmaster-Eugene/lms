@@ -11,7 +11,12 @@ type SearchResult = {
   type: 'roadmap' | 'course' | 'lesson'
 }
 
-export function SearchBar() {
+type SearchBarProps = {
+  autoFocus?: boolean
+  onNavigate?: () => void
+}
+
+export function SearchBar({ autoFocus, onNavigate }: SearchBarProps = {}) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -97,6 +102,7 @@ export function SearchBar() {
       lesson: `/lessons/${result.slug}`,
     }
     router.push(urlMap[result.type])
+    onNavigate?.()
   }
 
   const typeLabels = {
@@ -115,6 +121,7 @@ export function SearchBar() {
           onChange={(e) => handleChange(e.target.value)}
           onFocus={() => results.length > 0 && setOpen(true)}
           placeholder="Поиск курсов и уроков..."
+          autoFocus={autoFocus}
           className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
         />
         {loading && (

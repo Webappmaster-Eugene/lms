@@ -19,7 +19,7 @@ export default async function RoadmapsPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <h1 className="text-2xl font-bold text-foreground">Роадмапы</h1>
+      <h1 className="text-xl font-bold text-foreground sm:text-2xl">Роадмапы</h1>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {roadmaps.docs.map((roadmap) => (

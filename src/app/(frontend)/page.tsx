@@ -120,14 +120,14 @@ export default async function DashboardPage() {
     <div className="mx-auto max-w-5xl space-y-8">
       {/* Приветствие */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">
+        <h1 className="text-xl font-bold text-foreground sm:text-2xl">
           Привет, {user.firstName}!
         </h1>
         <p className="mt-1 text-muted-foreground">Продолжай обучение</p>
       </div>
 
-      {/* Статистика */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+      {/* Статистика — горизонтальный скролл на мобильных */}
+      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide sm:grid sm:grid-cols-5 sm:gap-4 sm:overflow-visible sm:pb-0">
         <StatCard icon={BookOpen} color="info" value={completedLessons} label="Уроков" />
         <StatCard icon={Star} color="warning" value={user.totalPoints ?? 0} label="Баллов" />
         <StatCard icon={Flame} color="streak" value={streakDays} label="Дней подряд" />
@@ -144,12 +144,12 @@ export default async function DashboardPage() {
               Все курсы
             </Link>
           </div>
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
             {coursesWithProgress.slice(0, 6).map((course) => (
               <Link
                 key={course.id}
                 href={`/courses/${course.slug}`}
-                className="group flex flex-col rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/50"
+                className="group flex flex-col rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/50 sm:p-5"
               >
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
@@ -196,7 +196,7 @@ export default async function DashboardPage() {
             <Link
               key={roadmap.id}
               href={`/roadmaps/${roadmap.slug}`}
-              className="group rounded-xl border border-border bg-card p-6 transition-colors hover:border-primary/50"
+              className="group rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/50 sm:p-6"
             >
               <div className="flex items-start gap-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -265,12 +265,12 @@ function StatCard({
   const classes = colorMap[color] ?? colorMap.primary
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
-      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${classes.split(' ')[0]}`}>
-        <Icon className={`h-5 w-5 ${classes.split(' ')[1]}`} />
+    <div className="flex min-w-[140px] flex-shrink-0 items-center gap-3 rounded-xl border border-border bg-card p-3 sm:min-w-0 sm:flex-shrink sm:p-4">
+      <div className={`flex h-8 w-8 items-center justify-center rounded-lg sm:h-10 sm:w-10 ${classes.split(' ')[0]}`}>
+        <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${classes.split(' ')[1]}`} />
       </div>
       <div>
-        <p className="text-xl font-bold text-foreground">{value}</p>
+        <p className="text-lg font-bold text-foreground sm:text-xl">{value}</p>
         <p className="text-xs text-muted-foreground">{label}</p>
       </div>
     </div>

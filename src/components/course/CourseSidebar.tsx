@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ChevronDown, CheckCircle2, Circle, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -36,7 +36,7 @@ export function CourseSidebar({
   totalLessons,
   totalCompleted,
 }: CourseSidebarProps) {
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpen, setIsOpen] = useState(false)
 
   // Auto-expand секцию с текущим уроком
   const currentSectionId = sections.find((s) =>
@@ -46,6 +46,21 @@ export function CourseSidebar({
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(currentSectionId ? [currentSectionId] : []),
   )
+
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (isOpen) {
+      const isLg = window.matchMedia('(min-width: 1024px)').matches
+      if (!isLg) {
+        document.body.style.overflow = 'hidden'
+      }
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isOpen])
 
   const toggleSection = (sectionId: string) => {
     setExpandedSections((prev) => {
@@ -63,20 +78,29 @@ export function CourseSidebar({
 
   return (
     <>
-      {/* Toggle button for mobile */}
+      {/* Toggle button for mobile — positioned above bottom nav */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed right-4 top-20 z-30 flex h-10 w-10 items-center justify-center rounded-lg bg-card border border-border shadow-sm lg:hidden"
+        className="fixed right-4 bottom-24 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-card border border-border shadow-lg lg:hidden"
         aria-label={isOpen ? 'Скрыть содержание' : 'Показать содержание'}
       >
         {isOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
       </button>
 
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed right-0 top-0 z-20 h-full w-80 border-l border-border bg-card overflow-y-auto transition-transform lg:sticky lg:top-0 lg:h-auto lg:max-h-[calc(100vh-4rem)] lg:translate-x-0 lg:w-72 lg:rounded-xl lg:border',
-          isOpen ? 'translate-x-0' : 'translate-x-full',
+          'fixed right-0 top-16 z-50 h-[calc(100vh-4rem)] w-80 border-l border-border bg-card overflow-y-auto transition-transform duration-300 ease-in-out',
+          'lg:sticky lg:top-0 lg:z-auto lg:h-auto lg:max-h-[calc(100vh-4rem)] lg:translate-x-0 lg:w-72 lg:rounded-xl lg:border',
+          isOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0',
         )}
       >
         {/* Header */}
@@ -95,7 +119,7 @@ export function CourseSidebar({
           </div>
           <button
             onClick={() => setIsOpen(false)}
-            className="absolute right-2 top-2 p-1 text-muted-foreground hover:text-foreground lg:hidden"
+            className="absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground lg:hidden"
           >
             <PanelRightClose className="h-4 w-4" />
           </button>
@@ -113,7 +137,7 @@ export function CourseSidebar({
               <div key={section.id} className="mb-1">
                 <button
                   onClick={() => toggleSection(section.id)}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent/50 transition-colors"
+                  className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent/50 transition-colors"
                 >
                   <ChevronDown
                     className={cn(
@@ -144,8 +168,9 @@ export function CourseSidebar({
                         <Link
                           key={lesson.id}
                           href={`/lessons/${lesson.slug}`}
+                          onClick={() => setIsOpen(false)}
                           className={cn(
-                            'flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
+                            'flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
                             isCurrent
                               ? 'bg-primary/10 text-primary font-medium'
                               : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',

@@ -86,7 +86,7 @@ export default async function CoursesListPage() {
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex items-center gap-3">
         <BookOpen className="h-7 w-7 text-primary" />
-        <h1 className="text-2xl font-bold text-foreground">Курсы</h1>
+        <h1 className="text-xl font-bold text-foreground sm:text-2xl">Курсы</h1>
       </div>
 
       {coursesWithProgress.length === 0 ? (
@@ -97,7 +97,7 @@ export default async function CoursesListPage() {
             <Link
               key={course.id}
               href={`/courses/${course.slug}`}
-              className="group flex flex-col rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/50 hover:bg-accent/50"
+              className="group flex flex-col rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/50 hover:bg-accent/50 sm:p-5"
             >
               <div className="flex-1">
                 <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">

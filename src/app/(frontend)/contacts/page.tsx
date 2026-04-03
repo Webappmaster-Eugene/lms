@@ -50,7 +50,7 @@ export default async function ContactsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-2xl font-bold text-foreground">Контакты</h1>
+      <h1 className="text-xl font-bold text-foreground sm:text-2xl">Контакты</h1>
       <p className="text-muted-foreground">
         Свяжитесь с нами удобным способом или присоединяйтесь к нашему сообществу.
       </p>
