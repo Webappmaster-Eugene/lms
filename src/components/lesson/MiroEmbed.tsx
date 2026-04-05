@@ -22,6 +22,7 @@ export function MiroEmbed({ title, embedUrl, height }: Props) {
           className="h-full w-full"
           allow="fullscreen"
           allowFullScreen
+          loading="lazy"
           sandbox="allow-scripts allow-same-origin allow-popups"
         />
       </div>

@@ -72,7 +72,23 @@ export const Roadmaps: CollectionConfig = {
       type: 'text',
       label: 'Ссылка для встраивания Miro-доски',
       admin: {
-        description: 'Формат: https://miro.com/app/board/... или https://miro.com/app/embed/... Если указана — отображается на странице роадмапа.',
+        description:
+          'Допустимые форматы: https://miro.com/app/live-embed/<boardId>/ или https://miro.com/app/embed/<boardId>/. Доска должна быть публичной (Share → Anyone with the link). View-URL вида https://miro.com/app/board/... не подойдёт — iframe покажет экран логина Miro.',
+      },
+      validate: (value: string | null | undefined) => {
+        if (value == null || value === '') return true
+        try {
+          const url = new URL(value)
+          if (url.protocol !== 'https:' || url.hostname !== 'miro.com') {
+            return 'Ссылка должна вести на https://miro.com'
+          }
+          if (!url.pathname.startsWith('/app/live-embed/') && !url.pathname.startsWith('/app/embed/')) {
+            return 'Используйте URL формата https://miro.com/app/live-embed/<boardId>/ или /app/embed/<boardId>/. Ссылка вида /app/board/... не работает в iframe.'
+          }
+          return true
+        } catch {
+          return 'Некорректный URL'
+        }
       },
     },
   ],

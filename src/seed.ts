@@ -1,4 +1,10 @@
 import type { Payload } from 'payload'
+import {
+  findOrCreateRoadmap,
+  findOrCreateCourse,
+  createSection,
+  createLessonsForSection,
+} from '@/lib/seed-helpers'
 
 /**
  * Seed-скрипт: создаёт начальные данные для LMS.
@@ -84,20 +90,16 @@ export const seed = async (payload: Payload) => {
   })
   console.log('Site settings configured')
 
-  // 4. Роадмап: Frontend React
-  const reactRoadmap = await payload.create({
-    collection: 'roadmaps',
-    data: {
-      title: 'Frontend React',
-      slug: 'frontend-react',
-      order: 1,
-      isPublished: true,
-      miroEmbedUrl: 'https://miro.com/app/board/uXjVJaQFRcw=/',
-    },
+  // 4. Роадмап: Frontend React (idempotent — не упадёт при повторном запуске)
+  const reactRoadmap = await findOrCreateRoadmap(payload, {
+    title: 'Frontend React',
+    slug: 'frontend-react',
+    order: 1,
+    miroEmbedUrl: 'https://miro.com/app/live-embed/uXjVJaQFRcw=/?embedMode=view_only_without_ui',
   })
 
-  // Курсы React с секциями
-  const jsBasics = await createCourse(payload, {
+  // Курсы React с секциями (idempotent)
+  const jsBasics = await findOrCreateCourse(payload, {
     title: 'Основы JavaScript',
     slug: 'js-basics',
     roadmapId: reactRoadmap.id,
@@ -121,7 +123,7 @@ export const seed = async (payload: Payload) => {
   await createLessonsForSection(payload, jsBasics.id, jsSection1.id, jsLessons1)
   await createLessonsForSection(payload, jsBasics.id, jsSection2.id, jsLessons2)
 
-  const reactFundamentals = await createCourse(payload, {
+  const reactFundamentals = await findOrCreateCourse(payload, {
     title: 'React Fundamentals',
     slug: 'react-fundamentals',
     roadmapId: reactRoadmap.id,
@@ -145,19 +147,15 @@ export const seed = async (payload: Payload) => {
 
   console.log('React roadmap created with courses, sections and lessons')
 
-  // 5. Роадмап: Backend Node.js
-  const nodeRoadmap = await payload.create({
-    collection: 'roadmaps',
-    data: {
-      title: 'Backend Node.js',
-      slug: 'backend-nodejs',
-      order: 2,
-      isPublished: true,
-      miroEmbedUrl: 'https://miro.com/app/board/uXjVJaQFRcw=/',
-    },
+  // 5. Роадмап: Backend Node.js (idempotent)
+  const nodeRoadmap = await findOrCreateRoadmap(payload, {
+    title: 'Backend Node.js',
+    slug: 'backend-nodejs',
+    order: 2,
+    miroEmbedUrl: 'https://miro.com/app/live-embed/uXjVJaQFRcw=/?embedMode=view_only_without_ui',
   })
 
-  const nodeBasics = await createCourse(payload, {
+  const nodeBasics = await findOrCreateCourse(payload, {
     title: 'Основы Node.js',
     slug: 'node-basics',
     roadmapId: nodeRoadmap.id,
@@ -392,102 +390,6 @@ function makeRichText(text: string) {
         { type: 'paragraph', version: 1, children: [{ type: 'text', version: 1, text }] },
       ],
     },
-  }
-}
-
-type CourseInput = {
-  title: string
-  slug: string
-  roadmapId: string | number
-  order: number
-  estimatedHours: number
-  prerequisites?: (string | number)[]
-}
-
-async function createCourse(payload: Payload, input: CourseInput) {
-  return payload.create({
-    collection: 'courses',
-    data: {
-      title: input.title,
-      slug: input.slug,
-      roadmap: input.roadmapId as unknown as number,
-      order: input.order,
-      estimatedHours: input.estimatedHours,
-      isPublished: true,
-      prerequisites: input.prerequisites as unknown as number[],
-    },
-  })
-}
-
-async function createSection(payload: Payload, input: { title: string; courseId: string | number; order: number }) {
-  const slug = input.title
-    .toLowerCase()
-    .replace(/\d+\.\s*/, '')
-    .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/^-+|-+$/g, '') + '-' + Date.now()
-
-  return payload.create({
-    collection: 'sections',
-    data: {
-      title: input.title,
-      slug,
-      course: input.courseId as unknown as number,
-      order: input.order,
-      isPublished: true,
-    },
-  })
-}
-
-type LessonInput = {
-  title: string
-  estimatedMinutes: number
-}
-
-async function createLessonsForSection(
-  payload: Payload,
-  courseId: string | number,
-  sectionId: string | number,
-  lessons: LessonInput[],
-) {
-  for (let i = 0; i < lessons.length; i++) {
-    const lesson = lessons[i]
-    const slug = lesson.title
-      .toLowerCase()
-      .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/^-+|-+$/g, '') + '-' + Date.now() + '-' + i
-
-    await payload.create({
-      collection: 'lessons',
-      data: {
-        title: lesson.title,
-        slug,
-        course: courseId as unknown as number,
-        section: sectionId as unknown as number,
-        order: i + 1,
-        isPublished: true,
-        estimatedMinutes: lesson.estimatedMinutes,
-        content: [
-          {
-            blockType: 'text',
-            content: {
-              root: {
-                type: 'root',
-                direction: 'ltr' as const,
-                format: '' as const,
-                indent: 0,
-                version: 1,
-                children: [
-                  { type: 'heading', tag: 'h2', version: 1, children: [{ type: 'text', text: lesson.title, version: 1 }] },
-                  { type: 'paragraph', version: 1, children: [{ type: 'text', version: 1, text: `Содержимое урока "${lesson.title}". Здесь будет учебный материал, примеры кода и задания.` }] },
-                ],
-              },
-            },
-          },
-        ],
-      },
-    })
   }
 }
 

@@ -1,0 +1,53 @@
+/* ReactFlow theme overrides — подогнаны под Miro-стиль и CSS-переменные проекта. */
+
+.react-flow__controls button {
+  background-color: hsl(var(--card));
+  border-color: hsl(var(--border));
+  color: hsl(var(--foreground));
+  fill: hsl(var(--foreground));
+}
+
+.react-flow__controls button:hover {
+  background-color: hsl(var(--accent));
+}
+
+.react-flow__minimap {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+}
+
+/* Рёбра — толще, чем дефолтные ReactFlow-рёбра, чтобы соответствовать
+   визуалу Miro-доски (там соединения — заметные curves). */
+.react-flow__edge-path {
+  stroke: hsl(var(--muted-foreground) / 0.6);
+  stroke-width: 2.5;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke: hsl(var(--primary));
+  stroke-width: 3;
+}
+
+/* Подсветка при hover на ребре */
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: hsl(var(--foreground));
+}
+
+.react-flow__background pattern circle,
+.react-flow__background pattern line {
+  fill: hsl(var(--border));
+  stroke: hsl(var(--border));
+}
+
+.react-flow__attribution {
+  display: none;
+}
+
+/* Handle — точки подключения — делаем ненавязчивыми */
+.react-flow__handle {
+  opacity: 0.3;
+}
+.react-flow__handle:hover {
+  opacity: 0.8;
+}

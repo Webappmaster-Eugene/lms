@@ -11,6 +11,8 @@ import sharp from 'sharp'
 import { migrations } from './migrations'
 import { Users } from '@/payload/collections/Users'
 import { Roadmaps } from '@/payload/collections/Roadmaps'
+import { RoadmapNodes } from '@/payload/collections/RoadmapNodes'
+import { RoadmapEdges } from '@/payload/collections/RoadmapEdges'
 import { Courses } from '@/payload/collections/Courses'
 import { Sections } from '@/payload/collections/Sections'
 import { Lessons } from '@/payload/collections/Lessons'
@@ -49,6 +51,8 @@ export default buildConfig({
   collections: [
     Users,
     Roadmaps,
+    RoadmapNodes,
+    RoadmapEdges,
     Courses,
     Sections,
     Lessons,

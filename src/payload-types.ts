@@ -69,6 +69,8 @@ export interface Config {
   collections: {
     users: User;
     roadmaps: Roadmap;
+    'roadmap-nodes': RoadmapNode;
+    'roadmap-edges': RoadmapEdge;
     courses: Course;
     sections: Section;
     lessons: Lesson;
@@ -95,6 +97,8 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     roadmaps: RoadmapsSelect<false> | RoadmapsSelect<true>;
+    'roadmap-nodes': RoadmapNodesSelect<false> | RoadmapNodesSelect<true>;
+    'roadmap-edges': RoadmapEdgesSelect<false> | RoadmapEdgesSelect<true>;
     courses: CoursesSelect<false> | CoursesSelect<true>;
     sections: SectionsSelect<false> | SectionsSelect<true>;
     lessons: LessonsSelect<false> | LessonsSelect<true>;
@@ -244,9 +248,54 @@ export interface Roadmap {
   order?: number | null;
   isPublished?: boolean | null;
   /**
-   * Формат: https://miro.com/app/board/... или https://miro.com/app/embed/... Если указана — отображается на странице роадмапа.
+   * Допустимые форматы: https://miro.com/app/live-embed/<boardId>/ или https://miro.com/app/embed/<boardId>/. Доска должна быть публичной (Share → Anyone with the link). View-URL вида https://miro.com/app/board/... не подойдёт — iframe покажет экран логина Miro.
    */
   miroEmbedUrl?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roadmap-nodes".
+ */
+export interface RoadmapNode {
+  id: number;
+  /**
+   * Уникальный идентификатор узла для графа (например: "cat-backend", "topic-nodejs")
+   */
+  nodeId: string;
+  label: string;
+  nodeType: 'category' | 'topic' | 'subtopic';
+  roadmap: number | Roadmap;
+  /**
+   * Если указан — узел кликабелен и отображает прогресс курса
+   */
+  course?: (number | null) | Course;
+  positionX: number;
+  positionY: number;
+  description?: string | null;
+  /**
+   * Имя иконки из lucide-react (например: "server", "database", "globe")
+   */
+  icon?: string | null;
+  /**
+   * Используется для группировки узлов по уровню (Стажёр → Junior → Middle → Senior).
+   */
+  stage?: ('start' | 'base' | 'stage1' | 'stage2' | 'practice' | 'advanced' | 'growth') | null;
+  /**
+   * Палитра Miro-доски. Если не указан — берётся цвет по умолчанию для стадии.
+   */
+  color?: ('yellow' | 'lime' | 'white' | 'gray' | 'pink' | 'blue' | 'red') | null;
+  /**
+   * Маркированный список под-тем — отображается внутри карточки узла на графе, в стиле Miro.
+   */
+  bullets?:
+    | {
+        text: string;
+        id?: string | null;
+      }[]
+    | null;
+  order?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -285,6 +334,27 @@ export interface Course {
    * Курсы, которые нужно завершить перед началом этого курса
    */
   prerequisites?: (number | Course)[] | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roadmap-edges".
+ */
+export interface RoadmapEdge {
+  id: number;
+  /**
+   * Уникальный идентификатор связи (например: "edge-1", "e-cat-topic")
+   */
+  edgeId: string;
+  roadmap: number | Roadmap;
+  source: number | RoadmapNode;
+  target: number | RoadmapNode;
+  edgeType?: ('smoothstep' | 'default' | 'straight') | null;
+  /**
+   * Анимированная пунктирная линия
+   */
+  animated?: boolean | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -719,6 +789,14 @@ export interface PayloadLockedDocument {
         value: number | Roadmap;
       } | null)
     | ({
+        relationTo: 'roadmap-nodes';
+        value: number | RoadmapNode;
+      } | null)
+    | ({
+        relationTo: 'roadmap-edges';
+        value: number | RoadmapEdge;
+      } | null)
+    | ({
         relationTo: 'courses';
         value: number | Course;
       } | null)
@@ -866,6 +944,46 @@ export interface RoadmapsSelect<T extends boolean = true> {
   order?: T;
   isPublished?: T;
   miroEmbedUrl?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roadmap-nodes_select".
+ */
+export interface RoadmapNodesSelect<T extends boolean = true> {
+  nodeId?: T;
+  label?: T;
+  nodeType?: T;
+  roadmap?: T;
+  course?: T;
+  positionX?: T;
+  positionY?: T;
+  description?: T;
+  icon?: T;
+  stage?: T;
+  color?: T;
+  bullets?:
+    | T
+    | {
+        text?: T;
+        id?: T;
+      };
+  order?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roadmap-edges_select".
+ */
+export interface RoadmapEdgesSelect<T extends boolean = true> {
+  edgeId?: T;
+  roadmap?: T;
+  source?: T;
+  target?: T;
+  edgeType?: T;
+  animated?: T;
   updatedAt?: T;
   createdAt?: T;
 }
