@@ -3,6 +3,10 @@ import type { CollectionConfig } from 'payload'
 import { isAdmin } from '@/payload/access/isAdmin'
 import { isAuthenticated } from '@/payload/access/isAuthenticated'
 import { generateSlug } from '@/payload/hooks/generateSlug'
+import {
+  normalizeLexicalAfterRead,
+  normalizeLexicalBeforeValidate,
+} from '@/payload/hooks/normalizeLexicalField'
 
 export const Roadmaps: CollectionConfig = {
   slug: 'roadmaps',
@@ -42,6 +46,14 @@ export const Roadmaps: CollectionConfig = {
       name: 'description',
       type: 'richText',
       label: 'Описание',
+      // Защита от "scalar-in-jsonb": если в колонку попадает строка/число/bool
+      // (раньше такое случалось из-за ручных SQL-апдейтов), Lexical-редактор
+      // админки падает на useMemo. Хуки нормализуют значение на входе и выходе,
+      // чтобы страница редактирования всегда оставалась доступной.
+      hooks: {
+        beforeValidate: [normalizeLexicalBeforeValidate],
+        afterRead: [normalizeLexicalAfterRead],
+      },
     },
     {
       name: 'coverImage',
