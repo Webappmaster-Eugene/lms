@@ -6,7 +6,8 @@ import Link from 'next/link'
 import { ArrowLeft, BookOpen, CheckCircle2, Clock, Lock } from 'lucide-react'
 import { MiroEmbed } from '@/components/lesson/MiroEmbed'
 import { RoadmapGraph } from '@/components/roadmap/RoadmapGraph'
-import type { GraphNode, GraphEdge, NodeStatus } from '@/components/roadmap/types'
+import type { GraphNode, GraphEdge, NodeStatus, AnnotationGraphNode, AnyRoadmapNode } from '@/components/roadmap/types'
+import { STAGE_ANNOTATIONS, STAGE_LEVELS } from '@/components/roadmap/stage-colors'
 import type {
   RoadmapNode as PayloadRoadmapNode,
   RoadmapEdge as PayloadRoadmapEdge,
@@ -336,12 +337,12 @@ function buildGraphData(
   rawNodes: PayloadRoadmapNode[],
   rawEdges: PayloadRoadmapEdge[],
   coursesWithProgress: CourseWithProgress[],
-): { graphNodes: GraphNode[]; graphEdges: GraphEdge[] } {
+): { graphNodes: AnyRoadmapNode[]; graphEdges: GraphEdge[] } {
   const courseMap = new Map(coursesWithProgress.map((c) => [c.id, c]))
 
   const nodeIdSet = new Set<string>()
 
-  const graphNodes: GraphNode[] = rawNodes.map((n) => {
+  const graphNodes: AnyRoadmapNode[] = rawNodes.map((n) => {
     nodeIdSet.add(n.nodeId)
 
     const linkedCourseId = resolveRelationId(n.course)
@@ -386,6 +387,9 @@ function buildGraphData(
     }
   })
 
+  // Добавляем annotation-узлы (привязаны к координатам графа, двигаются при пан/зум)
+  graphNodes.push(...buildAnnotationNodes(rawNodes))
+
   const graphEdges: GraphEdge[] = rawEdges
     .map((e) => ({
       id: e.edgeId,
@@ -394,7 +398,6 @@ function buildGraphData(
       type: e.edgeType ?? 'smoothstep',
       animated: e.animated === true,
     }))
-    // Отбрасываем orphan edges со ссылкой на несуществующие узлы
     .filter((e) => {
       const valid = nodeIdSet.has(e.source) && nodeIdSet.has(e.target)
       if (!valid && process.env.NODE_ENV !== 'production') {
@@ -406,4 +409,102 @@ function buildGraphData(
     })
 
   return { graphNodes, graphEdges }
+}
+
+type StageRange = { minY: number; maxY: number; minX: number; maxX: number }
+
+/**
+ * Создаёт annotation-узлы на основе реальных позиций roadmap-узлов.
+ * Координаты вычисляются динамически — работает с любым роадмапом.
+ */
+function buildAnnotationNodes(rawNodes: PayloadRoadmapNode[]): AnnotationGraphNode[] {
+  // Группируем узлы по stage для вычисления координат
+  const stageRanges = new Map<string, StageRange>()
+  for (const n of rawNodes) {
+    if (!n.stage) continue
+    const range = stageRanges.get(n.stage)
+    if (range) {
+      range.minY = Math.min(range.minY, n.positionY)
+      range.maxY = Math.max(range.maxY, n.positionY)
+      range.minX = Math.min(range.minX, n.positionX)
+      range.maxX = Math.max(range.maxX, n.positionX)
+    } else {
+      stageRanges.set(n.stage, {
+        minY: n.positionY,
+        maxY: n.positionY,
+        minX: n.positionX,
+        maxX: n.positionX,
+      })
+    }
+  }
+
+  if (stageRanges.size === 0) return []
+
+  const annotations: AnnotationGraphNode[] = []
+  let counter = 0
+
+  // Определяем горизонтальные границы всех узлов
+  let globalMinX = Infinity
+  let globalMaxX = -Infinity
+  for (const range of stageRanges.values()) {
+    globalMinX = Math.min(globalMinX, range.minX)
+    globalMaxX = Math.max(globalMaxX, range.maxX)
+  }
+  const centerX = Math.round((globalMinX + globalMaxX) / 2)
+
+  // Стадии в порядке обучения
+  const stageOrder: string[] = ['start', 'base', 'stage1', 'stage2', 'practice', 'advanced', 'growth']
+
+  for (const ann of STAGE_ANNOTATIONS) {
+    const range = stageRanges.get(ann.stage)
+    if (!range) continue
+
+    const midY = Math.round((range.minY + range.maxY) / 2)
+
+    // Left label
+    if (ann.leftLabel) {
+      annotations.push({
+        id: `ann-left-${counter++}`,
+        type: 'annotation',
+        position: { x: globalMinX - 200, y: midY },
+        data: { annotationType: 'leftLabel', text: ann.leftLabel },
+        selectable: false,
+        draggable: false,
+      })
+    }
+
+    // Right label
+    if (ann.rightLabel) {
+      annotations.push({
+        id: `ann-right-${counter++}`,
+        type: 'annotation',
+        position: { x: globalMaxX + 280, y: midY },
+        data: { annotationType: 'rightLabel', text: ann.rightLabel },
+        selectable: false,
+        draggable: false,
+      })
+    }
+
+    // Level badge — между текущей и предыдущей стадией
+    const level = STAGE_LEVELS[ann.stage as keyof typeof STAGE_LEVELS]
+    if (level) {
+      const stageIdx = stageOrder.indexOf(ann.stage)
+      const prevStage = stageIdx > 0 ? stageOrder[stageIdx - 1] : null
+      const prevRange = prevStage ? stageRanges.get(prevStage) : null
+      const badgeY = prevRange
+        ? Math.round((prevRange.maxY + range.minY) / 2)
+        : range.minY - 60
+
+      annotations.push({
+        id: `ann-badge-${counter++}`,
+        type: 'annotation',
+        position: { x: centerX, y: badgeY },
+        data: { annotationType: 'levelBadge', text: level },
+        selectable: false,
+        draggable: false,
+      })
+    }
+  }
+
+  return annotations
 }

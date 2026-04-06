@@ -108,32 +108,45 @@ export default buildConfig({
   },
 
   onInit: async (payload) => {
-    const { totalDocs } = await payload.count({ collection: 'users' })
+    // --- Auto-create admin user on first launch ---
+    const { totalDocs: usersCount } = await payload.count({ collection: 'users' })
 
-    if (totalDocs > 0) return
+    if (usersCount === 0) {
+      const email = process.env.ADMIN_EMAIL
+      const password = process.env.ADMIN_PASSWORD
 
-    const email = process.env.ADMIN_EMAIL
-    const password = process.env.ADMIN_PASSWORD
-
-    if (!email || !password) {
-      payload.logger.error(
-        'No users in DB and ADMIN_EMAIL / ADMIN_PASSWORD env vars not set. Cannot create initial admin.',
-      )
-      return
+      if (!email || !password) {
+        payload.logger.error(
+          'No users in DB and ADMIN_EMAIL / ADMIN_PASSWORD env vars not set. Cannot create initial admin.',
+        )
+      } else {
+        await payload.create({
+          collection: 'users',
+          data: {
+            email,
+            password,
+            firstName: 'Admin',
+            lastName: 'System',
+            role: 'admin',
+            isActive: true,
+          },
+        })
+        payload.logger.info(`Initial admin user created: ${email}`)
+      }
     }
 
-    await payload.create({
-      collection: 'users',
-      data: {
-        email,
-        password,
-        firstName: 'Admin',
-        lastName: 'System',
-        role: 'admin',
-        isActive: true,
-      },
-    })
+    // --- Auto-seed roadmap nodes if empty ---
+    const { totalDocs: nodesCount } = await payload.count({ collection: 'roadmap-nodes' })
 
-    payload.logger.info(`Initial admin user created: ${email}`)
+    if (nodesCount === 0) {
+      payload.logger.info('roadmap-nodes is empty — running auto-seed…')
+      try {
+        const { seedRoadmapNodes } = await import('./lib/seed-roadmap-runner')
+        await seedRoadmapNodes(payload)
+        payload.logger.info('Roadmap auto-seed complete')
+      } catch (err) {
+        payload.logger.error({ err }, 'Roadmap auto-seed failed')
+      }
+    }
   },
 })
