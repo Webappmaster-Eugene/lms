@@ -9,6 +9,7 @@ export const RoadmapNodes: CollectionConfig = {
     useAsTitle: 'label',
     defaultColumns: ['label', 'nodeType', 'roadmap', 'course', 'order', 'updatedAt'],
     group: 'Контент',
+    hidden: true,
   },
   access: {
     create: isAdmin,

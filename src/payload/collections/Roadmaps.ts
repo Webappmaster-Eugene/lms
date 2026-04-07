@@ -26,6 +26,15 @@ export const Roadmaps: CollectionConfig = {
   },
   fields: [
     {
+      name: 'visualEditor',
+      type: 'ui',
+      admin: {
+        components: {
+          Field: '/components/roadmap-editor/OpenEditorButton#OpenEditorButton',
+        },
+      },
+    },
+    {
       name: 'title',
       type: 'text',
       required: true,

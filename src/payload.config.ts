@@ -47,6 +47,7 @@ export default buildConfig({
       icons: [{ url: '/icon.svg', type: 'image/svg+xml' }],
     },
     components: {
+      afterNavLinks: ['/components/roadmap-editor/NavLink#RoadmapEditorNavLink'],
       views: {
         roadmapEditor: {
           Component: '/components/roadmap-editor/RoadmapEditorView',

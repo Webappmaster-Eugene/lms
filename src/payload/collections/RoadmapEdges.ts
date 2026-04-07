@@ -9,6 +9,7 @@ export const RoadmapEdges: CollectionConfig = {
     useAsTitle: 'edgeId',
     defaultColumns: ['edgeId', 'roadmap', 'source', 'target', 'edgeType', 'updatedAt'],
     group: 'Контент',
+    hidden: true,
   },
   access: {
     create: isAdmin,
