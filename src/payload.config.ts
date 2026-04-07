@@ -46,6 +46,14 @@ export default buildConfig({
       titleSuffix: ' — MentorCareer LMS',
       icons: [{ url: '/icon.svg', type: 'image/svg+xml' }],
     },
+    components: {
+      views: {
+        roadmapEditor: {
+          Component: '/components/roadmap-editor/RoadmapEditorView',
+          path: '/roadmap-editor/:segments*',
+        },
+      },
+    },
   },
 
   collections: [
