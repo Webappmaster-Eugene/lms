@@ -3,50 +3,89 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import type { EditorNodeData } from './types'
 import { getIconComponent } from '@/components/roadmap/icon-map'
-import { getNodeClasses } from '@/components/roadmap/stage-colors'
-import { cn } from '@/lib/utils'
+import { getEditorColors, getSelectionOutline } from './editor-colors'
 
 export function EditorTopicNode({ data, selected }: NodeProps) {
-  const nodeData = data as EditorNodeData
-  const Icon = getIconComponent(nodeData.icon)
-  const classes = getNodeClasses(nodeData.color, nodeData.stage, 'available')
+  const d = data as EditorNodeData
+  const Icon = getIconComponent(d.icon)
+  const c = getEditorColors(d.color, d.stage)
 
   return (
     <div
-      className={cn(
-        'w-[240px] rounded-lg border-2 shadow-md transition-all',
-        classes.bg,
-        classes.border,
-        classes.text,
-        selected && 'editor-node--selected',
-      )}
+      style={{
+        width: 240,
+        borderRadius: 8,
+        border: `2px solid ${c.border}`,
+        backgroundColor: c.bg,
+        color: c.text,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+        ...getSelectionOutline(selected ?? false),
+      }}
     >
       {/* Header */}
-      <div className={cn('flex items-center gap-2 border-b px-3 py-2', classes.border)}>
-        <div className={cn('flex h-6 w-6 flex-shrink-0 items-center justify-center rounded', classes.accent)}>
-          <Icon className="h-3.5 w-3.5" />
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          borderBottom: `1px solid ${c.border}`,
+          padding: '8px 12px',
+        }}
+      >
+        <div
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 4,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: c.accent,
+            flexShrink: 0,
+          }}
+        >
+          <Icon style={{ width: 14, height: 14 }} />
         </div>
-        <span className="text-xs font-bold uppercase tracking-wide leading-tight line-clamp-2">
-          {nodeData.label}
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            lineHeight: 1.2,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {d.label}
         </span>
       </div>
 
       {/* Bullet list */}
-      {nodeData.bullets.length > 0 && (
-        <ul className="space-y-0.5 px-3 py-2 text-[10px] leading-snug">
-          {nodeData.bullets.slice(0, 14).map((bullet, i) => (
-            <li key={i} className="flex gap-1.5">
-              <span className={cn('flex-shrink-0', classes.accent)}>•</span>
-              <span className="line-clamp-2">{bullet}</span>
+      {d.bullets.length > 0 && (
+        <ul style={{ padding: '6px 12px', margin: 0, listStyle: 'none', fontSize: 10, lineHeight: 1.4 }}>
+          {d.bullets.slice(0, 14).map((bullet, i) => (
+            <li key={i} style={{ display: 'flex', gap: 4, marginBottom: 2 }}>
+              <span style={{ color: c.accent, flexShrink: 0 }}>•</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bullet}</span>
             </li>
           ))}
         </ul>
       )}
 
       {/* Course link indicator */}
-      {nodeData.courseName && (
-        <div className={cn('border-t px-3 py-1.5 text-[10px]', classes.border, classes.accent)}>
-          📚 {nodeData.courseName}
+      {d.courseName && (
+        <div
+          style={{
+            borderTop: `1px solid ${c.border}`,
+            padding: '4px 12px',
+            fontSize: 10,
+            color: c.accent,
+          }}
+        >
+          📚 {d.courseName}
         </div>
       )}
 

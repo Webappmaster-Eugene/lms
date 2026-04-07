@@ -3,41 +3,49 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import type { EditorNodeData } from './types'
 import { getIconComponent } from '@/components/roadmap/icon-map'
-import { getNodeClasses } from '@/components/roadmap/stage-colors'
-import { cn } from '@/lib/utils'
+import { getEditorColors, getSelectionOutline } from './editor-colors'
 
 export function EditorCategoryNode({ data, selected }: NodeProps) {
-  const nodeData = data as EditorNodeData
-  const Icon = getIconComponent(nodeData.icon)
-  const classes = getNodeClasses(nodeData.color, nodeData.stage, 'available')
+  const d = data as EditorNodeData
+  const Icon = getIconComponent(d.icon)
+  const c = getEditorColors(d.color, d.stage)
 
   return (
     <div
-      className={cn(
-        'min-w-[280px] rounded-xl border-2 px-5 py-3 shadow-lg transition-all',
-        classes.bg,
-        classes.border,
-        classes.text,
-        selected && 'editor-node--selected',
-      )}
+      style={{
+        minWidth: 280,
+        borderRadius: 12,
+        border: `2px solid ${c.border}`,
+        backgroundColor: c.bg,
+        color: c.text,
+        padding: '12px 20px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        ...getSelectionOutline(selected ?? false),
+      }}
     >
-      <div className="flex items-center gap-3">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div
-          className={cn(
-            'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border',
-            classes.border,
-            classes.accent,
-          )}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            border: `1px solid ${c.border}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: c.accent,
+            flexShrink: 0,
+          }}
         >
-          <Icon className="h-5 w-5" />
+          <Icon style={{ width: 20, height: 20 }} />
         </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-bold uppercase tracking-wide leading-tight">
-            {nodeData.label}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: 14, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', lineHeight: 1.2 }}>
+            {d.label}
           </span>
-          {nodeData.description && (
-            <span className={cn('mt-0.5 text-[11px] leading-tight', classes.accent)}>
-              {nodeData.description}
+          {d.description && (
+            <span style={{ marginTop: 2, fontSize: 11, lineHeight: 1.2, color: c.accent }}>
+              {d.description}
             </span>
           )}
         </div>

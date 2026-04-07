@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { X, Trash2, Plus, GripVertical } from 'lucide-react'
 import type { EditorNode, EditorNodeData } from './types'
 import type { NodeColor, NodeStage } from '@/components/roadmap/stage-colors'
-import { COLOR_CLASSES, STAGE_DEFAULT_COLOR } from '@/components/roadmap/stage-colors'
-import { cn } from '@/lib/utils'
+import { STAGE_DEFAULT_COLOR } from '@/components/roadmap/stage-colors'
+import { getEditorColors } from './editor-colors'
 
 const ICON_OPTIONS = [
   { value: '', label: 'Без иконки' },
@@ -131,8 +131,7 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
     [update, data.bullets],
   )
 
-  const resolvedColor = data.color ?? (data.stage ? STAGE_DEFAULT_COLOR[data.stage] : 'white')
-  const previewClasses = COLOR_CLASSES[resolvedColor]
+  const previewColors = getEditorColors(data.color, data.stage)
 
   return (
     <div className="editor-side-panel flex h-full w-[360px] flex-shrink-0 flex-col border-l border-border bg-card overflow-hidden">
@@ -151,7 +150,7 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
       {/* Fields */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Color preview */}
-        <div className={cn('rounded-lg border-2 px-3 py-2 text-center text-xs font-bold uppercase tracking-wide', previewClasses.bg, previewClasses.border, previewClasses.text)}>
+        <div style={{ borderRadius: 8, border: `2px solid ${previewColors.border}`, backgroundColor: previewColors.bg, color: previewColors.text, padding: '8px 12px', textAlign: 'center', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           {data.label || 'Preview'}
         </div>
 
@@ -173,10 +172,16 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
             value={data.nodeId}
             readOnly={data.payloadId != null}
             onChange={(e) => data.payloadId == null && update({ nodeId: e.target.value })}
-            className={cn(
-              'w-full rounded-md border border-border px-3 py-1.5 text-sm font-mono',
-              data.payloadId != null ? 'bg-muted text-muted-foreground' : 'bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary',
-            )}
+            style={{
+              width: '100%',
+              borderRadius: 6,
+              border: '1px solid #555',
+              padding: '6px 12px',
+              fontSize: 14,
+              fontFamily: 'monospace',
+              backgroundColor: data.payloadId != null ? '#333' : '#1a1a1a',
+              color: data.payloadId != null ? '#999' : '#eee',
+            }}
           />
         </FieldGroup>
 

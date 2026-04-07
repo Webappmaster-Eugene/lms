@@ -2,24 +2,29 @@
 
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import type { EditorNodeData } from './types'
-import { getNodeClasses } from '@/components/roadmap/stage-colors'
-import { cn } from '@/lib/utils'
+import { getEditorColors, getSelectionOutline } from './editor-colors'
 
 export function EditorSubtopicNode({ data, selected }: NodeProps) {
-  const nodeData = data as EditorNodeData
-  const classes = getNodeClasses(nodeData.color, nodeData.stage, 'available')
+  const d = data as EditorNodeData
+  const c = getEditorColors(d.color, d.stage)
 
   return (
     <div
-      className={cn(
-        'flex min-w-[140px] items-center gap-2 rounded-md border-2 px-3 py-2 shadow-sm transition-all',
-        classes.bg,
-        classes.border,
-        classes.text,
-        selected && 'editor-node--selected',
-      )}
+      style={{
+        minWidth: 140,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        borderRadius: 6,
+        border: `2px solid ${c.border}`,
+        backgroundColor: c.bg,
+        color: c.text,
+        padding: '6px 12px',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+        ...getSelectionOutline(selected ?? false),
+      }}
     >
-      <span className="text-[11px] font-semibold leading-tight">{nodeData.label}</span>
+      <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.2 }}>{d.label}</span>
 
       <Handle type="target" position={Position.Top} id="top" />
       <Handle type="source" position={Position.Bottom} id="bottom" />
