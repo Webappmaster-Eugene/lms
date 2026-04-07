@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { X, Trash2, Plus, GripVertical } from 'lucide-react'
 import type { EditorNode, EditorNodeData } from './types'
 import type { NodeColor, NodeStage } from '@/components/roadmap/stage-colors'
-import { STAGE_DEFAULT_COLOR } from '@/components/roadmap/stage-colors'
 import { getEditorColors } from './editor-colors'
 
 const ICON_OPTIONS = [
@@ -67,6 +66,14 @@ const COLOR_OPTIONS: { value: NodeColor | ''; label: string }[] = [
   { value: 'red', label: 'Red (Critical)' },
 ]
 
+const inputStyle: React.CSSProperties = {
+  width: '100%', borderRadius: 6, border: '1px solid #3a3a5c', background: '#1a1a2e',
+  padding: '6px 12px', fontSize: 13, color: '#e0e0e0', outline: 'none',
+}
+const selectStyle: React.CSSProperties = { ...inputStyle, appearance: 'auto' as React.CSSProperties['appearance'] }
+const readonlyStyle: React.CSSProperties = { ...inputStyle, background: '#151528', color: '#666', fontFamily: 'monospace' }
+const icoSm: React.CSSProperties = { width: 12, height: 12, flexShrink: 0 }
+
 type Props = {
   node: EditorNode
   roadmapId: number
@@ -82,7 +89,6 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
   const [courses, setCourses] = useState<CourseOption[]>([])
   const [coursesLoading, setCoursesLoading] = useState(false)
 
-  // Load courses for this roadmap
   useEffect(() => {
     let cancelled = false
     setCoursesLoading(true)
@@ -105,9 +111,7 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
   }, [roadmapId])
 
   const update = useCallback(
-    (partial: Partial<EditorNodeData>) => {
-      onUpdate(node.id, partial)
-    },
+    (partial: Partial<EditorNodeData>) => { onUpdate(node.id, partial) },
     [onUpdate, node.id],
   )
 
@@ -116,154 +120,99 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
   }, [update, data.bullets])
 
   const removeBullet = useCallback(
-    (index: number) => {
-      update({ bullets: data.bullets.filter((_, i) => i !== index) })
-    },
+    (index: number) => { update({ bullets: data.bullets.filter((_, i) => i !== index) }) },
     [update, data.bullets],
   )
 
   const updateBullet = useCallback(
     (index: number, text: string) => {
-      const newBullets = [...data.bullets]
-      newBullets[index] = text
-      update({ bullets: newBullets })
+      const b = [...data.bullets]
+      b[index] = text
+      update({ bullets: b })
     },
     [update, data.bullets],
   )
 
-  const previewColors = getEditorColors(data.color, data.stage)
+  const pc = getEditorColors(data.color, data.stage)
 
   return (
-    <div className="editor-side-panel flex h-full w-[360px] flex-shrink-0 flex-col border-l border-border bg-card overflow-hidden">
+    <div
+      style={{
+        display: 'flex', flexDirection: 'column', width: 360, flexShrink: 0, height: '100%',
+        borderLeft: '1px solid #3a3a5c', background: '#1e1e38', overflow: 'hidden',
+        animation: 'slideInRight 0.2s ease-out',
+      }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold text-foreground">Свойства узла</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-        >
-          <X className="h-4 w-4" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #3a3a5c', padding: '12px 16px' }}>
+        <h2 style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', margin: 0 }}>Свойства узла</h2>
+        <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: 4, borderRadius: 4 }}>
+          <X style={{ width: 16, height: 16 }} />
         </button>
       </div>
 
-      {/* Fields */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Color preview */}
-        <div style={{ borderRadius: 8, border: `2px solid ${previewColors.border}`, backgroundColor: previewColors.bg, color: previewColors.text, padding: '8px 12px', textAlign: 'center', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+      {/* Scrollable fields */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* Preview */}
+        <div style={{ borderRadius: 8, border: `2px solid ${pc.border}`, background: pc.bg, color: pc.text, padding: '8px 12px', textAlign: 'center', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           {data.label || 'Preview'}
         </div>
 
-        {/* Label */}
-        <FieldGroup label="Название">
-          <input
-            type="text"
-            value={data.label}
-            onChange={(e) => update({ label: e.target.value })}
-            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            placeholder="Название узла"
-          />
-        </FieldGroup>
+        <Field label="Название">
+          <input type="text" value={data.label} onChange={(e) => update({ label: e.target.value })} style={inputStyle} placeholder="Название узла" />
+        </Field>
 
-        {/* Node ID (readonly for existing) */}
-        <FieldGroup label="Node ID">
+        <Field label="Node ID">
           <input
             type="text"
             value={data.nodeId}
             readOnly={data.payloadId != null}
             onChange={(e) => data.payloadId == null && update({ nodeId: e.target.value })}
-            style={{
-              width: '100%',
-              borderRadius: 6,
-              border: '1px solid #555',
-              padding: '6px 12px',
-              fontSize: 14,
-              fontFamily: 'monospace',
-              backgroundColor: data.payloadId != null ? '#333' : '#1a1a1a',
-              color: data.payloadId != null ? '#999' : '#eee',
-            }}
+            style={data.payloadId != null ? readonlyStyle : { ...inputStyle, fontFamily: 'monospace' }}
           />
-        </FieldGroup>
+        </Field>
 
-        {/* Node type */}
-        <FieldGroup label="Тип узла">
-          <select
-            value={data.nodeType}
-            onChange={(e) => update({ nodeType: e.target.value as EditorNodeData['nodeType'] })}
-            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            {NODE_TYPE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
+        <Field label="Тип узла">
+          <select value={data.nodeType} onChange={(e) => update({ nodeType: e.target.value as EditorNodeData['nodeType'] })} style={selectStyle}>
+            {NODE_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-        </FieldGroup>
+        </Field>
 
-        {/* Stage */}
-        <FieldGroup label="Стадия">
-          <select
-            value={data.stage ?? ''}
-            onChange={(e) => update({ stage: (e.target.value || null) as NodeStage | null })}
-            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            {STAGE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
+        <Field label="Стадия">
+          <select value={data.stage ?? ''} onChange={(e) => update({ stage: (e.target.value || null) as NodeStage | null })} style={selectStyle}>
+            {STAGE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-        </FieldGroup>
+        </Field>
 
-        {/* Color */}
-        <FieldGroup label="Цвет">
-          <select
-            value={data.color ?? ''}
-            onChange={(e) => update({ color: (e.target.value || null) as NodeColor | null })}
-            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            {COLOR_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
+        <Field label="Цвет">
+          <select value={data.color ?? ''} onChange={(e) => update({ color: (e.target.value || null) as NodeColor | null })} style={selectStyle}>
+            {COLOR_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-        </FieldGroup>
+        </Field>
 
-        {/* Icon */}
-        <FieldGroup label="Иконка">
-          <select
-            value={data.icon ?? ''}
-            onChange={(e) => update({ icon: e.target.value || null })}
-            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            {ICON_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
+        <Field label="Иконка">
+          <select value={data.icon ?? ''} onChange={(e) => update({ icon: e.target.value || null })} style={selectStyle}>
+            {ICON_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-        </FieldGroup>
+        </Field>
 
-        {/* Description */}
-        <FieldGroup label="Описание (tooltip)">
+        <Field label="Описание (tooltip)">
           <textarea
             value={data.description ?? ''}
             onChange={(e) => update({ description: e.target.value || null })}
             maxLength={300}
             rows={2}
-            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+            style={{ ...inputStyle, resize: 'none' }}
             placeholder="Краткое описание (max 300)"
           />
-          <span className="text-[10px] text-muted-foreground">
-            {(data.description ?? '').length}/300
-          </span>
-        </FieldGroup>
+          <span style={{ fontSize: 10, color: '#666' }}>{(data.description ?? '').length}/300</span>
+        </Field>
 
-        {/* Order */}
-        <FieldGroup label="Порядок">
-          <input
-            type="number"
-            value={data.order}
-            onChange={(e) => update({ order: Number(e.target.value) || 0 })}
-            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-        </FieldGroup>
+        <Field label="Порядок">
+          <input type="number" value={data.order} onChange={(e) => update({ order: Number(e.target.value) || 0 })} style={inputStyle} />
+        </Field>
 
-        {/* Course */}
-        <FieldGroup label="Привязанный курс">
+        <Field label="Привязанный курс">
           <select
             value={data.courseId ?? ''}
             onChange={(e) => {
@@ -272,58 +221,40 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
               update({ courseId: id, courseName: course?.title ?? null })
             }}
             disabled={coursesLoading}
-            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            style={selectStyle}
           >
             <option value="">Не привязан</option>
-            {courses.map((c) => (
-              <option key={c.id} value={c.id}>{c.title}</option>
-            ))}
+            {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
           </select>
-        </FieldGroup>
+        </Field>
 
-        {/* Position (readonly) */}
-        <FieldGroup label="Позиция">
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-[10px] text-muted-foreground">X</label>
-              <input
-                type="text"
-                value={Math.round(node.position.x)}
-                readOnly
-                className="w-full rounded-md border border-border bg-muted px-3 py-1.5 text-sm font-mono text-muted-foreground"
-              />
+        <Field label="Позиция">
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 10, color: '#666' }}>X</span>
+              <input type="text" value={Math.round(node.position.x)} readOnly style={readonlyStyle} />
             </div>
-            <div className="flex-1">
-              <label className="text-[10px] text-muted-foreground">Y</label>
-              <input
-                type="text"
-                value={Math.round(node.position.y)}
-                readOnly
-                className="w-full rounded-md border border-border bg-muted px-3 py-1.5 text-sm font-mono text-muted-foreground"
-              />
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 10, color: '#666' }}>Y</span>
+              <input type="text" value={Math.round(node.position.y)} readOnly style={readonlyStyle} />
             </div>
           </div>
-        </FieldGroup>
+        </Field>
 
-        {/* Bullets */}
-        <FieldGroup label={`Под-темы (${data.bullets.length})`}>
-          <div className="space-y-1.5">
+        <Field label={`Под-темы (${data.bullets.length})`}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {data.bullets.map((bullet, i) => (
-              <div key={i} className="flex items-center gap-1">
-                <GripVertical className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <GripVertical style={{ ...icoSm, color: '#555' }} />
                 <input
                   type="text"
                   value={bullet}
                   onChange={(e) => updateBullet(i, e.target.value)}
-                  className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  style={{ ...inputStyle, flex: 1, padding: '4px 8px', fontSize: 12 }}
                   placeholder={`Под-тема ${i + 1}`}
                 />
-                <button
-                  type="button"
-                  onClick={() => removeBullet(i)}
-                  className="flex-shrink-0 rounded p-0.5 text-muted-foreground hover:text-red-500 transition-colors"
-                >
-                  <X className="h-3 w-3" />
+                <button type="button" onClick={() => removeBullet(i)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: 2 }}>
+                  <X style={icoSm} />
                 </button>
               </div>
             ))}
@@ -331,24 +262,28 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
               <button
                 type="button"
                 onClick={addBullet}
-                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#818cf8', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}
               >
-                <Plus className="h-3 w-3" />
+                <Plus style={icoSm} />
                 Добавить под-тему
               </button>
             )}
           </div>
-        </FieldGroup>
+        </Field>
       </div>
 
-      {/* Delete button */}
-      <div className="border-t border-border p-4">
+      {/* Delete */}
+      <div style={{ borderTop: '1px solid #3a3a5c', padding: 16 }}>
         <button
           type="button"
           onClick={onDelete}
-          className="flex w-full items-center justify-center gap-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 dark:border-red-800 dark:bg-red-950 dark:text-red-300 dark:hover:bg-red-900 transition-colors"
+          style={{
+            display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 8,
+            borderRadius: 6, border: '1px solid #7f1d1d', background: '#1c0a0a', padding: '8px 12px',
+            fontSize: 13, fontWeight: 500, color: '#fca5a5', cursor: 'pointer',
+          }}
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 style={{ width: 16, height: 16 }} />
           Удалить узел
         </button>
       </div>
@@ -356,10 +291,10 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
   )
 }
 
-function FieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-muted-foreground">{label}</label>
+      <label style={{ display: 'block', marginBottom: 4, fontSize: 12, fontWeight: 500, color: '#888' }}>{label}</label>
       {children}
     </div>
   )

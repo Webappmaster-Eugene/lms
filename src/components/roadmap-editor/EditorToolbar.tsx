@@ -14,7 +14,6 @@ import {
   Tag,
 } from 'lucide-react'
 import type { RoadmapInfo } from './types'
-import { cn } from '@/lib/utils'
 
 type Props = {
   roadmapInfo: RoadmapInfo | null
@@ -25,6 +24,25 @@ type Props = {
   onDeleteSelected: () => void
   onSave: () => void
 }
+
+const ico = { width: 16, height: 16 }
+const icoSm = { width: 14, height: 14 }
+
+const btn = (active: boolean): React.CSSProperties => ({
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  borderRadius: 6,
+  border: '1px solid #3a3a5c',
+  padding: '6px 12px',
+  fontSize: 13,
+  fontWeight: 500,
+  cursor: active ? 'pointer' : 'not-allowed',
+  opacity: active ? 1 : 0.45,
+  background: active ? '#252540' : '#1a1a2e',
+  color: active ? '#e0e0e0' : '#666',
+  transition: 'background 0.15s',
+})
 
 export function EditorToolbar({
   roadmapInfo,
@@ -45,73 +63,107 @@ export function EditorToolbar({
     [onAddNode],
   )
 
+  const saveActive = isDirty && !isSaving
+
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5 shadow-sm">
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        borderRadius: 10,
+        border: '1px solid #3a3a5c',
+        background: '#252540',
+        padding: '8px 16px',
+        flexWrap: 'wrap',
+      }}
+    >
       {/* Back */}
       <a
         href="/admin/collections/roadmaps"
-        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#888', textDecoration: 'none' }}
       >
-        <ArrowLeft className="h-4 w-4" />
-        <span className="hidden sm:inline">Назад</span>
+        <ArrowLeft style={ico} />
+        Назад
       </a>
 
       {/* Separator */}
-      <div className="h-5 w-px bg-border" />
+      <div style={{ width: 1, height: 20, background: '#3a3a5c' }} />
 
       {/* Title */}
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-        <h1 className="text-sm font-semibold text-foreground truncate">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 0%', minWidth: 0 }}>
+        <h1 style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {roadmapInfo?.title ?? 'Загрузка...'}
         </h1>
         {isDirty && (
-          <span className="flex-shrink-0 inline-block h-2 w-2 rounded-full bg-amber-500" title="Есть несохранённые изменения" />
+          <span
+            title="Есть несохранённые изменения"
+            style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: '#f59e0b' }}
+          />
         )}
       </div>
 
       {/* Add node dropdown */}
-      <div className="relative">
+      <div style={{ position: 'relative' }}>
         <button
           type="button"
           onClick={() => setAddMenuOpen(!addMenuOpen)}
-          className={cn(
-            'flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium transition-colors',
-            'bg-background hover:bg-accent text-foreground',
-          )}
+          style={{
+            ...btn(true),
+            background: '#2d2d50',
+            border: '1px solid #4a4a7c',
+          }}
         >
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">Добавить</span>
-          <ChevronDown className="h-3 w-3" />
+          <Plus style={ico} />
+          Добавить
+          <ChevronDown style={{ width: 12, height: 12 }} />
         </button>
 
         {addMenuOpen && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setAddMenuOpen(false)} />
-            <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-md border border-border bg-card py-1 shadow-lg">
-              <button
-                type="button"
-                onClick={() => handleAdd('category')}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-colors"
-              >
-                <LayoutGrid className="h-4 w-4 text-muted-foreground" />
-                Категория
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAdd('topic')}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-colors"
-              >
-                <BookOpen className="h-4 w-4 text-muted-foreground" />
-                Тема
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAdd('subtopic')}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-colors"
-              >
-                <Tag className="h-4 w-4 text-muted-foreground" />
-                Подтема
-              </button>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setAddMenuOpen(false)} />
+            <div
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: '100%',
+                zIndex: 50,
+                marginTop: 4,
+                width: 180,
+                borderRadius: 8,
+                border: '1px solid #3a3a5c',
+                background: '#252540',
+                padding: '4px 0',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+              }}
+            >
+              {([
+                { type: 'category' as const, label: 'Категория', Icon: LayoutGrid },
+                { type: 'topic' as const, label: 'Тема', Icon: BookOpen },
+                { type: 'subtopic' as const, label: 'Подтема', Icon: Tag },
+              ]).map(({ type, label, Icon }) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => handleAdd(type)}
+                  style={{
+                    display: 'flex',
+                    width: '100%',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '8px 12px',
+                    fontSize: 13,
+                    color: '#e0e0e0',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <Icon style={{ ...ico, color: '#888' }} />
+                  {label}
+                </button>
+              ))}
             </div>
           </>
         )}
@@ -122,31 +174,27 @@ export function EditorToolbar({
         type="button"
         disabled={!hasSelection}
         onClick={onDeleteSelected}
-        className={cn(
-          'flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors',
-          hasSelection
-            ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-800 dark:bg-red-950 dark:text-red-300 dark:hover:bg-red-900'
-            : 'border-border bg-background text-muted-foreground cursor-not-allowed opacity-50',
-        )}
+        style={{
+          ...btn(hasSelection),
+          ...(hasSelection ? { border: '1px solid #7f1d1d', background: '#1c0a0a', color: '#fca5a5' } : {}),
+        }}
       >
-        <Trash2 className="h-4 w-4" />
-        <span className="hidden sm:inline">Удалить</span>
+        <Trash2 style={ico} />
+        Удалить
       </button>
 
       {/* Save */}
       <button
         type="button"
-        disabled={!isDirty || isSaving}
+        disabled={!saveActive}
         onClick={onSave}
-        className={cn(
-          'flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors',
-          isDirty && !isSaving
-            ? 'border-primary bg-primary text-primary-foreground hover:bg-primary/90'
-            : 'border-border bg-background text-muted-foreground cursor-not-allowed opacity-50',
-        )}
+        style={{
+          ...btn(saveActive),
+          ...(saveActive ? { border: '1px solid #6366f1', background: '#6366f1', color: '#fff' } : {}),
+        }}
       >
-        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-        <span className="hidden sm:inline">{isSaving ? 'Сохранение...' : 'Сохранить'}</span>
+        {isSaving ? <Loader2 style={{ ...ico, animation: 'spin 1s linear infinite' }} /> : <Save style={ico} />}
+        {isSaving ? 'Сохранение...' : 'Сохранить'}
       </button>
 
       {/* Preview */}
@@ -155,10 +203,10 @@ export function EditorToolbar({
           href={`/roadmaps/${roadmapInfo.slug}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          style={{ display: 'flex', alignItems: 'center', gap: 6, ...btn(true), textDecoration: 'none' }}
         >
-          <ExternalLink className="h-4 w-4" />
-          <span className="hidden sm:inline">Preview</span>
+          <ExternalLink style={ico} />
+          Preview
         </a>
       )}
     </div>

@@ -58,26 +58,26 @@ function RoadmapEditorInner({ roadmapId }: { roadmapId: number }) {
 
   if (editor.isLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="flex items-center gap-3 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span className="text-sm">Загрузка роадмапа...</span>
+      <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: '#888' }}>
+          <Loader2 style={{ width: 20, height: 20, animation: 'spin 1s linear infinite' }} />
+          <span style={{ fontSize: 14 }}>Загрузка роадмапа...</span>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden">
+    <div style={{ display: 'flex', flex: '1 1 0%', minHeight: 0, flexDirection: 'column', gap: 12, overflow: 'hidden' }}>
       {/* Error banner */}
       {editor.error && (
-        <div className="flex-shrink-0 rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+        <div style={{ flexShrink: 0, borderRadius: 8, border: '1px solid #7f1d1d', background: '#1c0a0a', padding: '10px 16px', fontSize: 13, color: '#fca5a5' }}>
           {editor.error}
         </div>
       )}
 
       {/* Toolbar */}
-      <div className="flex-shrink-0">
+      <div style={{ flexShrink: 0 }}>
         <EditorToolbar
           roadmapInfo={editor.roadmapInfo}
           isDirty={editor.isDirty}
