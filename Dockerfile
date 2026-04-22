@@ -3,13 +3,14 @@
 # ──────────────────────────────────────────────
 FROM node:20-alpine AS base
 
+# libc6-compat required for sharp / esbuild native bindings on Alpine.
+# Installed in base so all stages (deps, builder, runner) inherit it.
+RUN apk add --no-cache libc6-compat
+
 # ──────────────────────────────────────────────
 # Stage 2: deps — install ALL dependencies
 # ──────────────────────────────────────────────
 FROM base AS deps
-
-# libc6-compat required for sharp / esbuild native bindings on Alpine
-RUN apk add --no-cache libc6-compat
 
 WORKDIR /app
 
@@ -43,8 +44,11 @@ ENV NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL}
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN corepack enable pnpm \
-    && pnpm run build
+# Limit Node.js heap to prevent OOM kills on memory-constrained build servers.
+# Next.js + Payload CMS compilation is very memory-intensive.
+ENV NODE_OPTIONS=--max-old-space-size=2048
+
+RUN npx next build
 
 # ──────────────────────────────────────────────
 # Stage 4: runner — minimal production image
