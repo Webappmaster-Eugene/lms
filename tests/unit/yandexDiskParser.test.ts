@@ -8,14 +8,6 @@ import {
 } from '@/lib/yandex-disk-parser'
 import { filterVideoFiles, type YandexDiskItem } from '@/lib/yandex-disk'
 
-/**
- * Импорт курса с Яндекс.Диска: имена файлов превращаются в структуру разделов и
- * уроков. Единственный контракт между преподавателем и системой — конвенция
- * именования «X.Y - Название». Ошибка разбора не падает, а создаёт курс с
- * перепутанным порядком уроков или молча теряет файл, и обнаруживается это уже
- * после публикации.
- */
-
 function file(name: string, extra: Partial<YandexDiskItem> = {}): YandexDiskItem {
   return { name, type: 'file', path: `/disk/${name}`, ...extra }
 }
@@ -54,7 +46,6 @@ describe('parseVideoFilename: поддерживаемые форматы', () =
   })
 
   it('двузначный порядок урока разбирается как число, а не как строка', () => {
-    // Строковое сравнение поставило бы "10" перед "2" — уроки перемешались бы.
     expect(parseVideoFilename('2.10 — Длинное название урока.mov')).toMatchObject({
       sectionNumber: 2,
       lessonOrder: 10,
@@ -105,7 +96,6 @@ describe('groupIntoSections', () => {
   })
 
   it('сортирует разделы по номеру независимо от порядка файлов', () => {
-    // Яндекс.Диск отдаёт файлы в своём порядке; полагаться на него нельзя.
     const sections = groupIntoSections([video(3, 1, 'c'), video(1, 1, 'a'), video(2, 1, 'b')])
     expect(sections.map((s) => s.sectionNumber)).toEqual([1, 2, 3])
   })
@@ -162,7 +152,6 @@ describe('parseYandexDiskFolder', () => {
   })
 
   it('файл с неподходящим именем не теряется молча, а попадает в errors', () => {
-    // Иначе преподаватель увидит курс без части уроков и не поймёт, почему.
     const result = parseYandexDiskFolder([file('1.1 - a.mp4'), file('Лекция.mp4')], FOLDER)
 
     expect(result.totalVideos).toBe(1)

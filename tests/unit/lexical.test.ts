@@ -7,25 +7,12 @@ import {
   stringToLexicalState,
 } from '@/lib/lexical'
 
-/**
- * Нормализация richText-значений. Цена ошибки здесь необычно высока для такой
- * мелкой функции: колонка в Postgres имеет тип jsonb и примет что угодно — строку,
- * число, массив, — а редактор Lexical в админке ждёт строго объект `{ root: {...} }`.
- * Посторонний тип в колонке роняет форму редактирования, и документ становится
- * неправимым через интерфейс: чтобы его починить, нужен доступ к БД.
- *
- * Поэтому проверяется не «функция вернула что-то», а что мусор превращается
- * именно в `null` (пустой редактор), а не пролезает дальше.
- */
-
 describe('EMPTY_LEXICAL_STATE', () => {
   it('имеет валидную структуру', () => {
     expect(isLexicalRootState(EMPTY_LEXICAL_STATE)).toBe(true)
   })
 
   it('заморожен — экземпляр общий на все запросы', () => {
-    // Незамороженный общий объект можно случайно мутировать в одном запросе
-    // и получить испорченный дефолт во всех последующих.
     expect(Object.isFrozen(EMPTY_LEXICAL_STATE)).toBe(true)
     expect(Object.isFrozen(EMPTY_LEXICAL_STATE.root)).toBe(true)
     expect(Object.isFrozen(EMPTY_LEXICAL_STATE.root.children)).toBe(true)
@@ -47,8 +34,6 @@ describe('stringToLexicalState', () => {
   })
 
   it('пустая строка даёт пустой документ, а не абзац с пустым текстом', () => {
-    // Lexical не принимает text-узел с пустым значением — такой документ
-    // невалиден и снова ломает редактор.
     expect(stringToLexicalState('')).toBe(EMPTY_LEXICAL_STATE)
   })
 
@@ -89,8 +74,6 @@ describe('isLexicalRootState', () => {
   })
 
   it('проверка намеренно поверхностная: содержимое children не валидируется', () => {
-    // Глубокая проверка дублировала бы валидацию самого Lexical и ломалась бы
-    // на каждом изменении набора узлов в новой версии Payload.
     expect(isLexicalRootState({ root: { type: 'root', children: ['мусор'], version: 1 } })).toBe(
       true,
     )
@@ -104,8 +87,6 @@ describe('normalizeLexicalValue', () => {
   })
 
   it('валидный документ возвращается тем же объектом', () => {
-    // Ссылочное равенство важно: новый объект на каждый рендер заставляет
-    // Lexical пересоздавать состояние редактора.
     const state = stringToLexicalState('x')
     expect(normalizeLexicalValue(state)).toBe(state)
   })
@@ -143,8 +124,6 @@ describe('normalizeLexicalValue', () => {
   })
 
   it('не бросает исключение ни на каком входе', () => {
-    // Смысл нормализации — сохранить админку доступной. Исключение здесь
-    // воспроизвело бы ровно ту поломку, ради которой функция написана.
     const nasty: unknown[] = [NaN, Infinity, Symbol('s'), () => {}, new Date(), { root: 1 }]
     for (const value of nasty) {
       expect(() => normalizeLexicalValue(value)).not.toThrow()

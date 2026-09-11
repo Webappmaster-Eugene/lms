@@ -3,6 +3,11 @@ import { withPayload } from '@payloadcms/next/withPayload'
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+
+  // Авто-инструментирование OTel подключает их через динамический require, статический
+  // анализ Next их не видит и в standalone-сборку не переносит
+  serverExternalPackages: ['require-in-the-middle', 'import-in-the-middle'],
+
   async headers() {
     return [
       {

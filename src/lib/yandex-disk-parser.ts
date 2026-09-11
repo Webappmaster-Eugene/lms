@@ -150,8 +150,7 @@ export function parseYandexDiskFolder(
     seen.add(key)
   }
 
-  // Убираем дубликаты (оставляем первый). Ключ тот же, что и при сборе ошибок выше,
-  // поэтому список errors и отфильтрованный список всегда согласованы между собой.
+  // Убираем дубликаты (оставляем первый)
   const keptKeys = new Set<string>()
   const uniqueVideos = parsedVideos.filter((video) => {
     const key = `${video.sectionNumber}.${video.lessonOrder}`

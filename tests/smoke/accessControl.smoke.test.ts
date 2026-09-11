@@ -2,22 +2,6 @@ import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-/**
- * Граница доступа на уровне коллекций.
- *
- * По умолчанию Payload разрешает операцию любому вошедшему пользователю, если у
- * коллекции не задан `access`. Для LMS это означает, что новая коллекция, добавленная
- * без блока прав, отдаёт чужой прогресс, чужие заметки и чужие сертификаты — и делает
- * это тихо: страницы работают, ошибок нет, в логах чисто.
- *
- * Тест текстовый и намеренно грубый: он не подменяет ревью, а ловит пропуск.
- * Забыть блок целиком — типичная ошибка при добавлении коллекции; ошибиться в его
- * содержимом, уже написав его, — гораздо реже.
- *
- * Точная семантика самих функций (`isAdmin`, `isAdminOrSelf`, `isAuthenticated`)
- * проверяется отдельно в tests/unit/access.test.ts.
- */
-
 const DIR = new URL('../../src/payload/collections/', import.meta.url)
 
 const collections = readdirSync(fileURLToPath(DIR))
@@ -70,8 +54,6 @@ describe('у каждой коллекции есть явные права', ()
     const { source } = collections.find((c) => c.name === name)!
     const block = source.slice(source.indexOf('access: {'))
 
-    // Пропущенная операция молча наследует поведение по умолчанию — то есть
-    // «разрешено любому вошедшему». Для delete это особенно дорого.
     for (const op of ['create', 'read', 'update', 'delete']) {
       expect(block, `${name}: не задан ${op}`).toMatch(new RegExp(`\\b${op}:`))
     }
@@ -80,7 +62,6 @@ describe('у каждой коллекции есть явные права', ()
 
 describe('коллекции с пользовательскими данными', () => {
   it('список актуален — все перечисленные коллекции существуют', () => {
-    // Иначе переименование коллекции превратит проверку ниже в пустую.
     const names = collections.map((c) => c.name)
     const unknown = USER_OWNED.filter((n) => !names.includes(n))
     expect(unknown, `в списке USER_OWNED есть несуществующие: ${unknown.join(', ')}`).toEqual([])
@@ -91,8 +72,6 @@ describe('коллекции с пользовательскими данным�
     const block = source.slice(source.indexOf('access: {'), source.indexOf('fields:'))
     const read = block.match(/read:\s*([^,\n]+)/)?.[1] ?? ''
 
-    // Допустимы только ограничивающие варианты. `isAuthenticated` здесь означало бы
-    // «любой вошедший видит записи всех остальных».
     expect(read, `${name}: read = ${read}`).toMatch(/isAdminOrSelf|isAdmin\b|=>/)
     expect(read).not.toMatch(/isAuthenticated/)
   })
@@ -120,8 +99,6 @@ describe('справочный контент', () => {
 
 describe('отдельные правила', () => {
   it('транзакции баллов запрещено редактировать вообще', () => {
-    // Баллы — это лидерборд и достижения. Правка задним числом ломает и то, и другое,
-    // причём пересчитать «как было» уже нельзя.
     const { source } = collections.find((c) => c.name === 'PointsTransactions')!
     expect(source).toMatch(/update:\s*\(\)\s*=>\s*false/)
   })

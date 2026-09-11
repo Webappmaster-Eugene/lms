@@ -34,11 +34,6 @@ export function TrainerWorkspace({
 
   const { execute } = useCodeRunner()
 
-  // Объявлена до handleRun и обёрнута в useCallback намеренно: handleRun вызывает её
-  // из своего замыкания. Пока функция пересоздавалась на каждом рендере и не входила
-  // в зависимости, handleRun держал версию с первого рендера — вместе с тогдашним
-  // taskId. При переходе между задачами без размонтирования решение ушло бы на
-  // предыдущую задачу, причём молча: сервер принял бы запрос и записал прогресс.
   const submitSolution = useCallback(
     async (userCode: string, userOutput: string) => {
       setIsSubmitting(true)

@@ -10,10 +10,6 @@ export default function FrontendError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
-  // Пользователю показывается обезличенный текст, а сам сбой до сих пор не попадал
-  // никуда: `digest` — единственное, чем ошибку в браузере можно связать с записью
-  // в логах контейнера. Без этой строки разбор жалобы «просто не открывается»
-  // начинается с нуля.
   useEffect(() => {
     console.error('[frontend] render error', { digest: error.digest, message: error.message })
   }, [error])

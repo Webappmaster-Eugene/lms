@@ -58,9 +58,6 @@ export const awardPoints: CollectionAfterChangeHook = async ({
         roadmapPoints = settings.points.roadmapCompleted ?? roadmapPoints
       }
     } catch (error) {
-      // Падение чтения настроек не должно ломать прохождение урока, но и пройти
-      // незамеченным не должно: пользователи начнут получать баллы по умолчанию
-      // вместо настроенных, и внешне это выглядит как «баллы считаются неправильно».
       logger.warn('awardPoints: не удалось прочитать SiteSettings, берутся значения по умолчанию', {
         'user.id': userId,
         'error.message': error instanceof Error ? error.message : String(error),
@@ -230,10 +227,8 @@ async function safeCreateTransaction(
       })
       return true
     } catch (error) {
-      // Ожидаемый случай — гонка: параллельный запрос уже создал ту же транзакцию,
-      // и уникальный индекс отверг вторую. Но сюда же попадают реальные отказы БД,
-      // после которых баллы молча не начисляются. Отличить одно от другого можно
-      // только по логу, поэтому пишем его всегда.
+      // Сюда попадает и гонка (уникальный индекс отверг дубль), и реальный отказ БД:
+      // различить их можно только по логу
       logger.warn('awardPoints: транзакция не создана', {
         'user.id': userId,
         'points.reason': reason,

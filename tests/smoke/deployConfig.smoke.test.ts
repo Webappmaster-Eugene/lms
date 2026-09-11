@@ -2,20 +2,6 @@ import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-/**
- * Конфигурация выката: то, что ломается один раз и дорого.
- *
- * Здесь собраны проверки с несимметричной ценой ошибки. Потерянный том — это не
- * «перезапустимся»: в /app/media лежат загруженные файлы курсов, и деплой без тома
- * стирает их безвозвратно. Забытый build-ARG для NEXT_PUBLIC_* не роняет сборку —
- * переменная просто становится undefined в браузере, и ссылки начинают вести
- * в никуда. Несовпадение версии Node в образе с требованиями зависимостей
- * проявляется только на сервере: локально стоит другая версия, и всё собирается.
- *
- * Файлы читаются как текст: поднимать docker в тестах незачем, а проверяются
- * именно формулировки.
- */
-
 function read(relative: string): string {
   return readFileSync(fileURLToPath(new URL(relative, import.meta.url)), 'utf8')
 }
@@ -44,8 +30,6 @@ function nodeMajor(dockerfile: string): number {
 
 describe('постоянное хранилище', () => {
   it('каталог загруженных файлов смонтирован томом', () => {
-    // Без тома media живёт внутри слоя контейнера и исчезает при каждом деплое
-    // вместе со всеми материалами курсов.
     expect(COMPOSE).toMatch(/lms-media:\/app\/media/)
   })
 
@@ -54,7 +38,6 @@ describe('постоянное хранилище', () => {
   })
 
   it('каждый использованный том объявлен в секции volumes', () => {
-    // Compose падает на неизвестном имени тома, но падает уже при деплое.
     const used = new Set(
       [...COMPOSE.matchAll(/^\s+-\s+([a-z0-9-]+):\/(?:app|var)\//gm)].map((m) => m[1]),
     )
@@ -67,8 +50,6 @@ describe('постоянное хранилище', () => {
   })
 
   it('образ заранее создаёт каталог точки монтирования', () => {
-    // Иначе docker создаст её от root, а процесс в контейнере работает от nextjs
-    // и не сможет туда писать.
     expect(DOCKERFILE).toMatch(/mkdir -p media/)
     expect(DOCKERFILE).toMatch(/chown nextjs:nodejs media/)
   })
@@ -84,14 +65,10 @@ describe('healthcheck', () => {
   })
 
   it('в рантайм-образе есть curl, которым healthcheck пользуется', () => {
-    // Healthcheck, который не может запуститься, вечно даёт unhealthy, и Dokploy
-    // считает контейнер мёртвым.
     expect(DOCKERFILE).toMatch(/apk add --no-cache curl/)
   })
 
   it('приложение стартует только после готовности БД', () => {
-    // Без condition: service_healthy приложение стартует раньше Postgres,
-    // падает на миграциях и уходит в цикл перезапусков.
     expect(COMPOSE).toMatch(/depends_on:\s*\n\s*lms-mentor-db:\s*\n\s*condition:\s*service_healthy/)
   })
 
@@ -102,9 +79,6 @@ describe('healthcheck', () => {
 
 describe('переменные сборки', () => {
   it('NEXT_PUBLIC_SERVER_URL передаётся как build-ARG, а не только в рантайм', () => {
-    // NEXT_PUBLIC_* инлайнится в клиентский бандл на этапе сборки. Переданная
-    // только через environment, она останется undefined в браузере, и сборка
-    // об этом не сообщит.
     expect(DOCKERFILE).toMatch(/ARG NEXT_PUBLIC_SERVER_URL/)
     expect(DOCKERFILE).toMatch(/ENV NEXT_PUBLIC_SERVER_URL=\$\{NEXT_PUBLIC_SERVER_URL\}/)
     expect(COMPOSE).toMatch(/args:[\s\S]{0,200}NEXT_PUBLIC_SERVER_URL/)
@@ -116,8 +90,6 @@ describe('переменные сборки', () => {
   })
 
   it('в Dockerfile нет значений секретов по умолчанию', () => {
-    // Дефолт для секрета опаснее его отсутствия: приложение поднимется и будет
-    // работать с общеизвестным ключом подписи сессий.
     const defaults = [...DOCKERFILE.matchAll(/^ARG\s+(\w*(?:SECRET|PASSWORD|TOKEN))=(.+)$/gm)]
     for (const [, name, value] of defaults) {
       expect(value, `${name} имеет небезопасное значение по умолчанию`).toMatch(/placeholder/)
@@ -133,16 +105,13 @@ describe('версии Node', () => {
   })
 
   it('образ лендинга удовлетворяет требованиям Astro', () => {
-    // Astro 6 и 7 требуют node >= 22.12. Локально версия обычно новее, поэтому
-    // расхождение видно только при сборке образа — то есть на деплое.
+    // Astro 6+ требует node >= 22.12, локально версия обычно новее
     const astroMajor = Number(LANDING_PACKAGE.dependencies.astro.match(/(\d+)/)?.[1] ?? 0)
     expect(astroMajor).toBeGreaterThanOrEqual(6)
     expect(nodeMajor(LANDING_DOCKERFILE)).toBeGreaterThanOrEqual(22)
   })
 
   it('версия pnpm зафиксирована — Docker ставит её через corepack', () => {
-    // Без packageManager corepack берёт версию по своему усмотрению, и она может
-    // не понять формат pnpm-lock.yaml, собранного локально.
     expect(PACKAGE.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+$/)
     expect(DOCKERFILE).toMatch(/corepack enable pnpm/)
   })
@@ -154,8 +123,6 @@ describe('версии Node', () => {
 
 describe('контекст сборки', () => {
   it('.dockerignore исключает то, что ломает воспроизводимость', () => {
-    // node_modules с хоста содержат бинарники под macOS и ломают образ на Alpine;
-    // .next приносит артефакты прошлой сборки.
     for (const entry of ['node_modules', '.next', '.git', 'media']) {
       expect(DOCKERIGNORE, `.dockerignore не исключает ${entry}`).toMatch(
         new RegExp(`^${entry.replace('.', '\\.')}$`, 'm'),
@@ -164,8 +131,6 @@ describe('контекст сборки', () => {
   })
 
   it('файлы окружения не попадают в образ', () => {
-    // Секреты приходят в рантайме через Dokploy; .env в слое образа — утечка,
-    // которая переживёт и push в registry.
     expect(DOCKERIGNORE).toMatch(/^\.env$/m)
     expect(DOCKERIGNORE).toMatch(/^\.env\.\*$/m)
   })
@@ -173,8 +138,6 @@ describe('контекст сборки', () => {
 
 describe('режим сборки Next', () => {
   it('next.config собирает standalone, а Dockerfile его копирует', () => {
-    // Рантайм-образ запускает node server.js из .next/standalone. Без
-    // output: 'standalone' этого каталога не существует, и COPY молча положит пустоту.
     expect(NEXT_CONFIG).toMatch(/output:\s*'standalone'/)
     expect(DOCKERFILE).toMatch(/\.next\/standalone/)
     expect(DOCKERFILE).toMatch(/\.next\/static/)
@@ -183,6 +146,34 @@ describe('режим сборки Next', () => {
 
   it('контейнер работает не от root', () => {
     expect(DOCKERFILE).toMatch(/^USER nextjs$/m)
+  })
+})
+
+describe('инструментирование', () => {
+  const INSTRUMENTATION = read('../../src/instrumentation.ts')
+
+  it('проверка NEXT_RUNTIME написана как положительное условие вокруг импорта', () => {
+    // Только такую форму Next сворачивает на сборке; при раннем выходе OTel попадает
+    // в edge-бандл, тянет gRPC и сборка падает на `Can't resolve 'fs'`
+    expect(INSTRUMENTATION).toMatch(
+      /if \(process\.env\.NEXT_RUNTIME === 'nodejs'\) \{[\s\S]*import\('\.\/instrumentation\.node'\)/,
+    )
+    expect(INSTRUMENTATION).not.toMatch(/NEXT_RUNTIME !== 'nodejs'/)
+  })
+
+  it('отказ телеметрии не роняет запуск сервера', () => {
+    expect(INSTRUMENTATION).toMatch(/try \{[\s\S]*instrumentation\.node[\s\S]*\} catch/)
+  })
+
+  it('перехватчики require объявлены зависимостями и внешними пакетами', () => {
+    const pkg = JSON.parse(read('../../package.json')) as {
+      dependencies: Record<string, string>
+    }
+
+    for (const name of ['require-in-the-middle', 'import-in-the-middle']) {
+      expect(pkg.dependencies[name], `${name} не в dependencies`).toBeDefined()
+      expect(NEXT_CONFIG, `${name} не в serverExternalPackages`).toContain(name)
+    }
   })
 })
 
@@ -195,8 +186,6 @@ describe('скрипты проверки', () => {
   })
 
   it('lint вызывает eslint напрямую', () => {
-    // `next lint` без конфигурации уходит в интерактивный визард и падает —
-    // ровно так линтер и был сломан до появления eslint.config.mjs.
     expect(PACKAGE.scripts.lint).toBe('eslint .')
   })
 })

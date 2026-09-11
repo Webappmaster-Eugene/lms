@@ -1,10 +1,5 @@
 @import 'tailwindcss';
 
-/**
- * Тема Tailwind 4 задаётся здесь, а не в tailwind.config.mjs: в v4 конфиг переехал
- * в CSS, а `content` больше не нужен — источники определяются автоматически.
- * Значения перенесены один в один из прежнего JS-конфига, чтобы вёрстка не поехала.
- */
 @theme {
   --font-sans: Inter, system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
@@ -20,7 +15,6 @@
   --color-brand-800: #1e40af;
   --color-brand-900: #1e3a8a;
 
-  /* В v3 это был объект с ключом DEFAULT — в v4 роль DEFAULT играет само имя цвета. */
   --color-surface: #0f172a;
   --color-surface-light: #1e293b;
   --color-surface-lighter: #334155;

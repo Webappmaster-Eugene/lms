@@ -105,9 +105,7 @@ export function CourseSidebar({
       >
         {/* Header */}
         <div className="sticky top-0 border-b border-border bg-card p-4 z-10">
-          {/* Название курса приходило пропсом, но нигде не выводилось. На мобильных
-              панель открывается поверх урока, и без заголовка непонятно, к какому
-              курсу относится содержание. pr-12 — запас под кнопку закрытия справа. */}
+          {/* pr-12 — запас под кнопку закрытия, она перекрывает правый край на мобильных */}
           <p className="mb-2 pr-12 text-sm font-semibold text-foreground line-clamp-2 lg:pr-0">
             {courseTitle}
           </p>
