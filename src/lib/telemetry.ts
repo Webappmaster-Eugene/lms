@@ -25,7 +25,14 @@ export async function withSpan<T>(
   maybeFn?: () => Promise<T>,
 ): Promise<T> {
   const attributes = typeof attributesOrFn === 'function' ? {} : attributesOrFn
-  const fn = typeof attributesOrFn === 'function' ? attributesOrFn : maybeFn!
+  const fn = typeof attributesOrFn === 'function' ? attributesOrFn : maybeFn
+
+  // Перегрузка допускает вызов с атрибутами, но без функции. Раньше здесь стоял
+  // non-null assertion, и такой вызов падал внутри спана с невнятным "fn is not
+  // a function" уже после старта трассировки.
+  if (!fn) {
+    throw new TypeError(`withSpan("${spanName}"): не передана функция для выполнения внутри спана`)
+  }
 
   const tracer = getTracer()
   return tracer.startActiveSpan(spanName, { attributes }, async (span: Span) => {

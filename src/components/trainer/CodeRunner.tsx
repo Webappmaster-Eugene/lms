@@ -84,6 +84,11 @@ export function useCodeRunner() {
 
       // Use base64 encoding to completely avoid script injection in srcdoc.
       // The code is decoded and executed via new Function() inside the sandbox.
+      //
+      // Закрывающий тег в конце шаблона записан как `<\/script>` намеренно: строка
+      // разбирается браузером как HTML, и неэкранированный литерал закрыл бы тег
+      // раньше времени — остаток кода утёк бы в разметку страницы. Для JS слэш здесь
+      // избыточен, поэтому no-useless-escape глушится на той строке точечно.
       iframe.srcdoc = `<!DOCTYPE html><html><body><script>
 (function() {
   var _output = [];
@@ -123,7 +128,7 @@ export function useCodeRunner() {
     parent.postMessage({ type: 'execution-result', output: _output.join('\\n'), error: e.message || String(e) }, '*');
   }
 })();
-<\/script></body></html>`
+<\/script></body></html>` // eslint-disable-line no-useless-escape -- см. комментарий к srcdoc выше
 
       document.body.appendChild(iframe)
     })

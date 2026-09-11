@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { ArrowLeft, BookOpen, CheckCircle2, Clock, Lock } from 'lucide-react'
 import { MiroEmbed } from '@/components/lesson/MiroEmbed'
 import { RoadmapGraph } from '@/components/roadmap/RoadmapGraph'
-import type { GraphNode, GraphEdge, NodeStatus, AnnotationGraphNode, AnyRoadmapNode } from '@/components/roadmap/types'
+import type { GraphEdge, NodeStatus, AnnotationGraphNode, AnyRoadmapNode } from '@/components/roadmap/types'
 import { STAGE_ANNOTATIONS, STAGE_LEVELS } from '@/components/roadmap/stage-colors'
 import type {
   RoadmapNode as PayloadRoadmapNode,
@@ -77,8 +77,9 @@ export default async function RoadmapDetailPage({ params }: Props) {
   const lessonsByCourse = new Map<string, string[]>()
   for (const lesson of allLessons.docs) {
     const cId = String(typeof lesson.course === 'object' ? lesson.course.id : lesson.course)
-    if (!lessonsByCourse.has(cId)) lessonsByCourse.set(cId, [])
-    lessonsByCourse.get(cId)!.push(String(lesson.id))
+    const courseLessons = lessonsByCourse.get(cId) ?? []
+    courseLessons.push(String(lesson.id))
+    lessonsByCourse.set(cId, courseLessons)
   }
 
   // Прогресс пользователя (один запрос)

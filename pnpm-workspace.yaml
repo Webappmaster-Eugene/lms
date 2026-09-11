@@ -2,3 +2,6 @@ allowBuilds:
   esbuild: true
   sharp: true
   unrs-resolver: true
+  # Нативный watcher, пришёл транзитивно с tailwindcss 4.3. Без разрешения на сборку
+  # pnpm печатает предупреждение на каждой установке, в том числе внутри Docker.
+  '@parcel/watcher': true

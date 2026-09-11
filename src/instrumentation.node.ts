@@ -41,7 +41,9 @@ if (OTEL_ENDPOINT) {
   const sdk = new NodeSDK({
     resource,
     traceExporter,
-    logRecordProcessors: [new SimpleLogRecordProcessor(logExporter)],
+    // С @opentelemetry/sdk-logs 0.222 процессор принимает объект опций, а не сам
+    // экспортёр позиционным аргументом.
+    logRecordProcessors: [new SimpleLogRecordProcessor({ exporter: logExporter })],
     instrumentations: [
       getNodeAutoInstrumentations({
         // Disable noisy instrumentations that produce no actionable data with Next.js

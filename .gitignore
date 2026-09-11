@@ -32,3 +32,6 @@ build/
 # Misc
 *.log
 npm-debug.log*
+
+# TypeScript incremental build cache (артефакт сборки, в git ему не место)
+tsconfig.tsbuildinfo

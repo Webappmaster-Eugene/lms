@@ -1,4 +1,10 @@
 ---
+// Глобальные стили подключаются обычным импортом: Vite-плагин Tailwind
+// обрабатывает файл как точку входа и подставляет сгенерированные утилиты.
+// Прежний `<style is:global>@import ...</style>` работал только через интеграцию
+// @astrojs/tailwind, которой больше нет.
+import '../styles/global.css'
+
 interface Props {
   title?: string
   description?: string
@@ -121,7 +127,3 @@ const canonicalUrl = new URL(Astro.url.pathname, siteUrl).href
     <slot />
   </body>
 </html>
-
-<style is:global>
-  @import '../styles/global.css';
-</style>

@@ -34,6 +34,38 @@ export function TrainerWorkspace({
 
   const { execute } = useCodeRunner()
 
+  // Объявлена до handleRun и обёрнута в useCallback намеренно: handleRun вызывает её
+  // из своего замыкания. Пока функция пересоздавалась на каждом рендере и не входила
+  // в зависимости, handleRun держал версию с первого рендера — вместе с тогдашним
+  // taskId. При переходе между задачами без размонтирования решение ушло бы на
+  // предыдущую задачу, причём молча: сервер принял бы запрос и записал прогресс.
+  const submitSolution = useCallback(
+    async (userCode: string, userOutput: string) => {
+      setIsSubmitting(true)
+      try {
+        const res = await fetch('/api/trainer-progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            taskId,
+            userCode,
+            output: userOutput,
+          }),
+        })
+
+        if (!res.ok) {
+          console.error('Failed to submit solution:', await res.text())
+        }
+      } catch (err) {
+        console.error('Failed to submit solution:', err)
+      } finally {
+        setIsSubmitting(false)
+      }
+    },
+    [taskId],
+  )
+
   const handleRun = useCallback(async () => {
     setIsRunning(true)
     setOutput('')
@@ -61,31 +93,7 @@ export function TrainerWorkspace({
     }
 
     setIsRunning(false)
-  }, [code, expectedOutput, execute, isAlreadyCompleted])
-
-  const submitSolution = async (userCode: string, userOutput: string) => {
-    setIsSubmitting(true)
-    try {
-      const res = await fetch('/api/trainer-progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          taskId,
-          userCode,
-          output: userOutput,
-        }),
-      })
-
-      if (!res.ok) {
-        console.error('Failed to submit solution:', await res.text())
-      }
-    } catch (err) {
-      console.error('Failed to submit solution:', err)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+  }, [code, expectedOutput, execute, isAlreadyCompleted, submitSolution])
 
   const handleReset = () => {
     setCode(starterCode)

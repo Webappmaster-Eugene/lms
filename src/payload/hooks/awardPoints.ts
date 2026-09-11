@@ -57,8 +57,14 @@ export const awardPoints: CollectionAfterChangeHook = async ({
         coursePoints = settings.points.courseCompleted ?? coursePoints
         roadmapPoints = settings.points.roadmapCompleted ?? roadmapPoints
       }
-    } catch {
-      // fallback to defaults
+    } catch (error) {
+      // Падение чтения настроек не должно ломать прохождение урока, но и пройти
+      // незамеченным не должно: пользователи начнут получать баллы по умолчанию
+      // вместо настроенных, и внешне это выглядит как «баллы считаются неправильно».
+      logger.warn('awardPoints: не удалось прочитать SiteSettings, берутся значения по умолчанию', {
+        'user.id': userId,
+        'error.message': error instanceof Error ? error.message : String(error),
+      })
     }
 
     // 1. Баллы за урок
@@ -223,8 +229,17 @@ async function safeCreateTransaction(
         context: { skipHooks: true },
       })
       return true
-    } catch {
-      // Race condition: другой запрос уже создал транзакцию
+    } catch (error) {
+      // Ожидаемый случай — гонка: параллельный запрос уже создал ту же транзакцию,
+      // и уникальный индекс отверг вторую. Но сюда же попадают реальные отказы БД,
+      // после которых баллы молча не начисляются. Отличить одно от другого можно
+      // только по логу, поэтому пишем его всегда.
+      logger.warn('awardPoints: транзакция не создана', {
+        'user.id': userId,
+        'points.reason': reason,
+        'points.relatedEntity': relatedEntity,
+        'error.message': error instanceof Error ? error.message : String(error),
+      })
       return false
     }
   })

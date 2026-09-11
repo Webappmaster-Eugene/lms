@@ -74,7 +74,9 @@ export function MarkdownRenderer({ content }: Props) {
             )
           },
         }}
-      />
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   )
 }

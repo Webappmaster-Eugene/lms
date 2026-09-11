@@ -26,7 +26,6 @@ type Props = {
 }
 
 const ico = { width: 16, height: 16 }
-const icoSm = { width: 14, height: 14 }
 
 const btn = (active: boolean): React.CSSProperties => ({
   display: 'flex',

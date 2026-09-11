@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { AlertCircle, RefreshCw } from 'lucide-react'
 
 export default function FrontendError({
@@ -9,6 +10,14 @@ export default function FrontendError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  // Пользователю показывается обезличенный текст, а сам сбой до сих пор не попадал
+  // никуда: `digest` — единственное, чем ошибку в браузере можно связать с записью
+  // в логах контейнера. Без этой строки разбор жалобы «просто не открывается»
+  // начинается с нуля.
+  useEffect(() => {
+    console.error('[frontend] render error', { digest: error.digest, message: error.message })
+  }, [error])
+
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center gap-6 px-4">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10">

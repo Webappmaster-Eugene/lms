@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { Award, Download } from 'lucide-react'
+import { Award } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
 export const metadata: Metadata = {
