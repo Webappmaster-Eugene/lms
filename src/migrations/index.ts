@@ -3,6 +3,7 @@ import * as migration_20260402_095341 from './20260402_095341';
 import * as migration_20260404_202710 from './20260404_202710';
 import * as migration_20260405_102500_roadmap_nodes_miro_style from './20260405_102500_roadmap_nodes_miro_style';
 import * as migration_20260405_150000_normalize_roadmap_description from './20260405_150000_normalize_roadmap_description';
+import * as migration_20260911_233042_payload_389_sessions_kv from './20260911_233042_payload_389_sessions_kv';
 
 export const migrations = [
   {
@@ -23,11 +24,16 @@ export const migrations = [
   {
     up: migration_20260405_102500_roadmap_nodes_miro_style.up,
     down: migration_20260405_102500_roadmap_nodes_miro_style.down,
-    name: '20260405_102500_roadmap_nodes_miro_style'
+    name: '20260405_102500_roadmap_nodes_miro_style',
   },
   {
     up: migration_20260405_150000_normalize_roadmap_description.up,
     down: migration_20260405_150000_normalize_roadmap_description.down,
     name: '20260405_150000_normalize_roadmap_description',
+  },
+  {
+    up: migration_20260911_233042_payload_389_sessions_kv.up,
+    down: migration_20260911_233042_payload_389_sessions_kv.down,
+    name: '20260911_233042_payload_389_sessions_kv'
   },
 ];
