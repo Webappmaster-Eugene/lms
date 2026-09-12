@@ -3,7 +3,15 @@
  * Используется для автоматического импорта курсов из видео-файлов.
  */
 
+import type { PublicResourceRef } from './yandex-disk-url'
+
+export { buildPublicFileUrl, parsePublicResourceUrl } from './yandex-disk-url'
+export type { PublicResourceRef } from './yandex-disk-url'
+
 const YD_API_BASE = 'https://cloud-api.yandex.net/v1/disk/public/resources'
+
+/** Максимальный размер текстового материала, который разворачиваем в контент урока. */
+const MAX_TEXT_FILE_BYTES = 64 * 1024
 const MAX_RETRIES = 3
 const RETRY_DELAY_MS = 1000
 const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv'])
@@ -170,5 +178,65 @@ export class YandexDiskError extends Error {
   ) {
     super(message)
     this.name = 'YandexDiskError'
+  }
+}
+
+/**
+ * Получает временную прямую ссылку на файл публичного ресурса.
+ * Ссылка живёт ограниченное время, поэтому её нельзя сохранять в контент.
+ */
+export async function fetchPublicDownloadHref(
+  ref: PublicResourceRef,
+  options: { token?: string } = {},
+): Promise<string> {
+  const url = new URL(`${YD_API_BASE}/download`)
+  url.searchParams.set('public_key', ref.publicKey)
+  if (ref.path) {
+    url.searchParams.set('path', ref.path)
+  }
+
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  if (options.token) {
+    headers['Authorization'] = `OAuth ${options.token}`
+  }
+
+  const response = await fetchWithRetry(url.toString(), { headers })
+  const data: { href?: string } = await response.json()
+
+  if (!data.href) {
+    throw new YandexDiskError('Яндекс.Диск не вернул ссылку на файл', 502)
+  }
+
+  return data.href
+}
+
+/**
+ * Скачивает небольшой текстовый файл публичного ресурса.
+ * Файлы больше MAX_TEXT_FILE_BYTES не читаем — такие материалы остаются ссылкой.
+ */
+export async function fetchPublicTextFile(
+  ref: PublicResourceRef,
+  options: { token?: string } = {},
+): Promise<string | null> {
+  const href = await fetchPublicDownloadHref(ref, options)
+  const response = await fetchWithRetry(href, {
+    headers: { Range: `bytes=0-${MAX_TEXT_FILE_BYTES - 1}` },
+  })
+
+  const buffer = await response.arrayBuffer()
+  if (buffer.byteLength === 0) return null
+
+  return decodeText(buffer)
+}
+
+/**
+ * Текстовые материалы курсов приходят как из UTF-8, так и из Windows-1251 —
+ * определяем кодировку по успешности строгого UTF-8 декодирования.
+ */
+function decodeText(buffer: ArrayBuffer): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buffer).replace(/^\uFEFF/, '')
+  } catch {
+    return new TextDecoder('windows-1251').decode(buffer)
   }
 }

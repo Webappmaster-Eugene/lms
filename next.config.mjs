@@ -33,7 +33,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data:",
-              "frame-src https://disk.yandex.ru https://disk.yandex.com https://miro.com https://www.youtube.com https://youtube.com",
+              "frame-src https://miro.com https://www.youtube.com https://youtube.com",
               "connect-src 'self'",
               "media-src 'self' https:",
             ].join('; '),

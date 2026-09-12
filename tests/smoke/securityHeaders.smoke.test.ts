@@ -58,15 +58,11 @@ describe('CSP и встраиваемый контент не разошлись
 
     expect(VIDEO_PLAYER).toContain('https://www.youtube.com/embed/')
     expect(frameSrc).toContain('https://www.youtube.com')
-
-    expect(VIDEO_PLAYER).toContain('disk.yandex')
-    expect(frameSrc).toMatch(/https:\/\/disk\.yandex\.(ru|com)/)
   })
 
-  it('оба домена Яндекс.Диска разрешены — ссылки встречаются и .ru, и .com', () => {
-    const frameSrc = directive('frame-src')
-    expect(frameSrc).toContain('https://disk.yandex.ru')
-    expect(frameSrc).toContain('https://disk.yandex.com')
+  it('Яндекс.Диск не встраивается в iframe — он запрещает это своим frame-ancestors', () => {
+    expect(VIDEO_PLAYER).toContain('/api/yandex-disk/stream')
+    expect(directive('frame-src')).not.toContain('disk.yandex')
   })
 
   it('miro разрешён — блок MiroBlock встраивает доски через iframe', () => {
