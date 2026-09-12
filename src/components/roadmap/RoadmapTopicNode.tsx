@@ -1,7 +1,7 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { CheckCircle2, Lock } from 'lucide-react'
 import type { RoadmapNodeData } from './types'
-import { getIconComponent } from './icon-map'
+import { RoadmapIcon } from './RoadmapIcon'
 import { getNodeClasses } from './stage-colors'
 import { cn } from '@/lib/utils'
 
@@ -14,7 +14,6 @@ import { cn } from '@/lib/utils'
  */
 export function RoadmapTopicNode({ data }: NodeProps) {
   const nodeData = data as RoadmapNodeData
-  const Icon = getIconComponent(nodeData.icon)
   const isLocked = nodeData.status === 'locked'
   const isCompleted = nodeData.status === 'completed'
   const hasProgress = nodeData.totalLessons > 0
@@ -42,7 +41,7 @@ export function RoadmapTopicNode({ data }: NodeProps) {
           ) : isCompleted ? (
             <CheckCircle2 className="h-3.5 w-3.5 text-success" />
           ) : (
-            <Icon className="h-3.5 w-3.5" />
+            <RoadmapIcon name={nodeData.icon} className="h-3.5 w-3.5" />
           )}
         </div>
         <span className="text-xs font-bold uppercase tracking-wide leading-tight line-clamp-2">

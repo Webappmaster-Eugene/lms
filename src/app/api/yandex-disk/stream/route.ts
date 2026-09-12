@@ -58,6 +58,9 @@ export async function GET(request: Request): Promise<Response> {
           Location: href,
           // Временную ссылку нельзя класть ни в кеш браузера, ни в общий кеш.
           'Cache-Control': 'private, no-store',
+          // CDN Яндекса отвечает 403 на запрос с чужим Referer; политика редиректа
+          // снимает заголовок у запроса, который браузер отправит по Location.
+          'Referrer-Policy': 'no-referrer',
         },
       })
     } catch (error) {

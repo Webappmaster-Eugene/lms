@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { MessageSquare, Send, Loader2 } from 'lucide-react'
+import { useAsyncData } from '@/hooks/use-async-data'
 import { useToast } from '@/components/ui/Toast'
 import { formatDate } from '@/lib/utils'
 
@@ -23,30 +24,23 @@ type CommentDoc = {
 }
 
 export function LessonComments({ lessonId }: Props) {
-  const [comments, setComments] = useState<CommentDoc[]>([])
   const [newComment, setNewComment] = useState('')
-  const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const { toast } = useToast()
 
-  const loadComments = useCallback(async () => {
-    try {
+  const loadComments = useCallback(
+    async (signal: AbortSignal): Promise<CommentDoc[]> => {
       const res = await fetch(
         `/api/comments?where[lesson][equals]=${lessonId}&where[parentComment][exists]=false&sort=-createdAt&limit=50&depth=1`,
-        { credentials: 'include' },
+        { credentials: 'include', signal },
       )
-      const data = await res.json()
-      setComments(data.docs ?? [])
-    } catch {
-      // silently fail
-    } finally {
-      setLoading(false)
-    }
-  }, [lessonId])
+      const data = (await res.json()) as { docs?: CommentDoc[] }
+      return data.docs ?? []
+    },
+    [lessonId],
+  )
 
-  useEffect(() => {
-    loadComments()
-  }, [loadComments])
+  const { data: comments, loading, reload } = useAsyncData<CommentDoc[]>(loadComments, [])
 
   async function handleSubmit() {
     if (!newComment.trim()) return
@@ -61,7 +55,7 @@ export function LessonComments({ lessonId }: Props) {
       if (!res.ok) throw new Error('Failed')
       setNewComment('')
       toast('Комментарий добавлен', 'success')
-      await loadComments()
+      reload()
     } catch {
       toast('Не удалось добавить комментарий', 'error')
     } finally {

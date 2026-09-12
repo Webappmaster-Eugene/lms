@@ -3,15 +3,13 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Search, X } from 'lucide-react'
+
+import { useHydrated } from '@/hooks/use-hydrated'
 import { SearchBar } from './SearchBar'
 
 export function MobileSearchOverlay() {
   const [isOpen, setIsOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const hydrated = useHydrated()
 
   // Close on Escape
   useEffect(() => {
@@ -52,7 +50,7 @@ export function MobileSearchOverlay() {
       </button>
 
       {/* Portal to body to escape header stacking context */}
-      {mounted && overlay && createPortal(overlay, document.body)}
+      {hydrated && overlay && createPortal(overlay, document.body)}
     </>
   )
 }

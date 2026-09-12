@@ -1,6 +1,6 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import type { RoadmapNodeData } from './types'
-import { getIconComponent } from './icon-map'
+import { RoadmapIcon } from './RoadmapIcon'
 import { getNodeClasses } from './stage-colors'
 import { cn } from '@/lib/utils'
 
@@ -11,7 +11,6 @@ import { cn } from '@/lib/utils'
  */
 export function RoadmapCategoryNode({ data }: NodeProps) {
   const nodeData = data as RoadmapNodeData
-  const Icon = getIconComponent(nodeData.icon)
   const classes = getNodeClasses(nodeData.color, nodeData.stage, nodeData.status)
 
   return (
@@ -32,7 +31,7 @@ export function RoadmapCategoryNode({ data }: NodeProps) {
             classes.accent,
           )}
         >
-          <Icon className="h-5 w-5" />
+          <RoadmapIcon name={nodeData.icon} className="h-5 w-5" />
         </div>
         <div className="flex flex-col">
           <span className="text-sm font-bold uppercase tracking-wide leading-tight">

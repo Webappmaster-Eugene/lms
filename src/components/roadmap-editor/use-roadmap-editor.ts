@@ -32,7 +32,6 @@ type EditorState = {
   selectedNodeId: string | null
   isDirty: boolean
   isSaving: boolean
-  nodeIdToPayloadId: Map<string, number>
 
   onNodesChange: OnNodesChange<EditorNode>
   onEdgesChange: OnEdgesChange<EditorEdge>
@@ -450,7 +449,6 @@ export function useRoadmapEditor(roadmapId: number): EditorState {
     selectedNodeId,
     isDirty,
     isSaving,
-    nodeIdToPayloadId: nodeIdMapRef.current,
     onNodesChange,
     onEdgesChange,
     onConnect,

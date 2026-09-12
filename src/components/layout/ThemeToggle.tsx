@@ -2,17 +2,14 @@
 
 import { useTheme } from 'next-themes'
 import { Moon, Sun } from 'lucide-react'
-import { useEffect, useState } from 'react'
+
+import { useHydrated } from '@/hooks/use-hydrated'
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
+  const hydrated = useHydrated()
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
+  if (!hydrated) {
     return <div className="h-10 w-10" />
   }
 

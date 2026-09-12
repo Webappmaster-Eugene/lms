@@ -14,6 +14,14 @@ const PACKAGE = JSON.parse(read('../../package.json')) as {
   engines?: { node?: string }
   packageManager?: string
   scripts: Record<string, string>
+  dependencies: Record<string, string>
+}
+
+/** Имена пакетов из serverExternalPackages в next.config.mjs. */
+function externalPackages(): string[] {
+  const block = NEXT_CONFIG.match(/serverExternalPackages:\s*\[([\s\S]*?)\]/)
+  expect(block, 'в next.config.mjs нет serverExternalPackages').not.toBeNull()
+  return [...block![1].matchAll(/'([^']+)'/g)].map((m) => m[1])
 }
 
 const LANDING_DOCKERFILE = read('../../landing/Dockerfile')
@@ -166,14 +174,22 @@ describe('инструментирование', () => {
   })
 
   it('перехватчики require объявлены зависимостями и внешними пакетами', () => {
-    const pkg = JSON.parse(read('../../package.json')) as {
-      dependencies: Record<string, string>
-    }
-
     for (const name of ['require-in-the-middle', 'import-in-the-middle']) {
-      expect(pkg.dependencies[name], `${name} не в dependencies`).toBeDefined()
-      expect(NEXT_CONFIG, `${name} не в serverExternalPackages`).toContain(name)
+      expect(PACKAGE.dependencies[name], `${name} не в dependencies`).toBeDefined()
+      expect(externalPackages(), `${name} не в serverExternalPackages`).toContain(name)
     }
+  })
+
+  it('ни один пакет OpenTelemetry не попадает в бандл', () => {
+    // Пакет, оставшийся в бандле, ломает сборку обращением к fs или молча отдаёт
+    // undefined вместо класса — приложение стартует и отвечает 500 на каждый запрос
+    const otel = Object.keys(PACKAGE.dependencies).filter((d) => d.startsWith('@opentelemetry/'))
+    expect(otel.length).toBeGreaterThan(5)
+
+    const external = externalPackages()
+    const missing = otel.filter((name) => !external.includes(name))
+
+    expect(missing, `не объявлены внешними: ${missing.join(', ')}`).toEqual([])
   })
 })
 

@@ -83,6 +83,12 @@ describe('редирект на прямую ссылку', () => {
     expect(response.headers.get('Cache-Control')).toBe('private, no-store')
   })
 
+  it('снимает Referer с запроса по Location — иначе CDN Яндекса отвечает 403', async () => {
+    const response = await GET(streamRequest(uniqueVideoUrl()))
+
+    expect(response.headers.get('Referrer-Policy')).toBe('no-referrer')
+  })
+
   it('путь к файлу передаётся отдельно от ключа публикации', async () => {
     const url = uniqueVideoUrl()
 

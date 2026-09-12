@@ -1,6 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback } from 'react'
+
+import { useAsyncData } from '@/hooks/use-async-data'
 import { X, Trash2, Plus, GripVertical } from 'lucide-react'
 import type { EditorNode, EditorNodeData } from './types'
 import type { NodeColor, NodeStage } from '@/components/roadmap/stage-colors'
@@ -86,29 +88,19 @@ type CourseOption = { id: number; title: string; slug: string }
 
 export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: Props) {
   const data = node.data as EditorNodeData
-  const [courses, setCourses] = useState<CourseOption[]>([])
-  const [coursesLoading, setCoursesLoading] = useState(false)
+  const loadCourses = useCallback(
+    async (signal: AbortSignal): Promise<CourseOption[]> => {
+      const res = await fetch(
+        `/api/courses?where[roadmap][equals]=${roadmapId}&limit=200&sort=order&depth=0`,
+        { credentials: 'include', signal },
+      )
+      const json = (await res.json()) as { docs: CourseOption[] }
+      return json.docs
+    },
+    [roadmapId],
+  )
 
-  useEffect(() => {
-    let cancelled = false
-    setCoursesLoading(true)
-
-    fetch(`/api/courses?where[roadmap][equals]=${roadmapId}&limit=200&sort=order&depth=0`, {
-      credentials: 'include',
-    })
-      .then((res) => res.json())
-      .then((json: { docs: CourseOption[] }) => {
-        if (!cancelled) setCourses(json.docs)
-      })
-      .catch(() => {
-        if (!cancelled) setCourses([])
-      })
-      .finally(() => {
-        if (!cancelled) setCoursesLoading(false)
-      })
-
-    return () => { cancelled = true }
-  }, [roadmapId])
+  const { data: courses, loading: coursesLoading } = useAsyncData<CourseOption[]>(loadCourses, [])
 
   const update = useCallback(
     (partial: Partial<EditorNodeData>) => { onUpdate(node.id, partial) },

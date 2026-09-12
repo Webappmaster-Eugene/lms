@@ -41,7 +41,7 @@ if (OTEL_ENDPOINT) {
   const sdk = new NodeSDK({
     resource,
     traceExporter,
-    logRecordProcessors: [new SimpleLogRecordProcessor(logExporter)],
+    logRecordProcessors: [new SimpleLogRecordProcessor({ exporter: logExporter })],
     instrumentations: [
       getNodeAutoInstrumentations({
         // Disable noisy instrumentations that produce no actionable data with Next.js

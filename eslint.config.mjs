@@ -45,15 +45,6 @@ export default tseslint.config(
       ...next.configs['core-web-vitals'].rules,
       ...reactHooks.configs.recommended.rules,
 
-      // Правила из react-hooks 7 под React Compiler. В текущем коде срабатывают только
-      // на поиске иконки в константной карте и на mounted-флаге гидратации.
-      'react-hooks/static-components': 'warn',
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/refs': 'warn',
-      'react-hooks/purity': 'warn',
-      'react-hooks/immutability': 'warn',
-      'react-hooks/preserve-manual-memoization': 'warn',
-
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
       'react/jsx-uses-vars': 'error',

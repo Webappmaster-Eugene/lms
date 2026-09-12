@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Bell } from 'lucide-react'
 import Link from 'next/link'
+import { useAsyncData } from '@/hooks/use-async-data'
 import { formatDate } from '@/lib/utils'
 
 type NotificationDoc = {
@@ -15,33 +16,36 @@ type NotificationDoc = {
   createdAt: string
 }
 
+const POLL_INTERVAL_MS = 30_000
+
 export function NotificationsBell() {
-  const [notifications, setNotifications] = useState<NotificationDoc[]>([])
-  const [unreadCount, setUnreadCount] = useState(0)
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const loadNotifications = useCallback(async () => {
-    try {
-      const res = await fetch(
-        '/api/notifications?sort=-createdAt&limit=10&depth=0',
-        { credentials: 'include' },
-      )
-      const data = await res.json()
-      const docs = (data.docs ?? []) as NotificationDoc[]
-      setNotifications(docs)
-      setUnreadCount(docs.filter((n) => !n.isRead).length)
-    } catch {
-      // silently fail
-    }
-  }, [])
+  const loadNotifications = useCallback(
+    async (signal: AbortSignal): Promise<NotificationDoc[]> => {
+      const res = await fetch('/api/notifications?sort=-createdAt&limit=10&depth=0', {
+        credentials: 'include',
+        signal,
+      })
+      const data = (await res.json()) as { docs?: NotificationDoc[] }
+      return data.docs ?? []
+    },
+    [],
+  )
+
+  const {
+    data: notifications,
+    reload,
+    setData: setNotifications,
+  } = useAsyncData<NotificationDoc[]>(loadNotifications, [])
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length
 
   useEffect(() => {
-    loadNotifications()
-    // Обновляем каждые 30 секунд
-    const interval = setInterval(loadNotifications, 30000)
+    const interval = setInterval(reload, POLL_INTERVAL_MS)
     return () => clearInterval(interval)
-  }, [loadNotifications])
+  }, [reload])
 
   // Закрытие по клику вне дропдауна
   useEffect(() => {
@@ -67,7 +71,6 @@ export function NotificationsBell() {
       ),
     )
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
-    setUnreadCount(0)
   }
 
   return (

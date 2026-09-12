@@ -2,12 +2,11 @@
 
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import type { EditorNodeData } from './types'
-import { getIconComponent } from '@/components/roadmap/icon-map'
+import { RoadmapIcon } from '@/components/roadmap/RoadmapIcon'
 import { getEditorColors, getSelectionOutline } from './editor-colors'
 
 export function EditorCategoryNode({ data, selected }: NodeProps) {
   const d = data as EditorNodeData
-  const Icon = getIconComponent(d.icon)
   const c = getEditorColors(d.color, d.stage)
 
   return (
@@ -37,7 +36,7 @@ export function EditorCategoryNode({ data, selected }: NodeProps) {
             flexShrink: 0,
           }}
         >
-          <Icon style={{ width: 20, height: 20 }} />
+          <RoadmapIcon name={d.icon} style={{ width: 20, height: 20 }} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span style={{ fontSize: 14, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', lineHeight: 1.2 }}>

@@ -11,6 +11,8 @@ const collections = readdirSync(fileURLToPath(DIR))
     source: readFileSync(fileURLToPath(new URL(file, DIR)), 'utf8'),
   }))
 
+const names = collections.map((c) => c.name)
+
 /**
  * Коллекции, где каждая запись принадлежит конкретному пользователю. Чтение «всего
  * подряд» здесь — утечка: прогресс, заметки, баллы и сертификаты чужих людей.
@@ -40,77 +42,97 @@ const ADMIN_MANAGED = [
   'TrainerTopics',
 ]
 
+const OPERATIONS = ['create', 'read', 'update', 'delete'] as const
+
+function sourceOf(name: string): string {
+  const found = collections.find((c) => c.name === name)
+  expect(found, `коллекция ${name} не найдена`).toBeDefined()
+  return found!.source
+}
+
+/**
+ * Тело блока `access` — по балансу фигурных скобок. Границы по соседним ключам
+ * (`fields:`, конец файла) зависят от порядка полей и при его изменении дают либо
+ * пустой срез, либо срез до конца файла, где найдётся что угодно.
+ */
+function accessBlock(name: string): string {
+  const source = sourceOf(name)
+  const start = source.indexOf('access: {')
+  expect(start, `${name}: нет блока access`).toBeGreaterThanOrEqual(0)
+
+  let depth = 0
+  for (let i = source.indexOf('{', start); i < source.length; i += 1) {
+    if (source[i] === '{') depth += 1
+    else if (source[i] === '}') {
+      depth -= 1
+      if (depth === 0) return source.slice(start, i + 1)
+    }
+  }
+
+  throw new Error(`${name}: блок access не закрыт`)
+}
+
+/** Значение операции верхнего уровня: вложенные объекты в расчёт не берутся. */
+function operationValue(name: string, operation: string): string {
+  return accessBlock(name).match(new RegExp(`^ {4}${operation}:\\s*(.+)$`, 'm'))?.[1] ?? ''
+}
+
 describe('у каждой коллекции есть явные права', () => {
   it('коллекции найдены', () => {
     expect(collections.length).toBeGreaterThan(10)
   })
 
-  it.each(collections.map((c) => c.name))('%s объявляет блок access', (name) => {
-    const { source } = collections.find((c) => c.name === name)!
-    expect(source).toMatch(/^\s{2}access:\s*\{/m)
+  it.each(names)('%s объявляет блок access', (name) => {
+    expect(sourceOf(name)).toMatch(/^ {2}access:\s*\{/m)
   })
 
-  it.each(collections.map((c) => c.name))('%s задаёт все четыре операции', (name) => {
-    const { source } = collections.find((c) => c.name === name)!
-    const block = source.slice(source.indexOf('access: {'))
-
-    for (const op of ['create', 'read', 'update', 'delete']) {
-      expect(block, `${name}: не задан ${op}`).toMatch(new RegExp(`\\b${op}:`))
+  it.each(names)('%s задаёт все четыре операции', (name) => {
+    for (const operation of OPERATIONS) {
+      expect(operationValue(name, operation), `${name}: не задан ${operation}`).not.toBe('')
     }
   })
 })
 
 describe('коллекции с пользовательскими данными', () => {
   it('список актуален — все перечисленные коллекции существуют', () => {
-    const names = collections.map((c) => c.name)
     const unknown = USER_OWNED.filter((n) => !names.includes(n))
     expect(unknown, `в списке USER_OWNED есть несуществующие: ${unknown.join(', ')}`).toEqual([])
   })
 
   it.each(USER_OWNED)('%s ограничивает чтение владельцем', (name) => {
-    const { source } = collections.find((c) => c.name === name)!
-    const block = source.slice(source.indexOf('access: {'), source.indexOf('fields:'))
-    const read = block.match(/read:\s*([^,\n]+)/)?.[1] ?? ''
+    const read = operationValue(name, 'read')
 
     expect(read, `${name}: read = ${read}`).toMatch(/isAdminOrSelf|isAdmin\b|=>/)
-    expect(read).not.toMatch(/isAuthenticated/)
+    expect(read, `${name}: read = ${read}`).not.toMatch(/isAuthenticated/)
   })
 })
 
 describe('справочный контент', () => {
   it('список актуален', () => {
-    const names = collections.map((c) => c.name)
     const unknown = ADMIN_MANAGED.filter((n) => !names.includes(n))
-    expect(unknown, `в списке ADMIN_MANAGED есть несуществующие: ${unknown.join(', ')}`).toEqual(
-      [],
-    )
+    expect(unknown, `в списке ADMIN_MANAGED есть несуществующие: ${unknown.join(', ')}`).toEqual([])
   })
 
   it.each(ADMIN_MANAGED)('%s разрешает изменение только админу', (name) => {
-    const { source } = collections.find((c) => c.name === name)!
-    const block = source.slice(source.indexOf('access: {'), source.indexOf('fields:'))
-
-    for (const op of ['create', 'update', 'delete']) {
-      const value = block.match(new RegExp(`${op}:\\s*([^,\\n]+)`))?.[1] ?? ''
-      expect(value, `${name}: ${op} = ${value}`).toMatch(/isAdmin\b/)
+    for (const operation of ['create', 'update', 'delete']) {
+      const value = operationValue(name, operation)
+      expect(value, `${name}: ${operation} = ${value}`).toMatch(/isAdmin\b/)
     }
   })
 })
 
 describe('отдельные правила', () => {
   it('транзакции баллов запрещено редактировать вообще', () => {
-    const { source } = collections.find((c) => c.name === 'PointsTransactions')!
-    expect(source).toMatch(/update:\s*\(\)\s*=>\s*false/)
+    expect(operationValue('PointsTransactions', 'update')).toMatch(/\(\)\s*=>\s*false/)
   })
 
   it('пользователей заводит только админ — самостоятельной регистрации нет', () => {
-    const { source } = collections.find((c) => c.name === 'Users')!
-    const block = source.slice(source.indexOf('access: {'), source.indexOf('fields:'))
-    expect(block).toMatch(/create:\s*isAdmin/)
+    expect(operationValue('Users', 'create')).toMatch(/isAdmin\b/)
   })
 
   it('в админку пускают только админов', () => {
-    const { source } = collections.find((c) => c.name === 'Users')!
-    expect(source).toMatch(/admin:\s*\(\{\s*req:\s*\{\s*user\s*\}\s*\}\)\s*=>\s*user\?\.role\s*===\s*'admin'/)
+    expect(accessBlock('Users')).toMatch(
+      /admin:\s*\(\{\s*req:\s*\{\s*user\s*\}\s*\}\)\s*=>\s*user\?\.role\s*===\s*'admin'/,
+    )
   })
 })

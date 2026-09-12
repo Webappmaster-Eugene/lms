@@ -4,9 +4,22 @@ import { withPayload } from '@payloadcms/next/withPayload'
 const nextConfig = {
   output: 'standalone',
 
-  // Авто-инструментирование OTel подключает их через динамический require, статический
-  // анализ Next их не видит и в standalone-сборку не переносит
-  serverExternalPackages: ['require-in-the-middle', 'import-in-the-middle'],
+  // OTel обращается к fs/net/tls и подгружает перехватчики динамическим require —
+  // через webpack он не проходит: в sdk-trace-base 2.9+ реализация заменена на
+  // shim-реэкспорт, и после сборки BasicTracerProvider оказывается undefined
+  serverExternalPackages: [
+    '@opentelemetry/api',
+    '@opentelemetry/api-logs',
+    '@opentelemetry/auto-instrumentations-node',
+    '@opentelemetry/exporter-logs-otlp-http',
+    '@opentelemetry/exporter-trace-otlp-http',
+    '@opentelemetry/resources',
+    '@opentelemetry/sdk-logs',
+    '@opentelemetry/sdk-node',
+    '@opentelemetry/semantic-conventions',
+    'require-in-the-middle',
+    'import-in-the-middle',
+  ],
 
   async headers() {
     return [
