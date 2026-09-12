@@ -14,7 +14,9 @@ type ImportFormProps = {
 
 type ImportResult = {
   sectionsCreated: number
+  sectionsUpdated: number
   lessonsCreated: number
+  lessonsUpdated: number
   errors: string[]
   courseName?: string
 }
@@ -51,7 +53,13 @@ export function ImportForm({ courses }: ImportFormProps) {
       if (!res.ok) {
         setError(data.error ?? 'Ошибка импорта')
         if (data.errors?.length) {
-          setResult({ sectionsCreated: 0, lessonsCreated: 0, errors: data.errors })
+          setResult({
+            sectionsCreated: 0,
+            sectionsUpdated: 0,
+            lessonsCreated: 0,
+            lessonsUpdated: 0,
+            errors: data.errors,
+          })
         }
         return
       }
@@ -129,7 +137,10 @@ export function ImportForm({ courses }: ImportFormProps) {
       {/* Results */}
       {result && (
         <div className="rounded-xl border border-border bg-card p-5 space-y-3">
-          {(result.sectionsCreated > 0 || result.lessonsCreated > 0) && (
+          {(result.sectionsCreated > 0 ||
+            result.lessonsCreated > 0 ||
+            result.sectionsUpdated > 0 ||
+            result.lessonsUpdated > 0) && (
             <div className="flex items-center gap-2 text-success">
               <CheckCircle2 className="h-5 w-5" />
               <span className="font-medium">
@@ -138,15 +149,18 @@ export function ImportForm({ courses }: ImportFormProps) {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-lg bg-muted/30 p-3 text-center">
-              <p className="text-2xl font-bold text-foreground">{result.sectionsCreated}</p>
-              <p className="text-xs text-muted-foreground">Секций создано</p>
-            </div>
-            <div className="rounded-lg bg-muted/30 p-3 text-center">
-              <p className="text-2xl font-bold text-foreground">{result.lessonsCreated}</p>
-              <p className="text-xs text-muted-foreground">Уроков создано</p>
-            </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {([
+              ['Секций создано', result.sectionsCreated],
+              ['Секций обновлено', result.sectionsUpdated],
+              ['Уроков создано', result.lessonsCreated],
+              ['Уроков обновлено', result.lessonsUpdated],
+            ] as const).map(([label, value]) => (
+              <div key={label} className="rounded-lg bg-muted/30 p-3 text-center">
+                <p className="text-2xl font-bold text-foreground">{value}</p>
+                <p className="text-xs text-muted-foreground">{label}</p>
+              </div>
+            ))}
           </div>
 
           {result.errors.length > 0 && (
