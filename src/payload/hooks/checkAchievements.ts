@@ -6,6 +6,10 @@ import { withSpan } from '@/lib/telemetry'
  * Hook: проверяет и выдаёт достижения при изменении прогресса пользователя.
  *
  * Запускается на collection: user-progress, afterChange (после awardPoints).
+ *
+ * Все обращения к БД идут через req: local API тогда работает в транзакции
+ * исходного запроса. Без этого запись в users уходит отдельным соединением и
+ * встаёт на блокировке, которую держит незавершённая внешняя транзакция.
  */
 export const checkAchievements: CollectionAfterChangeHook = async ({
   doc,

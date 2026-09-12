@@ -11,6 +11,10 @@ import { withSpan, logger } from '@/lib/telemetry'
  * - Перед начислением проверяется наличие существующей транзакции
  * - При race condition (duplicate key) — ошибка перехватывается
  * - totalPoints пересчитывается как SUM всех транзакций (идемпотентно)
+ *
+ * Все обращения к БД идут через req: local API тогда работает в транзакции
+ * исходного запроса. Без этого запись в users уходит отдельным соединением и
+ * встаёт на блокировке, которую держит незавершённая внешняя транзакция.
  */
 export const awardTrainerPoints: CollectionAfterChangeHook = async ({
   doc,
