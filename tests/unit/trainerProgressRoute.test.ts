@@ -13,7 +13,7 @@ vi.mock('payload', () => ({
 const { POST } = await import('@/app/api/trainer-progress/route')
 
 const USER = { id: 'user-1' }
-const TASK = { id: 'task-1', expectedOutput: '42' }
+const TASK = { id: 17, expectedOutput: '42' }
 
 function post(body: unknown, raw?: string): Request {
   return new Request('https://lms.nadtocheev.ru/api/trainer-progress', {
@@ -174,6 +174,17 @@ describe('запись прогресса', () => {
     expect(args.data.completedAt).toEqual(expect.any(String))
   })
 
+  it('id задачи пишется числом из БД, а не строкой из запроса', () => {
+    // Поле связи в Postgres — integer: строка проходит проверку типов через
+    // приведение, но Payload отвергает её при записи
+    expect.hasAssertions()
+    return POST(post({ taskId: String(TASK.id), userCode: 'x', output: '42' })).then(() => {
+      const [[args]] = create.mock.calls
+      expect(args.data.task).toBe(TASK.id)
+      expect(typeof args.data.task).toBe('number')
+    })
+  })
+
   it('повторное решение обновляет запись и увеличивает счётчик попыток', async () => {
     find.mockImplementation(async ({ collection }: { collection: string }) =>
       collection === 'trainer-tasks'
@@ -193,7 +204,7 @@ describe('запись прогресса', () => {
   })
 
   it('существующая запись ищется по паре пользователь+задача', async () => {
-    await POST(post({ taskId: 'task-1', userCode: 'x', output: '42' }))
+    await POST(post({ taskId: '17', userCode: 'x', output: '42' }))
 
     const progressQuery = find.mock.calls
       .map(([q]) => q)
@@ -201,7 +212,7 @@ describe('запись прогресса', () => {
 
     expect(progressQuery.where).toMatchObject({
       user: { equals: USER.id },
-      task: { equals: 'task-1' },
+      task: { equals: '17' },
     })
   })
 

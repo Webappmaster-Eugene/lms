@@ -1,6 +1,7 @@
 import type { CollectionAfterChangeHook, Payload } from 'payload'
 import { DEFAULT_POINTS } from '@/lib/points-config'
 import type { PointsReason } from '@/lib/points-config'
+import { relationId } from '@/lib/relation-id'
 import { withSpan, logger } from '@/lib/telemetry'
 
 /**
@@ -26,8 +27,8 @@ export const awardPoints: CollectionAfterChangeHook = async ({
 
   if (!justCompleted) return doc
 
-  const userId = String(typeof doc.user === 'object' ? doc.user.id : doc.user)
-  const lessonId = String(typeof doc.lesson === 'object' ? doc.lesson.id : doc.lesson)
+  const userId = relationId(doc.user)
+  const lessonId = relationId(doc.lesson)
 
   return withSpan('hook.awardPoints', { 'user.id': userId, 'lesson.id': lessonId }, async () => {
     // Защита от повторного начисления: если урок уже был пройден ранее
@@ -36,7 +37,7 @@ export const awardPoints: CollectionAfterChangeHook = async ({
       where: {
         user: { equals: userId },
         reason: { equals: 'lesson_completed' },
-        relatedEntity: { equals: lessonId },
+        relatedEntity: { equals: String(lessonId) },
       },
       limit: 1,
     })
@@ -66,7 +67,7 @@ export const awardPoints: CollectionAfterChangeHook = async ({
 
     // 1. Баллы за урок
     const created = await safeCreateTransaction(
-      req.payload, userId, lessonPoints, 'lesson_completed', lessonId, 'Урок пройден',
+      req.payload, userId, lessonPoints, 'lesson_completed', String(lessonId), 'Урок пройден',
     )
     if (!created) return doc // race condition — другой запрос уже начислил
 
@@ -94,7 +95,7 @@ export const awardPoints: CollectionAfterChangeHook = async ({
  */
 async function checkCourseCompletion(
   payload: Payload,
-  userId: string,
+  userId: number,
   courseId: string,
   coursePoints: number,
   lesson: Record<string, unknown>,
@@ -193,7 +194,7 @@ async function checkCourseCompletion(
  */
 async function safeCreateTransaction(
   payload: Payload,
-  userId: string,
+  userId: number,
   amount: number,
   reason: PointsReason,
   relatedEntity: string,
@@ -217,7 +218,7 @@ async function safeCreateTransaction(
       await payload.create({
         collection: 'points-transactions',
         data: {
-          user: userId as unknown as number,
+          user: userId,
           amount,
           reason,
           relatedEntity,
@@ -244,7 +245,7 @@ async function safeCreateTransaction(
  * Пересчитывает totalPoints как сумму всех транзакций.
  * Идемпотентный подход — безопасен при concurrent requests.
  */
-async function recalculateTotalPoints(payload: Payload, userId: string) {
+async function recalculateTotalPoints(payload: Payload, userId: number) {
   return withSpan('awardPoints.recalculateTotalPoints', { 'user.id': userId }, async () => {
     const allTransactions = await payload.find({
       collection: 'points-transactions',

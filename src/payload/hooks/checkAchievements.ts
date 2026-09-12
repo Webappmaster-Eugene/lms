@@ -1,4 +1,5 @@
 import type { CollectionAfterChangeHook, Payload } from 'payload'
+import { relationId } from '@/lib/relation-id'
 import { withSpan } from '@/lib/telemetry'
 
 /**
@@ -20,7 +21,7 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
 
   if (!justCompleted) return doc
 
-  const userId = String(typeof doc.user === 'object' ? doc.user.id : doc.user)
+  const userId = relationId(doc.user)
 
   return withSpan('hook.checkAchievements', { 'user.id': userId }, async () => {
     // Загружаем данные параллельно
@@ -119,7 +120,7 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
         await req.payload.create({
           collection: 'user-achievements',
           data: {
-            user: userId as unknown as number,
+            user: userId,
             achievement: achievement.id,
             unlockedAt: new Date().toISOString(),
           },
@@ -135,7 +136,7 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
         await req.payload.create({
           collection: 'points-transactions',
           data: {
-            user: userId as unknown as number,
+            user: userId,
             amount: achievement.pointsReward,
             reason: 'achievement_unlocked' as const,
             relatedEntity: String(achievement.id),
@@ -202,7 +203,7 @@ function checkCriteria(
   }
 }
 
-async function recalculateTotalPoints(payload: Payload, userId: string) {
+async function recalculateTotalPoints(payload: Payload, userId: number) {
   return withSpan('checkAchievements.recalculateTotalPoints', { 'user.id': userId }, async () => {
     const allTransactions = await payload.find({
       collection: 'points-transactions',

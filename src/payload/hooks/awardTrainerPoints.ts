@@ -1,6 +1,7 @@
 import type { CollectionAfterChangeHook, Payload } from 'payload'
 import { DEFAULT_POINTS } from '@/lib/points-config'
 import type { PointsReason } from '@/lib/points-config'
+import { relationId } from '@/lib/relation-id'
 import { withSpan, logger } from '@/lib/telemetry'
 
 /**
@@ -25,8 +26,8 @@ export const awardTrainerPoints: CollectionAfterChangeHook = async ({
 
   if (!justCompleted) return doc
 
-  const userId = String(typeof doc.user === 'object' ? doc.user.id : doc.user)
-  const taskId = String(typeof doc.task === 'object' ? doc.task.id : doc.task)
+  const userId = relationId(doc.user)
+  const taskId = relationId(doc.task)
 
   return withSpan('hook.awardTrainerPoints', { 'user.id': userId, 'task.id': taskId }, async () => {
     // Защита от повторного начисления
@@ -35,7 +36,7 @@ export const awardTrainerPoints: CollectionAfterChangeHook = async ({
       where: {
         user: { equals: userId },
         reason: { equals: 'trainer_task_completed' },
-        relatedEntity: { equals: taskId },
+        relatedEntity: { equals: String(taskId) },
       },
       limit: 1,
     })
@@ -74,7 +75,7 @@ export const awardTrainerPoints: CollectionAfterChangeHook = async ({
 
     // Начисляем баллы
     const created = await safeCreateTransaction(
-      req.payload, userId, taskPoints, 'trainer_task_completed', taskId, 'Задача тренажёра решена',
+      req.payload, userId, taskPoints, 'trainer_task_completed', String(taskId), 'Задача тренажёра решена',
     )
 
     if (!created) return doc
@@ -90,7 +91,7 @@ export const awardTrainerPoints: CollectionAfterChangeHook = async ({
 
 async function safeCreateTransaction(
   payload: Payload,
-  userId: string,
+  userId: number,
   amount: number,
   reason: PointsReason,
   relatedEntity: string,
@@ -113,7 +114,7 @@ async function safeCreateTransaction(
       await payload.create({
         collection: 'points-transactions',
         data: {
-          user: userId as unknown as number,
+          user: userId,
           amount,
           reason,
           relatedEntity,
@@ -128,7 +129,7 @@ async function safeCreateTransaction(
   })
 }
 
-async function recalculateTotalPoints(payload: Payload, userId: string) {
+async function recalculateTotalPoints(payload: Payload, userId: number) {
   return withSpan('awardTrainerPoints.recalculateTotalPoints', { 'user.id': userId }, async () => {
     const allTransactions = await payload.find({
       collection: 'points-transactions',

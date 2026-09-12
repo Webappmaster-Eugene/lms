@@ -96,7 +96,7 @@ export async function POST(request: Request) {
     collection: 'user-trainer-progress',
     data: {
       user: user.id,
-      task: taskId as unknown as number,
+      task: task.id,
       isCompleted: true,
       userCode,
       completedAt: new Date().toISOString(),
