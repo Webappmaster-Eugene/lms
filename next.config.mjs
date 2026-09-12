@@ -35,8 +35,11 @@ const nextConfig = {
             value: 'nosniff',
           },
           {
+            // Плеер берёт видео с CDN Яндекса, а тот отвечает 403 на запрос с чужим
+            // referer. Повторные Range-запросы (хвост файла, перемотка) браузер шлёт
+            // уже вне цепочки редиректов, поэтому referer снимаем на уровне документа.
             key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin',
+            value: 'no-referrer',
           },
           {
             key: 'Content-Security-Policy',

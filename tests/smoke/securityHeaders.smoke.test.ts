@@ -27,7 +27,7 @@ describe('базовые заголовки', () => {
   it.each([
     ['X-Frame-Options', 'DENY'],
     ['X-Content-Type-Options', 'nosniff'],
-    ['Referrer-Policy', 'strict-origin-when-cross-origin'],
+    ['Referrer-Policy', 'no-referrer'],
   ])('%s = %s', (key, value) => {
     expect(NEXT_CONFIG).toMatch(new RegExp(`key: '${key}',[\\s\\S]{0,80}value: '${value}'`))
   })
@@ -63,6 +63,10 @@ describe('CSP и встраиваемый контент не разошлись
   it('Яндекс.Диск не встраивается в iframe — он запрещает это своим frame-ancestors', () => {
     expect(VIDEO_PLAYER).toContain('/api/yandex-disk/stream')
     expect(directive('frame-src')).not.toContain('disk.yandex')
+  })
+
+  it('referer снят на уровне документа — иначе CDN Яндекса рвёт перемотку по 403', () => {
+    expect(NEXT_CONFIG).toMatch(/key: 'Referrer-Policy',[\s\S]{0,80}value: 'no-referrer'/)
   })
 
   it('miro разрешён — блок MiroBlock встраивает доски через iframe', () => {
