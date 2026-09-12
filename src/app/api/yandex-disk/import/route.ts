@@ -62,7 +62,8 @@ export async function POST(request: Request) {
       )
     }
 
-    if (!parsePublicResourceUrl(publicUrl)) {
+    const resource = parsePublicResourceUrl(publicUrl)
+    if (!resource) {
       return NextResponse.json(
         { error: 'Ссылка не похожа на публичную папку Яндекс.Диска' },
         { status: 400 },
@@ -92,9 +93,15 @@ export async function POST(request: Request) {
       const token = process.env.YANDEX_DISK_TOKEN || undefined
 
       logger.info(`YD Import: читаем папку ${publicUrl}`)
-      const items = await fetchFolderRecursive(publicUrl, { token })
+      // Импортировать можно и вложенную папку раздачи — API принимает ключ
+      // публикации и путь внутри неё по отдельности.
+      const items = await fetchFolderRecursive(
+        resource.publicKey,
+        { token },
+        resource.path ?? undefined,
+      )
 
-      const structure = buildStructure(items, course.title)
+      const structure = buildStructure(items, course.title, resource.path)
       const warnings = [...structure.warnings]
 
       if (structure.sections.length === 0) {
@@ -120,7 +127,7 @@ export async function POST(request: Request) {
         stats[sectionResult.created ? 'sectionsCreated' : 'sectionsUpdated']++
 
         for (const lesson of section.lessons) {
-          const content = await buildLessonContent(lesson, publicUrl, token, warnings)
+          const content = await buildLessonContent(lesson, resource.publicKey, token, warnings)
 
           const lessonResult = await upsertLesson(payload, {
             courseId,
@@ -178,8 +185,9 @@ export async function POST(request: Request) {
 function buildStructure(
   items: YandexDiskItem[],
   courseTitle: string,
+  basePath: string | null,
 ): { sections: ImportedSection[]; warnings: string[] } {
-  const rootVideos = filterVideoFiles(items.filter((item) => isRootLevel(item.path)))
+  const rootVideos = filterVideoFiles(items.filter((item) => isRootLevel(item.path, basePath)))
   const isLegacyNaming =
     rootVideos.length > 0 && rootVideos.every((item) => parseVideoFilename(item.name) !== null)
 
@@ -202,12 +210,16 @@ function buildStructure(
     }
   }
 
-  const tree = parseYandexDiskTree(items, { rootTitle: courseTitle })
+  const tree = parseYandexDiskTree(items, { rootTitle: courseTitle, basePath })
   return { sections: tree.sections, warnings: tree.warnings }
 }
 
-function isRootLevel(path: string): boolean {
-  return path.replace(/^disk:/, '').replace(/^\/+/, '').split('/').length === 1
+/** Файл лежит прямо в импортируемой папке, а не в её подпапке. */
+function isRootLevel(path: string, basePath: string | null): boolean {
+  const clean = (value: string) => value.replace(/^disk:/, '').replace(/^\/+|\/+$/g, '')
+  const relative = basePath ? clean(path).slice(clean(basePath).length + 1) : clean(path)
+
+  return relative.length > 0 && !relative.includes('/')
 }
 
 /** Собирает контент урока: сначала видео, затем материалы ссылками. */

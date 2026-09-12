@@ -82,10 +82,10 @@ type UnitRef = {
 
 export function parseYandexDiskTree(
   items: YandexDiskItem[],
-  options: { rootTitle?: string } = {},
+  options: { rootTitle?: string; basePath?: string | null } = {},
 ): StructureResult {
   const warnings: string[] = []
-  const root = buildTree(items)
+  const root = buildTree(items, options.basePath ?? null)
   const sections: ImportedSection[] = []
 
   // Папка "Курс (доп)" не отдельная секция, а материалы к одноимённой основной.
@@ -160,8 +160,12 @@ export function parseYandexDiskTree(
   return { sections: withLessons, warnings, totalVideos, totalMaterials }
 }
 
-/** Собирает дерево из плоского рекурсивного листинга. */
-function buildTree(items: YandexDiskItem[]): TreeNode {
+/**
+ * Собирает дерево из плоского рекурсивного листинга.
+ * basePath — папка публикации, которую импортируем: она становится корнем дерева.
+ */
+function buildTree(items: YandexDiskItem[], basePath: string | null): TreeNode {
+  const prefix = basePath ? normalizePath(basePath) : ''
   const root: TreeNode = { name: '', path: '/', dirs: [], files: [] }
   const nodes = new Map<string, TreeNode>([['', root]])
 
@@ -184,7 +188,10 @@ function buildTree(items: YandexDiskItem[]): TreeNode {
   const sorted = [...items].sort((a, b) => a.path.localeCompare(b.path, 'ru'))
 
   for (const item of sorted) {
-    const segments = normalizePath(item.path).split('/').filter(Boolean)
+    const relative = stripPrefix(normalizePath(item.path), prefix)
+    if (relative === null) continue
+
+    const segments = relative.split('/').filter(Boolean)
     if (segments.length === 0) continue
 
     if (item.type === 'dir') {
@@ -540,4 +547,11 @@ function cleanTitle(name: string): string {
 
 function normalizePath(path: string): string {
   return path.replace(/^disk:/, '').replace(/^\/+|\/+$/g, '')
+}
+
+/** Отрезает папку импорта от пути; null — путь лежит вне неё. */
+function stripPrefix(path: string, prefix: string): string | null {
+  if (prefix.length === 0) return path
+  if (path === prefix) return ''
+  return path.startsWith(prefix + '/') ? path.slice(prefix.length + 1) : null
 }

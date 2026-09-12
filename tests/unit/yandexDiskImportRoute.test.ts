@@ -175,6 +175,47 @@ describe('создание структуры', () => {
   })
 })
 
+describe('импорт вложенной папки раздачи', () => {
+  const NESTED = `${FOLDER}/purple/Next.js14`
+
+  beforeEach(() => {
+    fetchFolderRecursive.mockResolvedValue([
+      dir('/purple/Next.js14/Блок 1'),
+      file('/purple/Next.js14/Блок 1/1.mp4'),
+      file('/purple/Next.js14/Блок 1/2.mp4'),
+    ])
+  })
+
+  it('путь внутри раздачи передаётся отдельно от ключа публикации', async () => {
+    await POST(post({ publicUrl: NESTED, courseId: '3' }))
+
+    expect(fetchFolderRecursive).toHaveBeenCalledWith(
+      FOLDER,
+      expect.anything(),
+      '/purple/Next.js14',
+    )
+  })
+
+  it('секции берутся из подпапки, а не из корня раздачи', async () => {
+    const response = await POST(post({ publicUrl: NESTED, courseId: '3' }))
+
+    await expect(response.json()).resolves.toMatchObject({ sectionsCreated: 1, lessonsCreated: 2 })
+    expect(createdDocs().find((c) => c.collection === 'sections')?.data).toMatchObject({
+      title: 'Блок 1',
+    })
+  })
+
+  it('ссылка на видео собирается от ключа публикации, а не от вложенного URL', async () => {
+    await POST(post({ publicUrl: NESTED, courseId: '3' }))
+
+    const content = lessonsCreated()[0].data.content as Array<Record<string, unknown>>
+
+    expect(content[0]).toMatchObject({
+      videoUrl: `${FOLDER}/purple/Next.js14/${encodeURIComponent('Блок 1')}/1.mp4`,
+    })
+  })
+})
+
 describe('повторный импорт', () => {
   beforeEach(() => {
     find.mockImplementation(async ({ collection, where }: { collection: string; where: Record<string, unknown> }) => {

@@ -281,6 +281,23 @@ describe('устойчивость к формату листинга', () => {
     expect(result.sections[0].lessons).toHaveLength(2)
   })
 
+  it('basePath делает импортируемую подпапку корнем дерева', () => {
+    const result = parseYandexDiskTree(
+      [
+        dir('/purple/Next.js14'),
+        dir('/purple/Next.js14/Блок 1'),
+        file('/purple/Next.js14/Блок 1/1.mp4'),
+        file('/purple/Next.js14/Блок 1/2.mp4'),
+        dir('/purple/React'),
+        file('/purple/React/1.mp4'),
+      ],
+      { basePath: '/purple/Next.js14' },
+    )
+
+    expect(result.sections.map((s) => s.title)).toEqual(['Блок 1'])
+    expect(result.totalVideos).toBe(2)
+  })
+
   it('пустой листинг не падает и сообщает об отсутствии видео', () => {
     const result = parseYandexDiskTree([])
 
