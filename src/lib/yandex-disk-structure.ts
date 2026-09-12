@@ -112,7 +112,7 @@ export function parseYandexDiskTree(
     if (computeKind(rootFiles) === 'multi') {
       sections.push(...buildDottedSections(rootFiles, warnings))
     } else {
-      sections.push(buildSection(rootFiles, title, warnings))
+      sections.push(buildSection(rootFiles, title))
     }
   }
 
@@ -318,7 +318,7 @@ function collectSections(node: TreeNode, sections: ImportedSection[], warnings: 
       if (computeKind(ownFiles) === 'multi') {
         sections.push(...buildDottedSections(ownFiles, warnings))
       } else {
-        sections.push(buildSection(ownFiles, cleanTitle(node.name), warnings))
+        sections.push(buildSection(ownFiles, cleanTitle(node.name)))
       }
     }
 
@@ -342,10 +342,10 @@ function collectSections(node: TreeNode, sections: ImportedSection[], warnings: 
     return
   }
 
-  sections.push(buildSection(node, cleanTitle(node.name), warnings))
+  sections.push(buildSection(node, cleanTitle(node.name)))
 }
 
-function buildSection(node: TreeNode, title: string, warnings: string[]): ImportedSection {
+function buildSection(node: TreeNode, title: string): ImportedSection {
   const lessons = new Map<number, ImportedLesson>()
 
   /** Урок с данным ключом; создаётся при первом обращении. */
