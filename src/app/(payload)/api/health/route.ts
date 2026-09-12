@@ -14,8 +14,6 @@ export async function GET(): Promise<NextResponse> {
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    // Наружу причина не отдаётся, но без неё unhealthy-контейнер нечем объяснить:
-    // Traefik снимает такой контейнер с маршрутизации, и снаружи виден только 404
     console.error('[health] проверка не прошла', error)
 
     return NextResponse.json(

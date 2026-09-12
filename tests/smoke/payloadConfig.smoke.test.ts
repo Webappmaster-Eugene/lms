@@ -35,10 +35,12 @@ describe('коллекции подключены к конфигу', () => {
   })
 
   it('каждая импортированная коллекция включена в массив collections', () => {
-    const collectionsArray = CONFIG.slice(
-      CONFIG.indexOf('collections: ['),
-      CONFIG.indexOf('globals:'),
-    )
+    const start = CONFIG.indexOf('collections: [')
+    const end = CONFIG.indexOf(']', start)
+    expect(start, 'в конфиге нет массива collections').toBeGreaterThanOrEqual(0)
+    expect(end).toBeGreaterThan(start)
+
+    const collectionsArray = CONFIG.slice(start, end)
     const missing = COLLECTION_FILES.filter(
       (name) => !new RegExp(`\\b${name}\\b`).test(collectionsArray),
     )
