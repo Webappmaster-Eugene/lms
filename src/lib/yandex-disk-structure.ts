@@ -70,12 +70,17 @@ type TreeNode = {
   files: YandexDiskItem[]
 }
 
-type NodeKind = 'group' | 'section' | 'lesson'
+type NodeKind = 'group' | 'multi' | 'section' | 'lesson' | 'materials'
 
-/** Разобранная нумерация из имени файла или папки. */
+/**
+ * Разобранная нумерация из имени файла или папки.
+ * Разделитель различает две конвенции: "5_2" — части одного урока,
+ * "1.2" — урок 2 раздела 1.
+ */
 type UnitRef = {
   number: number
   part: number | null
+  separator: '.' | '_' | '-' | null
   label: string
   isDate: boolean
 }
@@ -98,9 +103,17 @@ export function parseYandexDiskTree(
   }
   const overlayPaths = new Set([...overlays.values()].map((dir) => dir.path))
 
-  // Файлы в корне публикации образуют секцию с названием самой папки.
+  // Файлы в корне импортируемой папки разбираются отдельно от её подпапок:
+  // подпапки — это самостоятельные секции, а не уроки корневой секции.
   if (root.files.some(isVideo)) {
-    sections.push(buildSection(root, options.rootTitle ?? 'Материалы курса', warnings))
+    const rootFiles: TreeNode = { ...root, dirs: [] }
+    const title = options.rootTitle ?? 'Материалы курса'
+
+    if (computeKind(rootFiles) === 'multi') {
+      sections.push(...buildDottedSections(rootFiles, warnings))
+    } else {
+      sections.push(buildSection(rootFiles, title, warnings))
+    }
   }
 
   for (const dir of root.dirs) {
@@ -236,30 +249,87 @@ function classify(node: TreeNode): NodeKind {
 }
 
 function computeKind(node: TreeNode): NodeKind {
-  const childKinds = node.dirs.map(classify)
+  // Папка без единого видео в поддереве — это исходники или раздатка,
+  // структуру курса она не задаёт, всё её содержимое идёт материалами.
+  if (!hasVideo(node)) return 'materials'
+
+  const childKinds = node.dirs.map(classify).filter((kind) => kind !== 'materials')
 
   if (childKinds.some((kind) => kind !== 'lesson')) return 'group'
-  if (node.dirs.length > 0) return 'section'
+  if (childKinds.length > 0) return 'section'
 
-  const videos = node.files.filter(isVideo)
-  const numbers = new Set(
-    videos.map((file) => parseUnitRef(file.name)?.number).filter((n): n is number => n !== undefined),
-  )
+  // "1.1", "1.2", "2.1" в одной папке — это несколько секций, а не один урок.
+  const dotted = dottedRefs(node)
+  if (new Set(dotted.map((ref) => ref.number)).size >= 2) return 'multi'
 
-  return numbers.size >= 2 ? 'section' : 'lesson'
+  // Ненумерованный файл — сам по себе урок, поэтому считается наравне с номерами.
+  const refs = node.files.filter(isVideo).map((file) => parseUnitRef(file.name))
+  const keys = new Set(refs.filter((ref): ref is UnitRef => ref !== null).map(lessonKeyOf))
+  const unnumbered = refs.filter((ref) => ref === null).length
+
+  return keys.size + unnumbered >= 2 ? 'section' : 'lesson'
+}
+
+/** Есть ли видео в самой папке или где-то внутри неё. */
+function hasVideo(node: TreeNode): boolean {
+  return node.files.some(isVideo) || node.dirs.some(hasVideo)
+}
+
+/** Все файлы поддерева — для папок, которые целиком уходят в материалы. */
+function collectFiles(node: TreeNode): YandexDiskItem[] {
+  return [...node.files, ...node.dirs.flatMap(collectFiles)]
+}
+
+/** Кладёт материалы в первый урок последней секции — ближайший по смыслу. */
+function attachMaterials(sections: ImportedSection[], files: YandexDiskItem[], title: string): void {
+  if (files.length === 0) return
+
+  const section = sections[sections.length - 1]
+  const lesson = section?.lessons[0]
+
+  if (lesson) {
+    lesson.materials.push(...files.map(toMaterial))
+    return
+  }
+
+  sections.push({
+    order: 0,
+    title,
+    lessons: [{
+      order: 1, title: 'Материалы', videos: [], hasGeneratedTitle: false,
+      materials: files.map(toMaterial),
+    }],
+  })
 }
 
 /** Спускается по дереву, превращая в секции те узлы, что ими являются. */
 function collectSections(node: TreeNode, sections: ImportedSection[], warnings: string[]): void {
   const kind = classify(node)
 
+  if (kind === 'materials') {
+    attachMaterials(sections, collectFiles(node), cleanTitle(node.name) || 'Материалы')
+    return
+  }
+
   if (kind === 'group') {
+    // Видео самой папки-группы образуют свою секцию — иначе они потерялись бы.
+    if (node.files.some(isVideo)) {
+      const ownFiles: TreeNode = { ...node, dirs: [] }
+      if (computeKind(ownFiles) === 'multi') {
+        sections.push(...buildDottedSections(ownFiles, warnings))
+      } else {
+        sections.push(buildSection(ownFiles, cleanTitle(node.name), warnings))
+      }
+    }
+
     for (const child of node.dirs) {
       collectSections(child, sections, warnings)
     }
-    if (node.files.some(isVideo)) {
-      warnings.push(`Видео в папке "${node.name}" пропущены: папка содержит вложенные секции`)
-    }
+    return
+  }
+
+  if (kind === 'multi') {
+    sections.push(...buildDottedSections(node, warnings))
     return
   }
 
@@ -278,32 +348,36 @@ function collectSections(node: TreeNode, sections: ImportedSection[], warnings: 
 function buildSection(node: TreeNode, title: string, warnings: string[]): ImportedSection {
   const lessons = new Map<number, ImportedLesson>()
 
-  /** Урок с данным номером; создаётся при первом обращении. */
+  /** Урок с данным ключом; создаётся при первом обращении. */
   const ensureLesson = (ref: UnitRef): ImportedLesson => {
-    const existing = lessons.get(ref.number)
+    const key = lessonKeyOf(ref)
+    const existing = lessons.get(key)
     if (existing) return existing
 
     const label = cleanTitle(ref.label)
     const lesson: ImportedLesson = {
-      order: ref.number,
+      order: key,
       title: lessonTitle(ref),
       videos: [],
       materials: [],
       hasGeneratedTitle: !ref.isDate && label.length === 0,
     }
-    lessons.set(ref.number, lesson)
+    lessons.set(key, lesson)
     return lesson
   }
 
-  for (const child of node.dirs) {
+  const materialDirs = node.dirs.filter((child) => classify(child) === 'materials')
+
+  for (const child of node.dirs.filter((item) => classify(item) !== 'materials')) {
     const ref = parseUnitRef(child.name) ?? {
       number: lessons.size + 1,
       part: null,
+      separator: null,
       label: child.name,
       isDate: false,
     }
     const lesson = ensureLesson(ref)
-    const nested = buildLessonFromDir(child, ref.number)
+    const nested = buildLessonFromDir(child, lessonKeyOf(ref))
 
     if (nested) {
       lesson.videos.push(...nested.videos)
@@ -315,20 +389,44 @@ function buildSection(node: TreeNode, title: string, warnings: string[]): Import
     }
   }
 
+  const videoFiles = node.files.filter(isVideo)
+
+  // Ключи занумерованных уроков заняты — файлы без нумерации продолжают счёт.
+  let nextFreeKey = videoFiles.reduce((max, file) => {
+    const ref = parseUnitRef(file.name)
+    return ref ? Math.max(max, lessonKeyOf(ref)) : max
+  }, 0)
+
   // Сначала видео — иначе материал с номером может прийти раньше своего урока
   // и осесть в первом попавшемся.
-  for (const file of node.files.filter(isVideo)) {
+  for (const file of videoFiles) {
     const ref = parseUnitRef(file.name)
-    if (!ref) {
-      warnings.push(`Файл "${file.name}" пропущен: не удалось определить номер урока`)
+
+    if (ref) {
+      ensureLesson(ref).videos.push({ title: '', path: file.path, part: partOf(ref) })
       continue
     }
-    ensureLesson(ref).videos.push({ title: '', path: file.path, part: ref.part })
+
+    // Часть курсов подписывает видео только темой, без номеров: каждый файл — урок.
+    const title = cleanTitle(stripExtension(file.name))
+    nextFreeKey += 1
+    lessons.set(nextFreeKey, {
+      order: nextFreeKey,
+      title: title.length > 0 ? title : `Урок ${nextFreeKey}`,
+      videos: [{ title: '', path: file.path, part: null }],
+      materials: [],
+      hasGeneratedTitle: title.length === 0,
+    })
   }
 
-  for (const file of node.files.filter((item) => !isVideo(item))) {
+  const materialFiles = [
+    ...node.files.filter((item) => !isVideo(item)),
+    ...materialDirs.flatMap(collectFiles),
+  ]
+
+  for (const file of materialFiles) {
     const ref = parseUnitRef(file.name)
-    const target = ref ? lessons.get(ref.number) : undefined
+    const target = ref ? lessons.get(lessonKeyOf(ref)) : undefined
 
     // Материал без своего урока относится ко всей секции — кладём в первый урок.
     ;(target?.materials ?? sectionMaterials(lessons)).push(toMaterial(file))
@@ -341,6 +439,114 @@ function buildSection(node: TreeNode, title: string, warnings: string[]): Import
   }
 
   return section
+}
+
+/**
+ * Папка, где файлы пронумерованы как "раздел.урок" ("1.1", "1.2", "2.1"):
+ * каждый первый номер становится отдельной секцией.
+ *
+ * Название секции берём из скобок в конце имени — курсы подписывают так
+ * раздел целиком ("1.1. Zustand (Введение)"), — иначе нумеруем.
+ */
+function buildDottedSections(node: TreeNode, warnings: string[]): ImportedSection[] {
+  const groups = new Map<number, { files: YandexDiskItem[]; refs: UnitRef[] }>()
+
+  const loose: YandexDiskItem[] = []
+
+  for (const file of node.files.filter(isVideo)) {
+    const ref = parseUnitRef(file.name)
+    if (!ref || ref.separator !== '.' || ref.part === null) {
+      // Файл без нумерации раздела — отдельный урок в конце последней секции.
+      loose.push(file)
+      continue
+    }
+    const group = groups.get(ref.number) ?? { files: [], refs: [] }
+    group.files.push(file)
+    group.refs.push(ref)
+    groups.set(ref.number, group)
+  }
+
+  const sections: ImportedSection[] = []
+
+  for (const [number, group] of [...groups.entries()].sort((a, b) => a[0] - b[0])) {
+    const suffix = commonSuffix(group.refs)
+    const lessons = new Map<number, ImportedLesson>()
+
+    group.refs.forEach((ref, index) => {
+      const key = ref.part as number
+      const label = cleanTitle(stripSuffix(ref.label, suffix))
+      const lesson = lessons.get(key) ?? {
+        order: key,
+        title: label.length > 0 ? label : `Урок ${key}`,
+        videos: [],
+        materials: [],
+        hasGeneratedTitle: label.length === 0,
+      }
+      lesson.videos.push({ title: '', path: group.files[index].path, part: null })
+      lessons.set(key, lesson)
+    })
+
+    sections.push({
+      order: number,
+      title: suffix ?? `Раздел ${number}`,
+      lessons: [...lessons.values()].sort((a, b) => a.order - b.order),
+    })
+  }
+
+  const lastSection = sections[sections.length - 1]
+  if (lastSection) {
+    for (const file of loose) {
+      const title = cleanTitle(stripExtension(file.name))
+      lastSection.lessons.push({
+        order: (lastSection.lessons[lastSection.lessons.length - 1]?.order ?? 0) + 1,
+        title: title.length > 0 ? title : 'Урок',
+        videos: [{ title: '', path: file.path, part: null }],
+        materials: [],
+        hasGeneratedTitle: false,
+      })
+    }
+  } else if (loose.length > 0) {
+    warnings.push(`Файлы без нумерации в папке "${node.name}" пропущены: ${loose.length}`)
+  }
+
+  // Материалы такой папки относятся к уроку своего раздела, иначе к первому.
+  for (const file of node.files.filter((item) => !isVideo(item))) {
+    const ref = parseUnitRef(file.name)
+    const section = ref ? sections.find((item) => item.order === ref.number) : undefined
+    const target = section ?? sections[0]
+    if (!target) continue
+
+    const lesson =
+      (ref?.part !== null && ref?.part !== undefined
+        ? target.lessons.find((item) => item.order === ref.part)
+        : undefined) ?? target.lessons[0]
+
+    if (lesson) lesson.materials.push(toMaterial(file))
+  }
+
+  return sections
+}
+
+/**
+ * Название раздела в скобках: курсы ставят его не у каждого урока, а обычно
+ * у первого, поэтому достаточно, чтобы все встреченные варианты совпадали.
+ */
+function commonSuffix(refs: UnitRef[]): string | null {
+  const suffixes = refs
+    .map((ref) => /\(([^)]+)\)\s*$/.exec(ref.label)?.[1]?.trim())
+    .filter((value): value is string => Boolean(value))
+
+  if (suffixes.length === 0) return null
+  return suffixes.every((value) => value === suffixes[0]) ? suffixes[0] : null
+}
+
+function stripSuffix(label: string, suffix: string | null): string {
+  if (!suffix) return label
+  return label.replace(new RegExp(`\\(\\s*${escapeRegExp(suffix)}\\s*\\)\\s*$`), '').trim()
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 /** Материалы уровня секции: первый урок секции, либо отдельный урок, если уроков нет. */
@@ -368,7 +574,8 @@ function buildLessonFromDir(node: TreeNode, order: number): ImportedLesson | nul
   const collect = (current: TreeNode): void => {
     for (const file of current.files) {
       if (isVideo(file)) {
-        videos.push({ title: '', path: file.path, part: parseUnitRef(file.name)?.part ?? null })
+        const fileRef = parseUnitRef(file.name)
+        videos.push({ title: '', path: file.path, part: fileRef ? partOf(fileRef) : null })
       } else {
         materials.push(toMaterial(file))
       }
@@ -502,18 +709,58 @@ function dateFromNumber(value: number): string | null {
  * Возвращает null, если имя не начинается с числа.
  */
 export function parseUnitRef(name: string): UnitRef | null {
-  const base = stripExtension(name).trim()
-  const match = /^(\d+)(?:[_.\-–—](\d+))?(.*)$/.exec(base)
+  // Раздачи подписывают файлы тегом в начале имени — до нумерации.
+  const base = stripExtension(name).replace(NOISE_TAGS, '').trim()
+
+  const worded = /^(?:lesson|lecture|part|урок|занятие|часть)\s*[-_.№#]?\s*(\d+)(.*)$/i.exec(base)
+  if (worded) {
+    const number = Number(worded[1])
+    if (!Number.isSafeInteger(number)) return null
+    return { number, part: null, separator: null, label: trimLabel(worded[2]), isDate: false }
+  }
+
+  const match = /^(\d+)(?:([_.\-–—])(\d+))?(.*)$/.exec(base)
   if (!match) return null
 
   const number = Number(match[1])
   if (!Number.isSafeInteger(number)) return null
 
-  const part = match[2] === undefined ? null : Number(match[2])
-  const label = match[3].replace(/^[\s._\-–—)]+/, '').trim()
+  const rawPart = match[3] === undefined ? null : Number(match[3])
+  const part = rawPart !== null && Number.isSafeInteger(rawPart) ? rawPart : null
+  const separator = part === null ? null : normalizeSeparator(match[2])
   const isDate = match[1].length === 8 && dateFromNumber(number) !== null
 
-  return { number, part: part !== null && Number.isSafeInteger(part) ? part : null, label, isDate }
+  return { number, part, separator, label: trimLabel(match[4]), isDate }
+}
+
+function normalizeSeparator(raw: string | undefined): '.' | '_' | '-' {
+  if (raw === '_') return '_'
+  return raw === '.' ? '.' : '-'
+}
+
+function trimLabel(raw: string): string {
+  return raw.replace(/^[\s._\-–—)]+/, '').trim()
+}
+
+/**
+ * Номер урока внутри секции. Точка в "1.2" разделяет секцию и урок,
+ * подчёркивание в "5_2" — урок и его часть.
+ */
+function lessonKeyOf(ref: UnitRef): number {
+  return ref.separator === '.' && ref.part !== null ? ref.part : ref.number
+}
+
+/** Номер части урока — только для формы "5_2". */
+function partOf(ref: UnitRef): number | null {
+  return ref.separator === '_' ? ref.part : null
+}
+
+/** Файлы вида "1.1", "2.3" в одной папке: разные секции внутри неё. */
+function dottedRefs(node: TreeNode): UnitRef[] {
+  return node.files
+    .filter(isVideo)
+    .map((file) => parseUnitRef(file.name))
+    .filter((ref): ref is UnitRef => ref !== null && ref.separator === '.' && ref.part !== null)
 }
 
 function compareVideos(a: ImportedVideo, b: ImportedVideo): number {

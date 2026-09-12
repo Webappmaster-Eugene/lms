@@ -141,7 +141,7 @@ describe('уроки и части', () => {
     expect(result.sections[0].lessons[1].title).toBe('Разбор ниш')
   })
 
-  it('видео без номера в секции пропускается с предупреждением', () => {
+  it('видео без номера становится отдельным уроком, названным по файлу', () => {
     const result = parseYandexDiskTree([
       dir('/Блок 1'),
       file('/Блок 1/1.mp4'),
@@ -149,8 +149,129 @@ describe('уроки и части', () => {
       file('/Блок 1/финал.mp4'),
     ])
 
+    expect(result.totalVideos).toBe(3)
+    expect(result.sections[0].lessons.map((l) => l.title)).toEqual(['Урок 1', 'Урок 2', 'финал'])
+  })
+
+  it('курс без нумерации целиком: каждый файл — свой урок', () => {
+    const result = parseYandexDiskTree([
+      dir('/Доклады'),
+      file('/Доклады/Документация в эпоху AI.mp4'),
+      file('/Доклады/AI в SRE.mp4'),
+    ])
+
     expect(result.totalVideos).toBe(2)
-    expect(result.warnings.join('\n')).toContain('финал.mp4')
+    expect(result.sections[0].lessons.map((l) => l.title).sort()).toEqual([
+      'AI в SRE',
+      'Документация в эпоху AI',
+    ])
+  })
+
+  it('имена вида lessonN и «Урок №N» разбираются как нумерация', () => {
+    const result = parseYandexDiskTree([
+      dir('/Курс'),
+      file('/Курс/[eground.org] lesson1.mp4'),
+      file('/Курс/[eground.org] lesson2.mp4'),
+      file('/Курс/[eground.org] lesson10.mp4'),
+    ])
+
+    expect(result.sections[0].lessons.map((l) => l.title)).toEqual(['Урок 1', 'Урок 2', 'Урок 3'])
+
+    const numbered = parseYandexDiskTree([
+      dir('/Курс'),
+      file('/Курс/[eground.org] Урок №1. Введение.mp4'),
+      file('/Курс/[eground.org] Урок №2. Метрики.mp4'),
+    ])
+
+    expect(numbered.sections[0].lessons.map((l) => l.title)).toEqual(['Введение', 'Метрики'])
+  })
+})
+
+describe('нумерация «раздел.урок»', () => {
+  it('точка разделяет раздел и урок, а не урок и часть', () => {
+    const result = parseYandexDiskTree([
+      dir('/Курс'),
+      file('/Курс/1.1. Почему FSD (Введение).mp4'),
+      file('/Курс/1.2. Как устроен курс.mp4'),
+      file('/Курс/2.1. Настройка VSCode (Настройка).mp4'),
+      file('/Курс/2.2. Установка Node.mp4'),
+    ])
+
+    expect(result.sections.map((s) => s.title)).toEqual(['Введение', 'Настройка'])
+    expect(result.sections[0].lessons.map((l) => l.title)).toEqual(['Почему FSD', 'Как устроен курс'])
+    expect(result.totalVideos).toBe(4)
+  })
+
+  it('папка-раздел с файлами одного номера: файлы становятся уроками', () => {
+    const result = parseYandexDiskTree([
+      dir('/11. Типизация Redux'),
+      file('/11. Типизация Redux/11.1 О модуле.mp4'),
+      file('/11. Типизация Redux/11.2 Типизация слайсов.mp4'),
+    ])
+
+    expect(result.sections[0].title).toBe('11. Типизация Redux')
+    expect(result.sections[0].lessons.map((l) => l.title)).toEqual(['О модуле', 'Типизация слайсов'])
+  })
+
+  it('третий уровень нумерации — части одного урока', () => {
+    const result = parseYandexDiskTree([
+      dir('/Курс'),
+      file('/Курс/2.3 Функции.mp4'),
+      file('/Курс/2.3.2 Функции.mp4'),
+      file('/Курс/3.1 Объекты.mp4'),
+    ])
+
+    const lesson = result.sections[0].lessons[0]
+    expect(lesson.title).toBe('Функции')
+    expect(lesson.videos).toHaveLength(2)
+  })
+
+  it('подчёркивание по-прежнему означает части урока', () => {
+    const result = parseYandexDiskTree([
+      dir('/Блок'),
+      file('/Блок/5_1.mp4'),
+      file('/Блок/5_2.mp4'),
+      file('/Блок/6.mp4'),
+    ])
+
+    expect(result.sections[0].lessons).toHaveLength(2)
+    expect(result.sections[0].lessons[0].videos).toHaveLength(2)
+  })
+})
+
+describe('папки без видео', () => {
+  it('исходники проекта не становятся секциями, а идут материалами', () => {
+    const result = parseYandexDiskTree([
+      dir('/Блок 1'),
+      file('/Блок 1/1.mp4'),
+      dir('/Блок 1/src'),
+      dir('/Блок 1/src/shared'),
+      file('/Блок 1/src/shared/api.ts'),
+      file('/Блок 1/src/index.ts'),
+    ])
+
+    expect(result.sections.map((s) => s.title)).toEqual(['Блок 1'])
+    expect(result.sections[0].lessons[0].materials.map((m) => m.title).sort()).toEqual([
+      'api.ts',
+      'index.ts',
+    ])
+  })
+
+  it('видео папки не теряются, когда рядом лежат вложенные секции', () => {
+    const result = parseYandexDiskTree([
+      dir('/Курс'),
+      file('/Курс/1.mp4'),
+      file('/Курс/2.mp4'),
+      dir('/Курс/Блок A'),
+      file('/Курс/Блок A/1.mp4'),
+      file('/Курс/Блок A/2.mp4'),
+      dir('/Курс/Блок B'),
+      file('/Курс/Блок B/1.mp4'),
+      file('/Курс/Блок B/2.mp4'),
+    ])
+
+    expect(result.totalVideos).toBe(6)
+    expect(result.sections.map((s) => s.title)).toEqual(['Курс', 'Блок A', 'Блок B'])
   })
 })
 
