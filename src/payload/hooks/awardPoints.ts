@@ -69,7 +69,12 @@ export const awardPoints: CollectionAfterChangeHook = async ({
     const created = await safeCreateTransaction(
       req.payload, userId, lessonPoints, 'lesson_completed', String(lessonId), 'Урок пройден',
     )
-    if (!created) return doc // race condition — другой запрос уже начислил
+    if (!created) {
+      // Гонка: другой запрос уже начислил. Пересчёт всё равно выполняем — он
+      // идемпотентен и чинит возможное расхождение totalPoints с транзакциями
+      await recalculateTotalPoints(req.payload, userId)
+      return doc
+    }
 
     // 2. Проверяем завершение курса
     const lesson = typeof doc.lesson === 'object'

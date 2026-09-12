@@ -78,12 +78,13 @@ export const awardTrainerPoints: CollectionAfterChangeHook = async ({
       req.payload, userId, taskPoints, 'trainer_task_completed', String(taskId), 'Задача тренажёра решена',
     )
 
-    if (!created) return doc
-
-    // Пересчитываем totalPoints
+    // Пересчёт идемпотентен и выполняется всегда: если транзакция уже была, а
+    // totalPoints разошёлся с суммой, иначе это расхождение не исправит ничто
     await recalculateTotalPoints(req.payload, userId)
 
-    logger.info(`Trainer points awarded: ${taskPoints} points for user ${userId}, task ${taskId}`)
+    if (created) {
+      logger.info(`Trainer points awarded: ${taskPoints} points for user ${userId}, task ${taskId}`)
+    }
 
     return doc
   })
