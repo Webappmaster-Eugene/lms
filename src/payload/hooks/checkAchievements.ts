@@ -1,4 +1,4 @@
-import type { CollectionAfterChangeHook, Payload } from 'payload'
+import type { CollectionAfterChangeHook, PayloadRequest } from 'payload'
 import { relationId } from '@/lib/relation-id'
 import { withSpan } from '@/lib/telemetry'
 
@@ -28,17 +28,20 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
     const [achievements, userAchievements, user, completedLessons, courseTransactions, roadmapTransactions, trainerProgress] =
       await Promise.all([
         req.payload.find({
+          req,
           collection: 'achievements',
           where: { isActive: { equals: true } },
           limit: 100,
         }),
         req.payload.find({
+          req,
           collection: 'user-achievements',
           where: { user: { equals: userId } },
           limit: 1000,
         }),
-        req.payload.findByID({ collection: 'users', id: userId }),
+        req.payload.findByID({ req, collection: 'users', id: userId }),
         req.payload.find({
+          req,
           collection: 'user-progress',
           where: {
             user: { equals: userId },
@@ -47,6 +50,7 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
           limit: 0, // только totalDocs
         }),
         req.payload.find({
+          req,
           collection: 'points-transactions',
           where: {
             user: { equals: userId },
@@ -55,6 +59,7 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
           limit: 1000,
         }),
         req.payload.find({
+          req,
           collection: 'points-transactions',
           where: {
             user: { equals: userId },
@@ -63,6 +68,7 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
           limit: 1000,
         }),
         req.payload.find({
+          req,
           collection: 'user-trainer-progress',
           where: {
             user: { equals: userId },
@@ -118,6 +124,7 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
       // Выдаём достижение
       try {
         await req.payload.create({
+          req,
           collection: 'user-achievements',
           data: {
             user: userId,
@@ -134,6 +141,7 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
       // Начисляем бонусные баллы за достижение
       if (achievement.pointsReward && achievement.pointsReward > 0) {
         await req.payload.create({
+          req,
           collection: 'points-transactions',
           data: {
             user: userId,
@@ -153,7 +161,7 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
 
     // Пересчитываем totalPoints если были начислены баллы за достижения
     if (pointsAwarded > 0) {
-      await recalculateTotalPoints(req.payload, userId)
+      await recalculateTotalPoints(req, userId)
     }
 
     return doc
@@ -203,9 +211,10 @@ function checkCriteria(
   }
 }
 
-async function recalculateTotalPoints(payload: Payload, userId: number) {
+async function recalculateTotalPoints(req: PayloadRequest, userId: number) {
   return withSpan('checkAchievements.recalculateTotalPoints', { 'user.id': userId }, async () => {
-    const allTransactions = await payload.find({
+    const allTransactions = await req.payload.find({
+      req,
       collection: 'points-transactions',
       where: { user: { equals: userId } },
       limit: 10000,
@@ -213,7 +222,8 @@ async function recalculateTotalPoints(payload: Payload, userId: number) {
 
     const totalPoints = allTransactions.docs.reduce((sum, tx) => sum + (tx.amount ?? 0), 0)
 
-    await payload.update({
+    await req.payload.update({
+      req,
       collection: 'users',
       id: userId,
       data: { totalPoints },

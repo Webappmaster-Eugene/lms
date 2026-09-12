@@ -1,4 +1,4 @@
-import type { CollectionAfterChangeHook, Payload } from 'payload'
+import type { CollectionAfterChangeHook, PayloadRequest } from 'payload'
 import { DEFAULT_POINTS } from '@/lib/points-config'
 import type { PointsReason } from '@/lib/points-config'
 import { relationId } from '@/lib/relation-id'
@@ -33,6 +33,7 @@ export const awardPoints: CollectionAfterChangeHook = async ({
   return withSpan('hook.awardPoints', { 'user.id': userId, 'lesson.id': lessonId }, async () => {
     // Защита от повторного начисления: если урок уже был пройден ранее
     const existingLessonTx = await req.payload.find({
+      req,
       collection: 'points-transactions',
       where: {
         user: { equals: userId },
@@ -52,7 +53,7 @@ export const awardPoints: CollectionAfterChangeHook = async ({
     let roadmapPoints = DEFAULT_POINTS.ROADMAP_COMPLETED as number
 
     try {
-      const settings = await req.payload.findGlobal({ slug: 'site-settings' })
+      const settings = await req.payload.findGlobal({ req, slug: 'site-settings' })
       if (settings.points) {
         lessonPoints = settings.points.lessonCompleted ?? lessonPoints
         coursePoints = settings.points.courseCompleted ?? coursePoints
@@ -67,29 +68,29 @@ export const awardPoints: CollectionAfterChangeHook = async ({
 
     // 1. Баллы за урок
     const created = await safeCreateTransaction(
-      req.payload, userId, lessonPoints, 'lesson_completed', String(lessonId), 'Урок пройден',
+      req, userId, lessonPoints, 'lesson_completed', String(lessonId), 'Урок пройден',
     )
     if (!created) {
       // Гонка: другой запрос уже начислил. Пересчёт всё равно выполняем — он
       // идемпотентен и чинит возможное расхождение totalPoints с транзакциями
-      await recalculateTotalPoints(req.payload, userId)
+      await recalculateTotalPoints(req, userId)
       return doc
     }
 
     // 2. Проверяем завершение курса
     const lesson = typeof doc.lesson === 'object'
       ? doc.lesson
-      : await req.payload.findByID({ collection: 'lessons', id: lessonId })
+      : await req.payload.findByID({ req, collection: 'lessons', id: lessonId })
 
     const rawCourseId = typeof lesson.course === 'object' ? lesson.course?.id : lesson.course
     const courseId = rawCourseId ? String(rawCourseId) : null
 
     if (courseId) {
-      await checkCourseCompletion(req.payload, userId, courseId, coursePoints, lesson, roadmapPoints)
+      await checkCourseCompletion(req, userId, courseId, coursePoints, lesson, roadmapPoints)
     }
 
     // Финальный пересчёт totalPoints
-    await recalculateTotalPoints(req.payload, userId)
+    await recalculateTotalPoints(req, userId)
 
     return doc
   })
@@ -99,7 +100,7 @@ export const awardPoints: CollectionAfterChangeHook = async ({
  * Проверяет завершение курса и роадмапа, начисляет бонусы.
  */
 async function checkCourseCompletion(
-  payload: Payload,
+  req: PayloadRequest,
   userId: number,
   courseId: string,
   coursePoints: number,
@@ -108,7 +109,8 @@ async function checkCourseCompletion(
 ) {
   return withSpan('awardPoints.checkCourseCompletion', { 'user.id': userId, 'course.id': courseId }, async () => {
     const [allCourseLessons, userProgress] = await Promise.all([
-      payload.find({
+      req.payload.find({
+        req,
         collection: 'lessons',
         where: {
           course: { equals: courseId },
@@ -116,7 +118,8 @@ async function checkCourseCompletion(
         },
         limit: 500,
       }),
-      payload.find({
+      req.payload.find({
+        req,
         collection: 'user-progress',
         where: {
           user: { equals: userId },
@@ -140,14 +143,14 @@ async function checkCourseCompletion(
 
     // Бонус за курс (с защитой от дублей)
     const created = await safeCreateTransaction(
-      payload, userId, coursePoints, 'course_completed', courseId, 'Курс завершён',
+      req, userId, coursePoints, 'course_completed', courseId, 'Курс завершён',
     )
     if (!created) return // Уже начислено
 
     // 3. Проверяем завершение роадмапа
     const course = typeof lesson.course === 'object'
       ? lesson.course as Record<string, unknown>
-      : await payload.findByID({ collection: 'courses', id: courseId })
+      : await req.payload.findByID({ req, collection: 'courses', id: courseId })
 
     const rawRoadmapId = typeof course.roadmap === 'object'
       ? (course.roadmap as Record<string, unknown>)?.id
@@ -156,7 +159,8 @@ async function checkCourseCompletion(
 
     if (!roadmapId) return
 
-    const allRoadmapCourses = await payload.find({
+    const allRoadmapCourses = await req.payload.find({
+      req,
       collection: 'courses',
       where: {
         roadmap: { equals: roadmapId },
@@ -165,7 +169,8 @@ async function checkCourseCompletion(
       limit: 100,
     })
 
-    const existingCourseBonuses = await payload.find({
+    const existingCourseBonuses = await req.payload.find({
+      req,
       collection: 'points-transactions',
       where: {
         user: { equals: userId },
@@ -186,7 +191,7 @@ async function checkCourseCompletion(
 
     if (roadmapCompleted) {
       await safeCreateTransaction(
-        payload, userId, roadmapPoints, 'roadmap_completed', roadmapId, 'Роадмап завершён',
+        req, userId, roadmapPoints, 'roadmap_completed', roadmapId, 'Роадмап завершён',
       )
     }
   })
@@ -198,7 +203,7 @@ async function checkCourseCompletion(
  * Возвращает true если транзакция создана, false если дубль.
  */
 async function safeCreateTransaction(
-  payload: Payload,
+  req: PayloadRequest,
   userId: number,
   amount: number,
   reason: PointsReason,
@@ -207,7 +212,8 @@ async function safeCreateTransaction(
 ): Promise<boolean> {
   return withSpan('awardPoints.safeCreateTransaction', { 'user.id': userId, 'points.reason': reason, 'points.amount': amount }, async () => {
     // Проверяем дубль
-    const existing = await payload.find({
+    const existing = await req.payload.find({
+      req,
       collection: 'points-transactions',
       where: {
         user: { equals: userId },
@@ -220,7 +226,8 @@ async function safeCreateTransaction(
     if (existing.totalDocs > 0) return false
 
     try {
-      await payload.create({
+      await req.payload.create({
+        req,
         collection: 'points-transactions',
         data: {
           user: userId,
@@ -250,9 +257,10 @@ async function safeCreateTransaction(
  * Пересчитывает totalPoints как сумму всех транзакций.
  * Идемпотентный подход — безопасен при concurrent requests.
  */
-async function recalculateTotalPoints(payload: Payload, userId: number) {
+async function recalculateTotalPoints(req: PayloadRequest, userId: number) {
   return withSpan('awardPoints.recalculateTotalPoints', { 'user.id': userId }, async () => {
-    const allTransactions = await payload.find({
+    const allTransactions = await req.payload.find({
+      req,
       collection: 'points-transactions',
       where: { user: { equals: userId } },
       limit: 10000,
@@ -260,7 +268,8 @@ async function recalculateTotalPoints(payload: Payload, userId: number) {
 
     const totalPoints = allTransactions.docs.reduce((sum, tx) => sum + (tx.amount ?? 0), 0)
 
-    await payload.update({
+    await req.payload.update({
+      req,
       collection: 'users',
       id: userId,
       data: { totalPoints },

@@ -1,4 +1,4 @@
-import type { CollectionAfterChangeHook, Payload } from 'payload'
+import type { CollectionAfterChangeHook, PayloadRequest } from 'payload'
 import { DEFAULT_POINTS } from '@/lib/points-config'
 import type { PointsReason } from '@/lib/points-config'
 import { relationId } from '@/lib/relation-id'
@@ -32,6 +32,7 @@ export const awardTrainerPoints: CollectionAfterChangeHook = async ({
   return withSpan('hook.awardTrainerPoints', { 'user.id': userId, 'task.id': taskId }, async () => {
     // Защита от повторного начисления
     const existingTx = await req.payload.find({
+      req,
       collection: 'points-transactions',
       where: {
         user: { equals: userId },
@@ -49,7 +50,7 @@ export const awardTrainerPoints: CollectionAfterChangeHook = async ({
     let taskPoints = DEFAULT_POINTS.TRAINER_TASK_COMPLETED as number
 
     try {
-      const settings = await req.payload.findGlobal({ slug: 'site-settings' })
+      const settings = await req.payload.findGlobal({ req, slug: 'site-settings' })
       if (settings.points) {
         const configuredPoints = (settings.points as Record<string, unknown>).trainerTaskCompleted
         if (typeof configuredPoints === 'number') {
@@ -64,7 +65,7 @@ export const awardTrainerPoints: CollectionAfterChangeHook = async ({
     try {
       const task = typeof doc.task === 'object'
         ? doc.task
-        : await req.payload.findByID({ collection: 'trainer-tasks', id: taskId })
+        : await req.payload.findByID({ req, collection: 'trainer-tasks', id: taskId })
 
       if (task && typeof task.pointsReward === 'number' && task.pointsReward > 0) {
         taskPoints = task.pointsReward
@@ -75,12 +76,12 @@ export const awardTrainerPoints: CollectionAfterChangeHook = async ({
 
     // Начисляем баллы
     const created = await safeCreateTransaction(
-      req.payload, userId, taskPoints, 'trainer_task_completed', String(taskId), 'Задача тренажёра решена',
+      req, userId, taskPoints, 'trainer_task_completed', String(taskId), 'Задача тренажёра решена',
     )
 
     // Пересчёт идемпотентен и выполняется всегда: если транзакция уже была, а
     // totalPoints разошёлся с суммой, иначе это расхождение не исправит ничто
-    await recalculateTotalPoints(req.payload, userId)
+    await recalculateTotalPoints(req, userId)
 
     if (created) {
       logger.info(`Trainer points awarded: ${taskPoints} points for user ${userId}, task ${taskId}`)
@@ -91,7 +92,7 @@ export const awardTrainerPoints: CollectionAfterChangeHook = async ({
 }
 
 async function safeCreateTransaction(
-  payload: Payload,
+  req: PayloadRequest,
   userId: number,
   amount: number,
   reason: PointsReason,
@@ -99,7 +100,8 @@ async function safeCreateTransaction(
   description: string,
 ): Promise<boolean> {
   return withSpan('awardTrainerPoints.safeCreateTransaction', { 'user.id': userId, 'points.reason': reason }, async () => {
-    const existing = await payload.find({
+    const existing = await req.payload.find({
+      req,
       collection: 'points-transactions',
       where: {
         user: { equals: userId },
@@ -112,7 +114,8 @@ async function safeCreateTransaction(
     if (existing.totalDocs > 0) return false
 
     try {
-      await payload.create({
+      await req.payload.create({
+        req,
         collection: 'points-transactions',
         data: {
           user: userId,
@@ -130,9 +133,10 @@ async function safeCreateTransaction(
   })
 }
 
-async function recalculateTotalPoints(payload: Payload, userId: number) {
+async function recalculateTotalPoints(req: PayloadRequest, userId: number) {
   return withSpan('awardTrainerPoints.recalculateTotalPoints', { 'user.id': userId }, async () => {
-    const allTransactions = await payload.find({
+    const allTransactions = await req.payload.find({
+      req,
       collection: 'points-transactions',
       where: { user: { equals: userId } },
       limit: 10000,
@@ -140,7 +144,8 @@ async function recalculateTotalPoints(payload: Payload, userId: number) {
 
     const totalPoints = allTransactions.docs.reduce((sum, tx) => sum + (tx.amount ?? 0), 0)
 
-    await payload.update({
+    await req.payload.update({
+      req,
       collection: 'users',
       id: userId,
       data: { totalPoints },
