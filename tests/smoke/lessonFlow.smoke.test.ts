@@ -36,3 +36,12 @@ describe('владелец записи проставляется одинак�
     expect(source).not.toMatch(/role !== 'admin'/)
   })
 })
+
+describe('сбои фоновых хуков видны в логах контейнера', () => {
+  it('logger дублирует warn и error в stderr, а не только в телеметрию', () => {
+    const telemetry = read('../../src/lib/telemetry.ts')
+
+    expect(telemetry).toContain('severity >= SeverityNumber.WARN')
+    expect(telemetry).toContain('console.error(')
+  })
+})

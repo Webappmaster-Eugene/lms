@@ -50,6 +50,10 @@ export async function withSpan<T>(
 /**
  * Structured logger emitting OTel LogRecords.
  * Each log automatically carries trace_id/span_id from the active context.
+ *
+ * Предупреждения и ошибки дублируются в stderr: сбой фонового хука иначе
+ * виден только в собранной телеметрии, а в `docker logs` контейнера — нет,
+ * и отладка на проде превращается в гадание.
  */
 function emit(severity: SeverityNumber, severityText: string, message: string, attrs?: Attributes): void {
   const otelLogger = logs.getLogger(LOGGER_NAME)
@@ -59,6 +63,11 @@ function emit(severity: SeverityNumber, severityText: string, message: string, a
     body: message,
     attributes: attrs,
   })
+
+  if (severity >= SeverityNumber.WARN) {
+    const details = attrs && Object.keys(attrs).length > 0 ? ` ${JSON.stringify(attrs)}` : ''
+    console.error(`[${severityText}] ${message}${details}`)
+  }
 }
 
 export const logger = {
