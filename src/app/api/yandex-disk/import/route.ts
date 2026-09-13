@@ -18,6 +18,7 @@ import {
   type ImportedSection,
 } from '@/lib/yandex-disk-structure'
 import type { Course, Lesson } from '@/payload-types'
+import { applyCurriculum } from '@/lib/course-curricula'
 import { stringToLexicalState } from '@/lib/lexical'
 import { withSpan, logger } from '@/lib/telemetry'
 
@@ -103,8 +104,10 @@ export async function POST(request: Request) {
         resource.path ?? undefined,
       )
 
-      const structure = buildStructure(items, course.title, resource.path)
-      const warnings = [...structure.warnings]
+      const parsed = buildStructure(items, course.title, resource.path)
+      // Названия уроков берём из программы курса там, где на диске их нет
+      const structure = applyCurriculum(course.slug, parsed.sections)
+      const warnings = [...parsed.warnings, ...structure.warnings]
 
       if (structure.sections.length === 0) {
         const reason = warnings.length > 0 ? warnings.join('\n') : 'Не удалось разобрать структуру папки'
