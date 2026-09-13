@@ -125,12 +125,22 @@ export async function POST(request: Request) {
       const touchedLessonIds: number[] = []
       let totalMinutes = 0
 
+      // Длительности читаются из самих файлов и стоят по паре секунд каждая —
+      // последовательно это часы, поэтому опрашиваем весь курс пулом заранее.
+      const durations = await measureDurations(structure.sections, resource.publicKey, token)
+
       for (const section of structure.sections) {
         const sectionResult = await upsertSection(payload, courseId, course.slug, section)
         stats[sectionResult.created ? 'sectionsCreated' : 'sectionsUpdated']++
 
         for (const lesson of section.lessons) {
-          const content = await buildLessonContent(lesson, resource.publicKey, token, warnings)
+          const content = await buildLessonContent(
+            lesson,
+            resource.publicKey,
+            token,
+            warnings,
+            durations,
+          )
 
           const lessonResult = await upsertLesson(payload, {
             courseId,
@@ -227,6 +237,44 @@ function isRootLevel(path: string, basePath: string | null): boolean {
   return relative.length > 0 && !relative.includes('/')
 }
 
+/** Сколько файлов опрашиваем одновременно: Диск отвечает ~2 с на файл. */
+const DURATION_CONCURRENCY = 8
+
+/** Длительности всех видео курса, ключ — ссылка на файл. */
+async function measureDurations(
+  sections: ImportedSection[],
+  publicKey: string,
+  token: string | undefined,
+): Promise<Map<string, number>> {
+  const urls = [
+    ...new Set(
+      sections.flatMap((section) =>
+        section.lessons.flatMap((lesson) =>
+          lesson.videos
+            .map((video) => buildPublicFileUrl(publicKey, video.path))
+            .filter((url): url is string => url !== null),
+        ),
+      ),
+    ),
+  ]
+
+  const measured = new Map<string, number>()
+  let cursor = 0
+
+  const worker = async (): Promise<void> => {
+    while (cursor < urls.length) {
+      const url = urls[cursor++]
+      const ref = parsePublicResourceUrl(url)
+      const seconds = ref ? await fetchVideoDuration(ref, { token }) : null
+      if (seconds !== null) measured.set(url, seconds)
+    }
+  }
+
+  await Promise.all(Array.from({ length: DURATION_CONCURRENCY }, worker))
+
+  return measured
+}
+
 /** Суммарная длительность видео урока; null — ни у одной части её не удалось прочитать. */
 function lessonMinutes(content: LessonContent): number | null {
   const minutes = content
@@ -243,6 +291,7 @@ async function buildLessonContent(
   publicUrl: string,
   token: string | undefined,
   warnings: string[],
+  durations: Map<string, number>,
 ): Promise<LessonContent> {
   const content: LessonContent = []
 
@@ -255,18 +304,9 @@ async function buildLessonContent(
     if (!url) warnings.push(`Видео "${video.title}" пропущено: не удалось собрать ссылку`)
   }
 
-  // Длительность читается из самого файла: API Диска её не отдаёт, а без неё
-  // студент не видит, на сколько времени урок. Части урока опрашиваем разом.
-  const durations = await Promise.all(
-    videoUrls.map(({ url }) => {
-      const ref = url ? parsePublicResourceUrl(url) : null
-      return ref ? fetchVideoDuration(ref, { token }) : Promise.resolve(null)
-    }),
-  )
-
-  videoUrls.forEach(({ video, url }, index) => {
+  videoUrls.forEach(({ video, url }) => {
     if (!url) return
-    const seconds = durations[index]
+    const seconds = durations.get(url) ?? null
 
     content.push({
       blockType: 'video',
