@@ -182,9 +182,11 @@ export default async function RoadmapDetailPage({ params }: Props) {
         <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
           <span>{coursesWithProgress.length} курсов</span>
           <span>{totalLessons} уроков</span>
-          <span className="hidden sm:inline">
-            Клик по узлу графа → переход к курсу
-          </span>
+          {graphNodes.length > 0 && (
+            <span className="hidden sm:inline">
+              Клик по узлу графа → переход к курсу
+            </span>
+          )}
         </div>
 
         <div className="mt-4 max-w-md">
@@ -226,7 +228,8 @@ export default async function RoadmapDetailPage({ params }: Props) {
       )}
 
       {/* Список курсов — свёрнут, как вспомогательный способ навигации */}
-      <details className="rounded-xl border border-border bg-card p-4">
+      {/* Пока карта не нарисована, список курсов — единственная навигация */}
+      <details open={graphNodes.length === 0} className="rounded-xl border border-border bg-card p-4">
         <summary className="cursor-pointer text-lg font-semibold text-foreground">
           Все курсы роадмапа списком ({coursesWithProgress.length})
         </summary>
@@ -363,6 +366,11 @@ function buildGraphData(
       else if (completedLessons > 0) status = 'in-progress'
     }
 
+    // Тема без опубликованного курса с уроками — не тупик, а «скоро»:
+    // клик по ней никуда не ведёт, но каркас карты сохраняется.
+    const comingSoon = n.nodeType !== 'category' && (!linkedCourse || linkedCourse.totalLessons === 0)
+    if (comingSoon) status = 'locked'
+
     const bullets = Array.isArray(n.bullets)
       ? n.bullets.map((b) => b.text).filter((t): t is string => typeof t === 'string' && t.length > 0)
       : []
@@ -374,7 +382,8 @@ function buildGraphData(
       data: {
         label: n.label,
         nodeType: n.nodeType,
-        courseSlug: linkedCourse?.slug ?? null,
+        courseSlug: comingSoon ? null : linkedCourse?.slug ?? null,
+        comingSoon,
         icon: n.icon ?? null,
         description: n.description ?? null,
         status,

@@ -25,10 +25,16 @@ export function RoadmapSubtopicNode({ data }: NodeProps) {
         classes.border,
         classes.text,
         classes.ring,
+        nodeData.comingSoon && 'opacity-60',
         isClickable && 'cursor-pointer hover:scale-[1.03] hover:shadow-md',
       )}
     >
-      {isLocked && <Lock className={cn('h-3 w-3 flex-shrink-0', classes.accent)} />}
+      {isLocked && (
+        <Lock
+          className={cn('h-3 w-3 flex-shrink-0', classes.accent)}
+          aria-label={nodeData.comingSoon ? 'Материалы готовятся' : 'Пройдите предыдущие курсы'}
+        />
+      )}
       {isCompleted && <CheckCircle2 className="h-3 w-3 flex-shrink-0 text-success" />}
       <span className="text-[11px] font-semibold leading-tight">{nodeData.label}</span>
 

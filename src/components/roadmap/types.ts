@@ -10,6 +10,8 @@ export type RoadmapNodeData = {
   icon: string | null
   description: string | null
   status: NodeStatus
+  /** Тема есть на карте, но материалов по ней пока нет. */
+  comingSoon: boolean
   progressPercent: number
   totalLessons: number
   completedLessons: number

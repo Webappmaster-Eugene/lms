@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
  */
 export function RoadmapTopicNode({ data }: NodeProps) {
   const nodeData = data as RoadmapNodeData
+  const comingSoon = nodeData.comingSoon
   const isLocked = nodeData.status === 'locked'
   const isCompleted = nodeData.status === 'completed'
   const hasProgress = nodeData.totalLessons > 0
@@ -30,6 +31,7 @@ export function RoadmapTopicNode({ data }: NodeProps) {
         classes.border,
         classes.text,
         classes.ring,
+        comingSoon && 'opacity-60',
         isClickable && 'cursor-pointer hover:scale-[1.02] hover:shadow-lg',
       )}
     >
@@ -84,7 +86,7 @@ export function RoadmapTopicNode({ data }: NodeProps) {
 
       {isLocked && (
         <div className={cn('border-t px-3 py-1.5 text-[10px]', classes.border, classes.accent)}>
-          Пройдите предыдущие курсы
+          {comingSoon ? 'Материалы готовятся' : 'Пройдите предыдущие курсы'}
         </div>
       )}
 
