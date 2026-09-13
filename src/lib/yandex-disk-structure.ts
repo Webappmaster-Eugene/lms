@@ -21,7 +21,7 @@ const TEXT_EXTENSIONS = new Set(['txt', 'md'])
 const OVERLAY_SUFFIX = /^(.+?)\s*\((?:доп|доп\.|дополнительно|материалы)\)$/i
 
 /** Технические пометки раздач, которые не должны попадать в названия уроков. */
-const NOISE_TAGS = /\s*[[(](?:[a-z0-9-]+\.[a-z]{2,}|skladchik[^\])]*)[\])]/gi
+const NOISE_TAGS = /\s*[[(](?:[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+|skladchik[^\])]*)[\])]/gi
 
 export type ImportedVideo = {
   title: string
@@ -135,7 +135,7 @@ export function parseYandexDiskTree(
       if (lesson.hasGeneratedTitle) {
         lesson.title = `Урок ${lesson.order}`
       }
-      lesson.materials = dedupeMaterials(lesson.materials)
+      lesson.materials = capMaterials(dedupeMaterials(lesson.materials))
       lesson.title = disambiguate(lesson.title, lesson.order, section.lessons)
       lesson.videos.sort(compareVideos)
       lesson.videos.forEach((video, videoIndex) => {
@@ -144,8 +144,13 @@ export function parseYandexDiskTree(
     })
   })
 
-  const withLessons = sections.filter((section) => section.lessons.length > 0)
-  for (const empty of sections.filter((section) => section.lessons.length === 0)) {
+  const split = sections.flatMap(splitOversizedSection)
+  split.forEach((section, index) => {
+    section.order = index + 1
+  })
+
+  const withLessons = split.filter((section) => section.lessons.length > 0)
+  for (const empty of split.filter((section) => section.lessons.length === 0)) {
     warnings.push(`Секция "${empty.title}" пропущена: в ней нет ни видео, ни материалов`)
   }
   for (const section of withLessons) {
@@ -281,25 +286,56 @@ function collectFiles(node: TreeNode): YandexDiskItem[] {
   return [...node.files, ...node.dirs.flatMap(collectFiles)]
 }
 
-/** Кладёт материалы в первый урок последней секции — ближайший по смыслу. */
-function attachMaterials(sections: ImportedSection[], files: YandexDiskItem[], title: string): void {
-  if (files.length === 0) return
+/** Больше этого числа файлов — папка сворачивается в одну ссылку. */
+const MAX_FOLDER_FILES = 12
 
-  const section = sections[sections.length - 1]
-  const lesson = section?.lessons[0]
+/** Столько ссылок в уроке ещё читаются глазами. */
+const MAX_LESSON_MATERIALS = 12
+
+/** Раздаточные материалы, которые имеет смысл открывать по отдельности. */
+const HANDOUT_EXTENSIONS = new Set([
+  'zip', 'rar', '7z', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+])
+
+/**
+ * Материалы папки без видео. Распакованный проект — это сотни .ts, .png и
+ * .css, ссылка на каждый файл превращает урок в файловый менеджер. Такую
+ * папку сворачиваем в одну ссылку, отдельно оставляя архивы и документы.
+ */
+function materialsOf(node: TreeNode): ImportedMaterial[] {
+  const files = collectFiles(node).filter((file) => !isVideo(file))
+  if (files.length <= MAX_FOLDER_FILES) return files.map(toMaterial)
+
+  const handouts = files.filter((file) => HANDOUT_EXTENSIONS.has(extensionOf(file.name)))
+  const folder: ImportedMaterial = {
+    title: `${cleanTitle(node.name) || 'Материалы'} — папка на Диске`,
+    path: node.path,
+    isText: false,
+    size: null,
+  }
+
+  return handouts.length > MAX_FOLDER_FILES ? [folder] : [folder, ...handouts.map(toMaterial)]
+}
+
+/** Кладёт материалы в первый урок последней секции — ближайший по смыслу. */
+function attachMaterials(
+  sections: ImportedSection[],
+  materials: ImportedMaterial[],
+  title: string,
+): void {
+  if (materials.length === 0) return
+
+  const lesson = sections[sections.length - 1]?.lessons[0]
 
   if (lesson) {
-    lesson.materials.push(...files.map(toMaterial))
+    lesson.materials.push(...materials)
     return
   }
 
   sections.push({
     order: 0,
     title,
-    lessons: [{
-      order: 1, title: 'Материалы', videos: [], hasGeneratedTitle: false,
-      materials: files.map(toMaterial),
-    }],
+    lessons: [{ order: 1, title: 'Материалы', videos: [], hasGeneratedTitle: false, materials }],
   })
 }
 
@@ -308,7 +344,7 @@ function collectSections(node: TreeNode, sections: ImportedSection[], warnings: 
   const kind = classify(node)
 
   if (kind === 'materials') {
-    attachMaterials(sections, collectFiles(node), cleanTitle(node.name) || 'Материалы')
+    attachMaterials(sections, materialsOf(node), cleanTitle(node.name) || 'Материалы')
     return
   }
 
@@ -420,17 +456,20 @@ function buildSection(node: TreeNode, title: string): ImportedSection {
     })
   }
 
-  const materialFiles = [
-    ...node.files.filter((item) => !isVideo(item)),
-    ...materialDirs.flatMap(collectFiles),
-  ]
-
-  for (const file of materialFiles) {
+  for (const file of node.files.filter((item) => !isVideo(item))) {
     const ref = parseUnitRef(file.name)
     const target = ref ? lessons.get(lessonKeyOf(ref)) : undefined
 
     // Материал без своего урока относится ко всей секции — кладём в первый урок.
     ;(target?.materials ?? sectionMaterials(lessons)).push(toMaterial(file))
+  }
+
+  // Папка без видео принадлежит уроку со своим номером ("8/Креативы"), иначе секции.
+  for (const dir of materialDirs) {
+    const ref = parseUnitRef(dir.name)
+    const target = ref ? lessons.get(lessonKeyOf(ref)) : undefined
+
+    ;(target?.materials ?? sectionMaterials(lessons)).push(...materialsOf(dir))
   }
 
   const section: ImportedSection = {
@@ -550,6 +589,72 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+/** Курсы с плоской нумерацией дают одну секцию на сотню уроков — режем на блоки. */
+const MAX_FLAT_SECTION = 30
+const SECTION_CHUNK = 10
+
+/**
+ * Сотня уроков одним списком непролистываема, поэтому большие секции дробим.
+ *
+ * Сначала пробуем авторскую разбивку: часть курсов пишет название раздела в
+ * скобках у первого урока блока ("12. Обзор проекта (Компоненты)"). Если
+ * разметки нет, а названия сгенерированы из нумерации, режем по десять.
+ * Секцию с осмысленными названиями и без разметки оставляем как есть —
+ * придуманные границы были бы хуже честного длинного списка.
+ */
+function splitOversizedSection(section: ImportedSection): ImportedSection[] {
+  if (section.lessons.length <= MAX_FLAT_SECTION) return [section]
+
+  const byMarkers = splitBySectionMarkers(section)
+  if (byMarkers) return byMarkers
+
+  if (!section.lessons.every((lesson) => /^Урок \d+$/.test(lesson.title))) return [section]
+
+  const chunks: ImportedSection[] = []
+
+  for (let start = 0; start < section.lessons.length; start += SECTION_CHUNK) {
+    const lessons = section.lessons.slice(start, start + SECTION_CHUNK)
+    chunks.push({
+      order: 0,
+      title: `Уроки ${start + 1}–${start + lessons.length}`,
+      lessons: lessons.map((lesson, index) => ({ ...lesson, order: index + 1 })),
+    })
+  }
+
+  return chunks
+}
+
+/** Минимум маркеров, чтобы считать скобки разметкой разделов, а не случайностью. */
+const MIN_SECTION_MARKERS = 3
+
+/** Разбивка по названиям разделов в скобках у первого урока блока. */
+function splitBySectionMarkers(section: ImportedSection): ImportedSection[] | null {
+  const markers = section.lessons
+    .map((lesson, index) => ({ index, name: /\(([^)]+)\)\s*$/.exec(lesson.title)?.[1]?.trim() }))
+    .filter((item): item is { index: number; name: string } => Boolean(item.name))
+
+  if (markers.length < MIN_SECTION_MARKERS) return null
+
+  const result: ImportedSection[] = []
+  const bounds = markers.map((m) => m.index)
+
+  if (bounds[0] > 0) {
+    result.push({ order: 0, title: section.title, lessons: section.lessons.slice(0, bounds[0]) })
+  }
+
+  markers.forEach((marker, position) => {
+    const end = bounds[position + 1] ?? section.lessons.length
+    const lessons = section.lessons.slice(marker.index, end).map((lesson, index) => ({
+      ...lesson,
+      order: index + 1,
+      title: stripSuffix(lesson.title, marker.name) || lesson.title,
+    }))
+    result.push({ order: 0, title: marker.name, lessons })
+  })
+
+  return result
+}
+
 /** Материалы уровня секции: первый урок секции, либо отдельный урок, если уроков нет. */
 function sectionMaterials(lessons: Map<number, ImportedLesson>): ImportedMaterial[] {
   const first = [...lessons.values()].sort((a, b) => a.order - b.order)[0]
@@ -572,18 +677,15 @@ function buildLessonFromDir(node: TreeNode, order: number): ImportedLesson | nul
   const videos: ImportedVideo[] = []
   const materials: ImportedMaterial[] = []
 
-  const collect = (current: TreeNode): void => {
-    for (const file of current.files) {
-      if (isVideo(file)) {
-        const fileRef = parseUnitRef(file.name)
-        videos.push({ title: '', path: file.path, part: fileRef ? partOf(fileRef) : null })
-      } else {
-        materials.push(toMaterial(file))
-      }
+  const collectVideos = (current: TreeNode): void => {
+    for (const file of current.files.filter(isVideo)) {
+      const fileRef = parseUnitRef(file.name)
+      videos.push({ title: '', path: file.path, part: fileRef ? partOf(fileRef) : null })
     }
-    current.dirs.forEach(collect)
+    current.dirs.forEach(collectVideos)
   }
-  collect(node)
+  collectVideos(node)
+  materials.push(...materialsOf(node))
 
   if (videos.length === 0 && materials.length === 0) return null
 
@@ -676,6 +778,45 @@ function toMaterial(file: YandexDiskItem): ImportedMaterial {
 function disambiguate(title: string, order: number, lessons: ImportedLesson[]): string {
   const twins = lessons.filter((lesson) => lesson.title === title)
   return twins.length > 1 ? `${title} ${order}` : title
+}
+
+/**
+ * Урок не должен превращаться в файловый менеджер: если материалов набралось
+ * слишком много (обычно это исходники соседних уроков), оставляем архивы,
+ * документы и тексты, а россыпь файлов заменяем одной ссылкой на их папку.
+ */
+function capMaterials(materials: ImportedMaterial[]): ImportedMaterial[] {
+  if (materials.length <= MAX_LESSON_MATERIALS) return materials
+
+  const keep = materials.filter(
+    (material) =>
+      material.isText ||
+      material.size === null ||
+      HANDOUT_EXTENSIONS.has(extensionOf(material.title)),
+  )
+  const dropped = materials.filter((material) => !keep.includes(material))
+  if (dropped.length === 0) return materials
+
+  const folder = commonParent(dropped.map((material) => material.path))
+
+  return [
+    ...keep,
+    {
+      title: `${cleanTitle(folder.split('/').pop() ?? '') || 'Исходники'} — папка на Диске`,
+      path: folder,
+      isText: false,
+      size: null,
+    },
+  ]
+}
+
+/** Ближайшая общая папка для набора путей. */
+function commonParent(paths: string[]): string {
+  const parts = paths.map((path) => path.split('/').slice(0, -1))
+  const [first, ...rest] = parts
+  const common = first.filter((segment, index) => rest.every((other) => other[index] === segment))
+
+  return common.join('/') || '/'
 }
 
 /** Папка-наложение часто дублирует файлы основной: одинаковые имя и размер — одна копия. */

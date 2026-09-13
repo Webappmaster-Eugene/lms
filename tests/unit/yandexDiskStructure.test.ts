@@ -426,3 +426,89 @@ describe('устойчивость к формату листинга', () => {
     expect(result.warnings).toContain('В публичной папке не найдено видео-файлов')
   })
 })
+
+describe('чистка названий и размер секций', () => {
+  it('тег раздачи снимается при любом регистре и числе точек', () => {
+    const result = parseYandexDiskTree([
+      dir('/Курс'),
+      file('/Курс/[S1.SLIV.ONE] 01.01 Введение.mp4'),
+      file('/Курс/[SuperSliv.biz] 01.02 Установка.mp4'),
+    ])
+
+    expect(result.sections[0].lessons.map((l) => l.title)).toEqual(['Введение', 'Установка'])
+  })
+
+  it('скобки, не похожие на адрес сайта, остаются частью названия', () => {
+    const result = parseYandexDiskTree([
+      dir('/Курс'),
+      file('/Курс/1. Babel. Extract plugin [optional].mp4'),
+      file('/Курс/2. Финал.mp4'),
+    ])
+
+    expect(result.sections[0].lessons[0].title).toBe('Babel. Extract plugin [optional]')
+  })
+
+  it('плоская секция без названий режется на блоки по десять', () => {
+    const items = [dir('/Курс')]
+    for (let i = 1; i <= 35; i++) items.push(file(`/Курс/lesson${i}.mp4`))
+
+    const result = parseYandexDiskTree(items)
+
+    expect(result.sections.map((s) => s.title)).toEqual([
+      'Уроки 1–10', 'Уроки 11–20', 'Уроки 21–30', 'Уроки 31–35',
+    ])
+    expect(result.sections[3].lessons.map((l) => l.order)).toEqual([1, 2, 3, 4, 5])
+    expect(result.totalVideos).toBe(35)
+  })
+
+  it('название раздела в скобках у первого урока задаёт границы блоков', () => {
+    const items = [dir('/Курс')]
+    for (let i = 1; i <= 33; i++) {
+      const marker = i === 1 ? ' (Введение)' : i === 12 ? ' (Компоненты)' : i === 24 ? ' (Финал)' : ''
+      items.push(file(`/Курс/${i}. Тема ${i}${marker}.mp4`))
+    }
+
+    const result = parseYandexDiskTree(items)
+
+    expect(result.sections.map((s) => s.title)).toEqual(['Введение', 'Компоненты', 'Финал'])
+    expect(result.sections.map((s) => s.lessons.length)).toEqual([11, 12, 10])
+    expect(result.sections[0].lessons[0].title).toBe('Тема 1')
+  })
+
+  it('большая секция с авторскими названиями и без разметки остаётся целой', () => {
+    const items = [dir('/Курс')]
+    for (let i = 1; i <= 40; i++) items.push(file(`/Курс/${i}. Тема ${i}.mp4`))
+
+    const result = parseYandexDiskTree(items)
+
+    expect(result.sections).toHaveLength(1)
+    expect(result.sections[0].lessons).toHaveLength(40)
+  })
+})
+
+describe('материалы не превращают урок в файловый менеджер', () => {
+  it('распакованный проект сворачивается в ссылку на папку, архивы остаются', () => {
+    const items = [dir('/Блок'), file('/Блок/1.mp4'), dir('/Блок/src')]
+    for (let i = 0; i < 20; i++) items.push(file(`/Блок/src/file${i}.ts`))
+    items.push(file('/Блок/src/проект.zip'))
+
+    const result = parseYandexDiskTree(items)
+    const materials = result.sections[0].lessons[0].materials
+
+    // сворачивается папка урока целиком — это и есть «все материалы урока»
+    expect(materials.map((m) => m.title)).toEqual(['Блок — папка на Диске', 'проект.zip'])
+  })
+
+  it('когда ссылок всё равно много, россыпь файлов заменяется их папкой', () => {
+    const items = [dir('/Блок'), file('/Блок/1.mp4')]
+    for (let i = 0; i < 20; i++) {
+      items.push(dir(`/Блок/материалы${i}`), file(`/Блок/материалы${i}/файл${i}.png`))
+    }
+
+    const result = parseYandexDiskTree(items)
+    const materials = result.sections[0].lessons[0].materials
+
+    expect(materials.length).toBeLessThanOrEqual(13)
+    expect(materials[materials.length - 1].title).toContain('папка на Диске')
+  })
+})
