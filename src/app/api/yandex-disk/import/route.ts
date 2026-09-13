@@ -5,6 +5,7 @@ import {
   buildPublicFileUrl,
   fetchFolderRecursive,
   fetchPublicTextFile,
+  fetchVideoDuration,
   filterVideoFiles,
   parsePublicResourceUrl,
   YandexDiskError,
@@ -16,7 +17,8 @@ import {
   type ImportedLesson,
   type ImportedSection,
 } from '@/lib/yandex-disk-structure'
-import type { Lesson } from '@/payload-types'
+import type { Course, Lesson } from '@/payload-types'
+import { stringToLexicalState } from '@/lib/lexical'
 import { withSpan, logger } from '@/lib/telemetry'
 
 type LessonContent = NonNullable<Lesson['content']>
@@ -121,6 +123,7 @@ export async function POST(request: Request) {
 
       const stats = { sectionsCreated: 0, sectionsUpdated: 0, lessonsCreated: 0, lessonsUpdated: 0 }
       const touchedLessonIds: number[] = []
+      let totalMinutes = 0
 
       for (const section of structure.sections) {
         const sectionResult = await upsertSection(payload, courseId, course.slug, section)
@@ -140,10 +143,12 @@ export async function POST(request: Request) {
 
           stats[lessonResult.created ? 'lessonsCreated' : 'lessonsUpdated']++
           touchedLessonIds.push(lessonResult.id)
+          totalMinutes += lessonMinutes(content) ?? 0
         }
       }
 
       await warnAboutOrphans(payload, courseId, touchedLessonIds, warnings)
+      await updateCourseSummary(payload, courseId, structure.sections, totalMinutes)
 
       await payload.update({
         collection: 'yandex-disk-imports',
@@ -222,6 +227,16 @@ function isRootLevel(path: string, basePath: string | null): boolean {
   return relative.length > 0 && !relative.includes('/')
 }
 
+/** Суммарная длительность видео урока; null — ни у одной части её не удалось прочитать. */
+function lessonMinutes(content: LessonContent): number | null {
+  const minutes = content
+    .filter((block) => block.blockType === 'video')
+    .map((block) => (block as Extract<LessonContent[number], { blockType: 'video' }>).durationMinutes)
+    .filter((value): value is number => typeof value === 'number')
+
+  return minutes.length > 0 ? minutes.reduce((sum, value) => sum + value, 0) : null
+}
+
 /** Собирает контент урока: сначала видео, затем материалы ссылками. */
 async function buildLessonContent(
   lesson: ImportedLesson,
@@ -231,20 +246,36 @@ async function buildLessonContent(
 ): Promise<LessonContent> {
   const content: LessonContent = []
 
-  for (const video of lesson.videos) {
-    const url = buildPublicFileUrl(publicUrl, video.path)
-    if (!url) {
-      warnings.push(`Видео "${video.title}" пропущено: не удалось собрать ссылку`)
-      continue
-    }
+  const videoUrls = lesson.videos.map((video) => ({
+    video,
+    url: buildPublicFileUrl(publicUrl, video.path),
+  }))
+
+  for (const { video, url } of videoUrls) {
+    if (!url) warnings.push(`Видео "${video.title}" пропущено: не удалось собрать ссылку`)
+  }
+
+  // Длительность читается из самого файла: API Диска её не отдаёт, а без неё
+  // студент не видит, на сколько времени урок. Части урока опрашиваем разом.
+  const durations = await Promise.all(
+    videoUrls.map(({ url }) => {
+      const ref = url ? parsePublicResourceUrl(url) : null
+      return ref ? fetchVideoDuration(ref, { token }) : Promise.resolve(null)
+    }),
+  )
+
+  videoUrls.forEach(({ video, url }, index) => {
+    if (!url) return
+    const seconds = durations[index]
 
     content.push({
       blockType: 'video',
       title: video.title,
       videoUrl: url,
       displayMode: 'embed',
+      durationMinutes: seconds === null ? undefined : Math.max(1, Math.round(seconds / 60)),
     })
-  }
+  })
 
   const seenUrls = new Set<string>()
 
@@ -435,7 +466,12 @@ async function upsertLesson(
     depth: 0,
   })
 
-  const data = { title: lesson.title, isPublished: true, content }
+  const data = {
+    title: lesson.title,
+    isPublished: true,
+    content,
+    estimatedMinutes: lessonMinutes(content),
+  }
 
   const current = existing.docs[0]
   if (current) {
@@ -455,6 +491,37 @@ async function upsertLesson(
   })
 
   return { id: created.id, created: true }
+}
+
+/**
+ * Карточка курса в каталоге: без описания и часов она не отличима от соседних.
+ * Собираем и то и другое из разобранной структуры, описание не перезаписываем,
+ * если его правили руками.
+ */
+async function updateCourseSummary(
+  payload: Payload,
+  courseId: number,
+  sections: ImportedSection[],
+  totalMinutes: number,
+): Promise<void> {
+  const lessons = sections.reduce((sum, section) => sum + section.lessons.length, 0)
+  const titles = sections.map((section) => section.title)
+  const preview = titles.slice(0, 6).join(', ')
+  const tail = titles.length > 6 ? ` и ещё ${titles.length - 6}` : ''
+
+  // stringToLexicalState отдаёт неизменяемую структуру, Payload принимает обычную
+  const description = structuredClone(
+    stringToLexicalState(`${lessons} уроков в ${sections.length} разделах: ${preview}${tail}.`),
+  ) as NonNullable<Course['description']>
+
+  await payload.update({
+    collection: 'courses',
+    id: courseId,
+    data: {
+      description,
+      estimatedHours: totalMinutes > 0 ? Math.max(1, Math.round(totalMinutes / 60)) : undefined,
+    },
+  })
 }
 
 /**

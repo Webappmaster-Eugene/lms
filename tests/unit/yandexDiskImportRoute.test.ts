@@ -9,6 +9,7 @@ const create = vi.fn()
 const update = vi.fn()
 const fetchFolderRecursive = vi.fn()
 const fetchPublicTextFile = vi.fn()
+const fetchVideoDuration = vi.fn()
 
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('payload', () => ({
@@ -16,7 +17,7 @@ vi.mock('payload', () => ({
 }))
 vi.mock('@/lib/yandex-disk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/yandex-disk')>()
-  return { ...actual, fetchFolderRecursive, fetchPublicTextFile }
+  return { ...actual, fetchFolderRecursive, fetchPublicTextFile, fetchVideoDuration }
 })
 
 const { POST } = await import('@/app/api/yandex-disk/import/route')
@@ -72,6 +73,7 @@ beforeEach(() => {
   update.mockResolvedValue({})
   fetchFolderRecursive.mockResolvedValue(LISTING)
   fetchPublicTextFile.mockResolvedValue(null)
+  fetchVideoDuration.mockResolvedValue(null)
 })
 
 describe('доступ и валидация', () => {
@@ -213,6 +215,42 @@ describe('импорт вложенной папки раздачи', () => {
     expect(content[0]).toMatchObject({
       videoUrl: `${FOLDER}/purple/Next.js14/${encodeURIComponent('Блок 1')}/1.mp4`,
     })
+  })
+})
+
+describe('длительность и карточка курса', () => {
+  it('длительность видео пишется в блок и суммируется в урок', async () => {
+    fetchVideoDuration.mockResolvedValue(364)
+
+    await POST(post({ publicUrl: FOLDER, courseId: '3' }))
+
+    const lesson = lessonsCreated()[0]
+    const video = (lesson.data.content as Array<Record<string, unknown>>)[0]
+
+    expect(video.durationMinutes).toBe(6)
+    expect(lesson.data.estimatedMinutes).toBe(6)
+  })
+
+  it('нечитаемая длительность не ломает импорт — урок просто без времени', async () => {
+    const response = await POST(post({ publicUrl: FOLDER, courseId: '3' }))
+
+    expect(response.status).toBe(200)
+    const lesson = lessonsCreated()[0]
+    expect((lesson.data.content as Array<Record<string, unknown>>)[0].durationMinutes).toBeUndefined()
+    expect(lesson.data.estimatedMinutes).toBeNull()
+  })
+
+  it('курсу проставляются часы и описание из структуры', async () => {
+    fetchVideoDuration.mockResolvedValue(1800)
+
+    await POST(post({ publicUrl: FOLDER, courseId: '3' }))
+
+    const courseUpdate = update.mock.calls
+      .map(([args]) => args)
+      .find((args) => args.collection === 'courses')
+
+    expect(courseUpdate?.data.estimatedHours).toBe(1)
+    expect(JSON.stringify(courseUpdate?.data.description)).toContain('2 уроков в 1 разделах')
   })
 })
 

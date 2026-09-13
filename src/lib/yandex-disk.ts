@@ -240,3 +240,64 @@ function decodeText(buffer: ArrayBuffer): string {
     return new TextDecoder('windows-1251').decode(buffer)
   }
 }
+
+/** Сколько байт читаем в поисках moov-атома с начала и с конца файла. */
+const MOOV_HEAD_BYTES = 1024 * 1024
+const MOOV_TAIL_BYTES = 1536 * 1024
+
+/**
+ * Длительность видео в секундах.
+ *
+ * API Диска её не отдаёт, поэтому читаем заголовок контейнера: у mp4 с
+ * faststart атом moov лежит в начале, у QuickTime — в конце, так что при
+ * промахе добираем хвост. Не удалось разобрать — возвращаем null: показать
+ * урок без длительности лучше, чем уронить импорт.
+ */
+export async function fetchVideoDuration(
+  ref: PublicResourceRef,
+  options: { token?: string } = {},
+): Promise<number | null> {
+  try {
+    const href = await fetchPublicDownloadHref(ref, options)
+    const head = await fetchBytes(href, 0, MOOV_HEAD_BYTES - 1)
+
+    const fromHead = readMvhdDuration(head.body)
+    if (fromHead !== null) return fromHead
+
+    if (head.total <= MOOV_HEAD_BYTES) return null
+
+    const tail = await fetchBytes(href, Math.max(0, head.total - MOOV_TAIL_BYTES), head.total - 1)
+    return readMvhdDuration(tail.body)
+  } catch {
+    return null
+  }
+}
+
+async function fetchBytes(url: string, start: number, end: number) {
+  const response = await fetchWithRetry(url, { headers: { Range: `bytes=${start}-${end}` } })
+  const range = response.headers.get('Content-Range')
+  const total = Number(range?.split('/')[1]) || 0
+
+  return { body: Buffer.from(await response.arrayBuffer()), total }
+}
+
+/** Разбирает атом mvhd: длительность в единицах timescale. */
+function readMvhdDuration(buffer: Buffer): number | null {
+  const at = buffer.indexOf('mvhd')
+  if (at < 0) return null
+
+  const version = buffer[at + 4]
+  const offset = at + 4
+
+  try {
+    const timescale = version === 0 ? buffer.readUInt32BE(offset + 12) : buffer.readUInt32BE(offset + 20)
+    const duration = version === 0
+      ? buffer.readUInt32BE(offset + 16)
+      : Number(buffer.readBigUInt64BE(offset + 24))
+
+    if (!timescale || !duration) return null
+    return duration / timescale
+  } catch {
+    return null
+  }
+}
