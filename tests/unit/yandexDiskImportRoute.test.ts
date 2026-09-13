@@ -216,12 +216,28 @@ describe('импорт вложенной папки раздачи', () => {
   })
 })
 
+describe('уроки с одинаковыми названиями', () => {
+  it('оба урока создаются: ключ повторного импорта — порядок, а не название', async () => {
+    fetchFolderRecursive.mockResolvedValue([
+      dir('/Блок'),
+      file('/Блок/1 часть.mp4'),
+      file('/Блок/2 часть.mp4'),
+    ])
+
+    const response = await POST(post({ publicUrl: FOLDER, courseId: '3' }))
+
+    await expect(response.json()).resolves.toMatchObject({ lessonsCreated: 2 })
+    expect(lessonsCreated()).toHaveLength(2)
+    expect(lessonsCreated().map((c) => c.data.order)).toEqual([1, 2])
+  })
+})
+
 describe('повторный импорт', () => {
   beforeEach(() => {
     find.mockImplementation(async ({ collection, where }: { collection: string; where: Record<string, unknown> }) => {
-      const hasTitle = 'title' in where
-      if (collection === 'sections' && hasTitle) return { docs: [{ id: 50 }], totalDocs: 1 }
-      if (collection === 'lessons' && hasTitle) return { docs: [{ id: 60 }], totalDocs: 1 }
+      const byOrder = 'order' in where
+      if (collection === 'sections' && byOrder) return { docs: [{ id: 50 }], totalDocs: 1 }
+      if (collection === 'lessons' && byOrder) return { docs: [{ id: 60 }], totalDocs: 1 }
       return emptyFind()
     })
   })
@@ -249,8 +265,8 @@ describe('повторный импорт', () => {
 describe('уроки, исчезнувшие из папки', () => {
   it('не удаляются, но попадают в предупреждения', async () => {
     find.mockImplementation(async ({ collection, where }: { collection: string; where: Record<string, unknown> }) => {
-      // Запрос без title — это сверка курса на осиротевшие уроки.
-      if (collection === 'lessons' && !('title' in where) && !('slug' in where)) {
+      // Запрос без порядка и slug — это сверка курса на осиротевшие уроки.
+      if (collection === 'lessons' && !('order' in where) && !('slug' in where)) {
         return { docs: [{ id: 999, title: 'Старый урок' }], totalDocs: 1 }
       }
       return emptyFind()

@@ -136,6 +136,7 @@ export function parseYandexDiskTree(
         lesson.title = `Урок ${lesson.order}`
       }
       lesson.materials = dedupeMaterials(lesson.materials)
+      lesson.title = disambiguate(lesson.title, lesson.order, section.lessons)
       lesson.videos.sort(compareVideos)
       lesson.videos.forEach((video, videoIndex) => {
         video.title = lesson.videos.length > 1 ? `Часть ${videoIndex + 1}` : lesson.title
@@ -666,6 +667,15 @@ function toMaterial(file: YandexDiskItem): ImportedMaterial {
     isText: TEXT_EXTENSIONS.has(extensionOf(file.name)),
     size: file.size ?? null,
   }
+}
+
+/**
+ * Файлы вида "1 часть", "2 часть" дают одинаковые названия уроков — к таким
+ * добавляем номер, иначе в списке секции подряд идут неразличимые пункты.
+ */
+function disambiguate(title: string, order: number, lessons: ImportedLesson[]): string {
+  const twins = lessons.filter((lesson) => lesson.title === title)
+  return twins.length > 1 ? `${title} ${order}` : title
 }
 
 /** Папка-наложение часто дублирует файлы основной: одинаковые имя и размер — одна копия. */

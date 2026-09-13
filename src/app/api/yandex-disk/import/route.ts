@@ -381,14 +381,16 @@ async function upsertSection(
   courseSlug: string,
   section: ImportedSection,
 ): Promise<UpsertResult> {
+  // Ключ повторного импорта — порядковый номер, а не название: названия
+  // повторяются (два раздела «Введение»), и по ним записи схлопывались бы.
   const existing = await payload.find({
     collection: 'sections',
-    where: { course: { equals: courseId }, title: { equals: section.title } },
+    where: { course: { equals: courseId }, order: { equals: section.order } },
     limit: 1,
     depth: 0,
   })
 
-  const data = { order: section.order, isPublished: true }
+  const data = { title: section.title, isPublished: true }
 
   const current = existing.docs[0]
   if (current) {
@@ -400,7 +402,7 @@ async function upsertSection(
     collection: 'sections',
     data: {
       ...data,
-      title: section.title,
+      order: section.order,
       course: courseId,
       slug: await uniqueSlug(payload, 'sections', `${courseSlug}-${section.title}`),
     },
@@ -427,13 +429,13 @@ async function upsertLesson(
     where: {
       course: { equals: courseId },
       section: { equals: sectionId },
-      title: { equals: lesson.title },
+      order: { equals: lesson.order },
     },
     limit: 1,
     depth: 0,
   })
 
-  const data = { order: lesson.order, isPublished: true, content }
+  const data = { title: lesson.title, isPublished: true, content }
 
   const current = existing.docs[0]
   if (current) {
@@ -445,7 +447,7 @@ async function upsertLesson(
     collection: 'lessons',
     data: {
       ...data,
-      title: lesson.title,
+      order: lesson.order,
       course: courseId,
       section: sectionId,
       slug: await uniqueSlug(payload, 'lessons', `${courseSlug}-${sectionTitle}-${lesson.title}`),
