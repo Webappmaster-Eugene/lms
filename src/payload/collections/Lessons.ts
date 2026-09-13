@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
 import { isAuthenticated } from '@/payload/access/isAuthenticated'
+import { cleanupLessonRelations } from '@/payload/hooks/cleanupLessonRelations'
 import { generateSlug } from '@/payload/hooks/generateSlug'
 import { TextBlock } from '@/payload/blocks/TextBlock'
 import { VideoBlock } from '@/payload/blocks/VideoBlock'
@@ -25,6 +26,7 @@ export const Lessons: CollectionConfig = {
   },
   hooks: {
     beforeValidate: [generateSlug],
+    beforeDelete: [cleanupLessonRelations],
   },
   fields: [
     {
