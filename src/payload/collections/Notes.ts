@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 
 import { isAuthenticated } from '@/payload/access/isAuthenticated'
 import { isAdminOrSelf } from '@/payload/access/isAdminOrSelf'
+import { assignOwner } from '@/payload/hooks/assignOwner'
 
 export const Notes: CollectionConfig = {
   slug: 'notes',
@@ -16,14 +17,7 @@ export const Notes: CollectionConfig = {
     delete: isAdminOrSelf,
   },
   hooks: {
-    beforeChange: [
-      ({ req, data, operation }) => {
-        if (operation === 'create' && req.user && req.user.role !== 'admin') {
-          data.user = req.user.id
-        }
-        return data
-      },
-    ],
+    beforeChange: [assignOwner],
   },
   fields: [
     {

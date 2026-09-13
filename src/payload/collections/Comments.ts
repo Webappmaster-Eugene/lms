@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 
 import { isAuthenticated } from '@/payload/access/isAuthenticated'
 import { isAdmin } from '@/payload/access/isAdmin'
+import { assignOwner } from '@/payload/hooks/assignOwner'
 
 export const Comments: CollectionConfig = {
   slug: 'comments',
@@ -26,14 +27,7 @@ export const Comments: CollectionConfig = {
     delete: isAdmin,
   },
   hooks: {
-    beforeChange: [
-      ({ req, data, operation }) => {
-        if (operation === 'create' && req.user) {
-          data.user = req.user.id
-        }
-        return data
-      },
-    ],
+    beforeChange: [assignOwner],
   },
   fields: [
     {

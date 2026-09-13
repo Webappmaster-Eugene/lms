@@ -48,12 +48,13 @@ export function LessonNotes({ lessonId }: Props) {
     setSaving(true)
     try {
       if (noteId) {
-        await fetch(`/api/notes/${noteId}`, {
+        const res = await fetch(`/api/notes/${noteId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ content: note }),
         })
+        if (!res.ok) throw new Error(`PATCH /api/notes → ${res.status}`)
       } else {
         const res = await fetch('/api/notes', {
           method: 'POST',
@@ -61,6 +62,7 @@ export function LessonNotes({ lessonId }: Props) {
           credentials: 'include',
           body: JSON.stringify({ lesson: lessonId, content: note }),
         })
+        if (!res.ok) throw new Error(`POST /api/notes → ${res.status}`)
         const data = await res.json()
         setNoteId(data.doc?.id)
       }
@@ -76,10 +78,11 @@ export function LessonNotes({ lessonId }: Props) {
     if (!noteId) return
     setSaving(true)
     try {
-      await fetch(`/api/notes/${noteId}`, {
+      const res = await fetch(`/api/notes/${noteId}`, {
         method: 'DELETE',
         credentials: 'include',
       })
+      if (!res.ok) throw new Error(`DELETE /api/notes → ${res.status}`)
       setNote('')
       setNoteId(null)
       toast('Заметка удалена', 'info')

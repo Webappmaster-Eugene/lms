@@ -10,6 +10,14 @@ type Props = {
   progressId?: string
 }
 
+/** Прогресс важнее плавности UI: неуспешный ответ должен всплыть, а не потеряться. */
+async function send(url: string, init: RequestInit): Promise<void> {
+  const response = await fetch(url, { credentials: 'include', ...init })
+  if (!response.ok) {
+    throw new Error(`${init.method ?? 'POST'} ${url} → ${response.status}`)
+  }
+}
+
 export function CompletionButton({ lessonId, isCompleted: initialCompleted, progressId }: Props) {
   const [completed, setCompleted] = useState(initialCompleted)
   const [loading, setLoading] = useState(false)
@@ -23,7 +31,7 @@ export function CompletionButton({ lessonId, isCompleted: initialCompleted, prog
     try {
       if (progressId && completed) {
         // Снять отметку
-        await fetch(`/api/user-progress/${progressId}`, {
+        await send(`/api/user-progress/${progressId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -35,7 +43,7 @@ export function CompletionButton({ lessonId, isCompleted: initialCompleted, prog
         setCompleted(false)
       } else if (progressId && !completed) {
         // Отметить пройденным (update existing)
-        await fetch(`/api/user-progress/${progressId}`, {
+        await send(`/api/user-progress/${progressId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -47,7 +55,7 @@ export function CompletionButton({ lessonId, isCompleted: initialCompleted, prog
         setCompleted(true)
       } else {
         // Создать запись прогресса
-        await fetch('/api/user-progress', {
+        await send('/api/user-progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',

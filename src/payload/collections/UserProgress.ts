@@ -6,6 +6,7 @@ import { isAdminOrSelf } from '@/payload/access/isAdminOrSelf'
 import { awardPoints } from '@/payload/hooks/awardPoints'
 import { checkAchievements } from '@/payload/hooks/checkAchievements'
 import { updateStreak } from '@/payload/hooks/updateStreak'
+import { assignOwner } from '@/payload/hooks/assignOwner'
 
 export const UserProgress: CollectionConfig = {
   slug: 'user-progress',
@@ -20,19 +21,7 @@ export const UserProgress: CollectionConfig = {
     delete: isAdmin,
   },
   hooks: {
-    beforeChange: [
-      ({ req, data, operation }) => {
-        if (operation === 'create') {
-          // Для hook-вызовов (context.skipHooks) пропускаем проверку
-          if (req.context?.skipHooks) return data
-          // Студент может создавать прогресс только для себя
-          if (req.user && req.user.role !== 'admin') {
-            data.user = req.user.id
-          }
-        }
-        return data
-      },
-    ],
+    beforeChange: [assignOwner],
     afterChange: [awardPoints, checkAchievements, updateStreak],
   },
   fields: [
