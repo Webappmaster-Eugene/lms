@@ -1,4 +1,5 @@
 import type { CollectionAfterChangeHook } from 'payload'
+import { relationId } from '@/lib/relation-id'
 import { withSpan, logger } from '@/lib/telemetry'
 
 type StreakDoc = {
@@ -26,13 +27,13 @@ export const updateStreak: CollectionAfterChangeHook = async ({
 
   if (!justCompleted) return doc
 
-  const userId = String(typeof doc.user === 'object' ? doc.user.id : doc.user)
+  const userId = relationId(doc.user)
   const today = new Date().toISOString().split('T')[0]
 
   return withSpan('hook.updateStreak', { 'user.id': userId }, async () => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const existing = await (req.payload as any).find({
+      const existing = await req.payload.find({
+        req,
         collection: 'streaks',
         where: { user: { equals: userId } },
         limit: 1,
@@ -40,7 +41,8 @@ export const updateStreak: CollectionAfterChangeHook = async ({
 
       if (existing.docs.length > 0) {
         const streak = existing.docs[0] as StreakDoc
-        const lastDate = streak.lastActivityDate
+        // Payload отдаёт дату полным ISO, а сравниваем мы календарные дни
+        const lastDate = streak.lastActivityDate?.split('T')[0] ?? null
 
         if (lastDate === today) return doc
 
@@ -57,8 +59,8 @@ export const updateStreak: CollectionAfterChangeHook = async ({
 
         const newLongest = Math.max(newStreak, streak.longestStreak ?? 0)
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (req.payload as any).update({
+        await req.payload.update({
+          req,
           collection: 'streaks',
           id: streak.id,
           data: {
@@ -70,8 +72,8 @@ export const updateStreak: CollectionAfterChangeHook = async ({
           context: { skipHooks: true },
         })
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (req.payload as any).create({
+        await req.payload.create({
+          req,
           collection: 'streaks',
           data: {
             user: userId,
