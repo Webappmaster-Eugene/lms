@@ -15,7 +15,6 @@ type Props = {
 }
 
 type PlayerHandle = {
-  seek: (seconds: number) => void
   destroy: () => void
 }
 
@@ -94,9 +93,6 @@ export function TransportStreamPlayer({ src, durationMinutes, onFailure }: Props
         player.load()
 
         playerRef.current = {
-          seek: (seconds) => {
-            player.currentTime = seconds
-          },
           destroy: () => {
             player.destroy()
           },
@@ -151,16 +147,20 @@ export function TransportStreamPlayer({ src, durationMinutes, onFailure }: Props
     else video.pause()
   }, [])
 
+  /**
+   * В MPEG-TS нет оглавления, поэтому прыгнуть можно только по уже прочитанной
+   * части файла. Просьбу уйти дальше приводим к её краю: файл догружается
+   * заметно быстрее просмотра, так что через несколько секунд доступно больше.
+   */
   const seekTo = useCallback((seconds: number) => {
     const video = videoRef.current
-    if (!video) return
-    const target = Math.max(0, seconds)
-    // Внутри уже загруженного куска хватает обычной перемотки
-    if (video.buffered.length > 0 && target >= video.buffered.start(0) && target <= video.buffered.end(video.buffered.length - 1)) {
-      video.currentTime = target
-    } else {
-      playerRef.current?.seek(target)
-    }
+    if (!video || video.buffered.length === 0) return
+
+    const first = video.buffered.start(0)
+    const last = video.buffered.end(video.buffered.length - 1)
+    const target = Math.min(Math.max(seconds, first), Math.max(first, last - 0.5))
+
+    video.currentTime = target
     setPosition(target)
   }, [])
 
@@ -216,6 +216,7 @@ export function TransportStreamPlayer({ src, durationMinutes, onFailure }: Props
             if (event.key === 'ArrowRight') seekTo(position + 10)
             if (event.key === 'ArrowLeft') seekTo(position - 10)
           }}
+          title="Перемотка доступна по загруженной части — она обгоняет просмотр"
           className="relative h-1.5 flex-1 cursor-pointer rounded-full bg-white/20"
         >
           {duration > 0 && (

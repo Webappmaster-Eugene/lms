@@ -83,8 +83,9 @@ describe('видео выбирает плеер по контейнеру', () 
     expect(TS_PLAYER).not.toMatch(/<video[^>]*\scontrols/)
   })
 
-  it('перемотка за пределы загруженного идёт через плеер, а не через элемент', () => {
-    expect(TS_PLAYER).toContain('playerRef.current?.seek(target)')
+  it('перемотка ограничена загруженной частью — в контейнере нет оглавления', () => {
+    expect(TS_PLAYER).toContain('video.buffered.end(video.buffered.length - 1)')
+    expect(TS_PLAYER).toContain('Math.min(Math.max(seconds, first)')
   })
 
   it('сбой плеера потока откатывает урок на карточку с ссылкой', () => {
