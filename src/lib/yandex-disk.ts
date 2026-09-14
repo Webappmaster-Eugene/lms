@@ -245,13 +245,23 @@ function decodeText(buffer: ArrayBuffer): string {
 const MOOV_HEAD_BYTES = 1024 * 1024
 const MOOV_TAIL_BYTES = 1536 * 1024
 
+/** Заголовка mp4-бокса хватает 16 байт: size (4 или 4+8) + type (4). */
+const BOX_HEADER_BYTES = 16
+/** mvhd лежит первым ребёнком moov, так что начала бокса достаточно. */
+const MOOV_PROBE_BYTES = 4096
+/** Страховка от зацикливания на битом контейнере. */
+const MAX_BOX_WALK = 24
+
 /**
  * Длительность видео в секундах.
  *
- * API Диска её не отдаёт, поэтому читаем заголовок контейнера: у mp4 с
- * faststart атом moov лежит в начале, у QuickTime — в конце, так что при
- * промахе добираем хвост. Не удалось разобрать — возвращаем null: показать
- * урок без длительности лучше, чем уронить импорт.
+ * API Диска её не отдаёт, поэтому читаем сам контейнер. Идём по таблице
+ * верхнеуровневых боксов (ftyp → mdat → moov …) и прыгаем прямо к moov:
+ * слепое чтение начала и хвоста промахивается на длинных записях, где moov
+ * весит десятки мегабайт и лежит за пределами окна. Если обход не удался
+ * (нестандартный контейнер, сервер игнорирует Range) — пробуем по-старому.
+ * Не удалось разобрать — возвращаем null: показать урок без длительности
+ * лучше, чем уронить импорт.
  */
 export async function fetchVideoDuration(
   ref: PublicResourceRef,
@@ -259,18 +269,75 @@ export async function fetchVideoDuration(
 ): Promise<number | null> {
   try {
     const href = await fetchPublicDownloadHref(ref, options)
-    const head = await fetchBytes(href, 0, MOOV_HEAD_BYTES - 1)
 
-    const fromHead = readMvhdDuration(head.body)
-    if (fromHead !== null) return fromHead
+    const walked = await readDurationByBoxWalk(href)
+    if (walked !== null) return walked
 
-    if (head.total <= MOOV_HEAD_BYTES) return null
-
-    const tail = await fetchBytes(href, Math.max(0, head.total - MOOV_TAIL_BYTES), head.total - 1)
-    return readMvhdDuration(tail.body)
+    return await readDurationByScan(href)
   } catch {
     return null
   }
+}
+
+/** Прыжок к moov по таблице боксов: несколько коротких запросов вместо мегабайтов. */
+async function readDurationByBoxWalk(href: string): Promise<number | null> {
+  const first = await fetchBytes(href, 0, BOX_HEADER_BYTES - 1)
+  const total = first.total
+  if (!total) return null
+
+  let offset = 0
+  let header = first.body
+
+  for (let step = 0; step < MAX_BOX_WALK && offset + BOX_HEADER_BYTES <= total; step++) {
+    if (step > 0) {
+      header = (await fetchBytes(href, offset, offset + BOX_HEADER_BYTES - 1)).body
+    }
+
+    const box = readBoxHeader(header)
+    if (!box) return null
+
+    if (box.type === 'moov') {
+      const end = Math.min(offset + MOOV_PROBE_BYTES, total) - 1
+      const moov = await fetchBytes(href, offset, end)
+      return readMvhdDuration(moov.body)
+    }
+
+    // size 0 — бокс тянется до конца файла, дальше идти некуда
+    if (box.size < BOX_HEADER_BYTES) return null
+    offset += box.size
+  }
+
+  return null
+}
+
+/** Запасной путь: слепое чтение начала и хвоста файла. */
+async function readDurationByScan(href: string): Promise<number | null> {
+  const head = await fetchBytes(href, 0, MOOV_HEAD_BYTES - 1)
+
+  const fromHead = readMvhdDuration(head.body)
+  if (fromHead !== null) return fromHead
+
+  if (head.total <= MOOV_HEAD_BYTES) return null
+
+  const tail = await fetchBytes(href, Math.max(0, head.total - MOOV_TAIL_BYTES), head.total - 1)
+  return readMvhdDuration(tail.body)
+}
+
+/** Заголовок mp4-бокса: 32-битный размер, расширенный 64-битным при size === 1. */
+function readBoxHeader(buffer: Buffer): { size: number; type: string } | null {
+  if (buffer.length < 8) return null
+
+  const compact = buffer.readUInt32BE(0)
+  const type = buffer.toString('latin1', 4, 8)
+
+  if (compact === 1) {
+    if (buffer.length < BOX_HEADER_BYTES) return null
+    const large = buffer.readBigUInt64BE(8)
+    if (large > BigInt(Number.MAX_SAFE_INTEGER)) return null
+    return { size: Number(large), type }
+  }
+
+  return { size: compact, type }
 }
 
 async function fetchBytes(url: string, start: number, end: number) {
