@@ -615,6 +615,44 @@ describe('материалы не превращают урок в файлов�
     expect(materials.map((m) => m.title)).toEqual(['Блок — папка на Диске', 'проект.zip'])
   })
 
+  it('рекламные ярлыки раздач в материалы не попадают, полезные остаются', () => {
+    const result = parseYandexDiskTree([
+      dir('/Курс'),
+      file('/Курс/1.mp4'),
+      file('/Курс/Eground - Скачивай платные курсы, тренинги и другие материалы бесплатно!.url'),
+      file('/Курс/Присоединяйся в Telegram - @eground_live.url'),
+      file('/Курс/Topkursy.com - Удаленные курсы Skillbox, GeekBrains.url'),
+      file('/Курс/1 -NestJS gRPC.url'),
+      file('/Курс/Конспект.pdf'),
+    ])
+
+    const titles = result.sections[0].lessons[0].materials.map((m) => m.title)
+
+    expect(titles).toContain('1 -NestJS gRPC.url')
+    expect(titles).toContain('Конспект.pdf')
+    expect(titles.some((t) => /eground|topkursy/i.test(t))).toBe(false)
+  })
+
+  it('ссылка на папку ведёт на её полный путь, а не на путь внутри курса', () => {
+    // Курс импортируется из подпапки: у ссылки должен остаться путь от корня
+    // публикации, иначе на Диске открывается 404 — так было с 11 ссылками.
+    const items = [
+      dir('/purple/Bash скрипты'),
+      file('/purple/Bash скрипты/1.mp4'),
+      dir('/purple/Bash скрипты/[eground.org] code'),
+    ]
+    for (let i = 0; i < 20; i++) {
+      items.push(file(`/purple/Bash скрипты/[eground.org] code/file${i}.sh`))
+    }
+
+    const result = parseYandexDiskTree(items, { basePath: '/purple/Bash скрипты' })
+    const folder = result.sections[0].lessons[0].materials.find((m) =>
+      m.title.includes('папка на Диске'),
+    )
+
+    expect(folder?.path).toBe('/purple/Bash скрипты/[eground.org] code')
+  })
+
   it('когда ссылок всё равно много, россыпь файлов заменяется их папкой', () => {
     const items = [dir('/Блок'), file('/Блок/1.mp4')]
     for (let i = 0; i < 20; i++) {

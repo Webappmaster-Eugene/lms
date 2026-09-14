@@ -71,7 +71,10 @@ export type StructureResult = {
 
 type TreeNode = {
   name: string
+  /** Путь внутри импортируемой папки — по нему строится структура курса. */
   path: string
+  /** Полный путь на Диске — только он годится для ссылки на папку. */
+  diskPath: string
   dirs: TreeNode[]
   files: YandexDiskItem[]
 }
@@ -191,7 +194,7 @@ export function parseYandexDiskTree(
  */
 function buildTree(items: YandexDiskItem[], basePath: string | null): TreeNode {
   const prefix = basePath ? normalizePath(basePath) : ''
-  const root: TreeNode = { name: '', path: '/', dirs: [], files: [] }
+  const root: TreeNode = { name: '', path: '/', diskPath: `/${prefix}`, dirs: [], files: [] }
   const nodes = new Map<string, TreeNode>([['', root]])
 
   /** Возвращает узел каталога, достраивая недостающих предков. */
@@ -203,7 +206,13 @@ function buildTree(items: YandexDiskItem[], basePath: string | null): TreeNode {
     const segments = key.split('/').filter(Boolean)
     const name = segments[segments.length - 1] ?? ''
     const parent = ensureDir(segments.slice(0, -1).join('/'))
-    const node: TreeNode = { name, path: `/${key}`, dirs: [], files: [] }
+    const node: TreeNode = {
+      name,
+      path: `/${key}`,
+      diskPath: `/${[prefix, key].filter(Boolean).join('/')}`,
+      dirs: [],
+      files: [],
+    }
 
     parent.dirs.push(node)
     nodes.set(key, node)
@@ -298,6 +307,22 @@ const MAX_FOLDER_FILES = 12
 /** Столько ссылок в уроке ещё читаются глазами. */
 const MAX_LESSON_MATERIALS = 12
 
+/**
+ * Ярлыки .url в раздачах бывают двух сортов: полезные ссылки на документацию
+ * ("NestJS gRPC.url") и реклама площадок, откуда курс «слили». Вторые студенту
+ * показывать незачем — отсеиваем по названию, остальные ярлыки оставляем.
+ */
+const AD_SHORTCUTS = /(eground|topkursy|freecoursesonline|onehack|ftuapps|sw\.band|скачивай платные|как зайти на сайт с курсами)/i
+
+function isAdShortcut(file: YandexDiskItem): boolean {
+  return extensionOf(file.name) === 'url' && AD_SHORTCUTS.test(file.name)
+}
+
+/** Файл, который имеет смысл показать студентом материалом урока. */
+function isMaterialFile(file: YandexDiskItem): boolean {
+  return !isVideo(file) && !isAdShortcut(file)
+}
+
 /** Раздаточные материалы, которые имеет смысл открывать по отдельности. */
 const HANDOUT_EXTENSIONS = new Set([
   'zip', 'rar', '7z', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
@@ -309,13 +334,14 @@ const HANDOUT_EXTENSIONS = new Set([
  * папку сворачиваем в одну ссылку, отдельно оставляя архивы и документы.
  */
 function materialsOf(node: TreeNode): ImportedMaterial[] {
-  const files = collectFiles(node).filter((file) => !isVideo(file))
+  const files = collectFiles(node).filter(isMaterialFile)
   if (files.length <= MAX_FOLDER_FILES) return files.map(toMaterial)
 
   const handouts = files.filter((file) => HANDOUT_EXTENSIONS.has(extensionOf(file.name)))
   const folder: ImportedMaterial = {
     title: `${cleanTitle(node.name) || 'Материалы'} — папка на Диске`,
-    path: node.path,
+    // Ссылка строится от корня публикации, поэтому путь нужен полный
+    path: node.diskPath,
     isText: false,
     size: null,
   }
@@ -462,7 +488,7 @@ function buildSection(node: TreeNode, title: string): ImportedSection {
     })
   }
 
-  for (const file of node.files.filter((item) => !isVideo(item))) {
+  for (const file of node.files.filter(isMaterialFile)) {
     const ref = parseUnitRef(file.name)
     const target = ref ? lessons.get(lessonKeyOf(ref)) : undefined
 
@@ -561,7 +587,7 @@ function buildDottedSections(node: TreeNode, warnings: string[]): ImportedSectio
   }
 
   // Материалы такой папки относятся к уроку своего раздела, иначе к первому.
-  for (const file of node.files.filter((item) => !isVideo(item))) {
+  for (const file of node.files.filter(isMaterialFile)) {
     const ref = parseUnitRef(file.name)
     const section = ref ? sections.find((item) => item.order === ref.number) : undefined
     const target = section ?? sections[0]
