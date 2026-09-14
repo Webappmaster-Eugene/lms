@@ -23,6 +23,12 @@ const OVERLAY_SUFFIX = /^(.+?)\s*\((?:доп|доп\.|дополнительно
 /** Технические пометки раздач, которые не должны попадать в названия уроков. */
 const NOISE_TAGS = /\s*[[(](?:[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+|skladchik[^\])]*)[\])]/gi
 
+/**
+ * Хвостовое служебное слово «метка» из имён файлов автора: для студента это шум.
+ * Требуем пробел перед словом, иначе пострадали бы «Разметка», «Заметка» и подобные.
+ */
+const AUTHOR_MARK = /\s+метка\s*$/i
+
 export type ImportedVideo = {
   title: string
   /** Путь внутри публичной папки. */
@@ -938,6 +944,7 @@ function stripExtension(name: string): string {
 function cleanTitle(name: string): string {
   return name
     .replace(NOISE_TAGS, '')
+    .replace(AUTHOR_MARK, '')
     .replace(/\s+/g, ' ')
     .replace(/^[\s._\-–—]+|[\s._\-–—]+$/g, '')
     .trim()

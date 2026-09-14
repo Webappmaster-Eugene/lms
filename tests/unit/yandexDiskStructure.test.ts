@@ -448,6 +448,23 @@ describe('чистка названий и размер секций', () => {
     expect(result.sections[0].lessons[0].title).toBe('Babel. Extract plugin [optional]')
   })
 
+  it('хвостовая служебная «метка» снимается, а «разметка» не страдает', () => {
+    const result = parseYandexDiskTree([
+      dir('/Курс'),
+      file('/Курс/1. Sidebar. Layout приложения Метка.mp4'),
+      file('/Курс/2. React Testing Library. Тесты на компоненты метка.mp4'),
+      file('/Курс/3. Упражнение — Разметка страниц.mp4'),
+      file('/Курс/4. Работа с изображениями МЕТКА.mp4'),
+    ])
+
+    expect(result.sections[0].lessons.map((l) => l.title)).toEqual([
+      'Sidebar. Layout приложения',
+      'React Testing Library. Тесты на компоненты',
+      'Упражнение — Разметка страниц',
+      'Работа с изображениями',
+    ])
+  })
+
   it('плоская секция без названий режется на блоки по десять', () => {
     const items = [dir('/Курс')]
     for (let i = 1; i <= 35; i++) items.push(file(`/Курс/lesson${i}.mp4`))
