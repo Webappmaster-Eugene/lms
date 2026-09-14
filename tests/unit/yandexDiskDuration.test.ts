@@ -114,6 +114,22 @@ describe('длительность видео из контейнера', () => 
     expect(Math.max(...ranges)).toBeLessThanOrEqual(4096)
   })
 
+  it('короткий бокс free между ftyp и mdat не обрывает обход', async () => {
+    // Ровно такая раскладка у длинных записей библиотеки: ftyp, free(8), mdat, moov
+    const mdatSize = 32 * 1024 * 1024
+    const file = Buffer.concat([
+      box('ftyp', 32),
+      Buffer.alloc(24),
+      box('free', 8),
+      box('mdat', mdatSize),
+      Buffer.alloc(mdatSize - 8),
+      moovBox(1000, 6_755_334),
+    ])
+    install(file)
+
+    await expect(fetchVideoDuration(REF)).resolves.toBeCloseTo(6755.334, 2)
+  })
+
   it('понимает 64-битный размер бокса', async () => {
     const mdatSize = 16 * 1024 * 1024
     const file = Buffer.concat([

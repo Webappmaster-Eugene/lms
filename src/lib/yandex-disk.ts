@@ -247,6 +247,8 @@ const MOOV_TAIL_BYTES = 1536 * 1024
 
 /** Заголовка mp4-бокса хватает 16 байт: size (4 или 4+8) + type (4). */
 const BOX_HEADER_BYTES = 16
+/** Короткий бокс — это всё ещё валидный бокс: "free" между ftyp и mdat весит ровно 8. */
+const MIN_BOX_SIZE = 8
 /** mvhd лежит первым ребёнком moov, так что начала бокса достаточно. */
 const MOOV_PROBE_BYTES = 4096
 /** Страховка от зацикливания на битом контейнере. */
@@ -288,9 +290,9 @@ async function readDurationByBoxWalk(href: string): Promise<number | null> {
   let offset = 0
   let header = first.body
 
-  for (let step = 0; step < MAX_BOX_WALK && offset + BOX_HEADER_BYTES <= total; step++) {
+  for (let step = 0; step < MAX_BOX_WALK && offset + MIN_BOX_SIZE <= total; step++) {
     if (step > 0) {
-      header = (await fetchBytes(href, offset, offset + BOX_HEADER_BYTES - 1)).body
+      header = (await fetchBytes(href, offset, Math.min(offset + BOX_HEADER_BYTES, total) - 1)).body
     }
 
     const box = readBoxHeader(header)
@@ -302,8 +304,8 @@ async function readDurationByBoxWalk(href: string): Promise<number | null> {
       return readMvhdDuration(moov.body)
     }
 
-    // size 0 — бокс тянется до конца файла, дальше идти некуда
-    if (box.size < BOX_HEADER_BYTES) return null
+    // size 0 — бокс тянется до конца файла, значит moov за ним уже не будет
+    if (box.size < MIN_BOX_SIZE) return null
     offset += box.size
   }
 
