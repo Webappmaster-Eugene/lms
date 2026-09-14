@@ -118,6 +118,19 @@ describe('каталог тренажёра: инварианты', () => {
       .toBeGreaterThanOrEqual(50)
   })
 
+  it('каталог помещается на страницу «Все задачи» целиком', async () => {
+    // Страница отдаёт список одним запросом с лимитом PAGE_SIZE. Если каталог
+    // перерастёт лимит, целые темы станут недостижимы без фильтра — ровно это
+    // и случилось на проде, когда задач стало 133 при лимите 100.
+    const source = await import('node:fs').then((fs) =>
+      fs.readFileSync('src/app/(frontend)/trainer/tasks/page.tsx', 'utf8'),
+    )
+    const limit = Number(/const PAGE_SIZE = (\d+)/.exec(source)?.[1])
+
+    expect(limit, 'не удалось прочитать PAGE_SIZE со страницы каталога').toBeGreaterThan(0)
+    expect(entries.length, `задач ${entries.length}, а страница отдаёт ${limit}`).toBeLessThanOrEqual(limit)
+  })
+
   it('есть задачи всех уровней сложности', () => {
     const difficulties = new Set(entries.map(({ task }) => task.difficulty))
     expect([...difficulties].sort()).toEqual(['easy', 'hard', 'medium'])

@@ -20,7 +20,15 @@ type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
-const PAGE_SIZE = 100
+/**
+ * Страница отдаёт весь каталог одним списком.
+ *
+ * Задач сейчас 133, и ограничение в сотню прятало целые темы: «Все задачи» —
+ * единственное место, где можно посмотреть каталог целиком, и обрезать его
+ * там нельзя. Запас взят с расчётом на рост; если каталог перерастёт и его,
+ * внизу страницы появится предупреждение.
+ */
+const PAGE_SIZE = 500
 
 const DIFFICULTY_CLASS: Record<TrainerDifficulty, string> = {
   easy: 'text-success',
@@ -212,7 +220,7 @@ export default async function AllTasksPage({ searchParams }: Props) {
       )}
 
       {tasks.totalDocs > PAGE_SIZE && (
-        <p className="text-center text-xs text-muted-foreground">
+        <p className="text-center text-xs text-warning">
           Показаны первые {PAGE_SIZE} из {tasks.totalDocs} задач — уточните фильтры
         </p>
       )}
