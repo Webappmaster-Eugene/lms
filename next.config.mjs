@@ -51,7 +51,10 @@ const nextConfig = {
               "font-src 'self' data:",
               "frame-src https://miro.com https://www.youtube.com https://youtube.com",
               "connect-src 'self'",
-              "media-src 'self' https:",
+              // blob: нужен плееру MPEG-TS: mpegts.js отдаёт видео через MediaSource,
+              // а его поток адресуется blob-ссылкой
+              "media-src 'self' https: blob:",
+              "worker-src 'self' blob:",
             ].join('; '),
           },
         ],

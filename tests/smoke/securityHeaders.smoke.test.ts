@@ -77,6 +77,17 @@ describe('CSP и встраиваемый контент не разошлись
   it('media-src допускает внешние источники — видео отдаются по прямым ссылкам', () => {
     expect(directive('media-src')).toContain('https:')
   })
+
+  it('blob разрешён для видео и воркеров — иначе не работает плеер MPEG-TS', () => {
+    // mpegts.js отдаёт поток через MediaSource: источник видео адресуется blob-ссылкой
+    expect(directive('media-src')).toContain('blob:')
+    expect(directive('worker-src')).toContain('blob:')
+  })
+
+  it('blob не расползается на скрипты — политика остаётся узкой', () => {
+    expect(directive('script-src')).not.toContain('blob:')
+    expect(directive('default-src')).not.toContain('blob:')
+  })
 })
 
 describe('песочница встроенных фреймов', () => {
