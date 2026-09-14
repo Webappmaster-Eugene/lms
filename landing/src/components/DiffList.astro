@@ -1,0 +1,29 @@
+---
+/** Список в виде unified diff. Красный «−» и зелёный «+» здесь несут смысл,
+ *  а не работают декором — это единственное место, где эти цвета появляются. */
+interface Props {
+  sign: '-' | '+'
+  items: readonly string[]
+}
+
+const { sign, items } = Astro.props
+const isAdd = sign === '+'
+---
+
+<ul class="font-mono text-[0.8125rem] leading-relaxed">
+  {
+    items.map((text) => (
+      <li
+        class:list={[
+          'flex gap-3 border-l-2 py-1.5 pl-3 pr-2 transition-colors',
+          isAdd ? 'border-add/50 bg-add/[0.04] hover:bg-add/[0.08]' : 'border-del/50 bg-del/[0.04] hover:bg-del/[0.08]',
+        ]}
+      >
+        <span aria-hidden="true" class:list={['select-none font-bold', isAdd ? 'text-add' : 'text-del']}>
+          {sign}
+        </span>
+        <span class:list={[isAdd ? 'text-ink' : 'text-ink-dim']}>{text}</span>
+      </li>
+    ))
+  }
+</ul>

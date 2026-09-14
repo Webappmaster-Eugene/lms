@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css'
+import { SITE_URL, AUTHOR_URL, TELEGRAM_URL } from '../config'
 
 interface Props {
   title?: string
@@ -11,8 +12,8 @@ const {
   description = 'Персональное менторство по Frontend (React, TypeScript, Next.js) и Backend (Node.js, NestJS, SQL). Трудоустройство за 6-7 месяцев. LMS-платформа с тренажёром кода, геймификацией и сертификатами. Москва.',
 } = Astro.props
 
-const siteUrl = 'https://promo.nadtocheev.ru'
-const canonicalUrl = new URL(Astro.url.pathname, siteUrl).href
+const canonicalUrl = new URL(Astro.url.pathname, SITE_URL).href
+const ogImage = new URL('/og.png', SITE_URL).href
 ---
 
 <!doctype html>
@@ -21,12 +22,13 @@ const canonicalUrl = new URL(Astro.url.pathname, siteUrl).href
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#0b0b0c" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="canonical" href={canonicalUrl} />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+    <!-- Шрифты самохостятся: ни одного запроса к внешним доменам -->
+    <link rel="preload" href="/fonts/golos-text-400-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/golos-text-800-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
 
     <!-- GEO meta -->
     <meta name="geo.region" content="RU-MOW" />
@@ -41,11 +43,22 @@ const canonicalUrl = new URL(Astro.url.pathname, siteUrl).href
     <meta property="og:locale" content="ru_RU" />
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:site_name" content="MentorCareer" />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="MentorCareer — из нуля до оффера в IT за 6–7 месяцев" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <!-- Ставится до первой отрисовки: без JS класса нет и весь контент
+         виден сразу, с JS — включается появление при прокрутке. -->
+    <script is:inline>
+      document.documentElement.classList.add('js')
+    </script>
 
     <title>{title}</title>
 
@@ -56,7 +69,7 @@ const canonicalUrl = new URL(Astro.url.pathname, siteUrl).href
         {
           "@type": "EducationalOrganization",
           "name": "MentorCareer",
-          "url": siteUrl,
+          "url": SITE_URL,
           "description": "Персональное менторство по Frontend и Backend разработке с гарантией трудоустройства",
           "address": {
             "@type": "PostalAddress",
@@ -72,26 +85,20 @@ const canonicalUrl = new URL(Astro.url.pathname, siteUrl).href
             "@type": "Country",
             "name": "Russia"
           },
-          "sameAs": [
-            "https://nadtocheev.ru",
-            "https://t.me/eugene_nadtocheev"
-          ]
+          "sameAs": [AUTHOR_URL, TELEGRAM_URL]
         },
         {
           "@type": "Person",
           "name": "Евгений Надточеев",
           "jobTitle": "Fullstack Developer, Ментор",
-          "url": "https://nadtocheev.ru",
+          "url": AUTHOR_URL,
           "knowsAbout": ["React", "TypeScript", "Next.js", "Node.js", "NestJS", "PostgreSQL", "Kubernetes", "Docker"],
-          "sameAs": [
-            "https://nadtocheev.ru",
-            "https://t.me/eugene_nadtocheev"
-          ]
+          "sameAs": [AUTHOR_URL, TELEGRAM_URL]
         },
         {
           "@type": "WebSite",
           "name": "MentorCareer",
-          "url": siteUrl,
+          "url": SITE_URL,
           "inLanguage": "ru"
         },
         {
@@ -120,6 +127,63 @@ const canonicalUrl = new URL(Astro.url.pathname, siteUrl).href
     })} />
   </head>
   <body>
+    <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:bg-accent focus:px-4 focus:py-2 focus:font-mono focus:text-xs focus:text-ground">
+      К содержимому
+    </a>
     <slot />
+
+    <script>
+      // Единственный JS на странице: проявление блоков и подсветка рельса.
+      // Уважает prefers-reduced-motion и не ломает страницу без поддержки IO.
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+      const revealTargets = document.querySelectorAll<HTMLElement>('[data-reveal]')
+      if (reduced || !('IntersectionObserver' in window)) {
+        revealTargets.forEach((el) => el.classList.add('is-in'))
+      } else {
+        const revealObserver = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (!entry.isIntersecting) continue
+              entry.target.classList.add('is-in')
+              revealObserver.unobserve(entry.target)
+            }
+          },
+          { rootMargin: '0px 0px -12% 0px', threshold: 0.08 },
+        )
+        revealTargets.forEach((el) => revealObserver.observe(el))
+      }
+
+      // Подсветка активной метки левого рельса по текущей секции.
+      const marks = document.querySelectorAll<HTMLAnchorElement>('[data-rail-mark]')
+      // Пустая строка в querySelector бросает SyntaxError, поэтому
+      // отсеиваем метки без href до запроса, а не после.
+      const sections = Array.from(marks)
+        .map((mark) => mark.getAttribute('href'))
+        .filter((href): href is string => href !== null && href.startsWith('#') && href.length > 1)
+        .map((href) => document.querySelector<HTMLElement>(href))
+        .filter((el): el is HTMLElement => el !== null)
+
+      if (sections.length > 0 && 'IntersectionObserver' in window) {
+        const setActive = (id: string) => {
+          marks.forEach((mark) => {
+            mark.dataset.active = String(mark.getAttribute('href') === `#${id}`)
+          })
+        }
+
+        const spy = new IntersectionObserver(
+          (entries) => {
+            // Берём самую верхнюю из видимых секций — иначе активными
+            // мигают сразу две на границе прокрутки.
+            const visible = entries
+              .filter((e) => e.isIntersecting)
+              .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+            if (visible[0]) setActive(visible[0].target.id)
+          },
+          { rootMargin: '-45% 0px -45% 0px' },
+        )
+        sections.forEach((section) => spy.observe(section))
+      }
+    </script>
   </body>
 </html>

@@ -1,10 +1,12 @@
 import { defineConfig } from 'astro/config'
 import tailwindcss from '@tailwindcss/vite'
 
+import { SITE_URL } from './src/config.ts'
+
 export default defineConfig({
   integrations: [],
   vite: {
     plugins: [tailwindcss()],
   },
-  site: 'https://promo.nadtocheev.ru',
+  site: SITE_URL,
 })

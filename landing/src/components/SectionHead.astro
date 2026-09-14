@@ -1,0 +1,25 @@
+---
+/** Заголовок блока в виде строки-комментария редактора:
+ *  // 03 ──────────── ЗАГОЛОВОК
+ *  Заменяет повторявшуюся 13 раз связку «бейдж по центру + h2 по центру». */
+interface Props {
+  index: string
+  label: string
+  title: string
+  lead?: string
+}
+
+const { index, label, title, lead } = Astro.props
+---
+
+<header class="mb-10 lg:mb-14" data-reveal>
+  <div class="mb-5 flex items-center gap-3">
+    <span class="font-mono text-xs tracking-[0.08em] text-accent">// {index}</span>
+    <span class="t-mono">{label}</span>
+    <span aria-hidden="true" class="h-px flex-1 bg-line-soft"></span>
+  </div>
+
+  <h2 class="t-h2 max-w-3xl text-ink">{title}</h2>
+
+  {lead && <p class="t-lead mt-4 max-w-2xl">{lead}</p>}
+</header>

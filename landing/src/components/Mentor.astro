@@ -1,0 +1,154 @@
+---
+/** Блок 02 — ментор. Поднят выше по странице: доказательство должно идти
+ *  до оффера, а не после него. */
+import { AUTHOR_URL, MENTOR_PHOTO } from '../config'
+import SectionHead from './SectionHead.astro'
+import Pane from './Pane.astro'
+
+const STACK = [
+  'React', 'Next.js', 'TypeScript', 'Node.js', 'NestJS',
+  'Go', 'PostgreSQL', 'Redis', 'Kafka', 'Kubernetes', 'Docker',
+] as const
+
+/** Логотипы школ, где Евгений преподавал. Знаки чужие и используются
+ *  для фактической справки об опыте; файлы лежат в public/logos.
+ *  Высоты подобраны так, чтобы оба знака зрительно весили одинаково:
+ *  у Purple School это широкий словесный знак, у Школы 21 — компактный блок. */
+const TAUGHT_AT = [
+  {
+    logo: '/logos/purpleschool.svg',
+    alt: 'Purple School',
+    width: 84,
+    height: 22,
+  },
+  {
+    logo: '/logos/school21.svg',
+    alt: 'Школа 21 — Сбер',
+    width: 34,
+    height: 34,
+  },
+] as const
+
+const FACTS = [
+  { value: '5+', label: 'лет в разработке', desc: 'Enterprise, fintech, стартапы' },
+  { value: '30+', label: 'консультаций', desc: 'Карьерные и технические' },
+  { value: '2 года', label: 'преподавания', desc: 'Purple School, Sberbank School 21' },
+  { value: '10+', label: 'микросервисов', desc: 'В production, с мониторингом' },
+] as const
+---
+
+<section id="mentor" class="band border-t border-line-soft">
+  <div class="shell">
+    <SectionHead
+      index="02"
+      label="кто ведёт"
+      title="Практик, а не теоретик"
+      lead="Не просто преподаватель — действующий разработчик, который каждый день пишет production-код и знает, что реально нужно на рынке."
+    />
+
+    <div class="grid gap-8 lg:grid-cols-12 lg:gap-10">
+      <div class="lg:col-span-4 min-w-0" data-reveal>
+        <Pane path="евгений-надточеев" meta="fullstack">
+          {
+            MENTOR_PHOTO ? (
+              <img
+                src={MENTOR_PHOTO}
+                alt="Евгений Надточеев, fullstack-разработчик и ментор"
+                width="720"
+                height="960"
+                loading="lazy"
+                decoding="async"
+                class="aspect-3/4 w-full object-cover"
+              />
+            ) : (
+              <div class="mentor-slot flex aspect-3/4 items-center justify-center">
+                <span aria-hidden="true" class="font-mono text-6xl font-bold tracking-tighter text-accent/70">ЕН</span>
+              </div>
+            )
+          }
+
+          <div class="border-t border-line p-4">
+            <p class="t-h3 text-ink">Евгений Надточеев</p>
+            <p class="mt-1 font-mono text-xs text-accent">Fullstack Developer</p>
+            <p class="t-body mt-1 text-[0.8125rem]">5+ лет коммерческой разработки</p>
+
+            <a
+              href={AUTHOR_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-ink-dim transition-colors hover:text-accent"
+            >
+              nadtocheev.ru
+              <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+        </Pane>
+      </div>
+
+      <div class="lg:col-span-8 min-w-0" data-reveal>
+        <dl class="grid gap-px border border-line bg-line sm:grid-cols-2">
+          {
+            FACTS.map((fact) => (
+              <div class="bg-raised p-5">
+                <dd class="t-num text-2xl text-accent">{fact.value}</dd>
+                <dt class="t-h3 mt-1.5 text-[0.9375rem] text-ink">{fact.label}</dt>
+                <p class="t-body mt-1 text-[0.8125rem]">{fact.desc}</p>
+              </div>
+            ))
+          }
+        </dl>
+
+        <div class="panel mt-6 p-5">
+          <p class="t-mono mb-2.5">ключевой проект</p>
+          <p class="t-body text-ink">
+            <span class="font-mono text-accent">bnmap.pro</span> — сервис с 40 000+ DAU и нагрузкой
+            5 000 req/sec. Полный цикл: от архитектуры до Kubernetes-деплоя.
+          </p>
+        </div>
+
+        <div class="mt-6">
+          <p class="t-mono mb-3">стек</p>
+          <ul class="flex flex-wrap gap-1.5">
+            {STACK.map((tech) => <li class="chip">{tech}</li>)}
+          </ul>
+        </div>
+
+        <div class="mt-6">
+          <p class="t-mono mb-3">преподавал в</p>
+          <ul class="flex flex-wrap gap-3">
+            {
+              TAUGHT_AT.map((org) => (
+                <li class="panel flex h-16 items-center justify-center px-5">
+                  <img
+                    src={org.logo}
+                    alt={org.alt}
+                    width={org.width}
+                    height={org.height}
+                    loading="lazy"
+                    decoding="async"
+                    style={`height:${org.height}px;width:auto`}
+                  />
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* Заглушка портрета: штриховка «пустого буфера», а не градиентный круг.
+     Заменяется фотографией правкой MENTOR_PHOTO в src/config.ts. */
+  .mentor-slot {
+    background-color: var(--color-overlay);
+    background-image: repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 7px,
+      rgba(232, 230, 227, 0.035) 7px,
+      rgba(232, 230, 227, 0.035) 8px
+    );
+  }
+</style>

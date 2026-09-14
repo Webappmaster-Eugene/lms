@@ -1,0 +1,31 @@
+---
+/** Реальный скриншот платформы в рамке «окна редактора».
+ *  Размеры обязательны: без них картинка вызывает скачок вёрстки при загрузке,
+ *  а кадры у нас разного соотношения сторон. */
+import Pane from './Pane.astro'
+
+interface Props {
+  src: string
+  alt: string
+  path: string
+  width: number
+  height: number
+  meta?: string
+  /** Первый экран стоит грузить сразу, остальные — лениво. */
+  eager?: boolean
+}
+
+const { src, alt, path, width, height, meta, eager = false } = Astro.props
+---
+
+<Pane path={path} meta={meta}>
+  <img
+    src={src}
+    alt={alt}
+    width={width}
+    height={height}
+    loading={eager ? 'eager' : 'lazy'}
+    decoding="async"
+    class="block w-full"
+  />
+</Pane>

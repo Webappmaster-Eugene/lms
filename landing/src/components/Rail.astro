@@ -1,0 +1,29 @@
+---
+/** Левый рельс: вертикальная «нумерация строк» документа.
+ *  Активная метка подсвечивается скролл-спаем из Layout.astro.
+ *  Ниже lg скрыт — на узких экранах места нет, и он там не нужен. */
+import { RAIL_MARKS } from '../config'
+---
+
+<nav
+  class="fixed left-0 top-0 z-30 hidden h-screen w-[var(--rail-w)] flex-col items-center justify-center gap-1 border-r border-line-soft bg-ground/70 backdrop-blur-[2px] lg:flex"
+  aria-label="Навигация по разделам"
+>
+  {
+    RAIL_MARKS.map((mark, i) => (
+      <a
+        href={mark.href}
+        data-rail-mark
+        data-active="false"
+        class="group relative flex h-7 w-full items-center justify-center font-mono text-[0.6875rem] tabular-nums text-ink-faint transition-colors hover:text-ink data-[active=true]:text-accent"
+        aria-label={mark.label}
+      >
+        <span aria-hidden="true" class="absolute left-0 h-px w-2 bg-current opacity-0 transition-opacity group-data-[active=true]:opacity-100" />
+        {String(i).padStart(2, '0')}
+        <span class="pointer-events-none absolute left-full ml-3 whitespace-nowrap border border-line bg-overlay px-2 py-1 text-[0.625rem] uppercase tracking-[0.08em] text-ink-dim opacity-0 transition-opacity group-hover:opacity-100">
+          {mark.label}
+        </span>
+      </a>
+    ))
+  }
+</nav>

@@ -4,11 +4,10 @@ import { fileURLToPath } from 'node:url'
 import { buildConfig } from 'payload'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
-import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
-import nodemailer from 'nodemailer'
 import sharp from 'sharp'
 
 import { migrations } from './migrations'
+import { buildEmailAdapter } from '@/payload/email/transport'
 import { Users } from '@/payload/collections/Users'
 import { Roadmaps } from '@/payload/collections/Roadmaps'
 import { RoadmapNodes } from '@/payload/collections/RoadmapNodes'
@@ -95,20 +94,7 @@ export default buildConfig({
 
   sharp,
 
-  email: process.env.SMTP_HOST
-    ? nodemailerAdapter({
-        defaultFromAddress: process.env.EMAIL_FROM_ADDRESS ?? 'noreply@nadtocheev.ru',
-        defaultFromName: process.env.EMAIL_FROM_NAME ?? 'MentorCareer LMS',
-        transport: nodemailer.createTransport({
-          host: process.env.SMTP_HOST,
-          port: Number(process.env.SMTP_PORT ?? 587),
-          auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          },
-        }),
-      })
-    : undefined,
+  email: buildEmailAdapter(),
 
   secret: process.env.PAYLOAD_SECRET ?? 'CHANGE_ME_IN_PRODUCTION',
 
@@ -139,6 +125,9 @@ export default buildConfig({
             role: 'admin',
             isActive: true,
           },
+          // Пароль задан через ADMIN_PASSWORD — приглашение «задайте пароль»
+          // этому пользователю не нужно.
+          context: { skipHooks: true },
         })
         payload.logger.info(`Initial admin user created: ${email}`)
       }

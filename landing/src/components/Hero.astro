@@ -1,56 +1,112 @@
 ---
-const LMS_URL = 'https://lms.nadtocheev.ru'
+/** Блок 00 — герой.
+ *  Заголовок остаётся настоящим <h1> (единственным на странице),
+ *  а блок кода работает опорным визуалом, а не подменяет текст. */
+import { LMS_URL } from '../config'
+import Pane from './Pane.astro'
+
+const OUTPUT = [
+  { value: '6–7', unit: 'мес', label: 'до трудоустройства' },
+  { value: '30+', unit: '', label: 'консультаций' },
+  { value: '50+', unit: 'ч', label: 'менторинга' },
+  { value: '50K→320K', unit: '₽', label: 'рост дохода' },
+] as const
 ---
 
-<section class="section-padding relative overflow-hidden">
-  <!-- Background gradient -->
-  <div class="absolute inset-0 -z-10">
-    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-brand-600/20 blur-[120px]"></div>
-    <div class="absolute bottom-0 right-0 h-[400px] w-[400px] rounded-full bg-blue-500/10 blur-[100px]"></div>
-  </div>
+<section id="top" class="band relative pt-12 lg:pt-20">
+  <div class="shell grid items-center gap-12 lg:grid-cols-12 lg:gap-14">
+    <div class="lg:col-span-6 min-w-0" data-reveal>
+      <div class="mb-6 flex items-center gap-3">
+        <span class="font-mono text-xs tracking-[0.08em] text-accent">// 00</span>
+        <span class="t-mono">менторская программа</span>
+        <span aria-hidden="true" class="h-px w-16 bg-line-soft"></span>
+      </div>
 
-  <div class="container-narrow text-center">
-    <div class="inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-4 py-1.5 text-sm text-brand-300 mb-8">
-      <span class="h-1.5 w-1.5 rounded-full bg-brand-400 animate-pulse"></span>
-      Платформа обучения нового поколения
+      <h1 class="t-display text-ink">
+        Из нуля —<br />
+        до оффера в&nbsp;IT
+      </h1>
+
+      <p class="t-lead mt-7 max-w-xl">
+        Персональная LMS с видеоуроками, интерактивным тренажёром кода, системой достижений и
+        отслеживанием прогресса. Всё для того, чтобы учиться было не только полезно, но и интересно.
+      </p>
+
+      <div class="mt-9 flex flex-wrap gap-3">
+        <a href={LMS_URL} class="btn btn-solid">
+          Начать обучение
+          <span aria-hidden="true">→</span>
+        </a>
+        <a href="#how-it-works" class="btn btn-line">Как это работает</a>
+      </div>
     </div>
 
-    <h1 class="text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl">
-      Обучайся эффективно.<br />
-      <span class="gradient-text">Расти как разработчик.</span>
-    </h1>
-
-    <p class="mx-auto mt-6 max-w-2xl text-lg text-gray-400 sm:text-xl">
-      Персональная LMS с видеоуроками, интерактивным тренажёром кода,
-      системой достижений и отслеживанием прогресса. Всё для того, чтобы
-      учиться было не только полезно, но и интересно.
-    </p>
-
-    <div class="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-      <a href={LMS_URL} class="btn-primary text-base px-8 py-4">
-        Начать обучение
-        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path>
-        </svg>
-      </a>
-      <a href="#how-it-works" class="btn-secondary text-base px-8 py-4">
-        Как это работает
-      </a>
-    </div>
-
-    <!-- Stats -->
-    <div class="mt-16 grid grid-cols-2 gap-4 sm:grid-cols-4">
-      {[
-        { value: '2', label: 'Роадмапа' },
-        { value: '8+', label: 'Курсов' },
-        { value: '30+', label: 'Уроков' },
-        { value: '9+', label: 'Задач тренажёра' },
-      ].map(({ value, label }) => (
-        <div class="rounded-xl border border-white/5 bg-white/5 px-4 py-3">
-          <p class="text-2xl font-bold text-white">{value}</p>
-          <p class="text-sm text-gray-500">{label}</p>
+    <div class="space-y-4 lg:col-span-6 min-w-0" data-reveal>
+      <Pane path="mentor.build.ts" meta="typescript">
+        {/* Не <pre>: внутри него отступы разметки становятся реальными пробелами
+            и разрывают строки. Пробелы сохраняем точечно через whitespace-pre. */}
+        <div class="overflow-x-auto p-4 font-mono text-[0.8125rem] leading-[1.9] sm:p-5">
+          {[
+            [['const ', 'kw'], ['career', 'var'], [' = ', 'op'], ['await ', 'kw'], ['mentor', 'var'], ['.', 'op'], ['build', 'fn'], ['({', 'op']],
+            [['  from', 'key'], [': ', 'op'], ["'ноль'", 'str'], [',', 'op']],
+            [['  to', 'key'], [':   ', 'op'], ["'оффер в IT'", 'str'], [',', 'op']],
+            [['  in', 'key'], [':   ', 'op'], ["'6–7 месяцев'", 'str'], [',', 'op']],
+            [['  pay', 'key'], [':  ', 'op'], ["'после трудоустройства'", 'str'], [',', 'op']],
+            [['})', 'op']],
+          ].map((tokens, i) => (
+            <span
+              class="hero-line flex whitespace-pre"
+              style={`animation-delay:${120 + i * 90}ms`}
+            >
+              <span aria-hidden="true" class="mr-4 inline-block w-4 shrink-0 select-none text-right text-ink-faint">{i + 1}</span>
+              <span>
+                {tokens.map(([text, kind]) => (
+                  <span
+                    class:list={[
+                      kind === 'kw' && 'text-accent',
+                      kind === 'fn' && 'text-add',
+                      kind === 'str' && 'text-ink',
+                      kind === 'key' && 'text-ink-dim',
+                      kind === 'var' && 'text-ink-dim',
+                      kind === 'op' && 'text-ink-faint',
+                    ]}>{text}</span>
+                ))}
+                {i === 5 && <span class="caret ml-1" aria-hidden="true" />}
+              </span>
+            </span>
+          ))}
         </div>
-      ))}
+      </Pane>
+
+      <Pane path="вывод" meta="exit code 0">
+        <dl class="grid grid-cols-2 divide-x divide-y divide-line">
+          {
+            OUTPUT.map((item) => (
+              <div class="px-4 py-4 sm:px-5">
+                <dt class="t-mono mb-1.5 normal-case">{item.label}</dt>
+                <dd class="t-num text-xl text-ink sm:text-2xl">
+                  {item.value}
+                  {item.unit && <span class="ml-1 text-sm text-accent">{item.unit}</span>}
+                </dd>
+              </div>
+            ))
+          }
+        </dl>
+      </Pane>
     </div>
   </div>
 </section>
+
+<style>
+  .hero-line {
+    opacity: 0;
+    animation: line-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-line {
+      opacity: 1;
+      animation: none;
+    }
+  }
+</style>

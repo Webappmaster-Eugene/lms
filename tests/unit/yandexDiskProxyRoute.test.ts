@@ -26,7 +26,7 @@ function uniqueVideoUrl(extension = 'ts'): string {
 }
 
 function proxyRequest(url?: string, headers: Record<string, string> = {}): Request {
-  const target = new URL('https://lms.nadtocheev.ru/api/yandex-disk/proxy')
+  const target = new URL('https://learn.mentorcareer.ru/api/yandex-disk/proxy')
   if (url !== undefined) target.searchParams.set('url', url)
   return new Request(target, { headers })
 }

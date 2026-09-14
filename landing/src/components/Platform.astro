@@ -1,0 +1,187 @@
+---
+/** Блок 05 — сама платформа.
+ *  Слияние прежних Features + CodeTrainer + Gamification: всё это про LMS.
+ *  «Тренажёр кода» и «Геймификация» убраны из сетки возможностей —
+ *  ниже у каждого свой развёрнутый подблок, повторять их дважды незачем.
+ *  Якоря #features, #trainer и #gamification сохранены: на них могут вести
+ *  внешние ссылки. */
+import SectionHead from './SectionHead.astro'
+import Pane from './Pane.astro'
+import Shot from './Shot.astro'
+
+const INVENTORY = [
+  { value: '2', label: 'роадмапа' },
+  { value: '8+', label: 'курсов' },
+  { value: '30+', label: 'уроков' },
+  { value: '9+', label: 'задач тренажёра' },
+] as const
+
+const FEATURES = [
+  {
+    title: 'Структурированные курсы',
+    description:
+      'Роадмапы → Курсы → Секции → Уроки. Чёткий путь обучения с пререквизитами. Не потеряешься — всегда знаешь что дальше.',
+  },
+  {
+    title: 'Видео с Яндекс.Диска',
+    description:
+      'Просмотр видеоуроков прямо на платформе. Под каждым видео — ссылка для скачивания. Хранение в облаке, не на сервере.',
+  },
+  {
+    title: 'Отслеживание прогресса',
+    description:
+      'Прогресс-бары на каждом уровне. Видишь что пройдено, что осталось. Возвращайся в любой момент — прогресс сохранён.',
+  },
+  {
+    title: 'Приватные комментарии',
+    description:
+      'Задавай вопросы под уроком — видишь только ты и наставник. Плюс личные заметки к каждому уроку.',
+  },
+] as const
+
+const TRAINER_POINTS = [
+  { title: 'Задачи по темам', desc: 'Переменные, функции, массивы, объекты — от простого к сложному' },
+  { title: 'Три уровня сложности', desc: 'Easy, Medium, Hard — выбирай по силам' },
+  {
+    title: 'Мгновенная проверка',
+    desc: 'Нажми "Запустить" — увидишь результат. Автоматическое сравнение с ожидаемым выводом',
+  },
+  {
+    title: 'Подсказки',
+    desc: 'Застрял? Открой подсказку. Каждая раскрывается по очереди — не спойлерит решение сразу',
+  },
+  { title: 'Баллы за решение', desc: '10 XP за каждую решённую задачу — мотивация практиковаться' },
+] as const
+
+const GAME = [
+  { value: 'XP', label: '10 за урок · 50 за курс · 200 за роадмап' },
+  { value: '8+', label: 'достижений за milestone’ы' },
+  { value: 'Стрики', label: 'дни подряд без перерыва' },
+  { value: 'Top 50', label: 'лидерборд — рейтинг учеников' },
+  { value: 'Сертификаты', label: 'авто-выдача за курс и роадмап' },
+] as const
+---
+
+<section id="features" class="band border-t border-line-soft">
+  <div class="shell">
+    <SectionHead
+      index="05"
+      label="платформа"
+      title="Всё для эффективного обучения"
+      lead="Платформа продумана до мелочей — от структуры курсов до мотивации через игровые механики"
+    />
+
+    <dl class="mb-10 flex flex-wrap gap-x-10 gap-y-4 border-y border-line-soft py-5" data-reveal>
+      {
+        INVENTORY.map((item) => (
+          <div class="flex items-baseline gap-2">
+            <dd class="t-num text-xl text-accent">{item.value}</dd>
+            <dt class="t-mono">{item.label}</dt>
+          </div>
+        ))
+      }
+    </dl>
+
+    <div class="grid gap-px border border-line bg-line sm:grid-cols-2" data-reveal>
+      {
+        FEATURES.map((feature) => (
+          <div class="panel-live bg-raised p-5 pl-7 sm:p-6 sm:pl-8">
+            <h3 class="t-h3 text-ink">{feature.title}</h3>
+            <p class="t-body mt-2">{feature.description}</p>
+          </div>
+        ))
+      }
+    </div>
+
+    <div class="mt-10" data-reveal>
+      <Shot
+        src="/shots/dashboard.webp"
+        width={1440}
+        height={900}
+        alt="Дашборд ученика MentorCareer: пройденные уроки, баллы, стрик, достижения и прогресс по курсам"
+        path="дашборд ученика"
+        meta="1440×900"
+      />
+    </div>
+
+    <!-- ── Тренажёр ─────────────────────────────────────────── -->
+    <div id="trainer" class="mt-16 scroll-mt-24 lg:mt-24" data-reveal>
+      <div class="mb-6 flex items-center gap-3">
+        <span class="font-mono text-xs tracking-[0.08em] text-accent">// 05.1</span>
+        <span class="t-mono">интерактивная практика</span>
+        <span aria-hidden="true" class="h-px flex-1 bg-line-soft"></span>
+      </div>
+
+      <div class="grid gap-8 lg:grid-cols-12 lg:items-center lg:gap-10">
+        <div class="lg:col-span-5 min-w-0">
+          <h3 class="t-h2 text-ink">Тренажёр кода</h3>
+          <p class="t-lead mt-4">
+            Не просто смотри видео — пиши код. Встроенный JavaScript-редактор с мгновенным
+            выполнением прямо в браузере.
+          </p>
+
+          <ul class="mt-7 space-y-4">
+            {
+              TRAINER_POINTS.map((point) => (
+                <li class="flex gap-3 border-l border-line pl-4">
+                  <div>
+                    <span class="font-mono text-[0.8125rem] text-accent">{point.title}</span>
+                    <span class="t-body block text-[0.9375rem]">{point.desc}</span>
+                  </div>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+
+        <div class="lg:col-span-7 min-w-0">
+          <Shot
+            src="/shots/trainer.webp"
+            width={1308}
+            height={1390}
+            alt="Тренажёр кода MentorCareer: решение задачи на замыкания, все три теста пройдены"
+            path="тренажёр · задача решена"
+            meta="3 из 3 тестов"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Геймификация ─────────────────────────────────────── -->
+    <div id="gamification" class="mt-16 scroll-mt-24 lg:mt-24" data-reveal>
+      <div class="mb-6 flex items-center gap-3">
+        <span class="font-mono text-xs tracking-[0.08em] text-accent">// 05.2</span>
+        <span class="t-mono">мотивация</span>
+        <span aria-hidden="true" class="h-px flex-1 bg-line-soft"></span>
+      </div>
+
+      <h3 class="t-h2 text-ink">Учёба как игра</h3>
+      <p class="t-lead mt-4 max-w-2xl">
+        Геймификация — не гаджет, а проверенный метод. Когда видишь прогресс и соревнуешься —
+        учиться интереснее и эффективнее.
+      </p>
+
+      <dl class="mt-8 grid gap-px border border-line bg-line sm:grid-cols-2 lg:grid-cols-5">
+        {
+          GAME.map((item) => (
+            <div class="bg-raised p-5">
+              <dd class="t-num text-lg text-accent">{item.value}</dd>
+              <dt class="t-body mt-1.5 text-[0.8125rem]">{item.label}</dt>
+            </div>
+          ))
+        }
+      </dl>
+
+      <div class="mt-6">
+        <Shot
+          src="/shots/leaderboard.webp"
+          width={1440}
+          height={900}
+          alt="Лидерборд MentorCareer: рейтинг учеников по набранным баллам"
+          path="лидерборд"
+          meta="рейтинг учеников"
+        />
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,56 @@
+---
+/** Блок 01 — «Диагноз → Патч».
+ *  Пять проблем и пять решений соответствуют друг другу один к одному,
+ *  поэтому подаются настоящим unified diff: красный и зелёный здесь
+ *  несут смысл, а не работают украшением. */
+import SectionHead from './SectionHead.astro'
+import DiffList from './DiffList.astro'
+import Pane from './Pane.astro'
+
+const PROBLEMS = [
+  'Нет структуры — набор видео без логики прохождения',
+  'Нет прогресса — забыл где остановился, начинаешь заново',
+  'Нет практики — смотришь, но не пишешь код',
+  'Нет мотивации — скучно, нет обратной связи и соревнования',
+  'Нет персонализации — один формат для всех',
+] as const
+
+const SOLUTIONS = [
+  'Чёткий путь: роадмап → курс → секция → урок',
+  'Прогресс сохраняется — вернись когда угодно',
+  'Тренажёр кода — пишешь и запускаешь JS прямо в браузере',
+  'Баллы, достижения, стрики и лидерборд — учёба как игра',
+  'Приватные комментарии — задай вопрос наставнику лично',
+] as const
+---
+
+<section id="diagnosis" class="band border-t border-line-soft">
+  <div class="shell">
+    <SectionHead
+      index="01"
+      label="диагноз"
+      title="Почему обычные курсы не работают?"
+      lead="Пять типовых поломок онлайн-обучения — и что стоит на их месте здесь."
+    />
+
+    <div data-reveal>
+      <Pane path="обычные-курсы.md → mentorcareer.md" meta={`−${PROBLEMS.length} +${SOLUTIONS.length}`}>
+        <div aria-hidden="true" class="border-b border-line bg-ground/40 px-4 py-2 font-mono text-[0.6875rem] text-ink-faint">
+          @@ как учат обычно @@ как здесь @@
+        </div>
+
+        <div class="p-3 sm:p-4">
+          <h3 class="mb-2.5 flex items-center gap-2 font-mono text-[0.75rem] uppercase tracking-[0.08em] text-del">
+            <span aria-hidden="true">---</span> обычные курсы
+          </h3>
+          <DiffList sign="-" items={PROBLEMS} />
+
+          <h3 class="mb-2.5 mt-6 flex items-center gap-2 font-mono text-[0.75rem] uppercase tracking-[0.08em] text-add">
+            <span aria-hidden="true">+++</span> MentorCareer — всё иначе
+          </h3>
+          <DiffList sign="+" items={SOLUTIONS} />
+        </div>
+      </Pane>
+    </div>
+  </div>
+</section>

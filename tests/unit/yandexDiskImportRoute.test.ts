@@ -42,7 +42,7 @@ const LISTING: YandexDiskItem[] = [
 ]
 
 function post(body: unknown, raw?: string): Request {
-  return new Request('https://lms.nadtocheev.ru/api/yandex-disk/import', {
+  return new Request('https://learn.mentorcareer.ru/api/yandex-disk/import', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: raw ?? JSON.stringify(body),

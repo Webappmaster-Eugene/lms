@@ -1,0 +1,149 @@
+---
+/** Блок 03 — предложение менторства.
+ *  Слияние прежних AdvantagesSection и ResultsSection: это одно предложение,
+ *  разорванное на две секции. Четыре метрики отсюда переехали в герой,
+ *  чтобы не звучать дважды. */
+import { AUTHOR_URL } from '../config'
+import SectionHead from './SectionHead.astro'
+
+const BENEFITS = [
+  {
+    title: 'Трудоустройство за 6-7 месяцев',
+    desc: 'Чёткий план от нуля до оффера. Доведу до трудоустройства в IT-компанию — это не обещание, а рабочая система.',
+  },
+  {
+    title: 'Оплата с первой зарплаты',
+    desc: 'Модель pay-on-success: основная оплата только после получения оффера. Ты платишь, когда уже зарабатываешь.',
+  },
+  {
+    title: 'Персональный 1-на-1 менторинг',
+    desc: 'Не групповые лекции, а индивидуальная работа. Программа адаптируется под твой уровень, темп и цели.',
+  },
+  {
+    title: 'Реальные проекты',
+    desc: 'Никаких TODO-листов из туториалов. Строишь настоящие приложения, которые можно показать на собеседовании.',
+  },
+  {
+    title: 'Mock-интервью',
+    desc: 'Симуляция технических и поведенческих собеседований. Будешь готов к реальным интервью — без стресса и сюрпризов.',
+  },
+  {
+    title: 'Резюме и профиль',
+    desc: 'Помогу составить резюме, GitHub-профиль и LinkedIn так, чтобы рекрутеры сами писали тебе.',
+  },
+] as const
+
+const TRACKS = [
+  {
+    file: 'frontend.track',
+    title: 'Frontend-трек',
+    desc: 'React, TypeScript, Next.js — от основ до production-уровня. Компоненты, хуки, SSR, тестирование.',
+    stack: ['React', 'TypeScript', 'Next.js', 'Tailwind CSS', 'Jest'],
+  },
+  {
+    file: 'backend.track',
+    title: 'Backend-трек',
+    desc: 'Node.js, NestJS, SQL — серверная архитектура, API, базы данных, деплой и мониторинг.',
+    stack: ['Node.js', 'NestJS', 'PostgreSQL', 'Docker', 'Kubernetes'],
+  },
+] as const
+
+const PROGRAMS = [
+  {
+    title: 'Смена профессии в IT',
+    desc: 'Для тех, кто хочет войти в IT с нуля. Полный цикл подготовки: от основ программирования до успешного прохождения собеседований.',
+    items: [
+      'Индивидуальная программа обучения',
+      'Реальные проекты в портфолио',
+      'Подготовка к техническим интервью',
+      'Сопровождение до получения оффера',
+    ],
+  },
+  {
+    title: 'Рост junior-разработчика',
+    desc: 'Для тех, кто уже в IT, но хочет вырасти. Углубление знаний, прокачка архитектурного мышления и подготовка к middle-позициям.',
+    items: [
+      'Ревью кода и архитектурных решений',
+      'Практика на production-задачах',
+      'Разбор сложных концепций 1-на-1',
+      'Карьерная стратегия и рост оклада',
+    ],
+  },
+] as const
+---
+
+<section id="program" class="band border-t border-line-soft">
+  <div class="shell">
+    <SectionHead
+      index="03"
+      label="предложение"
+      title="Преимущества обучения"
+      lead="Не просто курсы — персональный путь в IT с гарантией трудоустройства и оплатой по результату"
+    />
+
+    <ol class="grid gap-px border border-line bg-line md:grid-cols-2" data-reveal>
+      {
+        BENEFITS.map((benefit, i) => (
+          <li class="panel-live bg-raised p-5 pl-7 sm:p-6 sm:pl-8">
+            <span class="t-num mb-2 block text-xs text-accent">{String(i + 1).padStart(2, '0')}</span>
+            <h3 class="t-h3 text-ink">{benefit.title}</h3>
+            <p class="t-body mt-2">{benefit.desc}</p>
+          </li>
+        ))
+      }
+    </ol>
+
+    <div class="mt-14" data-reveal>
+      <p class="t-mono mb-4">два направления</p>
+      <div class="grid gap-4 md:grid-cols-2">
+        {
+          TRACKS.map((track) => (
+            <div class="panel panel-live p-5 pl-7 sm:p-6 sm:pl-8">
+              <p class="font-mono text-[0.6875rem] text-ink-faint">{track.file}</p>
+              <h3 class="t-h3 mt-2 text-ink">{track.title}</h3>
+              <p class="t-body mt-2">{track.desc}</p>
+              <ul class="mt-4 flex flex-wrap gap-1.5">
+                {track.stack.map((tech) => (
+                  <li class="chip">{tech}</li>
+                ))}
+              </ul>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+
+    <div class="mt-14" data-reveal>
+      <p class="t-mono mb-1">две программы</p>
+      <p class="t-body mb-5">Реальные результаты менторства — от первого урока до оффера</p>
+
+      <div class="grid gap-4 md:grid-cols-2">
+        {
+          PROGRAMS.map((program) => (
+            <div class="panel p-5 sm:p-6">
+              <h3 class="t-h3 text-ink">{program.title}</h3>
+              <p class="t-body mt-2">{program.desc}</p>
+              <ul class="mt-5 space-y-2.5 border-t border-line-soft pt-5">
+                {program.items.map((item) => (
+                  <li class="flex gap-3 text-[0.9375rem] text-ink-dim">
+                    <span aria-hidden="true" class="font-mono font-bold text-accent">
+                      +
+                    </span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        }
+      </div>
+
+      <div class="mt-8">
+        <a href={AUTHOR_URL} target="_blank" rel="noopener noreferrer" class="btn btn-line">
+          Подробнее на сайте
+          <span aria-hidden="true">↗</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,35 +1,29 @@
 ---
 import Layout from '../layouts/Layout.astro'
+import Rail from '../components/Rail.astro'
 import Header from '../components/Header.astro'
 import Hero from '../components/Hero.astro'
-import ProblemSolution from '../components/ProblemSolution.astro'
-import MentorSection from '../components/MentorSection.astro'
-import AdvantagesSection from '../components/AdvantagesSection.astro'
-import ResultsSection from '../components/ResultsSection.astro'
-import Features from '../components/Features.astro'
+import Diagnosis from '../components/Diagnosis.astro'
+import Mentor from '../components/Mentor.astro'
+import Program from '../components/Program.astro'
 import HowItWorks from '../components/HowItWorks.astro'
-import CodeTrainer from '../components/CodeTrainer.astro'
-import Gamification from '../components/Gamification.astro'
-import Automation from '../components/Automation.astro'
-import TechAdvantages from '../components/TechAdvantages.astro'
+import Platform from '../components/Platform.astro'
+import ForMentors from '../components/ForMentors.astro'
 import ContactCTA from '../components/ContactCTA.astro'
 import Footer from '../components/Footer.astro'
 ---
 
 <Layout>
+  <Rail />
   <Header />
-  <main>
+  <main id="main">
     <Hero />
-    <ProblemSolution />
-    <MentorSection />
-    <AdvantagesSection />
-    <ResultsSection />
-    <Features />
+    <Diagnosis />
+    <Mentor />
+    <Program />
     <HowItWorks />
-    <CodeTrainer />
-    <Gamification />
-    <Automation />
-    <TechAdvantages />
+    <Platform />
+    <ForMentors />
     <ContactCTA />
   </main>
   <Footer />

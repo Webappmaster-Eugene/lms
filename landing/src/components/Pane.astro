@@ -1,0 +1,24 @@
+---
+/** Панель в оформлении окна редактора: строка заголовка с путём + содержимое.
+ *  Используется для кода, скриншотов продукта и файловых деревьев. */
+interface Props {
+  path: string
+  /** Правая подпись в шапке панели — статус, счётчик, язык. */
+  meta?: string
+}
+
+const { path, meta } = Astro.props
+---
+
+<figure class="panel overflow-hidden">
+  <figcaption class="flex items-center gap-2 border-b border-line bg-overlay px-3 py-2">
+    <span aria-hidden="true" class="flex gap-1.5">
+      <span class="h-2 w-2 rounded-full bg-line"></span>
+      <span class="h-2 w-2 rounded-full bg-line"></span>
+      <span class="h-2 w-2 rounded-full bg-line"></span>
+    </span>
+    <span class="ml-1 font-mono text-[0.6875rem] text-ink-faint">{path}</span>
+    {meta && <span class="ml-auto font-mono text-[0.6875rem] text-ink-faint">{meta}</span>}
+  </figcaption>
+  <slot />
+</figure>

@@ -1,6 +1,6 @@
 ---
 name: prod-check
-description: Диагностика прода LMS (lms.nadtocheev.ru / promo.nadtocheev.ru) через SSH — Dokploy, контейнеры, Traefik, логи, БД. Используй когда «прод не открывается», «сайт лежит», «проверь логи LMS», «404 на проде».
+description: Диагностика прода LMS (learn.mentorcareer.ru / promo.mentorcareer.ru) через SSH — Dokploy, контейнеры, Traefik, логи, БД. Используй когда «прод не открывается», «сайт лежит», «проверь логи LMS», «404 на проде».
 ---
 
 Подключись к проду и определи, что именно сломано. Прод — Dokploy на `root@217.199.254.38`, доступ описан в `expert_info/ssh_access.txt` (файл лежит на уровень выше репозитория, в корне рабочего каталога).
@@ -16,7 +16,7 @@ LMS развёрнута как **Dokploy compose**-приложение, а н�
 | Источник | GitHub `Webappmaster-Eugene/lms`, ветка `main`, сборка на сервере |
 | Каталог кода | `/etc/dokploy/compose/lms-mentor-3ghbnk/code` |
 | Сервисы | `lms-mentor-app` (Next+Payload, 3000), `lms-mentor-db` (postgres:16), `lms-mentor-landing` (nginx, 80) |
-| Домены | `lms.nadtocheev.ru → lms-mentor-app:3000`, `promo.nadtocheev.ru → lms-mentor-landing:80` |
+| Домены | `learn.mentorcareer.ru → lms-mentor-app:3000`, `promo.mentorcareer.ru → lms-mentor-landing:80` |
 | Тома | `lms-mentor-3ghbnk_lms-pgdata`, `lms-mentor-3ghbnk_lms-media` |
 
 Хеш в имени (`3ghbnk`) меняется при пересоздании приложения — **находи имена динамически**, не полагайся на константу.
@@ -28,7 +28,7 @@ LMS развёрнута как **Dokploy compose**-приложение, а н�
 ### 1. Внешняя проверка — что видно снаружи
 
 ```bash
-for u in https://lms.nadtocheev.ru/api/health https://lms.nadtocheev.ru/login https://promo.nadtocheev.ru/; do
+for u in https://learn.mentorcareer.ru/api/health https://learn.mentorcareer.ru/login https://promo.mentorcareer.ru/; do
   curl -s -o /dev/null -w "%{http_code} $u\n" -L --max-time 20 "$u"
 done
 ```

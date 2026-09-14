@@ -2,12 +2,45 @@ import type { CollectionConfig } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
 import { isAuthenticated } from '@/payload/access/isAuthenticated'
-import { sendWelcomeEmail } from '@/payload/hooks/sendNotification'
+import { resetPasswordEmail } from '@/payload/emails/templates'
+import { sendInviteEmail } from '@/payload/hooks/sendNotification'
+
+type ForgotPasswordArgs = {
+  token?: string
+  user?: { firstName?: string | null }
+}
+
+/**
+ * Собирает письмо восстановления пароля.
+ *
+ * Без этого Payload отправляет дефолтное англоязычное письмо со ссылкой на
+ * `{serverURL}/admin/reset/{token}` — то есть в админку, а не на страницу
+ * `/reset-password`, которая есть у нас во фронтенде.
+ */
+function buildResetPasswordEmail(args: ForgotPasswordArgs | undefined) {
+  const token = args?.token
+
+  if (!token) {
+    // Отправить письмо с нерабочей ссылкой хуже, чем упасть: студент
+    // потратит попытку и не поймёт, почему восстановление не работает.
+    throw new Error('Cannot build reset-password email: Payload did not provide a token')
+  }
+
+  return resetPasswordEmail(args?.user?.firstName ?? '', token)
+}
 
 export const Users: CollectionConfig = {
   slug: 'users',
   auth: {
     tokenExpiration: 60 * 60 * 24 * 7, // 7 дней
+    forgotPassword: {
+      // `expiration` здесь намеренно не задан: значение из конфига коллекции
+      // имеет приоритет над поштучным и перекрыло бы 7-дневный срок
+      // токена в письме-приглашении (см. sendInviteEmail).
+      // Токены восстановления живут стандартный час.
+      generateEmailSubject: (args) => buildResetPasswordEmail(args).subject,
+      generateEmailHTML: (args) => buildResetPasswordEmail(args).html,
+    },
   },
   admin: {
     useAsTitle: 'email',
@@ -15,7 +48,7 @@ export const Users: CollectionConfig = {
     group: 'Пользователи',
   },
   hooks: {
-    afterChange: [sendWelcomeEmail],
+    afterChange: [sendInviteEmail],
   },
   access: {
     create: isAdmin,

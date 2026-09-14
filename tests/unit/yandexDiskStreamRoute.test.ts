@@ -21,7 +21,7 @@ const HREF = 'https://downloader.disk.yandex.ru/disk/abc/1.mp4'
 let fileCounter = 0
 
 function streamRequest(url?: string): Request {
-  const target = new URL('https://lms.nadtocheev.ru/api/yandex-disk/stream')
+  const target = new URL('https://learn.mentorcareer.ru/api/yandex-disk/stream')
   if (url !== undefined) target.searchParams.set('url', url)
   return new Request(target)
 }

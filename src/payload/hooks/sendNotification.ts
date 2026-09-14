@@ -1,6 +1,6 @@
 import type { CollectionAfterChangeHook } from 'payload'
 import {
-  welcomeEmail,
+  inviteEmail,
   courseCompletedEmail,
   achievementUnlockedEmail,
   roadmapCompletedEmail,
@@ -8,22 +8,50 @@ import {
 import { withSpan, logger } from '@/lib/telemetry'
 
 /**
- * Hook для Users: отправляет приветственное email при создании аккаунта.
+ * Срок жизни токена в письме-приглашении — 7 дней.
+ *
+ * Передаётся поштучно в `payload.forgotPassword`, а НЕ в `Users.auth.forgotPassword.expiration`:
+ * Payload отдаёт приоритет значению из конфига коллекции
+ * (`collectionConfig.auth?.forgotPassword?.expiration ?? expiration ?? 3600000`),
+ * поэтому глобальная настройка перекрыла бы это значение и заодно растянула бы
+ * срок жизни обычных токенов восстановления пароля. Оставляем конфиг коллекции
+ * пустым: приглашение живёт 7 дней, восстановление пароля — стандартный час.
  */
-export const sendWelcomeEmail: CollectionAfterChangeHook = async ({
-  doc,
-  operation,
-  req,
-}) => {
+const INVITE_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
+/**
+ * Hook для Users: при создании аккаунта отправляет приглашение со ссылкой
+ * на установку пароля.
+ *
+ * Аккаунты заводит администратор (`Users.access.create = isAdmin`), поэтому
+ * студент не знает своего пароля. Пароль в письме не передаётся — вместо этого
+ * выпускается одноразовый токен, который ведёт на `/reset-password`.
+ */
+export const sendInviteEmail: CollectionAfterChangeHook = async ({ doc, operation, req }) => {
   if (operation !== 'create') return doc
   if (req.context?.skipHooks) return doc
 
-  return withSpan('hook.sendWelcomeEmail', { 'user.email': doc.email }, async () => {
+  return withSpan('hook.sendInviteEmail', { 'user.email': doc.email }, async () => {
     try {
-      const { subject, html } = welcomeEmail(doc.firstName ?? '', doc.email)
-      await req.payload.sendEmail({ to: doc.email, subject, html })
+      // `req` передаём намеренно: токен должен записаться в той же транзакции,
+      // что и сам пользователь, иначе `forgotPassword` не увидит ещё не
+      // закоммиченную строку и упадёт с "user not found".
+      const token = await req.payload.forgotPassword({
+        collection: 'users',
+        data: { email: doc.email },
+        disableEmail: true,
+        expiration: INVITE_TOKEN_TTL_MS,
+        req,
+      })
+
+      if (!token) {
+        throw new Error('forgotPassword returned an empty token')
+      }
+
+      const { subject, html, text } = inviteEmail(doc.firstName ?? '', doc.email, token)
+      await req.payload.sendEmail({ to: doc.email, subject, html, text })
     } catch (err) {
-      logger.error('Failed to send welcome email', err, { 'user.email': doc.email })
+      logger.error('Failed to send invite email', err, { 'user.email': doc.email })
     }
 
     return doc
@@ -55,12 +83,12 @@ export const sendCompletionEmail: CollectionAfterChangeHook = async ({
           collection: 'courses',
           id: String(doc.relatedEntity),
         })
-        const { subject, html } = courseCompletedEmail(
+        const { subject, html, text } = courseCompletedEmail(
           user.firstName ?? '',
           course.title,
           doc.amount ?? 0,
         )
-        await req.payload.sendEmail({ to: user.email, subject, html })
+        await req.payload.sendEmail({ to: user.email, subject, html, text })
       }
 
       if (reason === 'roadmap_completed' && doc.relatedEntity) {
@@ -68,12 +96,12 @@ export const sendCompletionEmail: CollectionAfterChangeHook = async ({
           collection: 'roadmaps',
           id: String(doc.relatedEntity),
         })
-        const { subject, html } = roadmapCompletedEmail(
+        const { subject, html, text } = roadmapCompletedEmail(
           user.firstName ?? '',
           roadmap.title,
           doc.amount ?? 0,
         )
-        await req.payload.sendEmail({ to: user.email, subject, html })
+        await req.payload.sendEmail({ to: user.email, subject, html, text })
       }
     } catch (err) {
       logger.error('Failed to send completion email', err, { 'user.id': userId, 'points.reason': reason })
@@ -107,14 +135,14 @@ export const sendAchievementEmail: CollectionAfterChangeHook = async ({
         req.payload.findByID({ collection: 'achievements', id: achievementId }),
       ])
 
-      const { subject, html } = achievementUnlockedEmail(
+      const { subject, html, text } = achievementUnlockedEmail(
         user.firstName ?? '',
         achievement.title,
         achievement.description ?? '',
         achievement.pointsReward ?? 0,
       )
 
-      await req.payload.sendEmail({ to: user.email, subject, html })
+      await req.payload.sendEmail({ to: user.email, subject, html, text })
     } catch (err) {
       logger.error('Failed to send achievement email', err, { 'user.id': userId })
     }
