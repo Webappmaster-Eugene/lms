@@ -254,6 +254,16 @@ const MOOV_PROBE_BYTES = 4096
 /** Страховка от зацикливания на битом контейнере. */
 const MAX_BOX_WALK = 24
 
+/** MPEG-TS: пакеты по 188 байт, каждый начинается с 0x47. Метки времени — в PCR. */
+const TS_PACKET_BYTES = 188
+const TS_SYNC_BYTE = 0x47
+/** Сколько читаем с начала и с конца, чтобы поймать первый и последний PCR. */
+const TS_PROBE_BYTES = 1024 * 1024
+/** Частота часов PCR. */
+const PCR_HZ = 27_000_000
+/** Запись длиннее суток — признак разрыва счётчика, а не реальной длительности. */
+const MAX_REASONABLE_SECONDS = 24 * 60 * 60
+
 /** Сигнатура Matroska: часть записей библиотеки — mkv, иногда под именем .mp4. */
 const EBML_MAGIC = 0x1a45dfa3
 /** Блок Info с длительностью лежит в начале сегмента, сразу за оглавлением. */
@@ -287,6 +297,11 @@ export async function fetchVideoDuration(
 
     if (first.body.readUInt32BE(0) === EBML_MAGIC) {
       return await readDurationFromMatroska(href, first.total)
+    }
+
+    if (first.body[0] === TS_SYNC_BYTE) {
+      const stream = await readDurationFromTransportStream(href, first.total)
+      if (stream !== null) return stream
     }
 
     const walked = await readDurationByBoxWalk(href, first)
@@ -436,6 +451,79 @@ function readVint(
   if (!Number.isSafeInteger(value)) return null
 
   return { value: unknown ? null : value, next: offset + length }
+}
+
+/**
+ * Длительность MPEG-TS: разница между первой и последней меткой PCR.
+ * Контейнер не хранит длительность целиком, поэтому читаем начало и конец.
+ */
+async function readDurationFromTransportStream(
+  href: string,
+  total: number,
+): Promise<number | null> {
+  const headSize = Math.min(TS_PROBE_BYTES, total)
+  const head = await fetchBytes(href, 0, headSize - 1)
+  const first = collectPcr(head.body)
+  if (first.length === 0) return null
+
+  const tailStart = Math.max(0, total - TS_PROBE_BYTES)
+  const tail = tailStart === 0 ? head : await fetchBytes(href, tailStart, total - 1)
+  const last = collectPcr(tail.body)
+  if (last.length === 0) return null
+
+  const seconds = (last[last.length - 1] - first[0]) / PCR_HZ
+
+  return seconds > 0 && seconds < MAX_REASONABLE_SECONDS ? seconds : null
+}
+
+/** Собирает метки PCR из пакетов, предварительно поймав выравнивание по sync-байту. */
+function collectPcr(buffer: Buffer): number[] {
+  const start = findTsAlignment(buffer)
+  if (start === null) return []
+
+  const values: number[] = []
+
+  for (let offset = start; offset + TS_PACKET_BYTES <= buffer.length; offset += TS_PACKET_BYTES) {
+    const adaptation = (buffer[offset + 3] >> 4) & 0b11
+    const hasAdaptation = adaptation === 2 || adaptation === 3
+    if (!hasAdaptation) continue
+
+    const adaptationLength = buffer[offset + 4]
+    if (adaptationLength === 0) continue
+
+    const pcrPresent = (buffer[offset + 5] & 0x10) !== 0
+    if (!pcrPresent) continue
+
+    // PCR: 33 бита базы по 90 кГц и 9 бит расширения по 27 МГц
+    const base =
+      buffer[offset + 6] * 2 ** 25 +
+      buffer[offset + 7] * 2 ** 17 +
+      buffer[offset + 8] * 2 ** 9 +
+      buffer[offset + 9] * 2 +
+      (buffer[offset + 10] >> 7)
+    const extension = ((buffer[offset + 10] & 1) << 8) | buffer[offset + 11]
+
+    values.push(base * 300 + extension)
+  }
+
+  return values
+}
+
+/** Кусок файла начинается не с границы пакета — ищем смещение по цепочке sync-байтов. */
+function findTsAlignment(buffer: Buffer): number | null {
+  for (let offset = 0; offset < TS_PACKET_BYTES; offset++) {
+    let aligned = true
+    for (let packet = 0; packet < 5; packet++) {
+      const at = offset + packet * TS_PACKET_BYTES
+      if (at >= buffer.length || buffer[at] !== TS_SYNC_BYTE) {
+        aligned = false
+        break
+      }
+    }
+    if (aligned) return offset
+  }
+
+  return null
 }
 
 /** Заголовок mp4-бокса: 32-битный размер, расширенный 64-битным при size === 1. */

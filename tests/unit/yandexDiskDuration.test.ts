@@ -96,6 +96,44 @@ function matroska(durationTicks: number, timecodeScale = 1_000_000): Buffer {
   ])
 }
 
+
+/** Пакет MPEG-TS с меткой PCR в поле адаптации. */
+function tsPacketWithPcr(pcr: number): Buffer {
+  const packet = Buffer.alloc(188, 0xff)
+  packet[0] = 0x47
+  packet[1] = 0x01
+  packet[2] = 0x00
+  packet[3] = 0x30 // есть поле адаптации и полезная нагрузка
+  packet[4] = 7 // длина поля адаптации
+  packet[5] = 0x10 // флаг PCR
+
+  const base = Math.floor(pcr / 300)
+  const extension = pcr % 300
+
+  packet[6] = Math.floor(base / 2 ** 25) & 0xff
+  packet[7] = Math.floor(base / 2 ** 17) & 0xff
+  packet[8] = Math.floor(base / 2 ** 9) & 0xff
+  packet[9] = Math.floor(base / 2) & 0xff
+  packet[10] = ((base & 1) << 7) | ((extension >> 8) & 1)
+  packet[11] = extension & 0xff
+
+  return packet
+}
+
+function tsPacket(): Buffer {
+  const packet = Buffer.alloc(188, 0x00)
+  packet[0] = 0x47
+  packet[3] = 0x10 // только полезная нагрузка
+  return packet
+}
+
+/** Поток: PCR в начале, «тело» и PCR в конце. */
+function transportStream(firstPcr: number, lastPcr: number, filler = 40): Buffer {
+  const head = [tsPacketWithPcr(firstPcr), ...Array.from({ length: filler }, tsPacket)]
+  const tail = [...Array.from({ length: filler }, tsPacket), tsPacketWithPcr(lastPcr)]
+  return Buffer.concat([...head, ...tail])
+}
+
 const REF = { publicKey: 'https://disk.yandex.ru/d/abc', path: '/lesson.mp4' }
 
 describe('длительность видео из контейнера', () => {
@@ -192,6 +230,19 @@ describe('длительность видео из контейнера', () => 
     install(matroska(600_000, 100_000))
 
     return expect(fetchVideoDuration(REF)).resolves.toBeCloseTo(60, 3)
+  })
+
+  it('MPEG-TS: длительность считается по меткам PCR', () => {
+    // 27 000 000 тактов PCR = 1 секунда
+    install(transportStream(0, 27_000_000 * 600))
+
+    return expect(fetchVideoDuration(REF)).resolves.toBeCloseTo(600, 1)
+  })
+
+  it('MPEG-TS с обратным ходом счётчика не даёт отрицательной длительности', () => {
+    install(transportStream(27_000_000 * 600, 0))
+
+    return expect(fetchVideoDuration(REF)).resolves.toBeNull()
   })
 
   it('на контейнере без moov отдаёт null, а не падает', async () => {
