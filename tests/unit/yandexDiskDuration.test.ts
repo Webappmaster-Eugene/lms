@@ -50,7 +50,7 @@ function serveFile(file: Buffer) {
     const [, from, to] = range.match(/bytes=(\d+)-(\d+)/) ?? []
     const start = Number(from)
     const end = Math.min(Number(to), file.length - 1)
-    const slice = file.subarray(start, end + 1)
+    const slice = new Uint8Array(file.subarray(start, end + 1))
 
     return new Response(slice, {
       status: 206,
