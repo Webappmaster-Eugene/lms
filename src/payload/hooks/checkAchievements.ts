@@ -1,6 +1,7 @@
 import type { CollectionAfterChangeHook, PayloadRequest } from 'payload'
 import { relationId } from '@/lib/relation-id'
 import { withSpan } from '@/lib/telemetry'
+import { skipHooksReq } from '@/lib/payload-req'
 
 /**
  * Hook: проверяет и выдаёт достижения при изменении прогресса пользователя.
@@ -128,14 +129,13 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
       // Выдаём достижение
       try {
         await req.payload.create({
-          req,
+          req: skipHooksReq(req),
           collection: 'user-achievements',
           data: {
             user: userId,
             achievement: achievement.id,
             unlockedAt: new Date().toISOString(),
           },
-          context: { skipHooks: true },
         })
       } catch {
         // Дубль (race condition) — пропускаем
@@ -145,7 +145,7 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
       // Начисляем бонусные баллы за достижение
       if (achievement.pointsReward && achievement.pointsReward > 0) {
         await req.payload.create({
-          req,
+          req: skipHooksReq(req),
           collection: 'points-transactions',
           data: {
             user: userId,
@@ -154,7 +154,6 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
             relatedEntity: String(achievement.id),
             description: `Достижение: ${achievement.title}`,
           },
-          context: { skipHooks: true },
         })
 
         pointsAwarded += achievement.pointsReward
@@ -227,11 +226,10 @@ async function recalculateTotalPoints(req: PayloadRequest, userId: number) {
     const totalPoints = allTransactions.docs.reduce((sum, tx) => sum + (tx.amount ?? 0), 0)
 
     await req.payload.update({
-      req,
+      req: skipHooksReq(req),
       collection: 'users',
       id: userId,
       data: { totalPoints },
-      context: { skipHooks: true },
     })
   })
 }

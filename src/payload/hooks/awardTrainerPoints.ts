@@ -3,6 +3,7 @@ import { DEFAULT_POINTS } from '@/lib/points-config'
 import type { PointsReason } from '@/lib/points-config'
 import { relationId } from '@/lib/relation-id'
 import { withSpan, logger } from '@/lib/telemetry'
+import { skipHooksReq } from '@/lib/payload-req'
 
 /**
  * Hook: начисляет баллы при решении задачи тренажёра.
@@ -119,7 +120,7 @@ async function safeCreateTransaction(
 
     try {
       await req.payload.create({
-        req,
+        req: skipHooksReq(req),
         collection: 'points-transactions',
         data: {
           user: userId,
@@ -128,7 +129,6 @@ async function safeCreateTransaction(
           relatedEntity,
           description,
         },
-        context: { skipHooks: true },
       })
       return true
     } catch {
@@ -149,11 +149,10 @@ async function recalculateTotalPoints(req: PayloadRequest, userId: number) {
     const totalPoints = allTransactions.docs.reduce((sum, tx) => sum + (tx.amount ?? 0), 0)
 
     await req.payload.update({
-      req,
+      req: skipHooksReq(req),
       collection: 'users',
       id: userId,
       data: { totalPoints },
-      context: { skipHooks: true },
     })
   })
 }
