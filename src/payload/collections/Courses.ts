@@ -57,6 +57,16 @@ export const Courses: CollectionConfig = {
       label: 'Роадмап',
     },
     {
+      name: 'roadmapNode',
+      type: 'relationship',
+      relationTo: 'roadmap-nodes',
+      label: 'Узел роадмапа',
+      admin: {
+        description:
+          'Тема на карте, к которой относится курс. По одной теме может быть несколько курсов — узел покажет их списком',
+      },
+    },
+    {
       name: 'order',
       type: 'number',
       defaultValue: 0,

@@ -3,10 +3,21 @@ import type { NodeColor, NodeStage } from './stage-colors'
 
 export type NodeStatus = 'locked' | 'available' | 'in-progress' | 'completed'
 
+/** Курс, отнесённый к теме карты. */
+export type NodeCourse = {
+  slug: string
+  title: string
+  totalLessons: number
+  completedLessons: number
+}
+
 export type RoadmapNodeData = {
   label: string
   nodeType: 'category' | 'topic' | 'subtopic'
+  /** Курс, который открывается по клику по узлу. */
   courseSlug: string | null
+  /** Все курсы темы — по одной теме их может быть несколько. */
+  courses: NodeCourse[]
   icon: string | null
   description: string | null
   status: NodeStatus

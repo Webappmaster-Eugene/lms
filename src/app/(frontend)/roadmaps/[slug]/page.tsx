@@ -2,11 +2,12 @@ import type { Metadata } from 'next'
 import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
+import { groupCoursesByNode, summarizeNode } from '@/lib/roadmap-node-courses'
 import Link from 'next/link'
 import { ArrowLeft, BookOpen, CheckCircle2, Clock, Lock } from 'lucide-react'
 import { MiroEmbed } from '@/components/lesson/MiroEmbed'
 import { RoadmapGraph } from '@/components/roadmap/RoadmapGraph'
-import type { GraphEdge, NodeStatus, AnnotationGraphNode, AnyRoadmapNode } from '@/components/roadmap/types'
+import type { GraphEdge, AnnotationGraphNode, AnyRoadmapNode } from '@/components/roadmap/types'
 import { STAGE_ANNOTATIONS, STAGE_LEVELS } from '@/components/roadmap/stage-colors'
 import type {
   RoadmapNode as PayloadRoadmapNode,
@@ -130,6 +131,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
       title: course.title,
       slug: course.slug,
       estimatedHours: course.estimatedHours,
+      nodeId: resolveRelationId(course.roadmapNode),
       totalLessons,
       completedCount,
       isCompleted,
@@ -306,6 +308,8 @@ type CourseWithProgress = {
   title: string
   slug: string
   estimatedHours: number | null | undefined
+  /** Тема карты, к которой курс привязан (может быть не задана). */
+  nodeId: string | null
   totalLessons: number
   completedCount: number
   isCompleted: boolean
@@ -343,6 +347,7 @@ function buildGraphData(
   coursesWithProgress: CourseWithProgress[],
 ): { graphNodes: AnyRoadmapNode[]; graphEdges: GraphEdge[] } {
   const courseMap = new Map(coursesWithProgress.map((c) => [c.id, c]))
+  const byNode = groupCoursesByNode(coursesWithProgress)
 
   const nodeIdSet = new Set<string>()
 
@@ -352,24 +357,14 @@ function buildGraphData(
     const linkedCourseId = resolveRelationId(n.course)
     const linkedCourse = linkedCourseId ? courseMap.get(linkedCourseId) ?? null : null
 
-    let status: NodeStatus = 'available'
-    let progressPercent = 0
-    let totalLessons = 0
-    let completedLessons = 0
-
-    if (linkedCourse) {
-      totalLessons = linkedCourse.totalLessons
-      completedLessons = linkedCourse.completedCount
-      progressPercent = linkedCourse.progressPercent
-      if (!linkedCourse.prerequisitesMet) status = 'locked'
-      else if (linkedCourse.isCompleted) status = 'completed'
-      else if (completedLessons > 0) status = 'in-progress'
-    }
-
     // Тема без опубликованного курса с уроками — не тупик, а «скоро»:
     // клик по ней никуда не ведёт, но каркас карты сохраняется.
-    const comingSoon = n.nodeType !== 'category' && (!linkedCourse || linkedCourse.totalLessons === 0)
-    if (comingSoon) status = 'locked'
+    const summary = summarizeNode(
+      linkedCourse,
+      byNode.get(String(n.id)) ?? [],
+      n.nodeType === 'category',
+    )
+    const { courses: nodeCourses, totalLessons, completedLessons, progressPercent, status, comingSoon } = summary
 
     const bullets = Array.isArray(n.bullets)
       ? n.bullets.map((b) => b.text).filter((t): t is string => typeof t === 'string' && t.length > 0)
@@ -382,7 +377,15 @@ function buildGraphData(
       data: {
         label: n.label,
         nodeType: n.nodeType,
-        courseSlug: comingSoon ? null : linkedCourse?.slug ?? null,
+        courseSlug: comingSoon ? null : (linkedCourse ?? nodeCourses[0])?.slug ?? null,
+        courses: comingSoon
+          ? []
+          : nodeCourses.map((c) => ({
+              slug: c.slug,
+              title: c.title,
+              totalLessons: c.totalLessons,
+              completedLessons: c.completedCount,
+            })),
         comingSoon,
         icon: n.icon ?? null,
         description: n.description ?? null,

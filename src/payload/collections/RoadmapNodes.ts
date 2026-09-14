@@ -59,9 +59,10 @@ export const RoadmapNodes: CollectionConfig = {
       name: 'course',
       type: 'relationship',
       relationTo: 'courses',
-      label: 'Связанный курс',
+      label: 'Основной курс темы',
       admin: {
-        description: 'Если указан — узел кликабелен и отображает прогресс курса',
+        description:
+          'Курс, который открывается по клику. Остальные курсы темы привязываются полем «Узел роадмапа» в самом курсе',
       },
     },
     {

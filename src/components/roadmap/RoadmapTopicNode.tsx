@@ -51,8 +51,24 @@ export function RoadmapTopicNode({ data }: NodeProps) {
         </span>
       </div>
 
+      {/* Курсы темы: по одной теме их может быть несколько */}
+      {nodeData.courses.length > 1 && (
+        <ul className={cn('space-y-0.5 border-b px-3 py-2 text-[10px] leading-snug', classes.border)}>
+          {nodeData.courses.slice(0, 6).map((course) => (
+            <li key={course.slug} className="flex items-baseline gap-1.5">
+              <span className={cn('flex-shrink-0', classes.accent)}>•</span>
+              <span className="line-clamp-1 flex-1">{course.title}</span>
+              <span className="flex-shrink-0 opacity-70">{course.totalLessons}</span>
+            </li>
+          ))}
+          {nodeData.courses.length > 6 && (
+            <li className="pl-3 opacity-70">и ещё {nodeData.courses.length - 6}</li>
+          )}
+        </ul>
+      )}
+
       {/* Bullet list */}
-      {nodeData.bullets.length > 0 && (
+      {nodeData.bullets.length > 0 && nodeData.courses.length <= 1 && (
         <ul className="space-y-0.5 px-3 py-2 text-[10px] leading-snug">
           {nodeData.bullets.slice(0, 14).map((bullet, i) => (
             <li key={i} className="flex gap-1.5">
@@ -68,6 +84,7 @@ export function RoadmapTopicNode({ data }: NodeProps) {
         <div className={cn('border-t px-3 py-1.5', classes.border)}>
           <div className="flex items-center justify-between text-[10px]">
             <span className={classes.accent}>
+              {nodeData.courses.length > 1 && `${nodeData.courses.length} курса · `}
               {nodeData.completedLessons}/{nodeData.totalLessons} уроков
             </span>
             <span className="font-semibold">{nodeData.progressPercent}%</span>

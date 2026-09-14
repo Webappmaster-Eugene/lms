@@ -280,7 +280,7 @@ export interface RoadmapNode {
   nodeType: 'category' | 'topic' | 'subtopic';
   roadmap: number | Roadmap;
   /**
-   * Если указан — узел кликабелен и отображает прогресс курса
+   * Курс, который открывается по клику. Остальные курсы темы привязываются полем «Узел роадмапа» в самом курсе
    */
   course?: (number | null) | Course;
   positionX: number;
@@ -339,6 +339,10 @@ export interface Course {
   } | null;
   coverImage?: (number | null) | Media;
   roadmap: number | Roadmap;
+  /**
+   * Тема на карте, к которой относится курс. По одной теме может быть несколько курсов — узел покажет их списком
+   */
+  roadmapNode?: (number | null) | RoadmapNode;
   order?: number | null;
   isPublished?: boolean | null;
   estimatedHours?: number | null;
@@ -1033,6 +1037,7 @@ export interface CoursesSelect<T extends boolean = true> {
   description?: T;
   coverImage?: T;
   roadmap?: T;
+  roadmapNode?: T;
   order?: T;
   isPublished?: T;
   estimatedHours?: T;
