@@ -89,3 +89,44 @@ describe('данные программы', () => {
     expect(titles.filter((t) => /\[[^\]]*\]/.test(t))).toEqual([])
   })
 })
+
+describe('названия из программы приводятся в порядок', () => {
+  it('в самих программах нет задвоенных пробелов и лишних краёв', () => {
+    const titles: string[] = []
+
+    for (const curriculum of Object.values(COURSE_CURRICULA)) {
+      for (const section of curriculum.syllabus?.sections ?? []) {
+        titles.push(section.title, ...section.lessons)
+      }
+      for (const names of Object.values(curriculum.names ?? {})) {
+        titles.push(...Object.values(names))
+      }
+    }
+
+    expect(titles.length).toBeGreaterThan(100)
+    expect(titles.filter((t) => t !== t.replace(/\s+/g, ' ').trim())).toEqual([])
+  })
+
+  it('пробелы подчищаются даже если в программе опечатка', () => {
+    const slug = Object.keys(COURSE_CURRICULA).find((key) => COURSE_CURRICULA[key]?.syllabus)
+    expect(slug).toBeDefined()
+    if (!slug) return
+
+    const syllabus = COURSE_CURRICULA[slug]?.syllabus
+    if (!syllabus) return
+
+    const planned = syllabus.sections.reduce((sum, s) => sum + s.lessons.length, 0)
+    const sections = [
+      {
+        order: 1,
+        title: 'Из папки',
+        lessons: Array.from({ length: planned }, (_, i) => lesson(i + 1, `Урок ${i + 1}`)),
+      },
+    ]
+
+    const { sections: result } = applyCurriculum(slug, sections)
+    const all = result.flatMap((s) => [s.title, ...s.lessons.map((l) => l.title)])
+
+    expect(all.filter((t) => /\s{2,}|^\s|\s$/.test(t))).toEqual([])
+  })
+})

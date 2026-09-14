@@ -137,7 +137,7 @@ const NEXTJS_14: Syllabus = {
     lessons: [
       'Обзор модуля',
       'Template и gap',
-      'Justify и  align',
+      'Justify и align',
       'Распределение ячеек',
       'Template-area',
       'Лучшие практики',
@@ -151,7 +151,7 @@ const NEXTJS_14: Syllabus = {
       'Переменные окружения',
       'Как работает SSR',
       'App Router - SSR в NextJS',
-      'Pages Router - SSR в  NextJS',
+      'Pages Router - SSR в NextJS',
       'App Router - Получение данных',
       'App Router - Динамические страницы',
       'App Router - notFound',
@@ -471,6 +471,11 @@ export const COURSE_CURRICULA: Record<string, Curriculum> = {
  * иначе сдвиг на один файл подписал бы весь курс неверно. Точечные названия
  * ставятся по номеру урока внутри секции и не трогают остальные.
  */
+/** Убирает задвоенные пробелы и края — опечатка в программе не должна доезжать до урока. */
+function tidy(title: string): string {
+  return title.replace(/\s+/g, ' ').trim()
+}
+
 export function applyCurriculum(
   slug: string,
   sections: ImportedSection[],
@@ -484,7 +489,7 @@ export function applyCurriculum(
       if (!names) continue
       for (const lesson of section.lessons) {
         const name = names[lesson.order]
-        if (name) lesson.title = name
+        if (name) lesson.title = tidy(name)
       }
     }
   }
@@ -507,10 +512,10 @@ export function applyCurriculum(
   let cursor = 0
   const rebuilt = syllabus.sections.map((planSection, index) => ({
     order: index + 1,
-    title: planSection.title,
+    title: tidy(planSection.title),
     lessons: planSection.lessons.map((title, position) => {
       const lesson = lessons[cursor++]
-      return { ...lesson, order: position + 1, title }
+      return { ...lesson, order: position + 1, title: tidy(title) }
     }),
   }))
 
