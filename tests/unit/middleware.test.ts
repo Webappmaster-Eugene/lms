@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 
 import { config, middleware } from '@/middleware'
 
-const ORIGIN = 'https://lms.nadtocheev.ru'
+const ORIGIN = 'https://learn.mentorcareer.ru'
 
 function request(path: string, cookie?: string): NextRequest {
   return new NextRequest(new URL(path, ORIGIN), {
@@ -42,7 +42,7 @@ describe('публичные пути', () => {
     ['/reset-password', 'переход по ссылке из письма происходит без сессии'],
     ['/admin', 'у админки Payload собственная авторизация'],
     ['/api/health', 'healthcheck контейнера ходит без куки'],
-    ['/api/trainer-progress', 'роут сам проверяет payload.auth()'],
+    ['/api/trainer/submit', 'роут сам проверяет payload.auth()'],
   ])('%s пропускается: %s', (path) => {
     expect(isRedirect(middleware(request(path)))).toBe(false)
   })

@@ -145,3 +145,99 @@ export function normalizeLexicalValue(
   onInvalid?.(value)
   return null
 }
+
+/**
+ * Разворачивает Lexical-документ обратно в Markdown-подобный текст.
+ *
+ * Нужен для обратной совместимости: условия задач тренажёра переехали на
+ * Markdown, но у ранее созданных записей они лежат в richText. Полноценный
+ * конвертер здесь не нужен — в старых документах встречаются только абзацы,
+ * заголовки, списки и блоки кода.
+ */
+export function lexicalToMarkdown(value: unknown): string {
+  if (!isLexicalRootState(value)) return ''
+  return renderNodes(value.root.children).join('\n\n').trim()
+}
+
+type LexicalNode = {
+  type?: unknown
+  tag?: unknown
+  text?: unknown
+  listType?: unknown
+  children?: unknown
+}
+
+function renderNodes(nodes: readonly unknown[]): string[] {
+  const blocks: string[] = []
+
+  for (const raw of nodes) {
+    if (typeof raw !== 'object' || raw === null) continue
+    const node = raw as LexicalNode
+    const children = Array.isArray(node.children) ? node.children : []
+
+    switch (node.type) {
+      case 'heading': {
+        const level = typeof node.tag === 'string' ? Number(node.tag.replace('h', '')) : 2
+        const hashes = '#'.repeat(Math.min(Math.max(Number.isFinite(level) ? level : 2, 1), 6))
+        blocks.push(`${hashes} ${inlineText(children)}`)
+        break
+      }
+      case 'quote':
+        blocks.push(`> ${inlineText(children)}`)
+        break
+      case 'code':
+        blocks.push(['```', inlineText(children), '```'].join('\n'))
+        break
+      case 'list': {
+        const ordered = node.listType === 'number'
+        const items = children.map((item, index) => {
+          const itemChildren =
+            typeof item === 'object' && item !== null && Array.isArray((item as LexicalNode).children)
+              ? ((item as LexicalNode).children as unknown[])
+              : []
+          return `${ordered ? `${index + 1}.` : '-'} ${inlineText(itemChildren)}`
+        })
+        blocks.push(items.join('\n'))
+        break
+      }
+      case 'horizontalrule':
+        blocks.push('---')
+        break
+      default: {
+        const text = inlineText(children)
+        if (text.length > 0) blocks.push(text)
+      }
+    }
+  }
+
+  return blocks
+}
+
+/** Битовая маска format у текстового узла Lexical. */
+const FORMAT_BOLD = 1
+const FORMAT_ITALIC = 2
+const FORMAT_CODE = 16
+
+function inlineText(nodes: readonly unknown[]): string {
+  return nodes
+    .map((raw) => {
+      if (typeof raw !== 'object' || raw === null) return ''
+      const node = raw as LexicalNode & { format?: unknown; url?: unknown }
+
+      if (typeof node.text === 'string') {
+        const format = typeof node.format === 'number' ? node.format : 0
+        let text = node.text
+        if (format & FORMAT_CODE) text = `\`${text}\``
+        if (format & FORMAT_BOLD) text = `**${text}**`
+        if (format & FORMAT_ITALIC) text = `_${text}_`
+        return text
+      }
+
+      const children = Array.isArray(node.children) ? node.children : []
+      if (node.type === 'link' && typeof node.url === 'string') {
+        return `[${inlineText(children)}](${node.url})`
+      }
+      return inlineText(children)
+    })
+    .join('')
+}

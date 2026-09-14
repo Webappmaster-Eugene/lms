@@ -5,6 +5,8 @@ import * as migration_20260405_102500_roadmap_nodes_miro_style from './20260405_
 import * as migration_20260405_150000_normalize_roadmap_description from './20260405_150000_normalize_roadmap_description';
 import * as migration_20260911_233042_payload_389_sessions_kv from './20260911_233042_payload_389_sessions_kv';
 import * as migration_20260914_140000_course_roadmap_node from './20260914_140000_course_roadmap_node';
+import * as migration_20260914_161713_trainer_leetcode from './20260914_161713_trainer_leetcode';
+import * as migration_20260914_170505_trainer_setup_types from './20260914_170505_trainer_setup_types';
 
 export const migrations = [
   {
@@ -35,11 +37,21 @@ export const migrations = [
   {
     up: migration_20260911_233042_payload_389_sessions_kv.up,
     down: migration_20260911_233042_payload_389_sessions_kv.down,
-    name: '20260911_233042_payload_389_sessions_kv'
+    name: '20260911_233042_payload_389_sessions_kv',
   },
   {
     up: migration_20260914_140000_course_roadmap_node.up,
     down: migration_20260914_140000_course_roadmap_node.down,
-    name: '20260914_140000_course_roadmap_node'
+    name: '20260914_140000_course_roadmap_node',
+  },
+  {
+    up: migration_20260914_161713_trainer_leetcode.up,
+    down: migration_20260914_161713_trainer_leetcode.down,
+    name: '20260914_161713_trainer_leetcode',
+  },
+  {
+    up: migration_20260914_170505_trainer_setup_types.up,
+    down: migration_20260914_170505_trainer_setup_types.down,
+    name: '20260914_170505_trainer_setup_types'
   },
 ];

@@ -35,3 +35,7 @@ npm-debug.log*
 
 # TypeScript incremental build cache (артефакт сборки, в git ему не место)
 tsconfig.tsbuildinfo
+
+# Ассеты Monaco: копируются из node_modules скриптом scripts/copy-monaco.mjs
+# (postinstall / prebuild), в git им не место — 13 МБ сгенерированного кода
+public/monaco/

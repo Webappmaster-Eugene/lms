@@ -83,8 +83,8 @@ export const seed = async (payload: Payload) => {
       contacts: {
         telegramChannel: 'https://t.me/eugene_nadtocheev',
         telegramGroup: 'https://t.me/mentorcareer_chat',
-        website: 'https://nadtocheev.ru',
-        email: 'johnn.hotmail@mail.ru',
+        website: 'https://promo.mentorcareer.ru',
+        email: 'support@mentorcareer.ru',
       },
     },
   })
@@ -198,17 +198,17 @@ export const seed = async (payload: Payload) => {
   // 7. Тренажёр: темы и задачи
   const topicVariables = await payload.create({
     collection: 'trainer-topics',
-    data: { title: 'Переменные и типы данных', slug: 'variables', order: 1, isPublished: true, description: 'Основы работы с переменными в JavaScript' },
+    data: { title: 'Переменные и типы данных', slug: 'variables', category: 'javascript', order: 1, isPublished: true, description: 'Основы работы с переменными в JavaScript' },
   })
 
   const topicFunctions = await payload.create({
     collection: 'trainer-topics',
-    data: { title: 'Функции', slug: 'functions', order: 2, isPublished: true, description: 'Функции, замыкания и области видимости' },
+    data: { title: 'Функции', slug: 'functions', category: 'javascript', order: 2, isPublished: true, description: 'Функции, замыкания и области видимости' },
   })
 
   const topicArrays = await payload.create({
     collection: 'trainer-topics',
-    data: { title: 'Массивы и объекты', slug: 'arrays-objects', order: 3, isPublished: true, description: 'Работа с массивами, объектами и их методами' },
+    data: { title: 'Массивы и объекты', slug: 'arrays-objects', category: 'javascript', order: 3, isPublished: true, description: 'Работа с массивами, объектами и их методами' },
   })
 
   // Задачи: Переменные
@@ -248,6 +248,8 @@ export const seed = async (payload: Payload) => {
         order: variableTasks.indexOf(task) + 1,
         isPublished: true,
         pointsReward: 10,
+        checkMode: 'stdout' as const,
+        languages: ['js'] as const,
         description: makeRichText(task.title),
       },
     })
@@ -290,6 +292,8 @@ export const seed = async (payload: Payload) => {
         order: functionTasks.indexOf(task) + 1,
         isPublished: true,
         pointsReward: 10,
+        checkMode: 'stdout' as const,
+        languages: ['js'] as const,
         description: makeRichText(task.title),
       },
     })
@@ -332,6 +336,8 @@ export const seed = async (payload: Payload) => {
         order: arrayTasks.indexOf(task) + 1,
         isPublished: true,
         pointsReward: 10,
+        checkMode: 'stdout' as const,
+        languages: ['js'] as const,
         description: makeRichText(task.title),
       },
     })

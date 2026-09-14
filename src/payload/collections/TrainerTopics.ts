@@ -3,6 +3,7 @@ import type { CollectionConfig } from 'payload'
 import { isAdmin } from '@/payload/access/isAdmin'
 import { isAuthenticated } from '@/payload/access/isAuthenticated'
 import { generateSlug } from '@/payload/hooks/generateSlug'
+import { TOPIC_CATEGORY_OPTIONS } from '@/lib/trainer/constants'
 
 export const TrainerTopics: CollectionConfig = {
   slug: 'trainer-topics',
@@ -43,6 +44,18 @@ export const TrainerTopics: CollectionConfig = {
       type: 'textarea',
       label: 'Описание темы',
       maxLength: 500,
+    },
+    {
+      name: 'category',
+      type: 'select',
+      required: true,
+      defaultValue: 'javascript',
+      label: 'Категория',
+      options: [...TOPIC_CATEGORY_OPTIONS],
+      admin: {
+        position: 'sidebar',
+        description: 'Используется для группировки и фильтров в каталоге задач.',
+      },
     },
     {
       name: 'icon',

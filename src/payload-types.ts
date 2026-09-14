@@ -671,6 +671,10 @@ export interface TrainerTopic {
   slug: string;
   description?: string | null;
   /**
+   * Используется для группировки и фильтров в каталоге задач.
+   */
+  category: 'javascript' | 'typescript' | 'algorithms' | 'leetcode' | 'companies' | 'patterns' | 'webapi';
+  /**
    * Emoji или имя иконки lucide (например: "code", "braces", "terminal")
    */
   icon?: string | null;
@@ -693,7 +697,15 @@ export interface TrainerTask {
   topic: number | TrainerTopic;
   order?: number | null;
   difficulty: 'easy' | 'medium' | 'hard';
-  description: {
+  /**
+   * stdout — сравнение вывода (legacy); unit — прогон тестов; types — проверка типов TypeScript
+   */
+  checkMode: 'stdout' | 'unit' | 'types';
+  languages: ('js' | 'ts')[];
+  /**
+   * Оставлено для старых задач. Для новых заполняйте «Условие (Markdown)».
+   */
+  description?: {
     root: {
       type: string;
       children: {
@@ -707,15 +719,63 @@ export interface TrainerTask {
       version: number;
     };
     [k: string]: unknown;
-  };
+  } | null;
+  /**
+   * Поддерживаются списки, таблицы и блоки кода с подсветкой.
+   */
+  descriptionMd?: string | null;
+  /**
+   * Что должен объявить пользователь: debounce, LRUCache, twoSum. Обязательно для табличных тестов.
+   */
+  entryName?: string | null;
   /**
    * Шаблон кода, который увидит пользователь. Используйте комментарии для подсказок.
    */
   starterCode: string;
   /**
-   * Ожидаемый вывод console.log. Каждая строка — один вызов console.log.
+   * Используется, когда пользователь выбрал TypeScript.
    */
-  expectedOutput: string;
+  starterCodeTs?: string | null;
+  /**
+   * Код, который выполняется ПЕРЕД решением: фикстуры, моки, вспомогательные классы. Доступен и решению, и тестам. Только JavaScript — преамбула одна на оба языка и в песочницу попадает без транспиляции.
+   */
+  setupCode?: string | null;
+  /**
+   * Объявления для компилятора: declare const helper: (x: number) => number. Нужны, когда задача решается на TypeScript, а преамбула написана на JavaScript — иначе strict-режим ругается на неявный any. Если пусто, tsc получит саму преамбулу.
+   */
+  setupTypes?: string | null;
+  /**
+   * Только для режима stdout. Каждая строка — один вызов console.log.
+   */
+  expectedOutput?: string | null;
+  /**
+   * Вызвать функцию решения с аргументами и сравнить результат.
+   */
+  testCases?:
+    | {
+        name: string;
+        /**
+         * Список аргументов как в вызове, без скобок: 1, "a", [2]. Допустимы NaN, undefined, new Map([...]). Пусто — вызов без аргументов.
+         */
+        argsCode?: string | null;
+        expectedCode: string;
+        compare: 'deep' | 'strict' | 'approx' | 'sorted' | 'set';
+        /**
+         * Входные данные и ожидаемый результат не показываются пользователю.
+         */
+        hidden?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Доступны test(name, fn), expect(value), __clock.tick(ms). Выполняются после табличных кейсов.
+   */
+  testCode?: string | null;
+  /**
+   * Код с Expect<Equal<...>> и @ts-expect-error. Решение считается верным, когда tsc не выдал ни одной диагностики.
+   */
+  typeHarness?: string | null;
+  timeLimitMs?: number | null;
   hints?:
     | {
         hint: string;
@@ -723,9 +783,45 @@ export interface TrainerTask {
       }[]
     | null;
   /**
-   * Только для администратора. Не показывается пользователям.
+   * Только для администратора. Пользователю отдаётся отдельным роутом после решения.
    */
   solutionCode?: string | null;
+  solutionCodeTs?: string | null;
+  /**
+   * Пояснение к эталонному решению: идея, сложность, подводные камни.
+   */
+  solutionNotes?: string | null;
+  tags?:
+    | (
+        | 'closures'
+        | 'this'
+        | 'hoisting'
+        | 'event-loop'
+        | 'prototypes'
+        | 'hof'
+        | 'async'
+        | 'promise'
+        | 'arrays'
+        | 'objects'
+        | 'strings'
+        | 'polyfill'
+        | 'data-structures'
+        | 'algorithms'
+        | 'recursion'
+        | 'leetcode'
+        | 'patterns'
+        | 'type-level'
+        | 'generics'
+        | 'web-api'
+        | 'performance'
+      )[]
+    | null;
+  companies?: ('yandex' | 'ozon' | 'avito' | 'tbank' | 'sber' | 'wildberries' | 'vk' | 'faang')[] | null;
+  /**
+   * Ссылка на первоисточник задачи.
+   */
+  sourceUrl?: string | null;
+  leetcodeNumber?: number | null;
   pointsReward?: number | null;
   isPublished?: boolean | null;
   updatedAt: string;
@@ -741,6 +837,27 @@ export interface UserTrainerProgress {
   task: number | TrainerTask;
   isCompleted?: boolean | null;
   userCode?: string | null;
+  language?: ('js' | 'ts') | null;
+  /**
+   * Считаются все отправки, не прошедшие тесты.
+   */
+  failedAttempts?: number | null;
+  /**
+   * Баллы начисляются только за решения, подтверждённые сервером.
+   */
+  verifiedBy?: ('server' | 'client') | null;
+  /**
+   * Краткая сводка: статус, счёт по тестам, имена упавших тестов.
+   */
+  lastResult?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   completedAt?: string | null;
   attempts?: number | null;
   updatedAt: string;
@@ -1320,6 +1437,7 @@ export interface TrainerTopicsSelect<T extends boolean = true> {
   title?: T;
   slug?: T;
   description?: T;
+  category?: T;
   icon?: T;
   order?: T;
   isPublished?: T;
@@ -1336,9 +1454,29 @@ export interface TrainerTasksSelect<T extends boolean = true> {
   topic?: T;
   order?: T;
   difficulty?: T;
+  checkMode?: T;
+  languages?: T;
   description?: T;
+  descriptionMd?: T;
+  entryName?: T;
   starterCode?: T;
+  starterCodeTs?: T;
+  setupCode?: T;
+  setupTypes?: T;
   expectedOutput?: T;
+  testCases?:
+    | T
+    | {
+        name?: T;
+        argsCode?: T;
+        expectedCode?: T;
+        compare?: T;
+        hidden?: T;
+        id?: T;
+      };
+  testCode?: T;
+  typeHarness?: T;
+  timeLimitMs?: T;
   hints?:
     | T
     | {
@@ -1346,6 +1484,12 @@ export interface TrainerTasksSelect<T extends boolean = true> {
         id?: T;
       };
   solutionCode?: T;
+  solutionCodeTs?: T;
+  solutionNotes?: T;
+  tags?: T;
+  companies?: T;
+  sourceUrl?: T;
+  leetcodeNumber?: T;
   pointsReward?: T;
   isPublished?: T;
   updatedAt?: T;
@@ -1360,6 +1504,10 @@ export interface UserTrainerProgressSelect<T extends boolean = true> {
   task?: T;
   isCompleted?: T;
   userCode?: T;
+  language?: T;
+  failedAttempts?: T;
+  verifiedBy?: T;
+  lastResult?: T;
   completedAt?: T;
   attempts?: T;
   updatedAt?: T;

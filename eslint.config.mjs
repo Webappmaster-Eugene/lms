@@ -20,6 +20,10 @@ export default tseslint.config(
       // Генерируются командами payload generate:types и generate:importmap
       'src/payload-types.ts',
       'src/app/(payload)/admin/importMap.js',
+      // Сборка Monaco, копируется скриптом scripts/copy-monaco.mjs
+      'public/monaco/**',
+      // Харнесс тренажёра вшивается строкой; генерируется build-harness.mjs
+      'src/lib/trainer/harness-source.generated.ts',
     ],
   },
 
@@ -93,6 +97,34 @@ export default tseslint.config(
     // навигация next/link заходит туда мимо провайдеров Payload
     files: ['src/components/roadmap-editor/**/*.tsx'],
     rules: { '@next/next/no-html-link-for-pages': 'off' },
+  },
+
+  {
+    // Рантайм песочницы тренажёра. Это не модуль приложения, а текст, который
+    // исполняется в iframe и в V8-изоляте: он подменяет console и таймеры,
+    // написан в ES5-стиле ради предсказуемости и к правилам проекта не сводится.
+    files: ['src/lib/trainer/harness.js'],
+    languageOptions: {
+      sourceType: 'script',
+      globals: { globalThis: 'readonly' },
+    },
+    rules: {
+      'no-var': 'off',
+      'no-console': 'off',
+      'prefer-const': 'off',
+      'no-unused-vars': 'off',
+    },
+  },
+
+  {
+    // Скрипты дочернего процесса-песочницы: запускаются напрямую через node,
+    // мимо сборки Next.
+    files: ['src/server/trainer/*.mjs', 'scripts/*.mjs'],
+    languageOptions: {
+      sourceType: 'module',
+      globals: { ...globals.node },
+    },
+    rules: { 'no-console': 'off' },
   },
 
   {

@@ -19,6 +19,12 @@ const nextConfig = {
     '@opentelemetry/semantic-conventions',
     'require-in-the-middle',
     'import-in-the-middle',
+    // Нативный модуль V8-изолятов: бандлер его не соберёт, он должен
+    // подгружаться из node_modules как есть
+    'isolated-vm',
+    // Компилятору нужны файлы lib.*.d.ts из своего пакета — через бандл
+    // они не доезжают
+    'typescript',
   ],
 
   async headers() {

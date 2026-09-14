@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
-import { Code2, ArrowRight } from 'lucide-react'
+import { Code2, ArrowRight, ListFilter } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'Тренажёр кода',
@@ -68,13 +68,24 @@ export default async function TrainerPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex items-center gap-3">
-        <Code2 className="h-7 w-7 text-primary" />
-        <h1 className="text-xl font-bold text-foreground sm:text-2xl">Тренажёр кода</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Code2 className="h-7 w-7 text-primary" />
+          <h1 className="text-xl font-bold text-foreground sm:text-2xl">Тренажёр кода</h1>
+        </div>
+
+        <Link
+          href="/trainer/tasks"
+          className="inline-flex min-h-[38px] items-center gap-2 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          <ListFilter className="h-4 w-4" />
+          Все задачи
+        </Link>
       </div>
 
       <p className="text-muted-foreground">
-        Практикуйте JavaScript, решая задачи по темам. За каждую решённую задачу начисляются баллы.
+        Задачи с реальных собеседований — на JavaScript и TypeScript. Решение проверяется тестами,
+        за каждую решённую задачу начисляются баллы.
       </p>
 
       {topicsWithStats.length === 0 ? (
