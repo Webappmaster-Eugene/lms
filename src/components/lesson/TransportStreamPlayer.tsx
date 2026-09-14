@@ -70,8 +70,20 @@ export function TransportStreamPlayer({ src, durationMinutes, onFailure }: Props
             withCredentials: true,
             ...(duration ? { duration: duration * 1000 } : {}),
           },
-          // Перемотка запрашивает нужный диапазон байт, файл целиком не тянется
-          { enableWorker: true, lazyLoad: true, lazyLoadMaxDuration: 3 * 60, seekType: 'range' },
+          {
+            enableWorker: true,
+            seekType: 'range',
+            // В MPEG-TS нет оглавления: прыгать можно только по уже прочитанной
+            // части файла, поэтому загружаем заметно вперёд — на типичный урок
+            // этого хватает целиком.
+            lazyLoad: true,
+            lazyLoadMaxDuration: 30 * 60,
+            lazyLoadRecoverDuration: 60,
+            // Просмотренное из памяти вычищаем, но с запасом назад
+            autoCleanupSourceBuffer: true,
+            autoCleanupMaxBackwardDuration: 5 * 60,
+            autoCleanupMinBackwardDuration: 3 * 60,
+          },
         )
 
         player.on(mpegts.Events.ERROR, () => {
