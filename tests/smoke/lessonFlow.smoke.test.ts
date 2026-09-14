@@ -73,7 +73,18 @@ describe('видео выбирает плеер по контейнеру', () 
 
   it('плееру потока передаётся длительность урока — в контейнере её нет', () => {
     expect(PLAYER).toContain('durationMinutes={durationMinutes}')
-    expect(TS_PLAYER).toContain('durationMinutes * 60 * 1000')
+    expect(TS_PLAYER).toContain('duration * 1000')
+  })
+
+  it('у потока своя панель: нативная показала бы его эфиром, без шкалы', () => {
+    expect(TS_PLAYER).toContain('Перемотка')
+    expect(TS_PLAYER).toContain('formatTime')
+    // нативные controls не включаем — они не знают длительности
+    expect(TS_PLAYER).not.toMatch(/<video[^>]*\scontrols/)
+  })
+
+  it('перемотка за пределы загруженного идёт через плеер, а не через элемент', () => {
+    expect(TS_PLAYER).toContain('playerRef.current?.seek(target)')
   })
 
   it('сбой плеера потока откатывает урок на карточку с ссылкой', () => {
