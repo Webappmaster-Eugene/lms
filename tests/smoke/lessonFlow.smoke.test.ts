@@ -9,6 +9,8 @@ function read(relative: string): string {
 const COMPLETION = read('../../src/components/lesson/CompletionButton.tsx')
 const NOTES = read('../../src/components/lesson/LessonNotes.tsx')
 const COMMENTS = read('../../src/components/lesson/LessonComments.tsx')
+const PLAYER = read('../../src/components/lesson/VideoPlayer.tsx')
+const TS_PLAYER = read('../../src/components/lesson/TransportStreamPlayer.tsx')
 const LESSON_PAGE = read('../../src/app/(frontend)/lessons/[slug]/page.tsx')
 
 describe('сохранение прогресса не теряет ошибки', () => {
@@ -44,6 +46,30 @@ describe('id урока уходит на сервер числом', () => {
   it('страница урока передаёт id без приведения к строке', () => {
     expect(LESSON_PAGE).not.toContain('lessonId={String(')
     expect(LESSON_PAGE.match(/lessonId=\{lesson\.id\}/g) ?? []).toHaveLength(3)
+  })
+})
+
+describe('видео выбирает плеер по контейнеру', () => {
+  it('поток MPEG-TS уходит в отдельный плеер через прокси', () => {
+    expect(PLAYER).toContain('isTransportStream')
+    expect(PLAYER).toContain('TransportStreamPlayer')
+    expect(PLAYER).toContain('/api/yandex-disk/proxy')
+  })
+
+  it('обычное видео по-прежнему идёт нативно через редирект, без прокси', () => {
+    expect(PLAYER).toContain('/api/yandex-disk/stream')
+    // прокси упоминается ровно один раз — в ветке потока
+    expect(PLAYER.match(/api\/yandex-disk\/proxy/g) ?? []).toHaveLength(1)
+  })
+
+  it('тяжёлая библиотека грузится только для таких видео', () => {
+    expect(TS_PLAYER).toContain("await import('mpegts.js')")
+    expect(PLAYER).not.toContain("from 'mpegts.js'")
+  })
+
+  it('сбой плеера потока откатывает урок на карточку с ссылкой', () => {
+    expect(TS_PLAYER).toContain('onFailure()')
+    expect(PLAYER).toContain('onFailure={handleFailure}')
   })
 })
 

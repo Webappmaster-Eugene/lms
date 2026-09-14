@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { ExternalLink, Play, Clock, AlertTriangle } from 'lucide-react'
 
 import { parsePublicResourceUrl } from '@/lib/yandex-disk-url'
+import { TransportStreamPlayer } from './TransportStreamPlayer'
 
 type Props = {
   title: string
@@ -40,8 +41,24 @@ function getStreamUrl(videoUrl: string): string {
   return `/api/yandex-disk/stream?url=${encodeURIComponent(videoUrl)}`
 }
 
+/** Прокси нужен только там, где плеер читает файл из JS. */
+function getProxyUrl(videoUrl: string): string {
+  return `/api/yandex-disk/proxy?url=${encodeURIComponent(videoUrl)}`
+}
+
+/**
+ * Записи в контейнере MPEG-TS браузер нативно не проигрывает — их разбирает
+ * отдельный плеер. Расширение .ts у видео библиотеки означает именно поток,
+ * исходники TypeScript в видео-блок не попадают.
+ */
+function isTransportStream(videoUrl: string): boolean {
+  const path = parsePublicResourceUrl(videoUrl)?.path ?? videoUrl
+  return /\.ts$/i.test(decodeURIComponent(path))
+}
+
 export function VideoPlayer({ title, videoUrl, displayMode, description, durationMinutes }: Props) {
   const [streamFailed, setStreamFailed] = useState(false)
+  const handleFailure = useCallback(() => setStreamFailed(true), [])
 
   const isYandexDisk = parsePublicResourceUrl(videoUrl) !== null
 
@@ -74,17 +91,25 @@ export function VideoPlayer({ title, videoUrl, displayMode, description, duratio
     return (
       <div className="space-y-3">
         <VideoHeading title={title} description={description} durationMinutes={durationMinutes} />
-        <div className="overflow-hidden rounded-xl border border-border bg-black">
-          <video
+        {isTransportStream(videoUrl) ? (
+          <TransportStreamPlayer
             key={videoUrl}
-            src={getStreamUrl(videoUrl)}
-            className="aspect-video w-full"
-            controls
-            preload="metadata"
-            controlsList="nodownload"
-            onError={() => setStreamFailed(true)}
+            src={getProxyUrl(videoUrl)}
+            onFailure={handleFailure}
           />
-        </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-border bg-black">
+            <video
+              key={videoUrl}
+              src={getStreamUrl(videoUrl)}
+              className="aspect-video w-full"
+              controls
+              preload="metadata"
+              controlsList="nodownload"
+              onError={handleFailure}
+            />
+          </div>
+        )}
       </div>
     )
   }

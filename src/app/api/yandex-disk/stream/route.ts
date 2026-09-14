@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import {
-  fetchPublicDownloadHref,
-  parsePublicResourceUrl,
-  YandexDiskError,
-  type PublicResourceRef,
-} from '@/lib/yandex-disk'
+import { parsePublicResourceUrl, YandexDiskError } from '@/lib/yandex-disk'
+import { resolveHref } from '@/lib/yandex-disk-href'
 import { withSpan, logger } from '@/lib/telemetry'
 
 /**
@@ -18,14 +14,6 @@ import { withSpan, logger } from '@/lib/telemetry'
  * её нужно получать на каждый просмотр, поэтому редирект, а не проксирование:
  * трафик идёт напрямую с CDN Яндекса, наш сервер остаётся stateless.
  */
-
-/** Прямые ссылки Яндекса живут заметно дольше, но перевыпускаем их чаще — с запасом. */
-const HREF_TTL_MS = 5 * 60 * 1000
-const CACHE_LIMIT = 500
-
-type CacheEntry = { href: string; expiresAt: number }
-
-const hrefCache = new Map<string, CacheEntry>()
 
 export async function GET(request: Request): Promise<Response> {
   return withSpan('api.yandexDisk.stream', {}, async () => {
@@ -73,34 +61,4 @@ export async function GET(request: Request): Promise<Response> {
       return NextResponse.json({ error: message }, { status: status === 404 ? 404 : status })
     }
   })
-}
-
-async function resolveHref(ref: PublicResourceRef): Promise<string> {
-  const key = `${ref.publicKey}${ref.path ?? ''}`
-  const now = Date.now()
-  const cached = hrefCache.get(key)
-
-  if (cached && cached.expiresAt > now) {
-    return cached.href
-  }
-
-  const href = await fetchPublicDownloadHref(ref, { token: process.env.YANDEX_DISK_TOKEN || undefined })
-
-  evictExpired(now)
-  hrefCache.set(key, { href, expiresAt: now + HREF_TTL_MS })
-
-  return href
-}
-
-/** Кеш живёт в памяти инстанса: чистим протухшее и держим размер ограниченным. */
-function evictExpired(now: number): void {
-  for (const [key, entry] of hrefCache) {
-    if (entry.expiresAt <= now) hrefCache.delete(key)
-  }
-
-  while (hrefCache.size >= CACHE_LIMIT) {
-    const oldest = hrefCache.keys().next()
-    if (oldest.done) break
-    hrefCache.delete(oldest.value)
-  }
 }
