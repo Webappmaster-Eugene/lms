@@ -6,6 +6,11 @@ import { Loader2 } from 'lucide-react'
 type Props = {
   /** Адрес нашего прокси: mpegts.js читает файл запросами из JS. */
   src: string
+  /**
+   * Длительность из урока. В контейнере MPEG-TS её нет, поэтому без подсказки
+   * плеер не знает, сколько всего видео, — шкала и перемотка не работают.
+   */
+  durationMinutes?: number | null
   onFailure: () => void
 }
 
@@ -16,7 +21,7 @@ type Props = {
  * пустой), поэтому поток разбирается в mp4-фрагменты на клиенте и скармливается
  * MediaSource. Библиотека тяжёлая, грузим её только для таких видео.
  */
-export function TransportStreamPlayer({ src, onFailure }: Props) {
+export function TransportStreamPlayer({ src, durationMinutes, onFailure }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -42,7 +47,14 @@ export function TransportStreamPlayer({ src, onFailure }: Props) {
         const absolute = new URL(src, window.location.origin).toString()
 
         const player = mpegts.createPlayer(
-          { type: 'mpegts', url: absolute, isLive: false, cors: false, withCredentials: true },
+          {
+            type: 'mpegts',
+            url: absolute,
+            isLive: false,
+            cors: false,
+            withCredentials: true,
+            ...(durationMinutes ? { duration: durationMinutes * 60 * 1000 } : {}),
+          },
           // Перемотка работает Range-запросами, поэтому файл не тянется целиком
           { enableWorker: true, lazyLoad: true, lazyLoadMaxDuration: 3 * 60, seekType: 'range' },
         )
@@ -70,7 +82,7 @@ export function TransportStreamPlayer({ src, onFailure }: Props) {
       cancelled = true
       destroy?.()
     }
-  }, [src, onFailure])
+  }, [src, durationMinutes, onFailure])
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-black">

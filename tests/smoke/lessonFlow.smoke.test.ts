@@ -71,6 +71,11 @@ describe('видео выбирает плеер по контейнеру', () 
     expect(TS_PLAYER).toContain('new URL(src, window.location.origin)')
   })
 
+  it('плееру потока передаётся длительность урока — в контейнере её нет', () => {
+    expect(PLAYER).toContain('durationMinutes={durationMinutes}')
+    expect(TS_PLAYER).toContain('durationMinutes * 60 * 1000')
+  })
+
   it('сбой плеера потока откатывает урок на карточку с ссылкой', () => {
     expect(TS_PLAYER).toContain('onFailure()')
     expect(PLAYER).toContain('onFailure={handleFailure}')

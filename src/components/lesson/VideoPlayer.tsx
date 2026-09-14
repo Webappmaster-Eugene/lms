@@ -95,6 +95,7 @@ export function VideoPlayer({ title, videoUrl, displayMode, description, duratio
           <TransportStreamPlayer
             key={videoUrl}
             src={getProxyUrl(videoUrl)}
+            durationMinutes={durationMinutes}
             onFailure={handleFailure}
           />
         ) : (
