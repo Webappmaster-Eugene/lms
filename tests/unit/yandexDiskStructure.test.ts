@@ -602,6 +602,56 @@ describe('тема безымянного раздела берётся из н�
   })
 })
 
+describe('расширение .ts: поток или исходник', () => {
+  const MB = 1024 * 1024
+
+  it('крупный .ts — это видео урока', () => {
+    const result = parseYandexDiskTree([
+      dir('/Курс'),
+      dir('/Курс/31. Enums'),
+      file('/Курс/31. Enums/01. video.ts', 160 * MB),
+      file('/Курс/31. Enums/02. Ссылки.txt', 512),
+      dir('/Курс/32. Unknown'),
+      file('/Курс/32. Unknown/01. video.ts', 120 * MB),
+    ])
+
+    expect(result.totalVideos).toBe(2)
+    // папки с одним видео — это уроки, их общий родитель становится разделом
+    expect(result.sections.map((s) => s.title)).toEqual(['Курс'])
+    // нумерация из имени папки уходит в порядок урока, в названии остаётся тема
+    expect(result.sections[0].lessons.map((l) => l.title)).toEqual(['Enums', 'Unknown'])
+    // порядок внутри раздела пересчитывается подряд от единицы
+    expect(result.sections[0].lessons.map((l) => l.order)).toEqual([1, 2])
+  })
+
+  it('мелкий .ts остаётся исходником и идёт в материалы', () => {
+    const result = parseYandexDiskTree([
+      dir('/Курс'),
+      file('/Курс/1. Вводный урок.mp4', 40 * MB),
+      file('/Курс/webpack.config.ts', 2048),
+      file('/Курс/index.ts', 1024),
+    ])
+
+    expect(result.totalVideos).toBe(1)
+    const titles = result.sections[0].lessons[0].materials.map((m) => m.title)
+    expect(titles).toContain('webpack.config.ts')
+    expect(titles).toContain('index.ts')
+  })
+
+  it('без размера .ts считается исходником — ошибаться безопаснее в эту сторону', () => {
+    const items: YandexDiskItem[] = [
+      dir('/Курс'),
+      file('/Курс/1. Урок.mp4', 30 * MB),
+      { name: 'types.ts', type: 'file', path: '/Курс/types.ts' },
+    ]
+
+    const result = parseYandexDiskTree(items)
+
+    expect(result.totalVideos).toBe(1)
+    expect(result.sections[0].lessons[0].materials.map((m) => m.title)).toContain('types.ts')
+  })
+})
+
 describe('материалы не превращают урок в файловый менеджер', () => {
   it('распакованный проект сворачивается в ссылку на папку, архивы остаются', () => {
     const items = [dir('/Блок'), file('/Блок/1.mp4'), dir('/Блок/src')]

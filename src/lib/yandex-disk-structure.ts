@@ -15,6 +15,13 @@
 import type { YandexDiskItem } from './yandex-disk'
 
 const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv'])
+/**
+ * Расширение .ts носят и транспортные потоки (видео), и исходники TypeScript.
+ * Различаем по размеру: в библиотеке записи весят от 5 МБ (медиана 160 МБ),
+ * а исходники — до 64 КБ, промежуточных нет. Порог с большим запасом.
+ */
+const AMBIGUOUS_VIDEO_EXTENSIONS = new Set(['ts'])
+const MIN_AMBIGUOUS_VIDEO_BYTES = 2 * 1024 * 1024
 const TEXT_EXTENSIONS = new Set(['txt', 'md'])
 
 /** Суффикс папки-наложения с дополнительными материалами: "Курс (доп)". */
@@ -1060,7 +1067,16 @@ function compareVideos(a: ImportedVideo, b: ImportedVideo): number {
 }
 
 function isVideo(item: YandexDiskItem): boolean {
-  return item.type === 'file' && VIDEO_EXTENSIONS.has(extensionOf(item.name))
+  if (item.type !== 'file') return false
+
+  const extension = extensionOf(item.name)
+  if (VIDEO_EXTENSIONS.has(extension)) return true
+
+  // .ts без размера считаем исходником: ошибиться в эту сторону безопаснее
+  return (
+    AMBIGUOUS_VIDEO_EXTENSIONS.has(extension) &&
+    (item.size ?? 0) >= MIN_AMBIGUOUS_VIDEO_BYTES
+  )
 }
 
 function extensionOf(name: string): string {
