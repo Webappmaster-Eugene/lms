@@ -31,6 +31,7 @@ export const updateStreak: CollectionAfterChangeHook = async ({
   const today = new Date().toISOString().split('T')[0]
 
   return withSpan('hook.updateStreak', { 'user.id': userId }, async () => {
+    logger.warn('streak: вход', { 'user.id': userId, today })
     try {
       const existing = await req.payload.find({
         req,
@@ -39,6 +40,7 @@ export const updateStreak: CollectionAfterChangeHook = async ({
         limit: 1,
       })
 
+      logger.warn('streak: найдено записей', { 'count': existing.docs.length })
       if (existing.docs.length > 0) {
         const streak = existing.docs[0] as StreakDoc
         // Payload отдаёт дату полным ISO, а сравниваем мы календарные дни
@@ -59,6 +61,7 @@ export const updateStreak: CollectionAfterChangeHook = async ({
 
         const newLongest = Math.max(newStreak, streak.longestStreak ?? 0)
 
+        logger.warn('streak: обновляю', { 'id': String(streak.id), 'lastDate': String(lastDate) })
         await req.payload.update({
           req,
           collection: 'streaks',
@@ -72,6 +75,7 @@ export const updateStreak: CollectionAfterChangeHook = async ({
           context: { skipHooks: true },
         })
       } else {
+        logger.warn('streak: создаю новую запись', {})
         await req.payload.create({
           req,
           collection: 'streaks',
