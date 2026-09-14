@@ -5,7 +5,8 @@ import { CheckCircle2, Circle, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 type Props = {
-  lessonId: string
+  /** Числовой id — Payload отвергает строковые id в relationship-полях. */
+  lessonId: number
   isCompleted: boolean
   progressId?: string
 }

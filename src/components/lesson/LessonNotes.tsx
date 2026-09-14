@@ -5,7 +5,8 @@ import { StickyNote, Save, Loader2, Trash2 } from 'lucide-react'
 import { useToast } from '@/components/ui/Toast'
 
 type Props = {
-  lessonId: string
+  /** Числовой id — Payload отвергает строковые id в relationship-полях. */
+  lessonId: number
 }
 
 type NoteDoc = {

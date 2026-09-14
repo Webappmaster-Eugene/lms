@@ -235,12 +235,12 @@ export default async function LessonPage({ params }: Props) {
         <ContentBlockRenderer blocks={blocks} />
 
         {/* Заметки */}
-        <LessonNotes lessonId={String(lesson.id)} />
+        <LessonNotes lessonId={lesson.id} />
 
         {/* Кнопка завершения */}
         <div className="flex justify-center border-t border-border pt-8">
           <CompletionButton
-            lessonId={String(lesson.id)}
+            lessonId={lesson.id}
             isCompleted={isCompleted}
             progressId={progressId}
           />
@@ -248,7 +248,7 @@ export default async function LessonPage({ params }: Props) {
 
         {/* Обсуждение */}
         <div className="border-t border-border pt-8">
-          <LessonComments lessonId={String(lesson.id)} />
+          <LessonComments lessonId={lesson.id} />
         </div>
 
         {/* Навигация prev/next */}

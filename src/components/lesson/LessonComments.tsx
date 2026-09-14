@@ -7,7 +7,8 @@ import { useToast } from '@/components/ui/Toast'
 import { formatDate } from '@/lib/utils'
 
 type Props = {
-  lessonId: string
+  /** Числовой id — Payload отвергает строковые id в relationship-полях. */
+  lessonId: number
 }
 
 type CommentUser = {

@@ -8,6 +8,8 @@ function read(relative: string): string {
 
 const COMPLETION = read('../../src/components/lesson/CompletionButton.tsx')
 const NOTES = read('../../src/components/lesson/LessonNotes.tsx')
+const COMMENTS = read('../../src/components/lesson/LessonComments.tsx')
+const LESSON_PAGE = read('../../src/app/(frontend)/lessons/[slug]/page.tsx')
 
 describe('сохранение прогресса не теряет ошибки', () => {
   it('каждый запрос кнопки «пройден» идёт через проверку ответа', () => {
@@ -24,6 +26,24 @@ describe('сохранение прогресса не теряет ошибки
 
   it('заметки проверяют статус на сохранении и удалении', () => {
     expect(NOTES.match(/if \(!res\.ok\)/g) ?? []).toHaveLength(3)
+  })
+})
+
+describe('id урока уходит на сервер числом', () => {
+  // Payload отвергает строковый id в relationship-поле: запись прогресса, заметки
+  // и комментария падала с 400 «This relationship field has the following invalid relationships».
+  it.each([
+    ['CompletionButton', COMPLETION],
+    ['LessonNotes', NOTES],
+    ['LessonComments', COMMENTS],
+  ])('%s принимает lessonId числом', (_name, source) => {
+    expect(source).toMatch(/lessonId: number/)
+    expect(source).not.toMatch(/lessonId: string/)
+  })
+
+  it('страница урока передаёт id без приведения к строке', () => {
+    expect(LESSON_PAGE).not.toContain('lessonId={String(')
+    expect(LESSON_PAGE.match(/lessonId=\{lesson\.id\}/g) ?? []).toHaveLength(3)
   })
 })
 
