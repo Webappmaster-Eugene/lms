@@ -56,9 +56,23 @@ function isTransportStream(videoUrl: string): boolean {
   return /\.ts$/i.test(decodeURIComponent(path))
 }
 
+/**
+ * Как проигрывать видео.
+ *
+ * Обычные записи браузер тянет сам — прямо с CDN. Поток MPEG-TS он не понимает,
+ * такие разбираются отдельным плеером. Расширение подсказывает формат, но врёт:
+ * часть потоков лежит под именем .mp4. Поэтому при отказе нативного плеера
+ * пробуем поток, и только потом показываем карточку со ссылкой.
+ */
+type PlaybackMode = 'native' | 'stream' | 'link'
+
 export function VideoPlayer({ title, videoUrl, displayMode, description, durationMinutes }: Props) {
-  const [streamFailed, setStreamFailed] = useState(false)
-  const handleFailure = useCallback(() => setStreamFailed(true), [])
+  const [mode, setMode] = useState<PlaybackMode>(() =>
+    isTransportStream(videoUrl) ? 'stream' : 'native',
+  )
+
+  const handleNativeFailure = useCallback(() => setMode('stream'), [])
+  const handleStreamFailure = useCallback(() => setMode('link'), [])
 
   const isYandexDisk = parsePublicResourceUrl(videoUrl) !== null
 
@@ -76,7 +90,7 @@ export function VideoPlayer({ title, videoUrl, displayMode, description, duratio
   // Яндекс.Диск запрещает встраивание своих страниц в iframe, поэтому его видео
   // проигрывается нативным плеером через серверный редирект на прямую ссылку.
   if (isYandexDisk) {
-    if (streamFailed) {
+    if (mode === 'link') {
       return (
         <VideoLinkCard
           title={title}
@@ -91,12 +105,12 @@ export function VideoPlayer({ title, videoUrl, displayMode, description, duratio
     return (
       <div className="space-y-3">
         <VideoHeading title={title} description={description} durationMinutes={durationMinutes} />
-        {isTransportStream(videoUrl) ? (
+        {mode === 'stream' ? (
           <TransportStreamPlayer
             key={videoUrl}
             src={getProxyUrl(videoUrl)}
             durationMinutes={durationMinutes}
-            onFailure={handleFailure}
+            onFailure={handleStreamFailure}
           />
         ) : (
           <div className="overflow-hidden rounded-xl border border-border bg-black">
@@ -107,7 +121,7 @@ export function VideoPlayer({ title, videoUrl, displayMode, description, duratio
               controls
               preload="metadata"
               controlsList="nodownload"
-              onError={handleFailure}
+              onError={handleNativeFailure}
             />
           </div>
         )}

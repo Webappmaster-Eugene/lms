@@ -88,9 +88,12 @@ describe('видео выбирает плеер по контейнеру', () 
     expect(TS_PLAYER).toContain('Math.min(Math.max(seconds, first)')
   })
 
-  it('сбой плеера потока откатывает урок на карточку с ссылкой', () => {
-    expect(TS_PLAYER).toContain('onFailure()')
-    expect(PLAYER).toContain('onFailure={handleFailure}')
+  it('отказ нативного плеера переводит на поток, и только потом на карточку', () => {
+    // часть потоков лежит под именем .mp4 — по расширению их не отличить
+    expect(PLAYER).toContain("setMode('stream')")
+    expect(PLAYER).toContain("setMode('link')")
+    expect(PLAYER).toContain('onError={handleNativeFailure}')
+    expect(PLAYER).toContain('onFailure={handleStreamFailure}')
   })
 })
 
