@@ -254,16 +254,26 @@ const MOOV_PROBE_BYTES = 4096
 /** Страховка от зацикливания на битом контейнере. */
 const MAX_BOX_WALK = 24
 
+/** Сигнатура Matroska: часть записей библиотеки — mkv, иногда под именем .mp4. */
+const EBML_MAGIC = 0x1a45dfa3
+/** Блок Info с длительностью лежит в начале сегмента, сразу за оглавлением. */
+const EBML_PROBE_BYTES = 256 * 1024
+const EBML_SEGMENT = 0x18538067
+const EBML_INFO = 0x1549a966
+const EBML_TIMECODE_SCALE = 0x2ad7b1
+const EBML_DURATION = 0x4489
+/** Наносекунды в секунде: TimecodeScale задаётся в них. */
+const NS_IN_SECOND = 1_000_000_000
+
 /**
  * Длительность видео в секундах.
  *
- * API Диска её не отдаёт, поэтому читаем сам контейнер. Идём по таблице
- * верхнеуровневых боксов (ftyp → mdat → moov …) и прыгаем прямо к moov:
- * слепое чтение начала и хвоста промахивается на длинных записях, где moov
- * весит десятки мегабайт и лежит за пределами окна. Если обход не удался
- * (нестандартный контейнер, сервер игнорирует Range) — пробуем по-старому.
- * Не удалось разобрать — возвращаем null: показать урок без длительности
- * лучше, чем уронить импорт.
+ * API Диска её не отдаёт, поэтому читаем сам контейнер. У mp4 идём по таблице
+ * верхнеуровневых боксов (ftyp → mdat → moov …) и прыгаем прямо к moov: слепое
+ * чтение начала и хвоста промахивается на длинных записях, где moov весит
+ * десятки мегабайт и лежит за пределами окна. Matroska узнаём по сигнатуре и
+ * разбираем отдельно — moov в ней не бывает. Если ничего не вышло, возвращаем
+ * null: показать урок без длительности лучше, чем уронить импорт.
  */
 export async function fetchVideoDuration(
   ref: PublicResourceRef,
@@ -272,7 +282,14 @@ export async function fetchVideoDuration(
   try {
     const href = await fetchPublicDownloadHref(ref, options)
 
-    const walked = await readDurationByBoxWalk(href)
+    const first = await fetchBytes(href, 0, BOX_HEADER_BYTES - 1)
+    if (!first.total || first.body.length < 4) return null
+
+    if (first.body.readUInt32BE(0) === EBML_MAGIC) {
+      return await readDurationFromMatroska(href, first.total)
+    }
+
+    const walked = await readDurationByBoxWalk(href, first)
     if (walked !== null) return walked
 
     return await readDurationByScan(href)
@@ -282,8 +299,10 @@ export async function fetchVideoDuration(
 }
 
 /** Прыжок к moov по таблице боксов: несколько коротких запросов вместо мегабайтов. */
-async function readDurationByBoxWalk(href: string): Promise<number | null> {
-  const first = await fetchBytes(href, 0, BOX_HEADER_BYTES - 1)
+async function readDurationByBoxWalk(
+  href: string,
+  first: { body: Buffer; total: number },
+): Promise<number | null> {
   const total = first.total
   if (!total) return null
 
@@ -323,6 +342,100 @@ async function readDurationByScan(href: string): Promise<number | null> {
 
   const tail = await fetchBytes(href, Math.max(0, head.total - MOOV_TAIL_BYTES), head.total - 1)
   return readMvhdDuration(tail.body)
+}
+
+/**
+ * Длительность Matroska: элемент Duration в блоке Info, в единицах TimecodeScale.
+ * Читаем начало файла — оглавление и Info лежат перед потоком данных.
+ */
+async function readDurationFromMatroska(href: string, total: number): Promise<number | null> {
+  const chunk = await fetchBytes(href, 0, Math.min(EBML_PROBE_BYTES, total) - 1)
+  const found = { scale: null as number | null, duration: null as number | null }
+
+  scanEbml(chunk.body, 0, chunk.body.length, found, 0)
+
+  if (found.duration === null || found.duration <= 0) return null
+
+  const scale = found.scale ?? 1_000_000
+  const seconds = (found.duration * scale) / NS_IN_SECOND
+
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null
+}
+
+/** Обходит элементы EBML, спускаясь только в Segment и Info. */
+function scanEbml(
+  buffer: Buffer,
+  start: number,
+  end: number,
+  found: { scale: number | null; duration: number | null },
+  depth: number,
+): void {
+  if (depth > 4) return
+
+  let offset = start
+  while (offset < end) {
+    const id = readVint(buffer, offset, true)
+    if (!id) return
+
+    const size = readVint(buffer, id.next, false)
+    if (!size) return
+
+    // размер «неизвестен» — дальше идти по смещениям нельзя
+    const bodyEnd = size.value === null ? end : Math.min(size.next + size.value, end)
+
+    if (id.value === EBML_SEGMENT || id.value === EBML_INFO) {
+      scanEbml(buffer, size.next, bodyEnd, found, depth + 1)
+      if (found.duration !== null && found.scale !== null) return
+    } else if (id.value === EBML_TIMECODE_SCALE && size.value !== null && size.value > 0) {
+      found.scale = buffer.readUIntBE(size.next, Math.min(size.value, 6))
+    } else if (id.value === EBML_DURATION && (size.value === 4 || size.value === 8)) {
+      found.duration = size.value === 4
+        ? buffer.readFloatBE(size.next)
+        : buffer.readDoubleBE(size.next)
+    }
+
+    if (size.value === null) return
+    offset = size.next + size.value
+  }
+}
+
+/**
+ * Переменная длина EBML: старшие нули первого байта задают число байт.
+ * keepMarker — для идентификаторов (маркер входит в значение), иначе размер;
+ * значение null у размера означает «неизвестен».
+ */
+function readVint(
+  buffer: Buffer,
+  offset: number,
+  keepMarker: boolean,
+): { value: number | null; next: number } | null {
+  if (offset >= buffer.length) return null
+
+  const head = buffer[offset]
+  if (head === 0) return null
+
+  let mask = 0x80
+  let length = 1
+  while ((head & mask) === 0) {
+    mask >>= 1
+    length += 1
+    if (length > 8) return null
+  }
+
+  if (offset + length > buffer.length) return null
+
+  let value = keepMarker ? head : head & (mask - 1)
+  let unknown = !keepMarker && (head & (mask - 1)) === mask - 1
+
+  for (let i = 1; i < length; i++) {
+    const byte = buffer[offset + i]
+    value = value * 256 + byte
+    if (byte !== 0xff) unknown = false
+  }
+
+  if (!Number.isSafeInteger(value)) return null
+
+  return { value: unknown ? null : value, next: offset + length }
 }
 
 /** Заголовок mp4-бокса: 32-битный размер, расширенный 64-битным при size === 1. */

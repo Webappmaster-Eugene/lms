@@ -59,6 +59,43 @@ function serveFile(file: Buffer) {
   })
 }
 
+
+/** Элемент EBML: идентификатор как есть + размер в переменной длине. */
+function ebml(id: number[], payload: Buffer): Buffer {
+  const size = Buffer.alloc(4)
+  size.writeUInt32BE(0x10000000 | payload.length, 0) // 4-байтовый vint
+  return Buffer.concat([Buffer.from(id), size, payload])
+}
+
+function ebmlFloat(id: number[], value: number): Buffer {
+  const payload = Buffer.alloc(8)
+  payload.writeDoubleBE(value, 0)
+  return ebml(id, payload)
+}
+
+function ebmlUint(id: number[], value: number): Buffer {
+  const payload = Buffer.alloc(4)
+  payload.writeUInt32BE(value, 0)
+  return ebml(id, payload)
+}
+
+/** Файл Matroska: заголовок EBML, затем Segment → Info → TimecodeScale + Duration. */
+function matroska(durationTicks: number, timecodeScale = 1_000_000): Buffer {
+  const info = Buffer.concat([
+    ebmlUint([0x2a, 0xd7, 0xb1], timecodeScale),
+    ebmlFloat([0x44, 0x89], durationTicks),
+  ])
+  const segment = Buffer.concat([
+    ebml([0x11, 0x4d, 0x9b, 0x74], Buffer.alloc(64)), // SeekHead — пропускаем
+    ebml([0x15, 0x49, 0xa9, 0x66], info),
+  ])
+  return Buffer.concat([
+    ebml([0x1a, 0x45, 0xdf, 0xa3], Buffer.alloc(16)),
+    ebml([0x18, 0x53, 0x80, 0x67], segment),
+    Buffer.alloc(4096), // «поток данных»
+  ])
+}
+
 const REF = { publicKey: 'https://disk.yandex.ru/d/abc', path: '/lesson.mp4' }
 
 describe('длительность видео из контейнера', () => {
@@ -142,6 +179,19 @@ describe('длительность видео из контейнера', () => 
     install(file)
 
     await expect(fetchVideoDuration(REF)).resolves.toBe(120)
+  })
+
+  it('Matroska: длительность берётся из Info, а не из moov', () => {
+    install(matroska(1_700_000))
+
+    // 1 700 000 тактов × 1 мс = 1700 с
+    return expect(fetchVideoDuration(REF)).resolves.toBeCloseTo(1700, 3)
+  })
+
+  it('Matroska с нестандартным TimecodeScale считается верно', () => {
+    install(matroska(600_000, 100_000))
+
+    return expect(fetchVideoDuration(REF)).resolves.toBeCloseTo(60, 3)
   })
 
   it('на контейнере без moov отдаёт null, а не падает', async () => {
