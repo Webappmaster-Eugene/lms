@@ -38,8 +38,11 @@ export function TransportStreamPlayer({ src, onFailure }: Props) {
           return
         }
 
+        // Загрузчик работает в blob-воркере, где у относительного адреса нет базы
+        const absolute = new URL(src, window.location.origin).toString()
+
         const player = mpegts.createPlayer(
-          { type: 'mpegts', url: src, isLive: false, cors: false, withCredentials: true },
+          { type: 'mpegts', url: absolute, isLive: false, cors: false, withCredentials: true },
           // Перемотка работает Range-запросами, поэтому файл не тянется целиком
           { enableWorker: true, lazyLoad: true, lazyLoadMaxDuration: 3 * 60, seekType: 'range' },
         )

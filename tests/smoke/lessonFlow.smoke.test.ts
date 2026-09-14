@@ -67,6 +67,10 @@ describe('видео выбирает плеер по контейнеру', () 
     expect(PLAYER).not.toContain("from 'mpegts.js'")
   })
 
+  it('загрузчику отдаётся абсолютный адрес — в blob-воркере относительный не разрешается', () => {
+    expect(TS_PLAYER).toContain('new URL(src, window.location.origin)')
+  })
+
   it('сбой плеера потока откатывает урок на карточку с ссылкой', () => {
     expect(TS_PLAYER).toContain('onFailure()')
     expect(PLAYER).toContain('onFailure={handleFailure}')
