@@ -532,11 +532,16 @@ function buildDottedSections(node: TreeNode, warnings: string[]): ImportedSectio
       lessons.set(key, lesson)
     })
 
-    sections.push({
+    const section: ImportedSection = {
       order: number,
       title: suffix ?? `Раздел ${number}`,
       lessons: [...lessons.values()].sort((a, b) => a.order - b.order),
-    })
+    }
+
+    // Имени у раздела нет — пробуем вытащить тему из самих уроков
+    if (!suffix) applySectionTheme(section)
+
+    sections.push(section)
   }
 
   const lastSection = sections[sections.length - 1]
@@ -593,6 +598,107 @@ function stripSuffix(label: string, suffix: string | null): string {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** Разделитель между темой раздела и названием урока: "Введение - Обзор проекта". */
+const THEME_SEPARATOR = /\s*[-—–:|]\s+/
+/** Доля уроков раздела, которая должна нести тему, чтобы считать её общей. */
+const MIN_THEME_SHARE = 0.6
+const MIN_THEME_LESSONS = 2
+const MIN_THEME_LENGTH = 3
+/** Сколько последних слов пробуем как тему в хвосте названия. */
+const MAX_THEME_WORDS = 4
+
+/**
+ * Достаёт тему безымянного раздела из повторяющейся части названий уроков.
+ *
+ * Часть авторов дублирует раздел в имени каждого файла — в начале
+ * ("Введение - Обзор проекта") или в хвосте ("Почему Golang Введение").
+ * Тогда раздел остаётся «Разделом N», а названия уроков несут лишний повтор.
+ * Тему берём только если её несёт большинство уроков, и снимаем её лишь там,
+ * где после снятия остаётся непустое название.
+ */
+function applySectionTheme(section: ImportedSection): void {
+  if (section.lessons.length < MIN_THEME_LESSONS) return
+
+  const titles = section.lessons.map((lesson) => lesson.title)
+  const theme = pickTheme(titles)
+  if (!theme) return
+
+  section.title = theme
+  section.lessons.forEach((lesson) => {
+    const stripped = stripTheme(lesson.title, theme)
+    if (stripped) lesson.title = stripped
+  })
+}
+
+/** Тема с наибольшим охватом; при равенстве — более длинная (она конкретнее). */
+function pickTheme(titles: string[]): string | null {
+  const needed = Math.max(MIN_THEME_LESSONS, Math.ceil(titles.length * MIN_THEME_SHARE))
+
+  let best: { theme: string; covered: number } | null = null
+
+  for (const candidate of themeCandidates(titles)) {
+    const covered = titles.filter((title) => stripTheme(title, candidate) !== null).length
+    if (covered < needed) continue
+
+    const better = !best ||
+      covered > best.covered ||
+      (covered === best.covered && candidate.length > best.theme.length)
+
+    if (better) best = { theme: candidate, covered }
+  }
+
+  return best?.theme ?? null
+}
+
+/** Возможные темы: начало до разделителя, хвост после него и просто последние слова. */
+function themeCandidates(titles: string[]): string[] {
+  const found = new Set<string>()
+
+  const add = (value: string | undefined): void => {
+    const text = value?.trim() ?? ''
+    if (text.length >= MIN_THEME_LENGTH && !/^\d+$/.test(text)) found.add(text)
+  }
+
+  for (const title of titles) {
+    const parts = title.split(THEME_SEPARATOR)
+    if (parts.length > 1) {
+      add(parts[0])
+      add(parts[parts.length - 1])
+    }
+
+    const words = title.split(/\s+/)
+    for (let count = 1; count <= Math.min(MAX_THEME_WORDS, words.length - 1); count++) {
+      add(words.slice(words.length - count).join(' '))
+    }
+  }
+
+  return [...found]
+}
+
+/**
+ * Снимает тему с начала или конца названия.
+ * null — темы в названии нет либо после снятия ничего не остаётся.
+ */
+function stripTheme(title: string, theme: string): string | null {
+  const lower = title.toLowerCase()
+  const needle = theme.toLowerCase()
+
+  if (lower.startsWith(needle)) {
+    const rest = title.slice(theme.length)
+    const cleaned = rest.replace(new RegExp(`^${THEME_SEPARATOR.source}`), '').trim()
+    if (cleaned.length > 0 && cleaned.length < title.length) return cleaned
+  }
+
+  // Хвост встречается и без пробела: "Обзор курсовВведение"
+  if (lower.endsWith(needle)) {
+    const rest = title.slice(0, title.length - theme.length)
+    const cleaned = rest.replace(new RegExp(`${THEME_SEPARATOR.source}$`), '').trim()
+    if (cleaned.length > 0 && cleaned.length < title.length) return cleaned
+  }
+
+  return null
 }
 
 /** Курсы с плоской нумерацией дают одну секцию на сотню уроков — режем на блоки. */

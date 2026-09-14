@@ -503,6 +503,105 @@ describe('чистка названий и размер секций', () => {
   })
 })
 
+describe('тема безымянного раздела берётся из названий уроков', () => {
+  /** Второй номер раздела нужен, чтобы папка разбиралась как набор секций. */
+  const filler = [file('/Курс/9.1 Прочее один.mp4'), file('/Курс/9.2 Прочее два.mp4')]
+
+  it('тема в хвосте названий становится разделом и снимается с уроков', () => {
+    const result = parseYandexDiskTree([
+      dir('/Курс'),
+      file('/Курс/1.1 Почему Golang Введение.mp4'),
+      file('/Курс/1.2 Как устроен курс Введение.mp4'),
+      file('/Курс/1.3 Обзор курсовВведение.mp4'),
+      ...filler,
+    ])
+
+    expect(result.sections[0].title).toBe('Введение')
+    expect(result.sections[0].lessons.map((l) => l.title)).toEqual([
+      'Почему Golang',
+      'Как устроен курс',
+      'Обзор курсов',
+    ])
+  })
+
+  it('тема в начале названий тоже подхватывается', () => {
+    const result = parseYandexDiskTree([
+      dir('/Курс'),
+      file('/Курс/1.1 Введение - API на Golang.mp4'),
+      file('/Курс/1.2 Введение - Как устроен курс.mp4'),
+      file('/Курс/1.3 Введение - Обзор проекта.mp4'),
+      ...filler,
+    ])
+
+    expect(result.sections[0].title).toBe('Введение')
+    expect(result.sections[0].lessons.map((l) => l.title)).toEqual([
+      'API на Golang',
+      'Как устроен курс',
+      'Обзор проекта',
+    ])
+  })
+
+  it('урок, равный теме целиком, сохраняет своё название', () => {
+    const result = parseYandexDiskTree([
+      dir('/Курс'),
+      file('/Курс/1.1 Настройка окружения.mp4'),
+      file('/Курс/1.2 Настройка окружения - Установка Golang.mp4'),
+      file('/Курс/1.3 Настройка окружения - Настройки VSCode.mp4'),
+      ...filler,
+    ])
+
+    expect(result.sections[0].title).toBe('Настройка окружения')
+    expect(result.sections[0].lessons.map((l) => l.title)).toEqual([
+      'Настройка окружения',
+      'Установка Golang',
+      'Настройки VSCode',
+    ])
+  })
+
+  it('без общей темы раздел остаётся безымянным, названия не трогаются', () => {
+    const result = parseYandexDiskTree([
+      dir('/Курс'),
+      file('/Курс/1.1 Адаптация CV.mp4'),
+      file('/Курс/1.2 Сопроводительное письмо.mp4'),
+      file('/Курс/1.3 Упражнение - Подготовить резюме.mp4'),
+      ...filler,
+    ])
+
+    expect(result.sections[0].title).toBe('Раздел 1')
+    expect(result.sections[0].lessons.map((l) => l.title)).toEqual([
+      'Адаптация CV',
+      'Сопроводительное письмо',
+      'Упражнение - Подготовить резюме',
+    ])
+  })
+
+  it('раздел из одного урока темы не получает', () => {
+    const result = parseYandexDiskTree([
+      dir('/Курс'),
+      file('/Курс/1.1 Введение - Обзор.mp4'),
+      file('/Курс/2.1 Практика - Первый шаг.mp4'),
+    ])
+
+    expect(result.sections.map((s) => s.title)).toEqual(['Раздел 1', 'Раздел 2'])
+    expect(result.sections[0].lessons[0].title).toBe('Введение - Обзор')
+  })
+
+  it('название раздела из папки важнее темы из уроков', () => {
+    const result = parseYandexDiskTree([
+      dir('/Курс'),
+      dir('/Курс/01. Основы вёрстки'),
+      file('/Курс/01. Основы вёрстки/1. Введение - Теги.mp4'),
+      file('/Курс/01. Основы вёрстки/2. Введение - Селекторы.mp4'),
+    ])
+
+    expect(result.sections[0].title).toBe('01. Основы вёрстки')
+    expect(result.sections[0].lessons.map((l) => l.title)).toEqual([
+      'Введение - Теги',
+      'Введение - Селекторы',
+    ])
+  })
+})
+
 describe('материалы не превращают урок в файловый менеджер', () => {
   it('распакованный проект сворачивается в ссылку на папку, архивы остаются', () => {
     const items = [dir('/Блок'), file('/Блок/1.mp4'), dir('/Блок/src')]
