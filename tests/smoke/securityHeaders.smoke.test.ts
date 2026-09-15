@@ -92,7 +92,7 @@ describe('CSP и встраиваемый контент не разошлись
 
 describe('песочница встроенных фреймов', () => {
   it('исполнение кода тренажёра изолировано sandbox без доступа к родителю', () => {
-    const runner = read('../../src/components/trainer/CodeRunner.tsx')
+    const runner = read('../../src/components/trainer/useCodeRunner.ts')
     const tokens = [...runner.matchAll(/sandbox\.add\('([^']+)'\)/g)].map((m) => m[1])
 
     expect(tokens).toEqual(['allow-scripts'])
