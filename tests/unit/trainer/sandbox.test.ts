@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { composeScript } from '@/lib/trainer/compose'
 import { normalizeRunResult } from '@/lib/trainer/result'
@@ -28,7 +28,9 @@ function spec(userCode: string, overrides: Partial<TrainerExecSpec> = {}): Train
     testCode: '',
     cases: [],
     entryName: 'solve',
-    timeLimitMs: 2000,
+    // Бюджет пула, а не скорость решения: тесты на сам таймаут задают
+    // короткий лимит явно.
+    timeLimitMs: 10000,
     ...overrides,
   }
 }
@@ -50,6 +52,11 @@ async function execute(userCode: string, overrides: Partial<TrainerExecSpec> = {
 
   return normalizeRunResult(raw)
 }
+
+/** Выносит запуск дочернего процесса за пределы бюджета отдельного теста. */
+beforeAll(async () => {
+  await execute('function solve() { return 0 }', { timeLimitMs: 20000 })
+}, 60000)
 
 const PASSING_TEST = `test('кейс', function () { expect(solve()).toBe(1) })`
 

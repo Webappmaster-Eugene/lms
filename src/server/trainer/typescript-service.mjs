@@ -42,6 +42,26 @@ const LIB_FILES = [
 let libCache = null
 
 /**
+ * Разобранные AST библиотек: парсинг lib.*.d.ts стоит сотни миллисекунд, а
+ * переиспользовать SourceFile между программами безопасно — файлы деклараций
+ * неизменяемы, и skipLibCheck не даёт перепроверять их содержимое.
+ */
+const libSourceFiles = new Map()
+
+function getLibSourceFile(fileName, languageVersion) {
+  const key = `${languageVersion}:${fileName}`
+  const cached = libSourceFiles.get(key)
+  if (cached) return cached
+
+  const text = loadLibs().files.get(path.basename(fileName))
+  if (text === undefined) return undefined
+
+  const file = ts.createSourceFile(fileName, text, languageVersion, true)
+  libSourceFiles.set(key, file)
+  return file
+}
+
+/**
  * Читает lib.*.d.ts из пакета typescript.
  *
  * Считываются транзитивно: lib.es2022.d.ts — это цепочка `/// <reference lib="..." />`,
@@ -82,9 +102,11 @@ function createHost(sources) {
 
   return {
     getSourceFile(fileName, languageVersion) {
-      const text = sources.get(fileName) ?? libs.get(path.basename(fileName))
-      if (text === undefined) return undefined
-      return ts.createSourceFile(fileName, text, languageVersion, true)
+      const source = sources.get(fileName)
+      if (source !== undefined) {
+        return ts.createSourceFile(fileName, source, languageVersion, true)
+      }
+      return getLibSourceFile(fileName, languageVersion)
     },
     writeFile() {},
     getDefaultLibFileName: () => 'lib.es2022.full.d.ts',

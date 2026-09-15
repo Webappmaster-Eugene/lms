@@ -16,6 +16,14 @@ import type { TrainerExecSpec, TrainerLanguage, TrainerRunResult } from '@/lib/t
 /** Запас поверх лимита задачи: тест не должен висеть, если решение зациклилось. */
 const HOST_TIMEOUT_OVERHEAD_MS = 2000
 
+/**
+ * Дефолтные 5000 мс vitest короче сторожа песочницы, поэтому о зациклившемся
+ * решении сообщалось бы «Test timed out» вместо внятной причины.
+ */
+export function sandboxTestTimeoutMs(timeLimitMs = 5000): number {
+  return timeLimitMs + HOST_TIMEOUT_OVERHEAD_MS + 3000
+}
+
 export async function runInNodeVm(spec: TrainerExecSpec): Promise<TrainerRunResult> {
   const composed = composeScript(spec)
   const context = vm.createContext(Object.create(null))

@@ -1,9 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 
 import { TRAINER_CATALOG } from '@/data/trainer'
 import { flattenCatalog, toCaseSpecs, type TrainerTaskSeed } from '@/data/trainer/types'
-import { runInNodeVm, specFromSeed } from '../../helpers/trainer-sandbox'
-import { compileSeedTypeScript, transpileSeed } from '../../helpers/trainer-typescript'
+import { runInNodeVm, sandboxTestTimeoutMs, specFromSeed } from '../../helpers/trainer-sandbox'
+import {
+  compileSeedTypeScript,
+  transpileSeed,
+  warmUpTypeScript,
+} from '../../helpers/trainer-typescript'
 import type { TrainerLanguage, TrainerRunResult } from '@/lib/trainer/types'
 
 /**
@@ -73,6 +77,10 @@ function describeFailure(result: TrainerRunResult): string {
 }
 
 describe('каталог задач тренажёра', () => {
+  beforeAll(async () => {
+    await warmUpTypeScript()
+  }, 60000)
+
   it('в каталоге есть задачи', () => {
     expect(entries.length).toBeGreaterThan(0)
   })
@@ -141,8 +149,10 @@ describe('каталог задач тренажёра', () => {
         }
       })
 
+      const timeout = sandboxTestTimeoutMs(task.timeLimitMs)
+
       for (const language of task.languages) {
-        it(`эталонное решение (${language}) проходит все тесты`, async () => {
+        it(`эталонное решение (${language}) проходит все тесты`, { timeout }, async () => {
           const code =
             language === 'ts' ? (task.solutionCodeTs ?? task.solutionCode) : task.solutionCode
           const result = await runSolutionOf(task, language, code)
@@ -150,7 +160,7 @@ describe('каталог задач тренажёра', () => {
         })
       }
 
-      it('стартовый шаблон тесты НЕ проходит', async () => {
+      it('стартовый шаблон тесты НЕ проходит', { timeout }, async () => {
         const language = task.languages[0]
         const code =
           task.wrongSolution ??

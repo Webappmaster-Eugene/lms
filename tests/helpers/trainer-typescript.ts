@@ -51,6 +51,12 @@ export async function compileSeedTypeScript(
   }).diagnostics
 }
 
+/** Выносит разбор файлов деклараций за пределы бюджета отдельного теста. */
+export async function warmUpTypeScript(): Promise<void> {
+  const compile = await getCompile()
+  compile({ code: 'const warmUp: number = 1\n', checkTypes: true })
+}
+
 /** Транспиляция решения в JavaScript без проверки типов. */
 export async function transpileSeed(task: TrainerTaskSeed, code: string): Promise<string> {
   const compile = await getCompile()
