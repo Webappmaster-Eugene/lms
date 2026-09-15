@@ -3,6 +3,20 @@ import type { NextRequest } from 'next/server'
 
 const PUBLIC_PATHS = ['/login', '/forgot-password', '/reset-password', '/admin', '/api']
 
+const STATIC_PREFIXES = ['/_next', '/images', '/monaco']
+
+/**
+ * Файлы перечислены поимённо, а не определяются по расширению: слаги приходят
+ * из CMS, и `/courses/next.js` неотличим от статики по суффиксу.
+ */
+const STATIC_FILES = new Set([
+  '/favicon.ico',
+  '/icon.svg',
+  '/manifest.webmanifest',
+  '/robots.txt',
+  '/sitemap.xml',
+])
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -12,7 +26,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Пропускаем статические файлы
-  if (pathname.startsWith('/_next') || pathname.startsWith('/images') || pathname.includes('.')) {
+  if (STATIC_PREFIXES.some((prefix) => pathname.startsWith(prefix)) || STATIC_FILES.has(pathname)) {
     return NextResponse.next()
   }
 
