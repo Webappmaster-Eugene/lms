@@ -20,6 +20,7 @@ import { POINTS_BY_DIFFICULTY, toCaseSpecs } from '@/data/trainer/types'
 import type { TrainerTaskSeed, TrainerTopicSeed } from '@/data/trainer/types'
 import type { TrainerTask } from '@/payload-types'
 import { relationId } from '@/lib/relation-id'
+import { collectAllPages } from '@/lib/paginate'
 
 /**
  * Абзац-заглушка для устаревшего richText-поля.
@@ -180,13 +181,19 @@ export async function seedTrainer(payload: Payload): Promise<void> {
   // Задачи, которых больше нет в каталоге, не удаляем: на них может висеть
   // прогресс пользователей. Вместо этого сообщаем о расхождении.
   const catalogSlugs = new Set(TRAINER_CATALOG.flatMap((topic) => topic.tasks.map((t) => t.slug)))
-  const all = await payload.find({
-    collection: 'trainer-tasks',
-    limit: 1000,
-    overrideAccess: true,
-    select: { slug: true, title: true },
-  })
-  const orphans = all.docs.filter((doc) => !catalogSlugs.has(doc.slug))
+  const all = await collectAllPages(
+    ({ page, limit }) =>
+      payload.find({
+        collection: 'trainer-tasks',
+        overrideAccess: true,
+        select: { slug: true, title: true },
+        sort: 'id',
+        page,
+        limit,
+      }),
+    { label: 'задачи тренажёра в базе' },
+  )
+  const orphans = all.filter((doc) => !catalogSlugs.has(doc.slug))
   if (orphans.length > 0) {
     console.log(`\nВ базе есть ${orphans.length} задач вне каталога (оставлены как есть):`)
     for (const orphan of orphans) console.log(`  - ${orphan.slug} (${orphan.title})`)

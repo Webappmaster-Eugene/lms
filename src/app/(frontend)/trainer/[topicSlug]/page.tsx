@@ -4,6 +4,7 @@ import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, ArrowRight, CheckCircle2, Circle } from 'lucide-react'
+import { collectAllPages } from '@/lib/paginate'
 
 type Props = {
   params: Promise<{ topicSlug: string }>
@@ -36,33 +37,44 @@ export default async function TopicTasksPage({ params }: Props) {
   const topic = topics.docs[0]
   if (!topic) notFound()
 
-  const tasks = await payload.find({
-    collection: 'trainer-tasks',
-    where: {
-      topic: { equals: topic.id },
-      isPublished: { equals: true },
-    },
-    sort: 'order',
-    limit: 100,
-  })
+  const tasks = await collectAllPages(
+    ({ page, limit }) =>
+      payload.find({
+        collection: 'trainer-tasks',
+        where: {
+          topic: { equals: topic.id },
+          isPublished: { equals: true },
+        },
+        sort: ['order', 'id'],
+        page,
+        limit,
+      }),
+    { label: `задачи темы «${topic.slug}»` },
+  )
 
   // Прогресс пользователя
   let completedTaskIds = new Set<string>()
-  if (user && tasks.docs.length > 0) {
-    const taskIds = tasks.docs.map((t) => String(t.id))
-    const progress = await payload.find({
-      collection: 'user-trainer-progress',
-      where: {
-        user: { equals: user.id },
-        task: { in: taskIds },
-        isCompleted: { equals: true },
-      },
-      limit: 500,
-    })
+  if (user && tasks.length > 0) {
+    const taskIds = tasks.map((t) => String(t.id))
+    const progressDocs = await collectAllPages(
+      ({ page, limit }) =>
+        payload.find({
+          collection: 'user-trainer-progress',
+          where: {
+            user: { equals: user.id },
+            task: { in: taskIds },
+            isCompleted: { equals: true },
+          },
+          select: { task: true },
+          depth: 0,
+          sort: 'id',
+          page,
+          limit,
+        }),
+      { label: `прогресс пользователя ${user.id} по теме ${topic.id}` },
+    )
     completedTaskIds = new Set(
-      progress.docs.map((p) =>
-        String(typeof p.task === 'object' ? p.task.id : p.task),
-      ),
+      progressDocs.map((p) => String(typeof p.task === 'object' ? p.task.id : p.task)),
     )
   }
 
@@ -90,15 +102,15 @@ export default async function TopicTasksPage({ params }: Props) {
           <p className="mt-2 text-muted-foreground">{topic.description}</p>
         )}
         <p className="mt-2 text-sm text-muted-foreground">
-          Решено: {completedTaskIds.size}/{tasks.docs.length}
+          Решено: {completedTaskIds.size}/{tasks.length}
         </p>
       </div>
 
-      {tasks.docs.length === 0 ? (
+      {tasks.length === 0 ? (
         <p className="text-center text-muted-foreground py-12">Задачи скоро появятся</p>
       ) : (
         <div className="space-y-2">
-          {tasks.docs.map((task) => {
+          {tasks.map((task) => {
             const isCompleted = completedTaskIds.has(String(task.id))
             const diff = difficultyLabels[task.difficulty ?? 'easy'] ?? difficultyLabels.easy
 

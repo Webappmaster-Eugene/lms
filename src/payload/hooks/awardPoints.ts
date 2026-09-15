@@ -4,6 +4,7 @@ import type { PointsReason } from '@/lib/points-config'
 import { relationId } from '@/lib/relation-id'
 import { withSpan, logger } from '@/lib/telemetry'
 import { skipHooksReq } from '@/lib/payload-req'
+import { collectAllPages } from '@/lib/paginate'
 
 /**
  * Hook: начисляет баллы при отметке урока как пройденного.
@@ -113,36 +114,49 @@ async function checkCourseCompletion(
   roadmapPoints: number,
 ) {
   return withSpan('awardPoints.checkCourseCompletion', { 'user.id': userId, 'course.id': courseId }, async () => {
-    const [allCourseLessons, userProgress] = await Promise.all([
-      req.payload.find({
-        req,
-        collection: 'lessons',
-        where: {
-          course: { equals: courseId },
-          isPublished: { equals: true },
-        },
-        limit: 500,
-      }),
-      req.payload.find({
-        req,
-        collection: 'user-progress',
-        where: {
-          user: { equals: userId },
-          isCompleted: { equals: true },
-        },
-        limit: 5000,
-      }),
+    const [courseLessons, userProgress] = await Promise.all([
+      collectAllPages(
+        ({ page, limit }) =>
+          req.payload.find({
+            req,
+            collection: 'lessons',
+            where: {
+              course: { equals: courseId },
+              isPublished: { equals: true },
+            },
+            select: {},
+            depth: 0,
+            sort: 'id',
+            page,
+            limit,
+          }),
+        { label: `уроки курса ${courseId}` },
+      ),
+      collectAllPages(
+        ({ page, limit }) =>
+          req.payload.find({
+            req,
+            collection: 'user-progress',
+            where: {
+              user: { equals: userId },
+              isCompleted: { equals: true },
+            },
+            select: { lesson: true },
+            depth: 0,
+            sort: 'id',
+            page,
+            limit,
+          }),
+        { label: `прогресс пользователя ${userId}` },
+      ),
     ])
 
     const completedIds = new Set(
-      userProgress.docs.map((p) =>
-        String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson),
-      ),
+      userProgress.map((p) => String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson)),
     )
 
     const courseCompleted =
-      allCourseLessons.totalDocs > 0 &&
-      allCourseLessons.docs.every((l) => completedIds.has(String(l.id)))
+      courseLessons.length > 0 && courseLessons.every((l) => completedIds.has(String(l.id)))
 
     if (!courseCompleted) return
 
@@ -164,35 +178,49 @@ async function checkCourseCompletion(
 
     if (!roadmapId) return
 
-    const allRoadmapCourses = await req.payload.find({
-      req,
-      collection: 'courses',
-      where: {
-        roadmap: { equals: roadmapId },
-        isPublished: { equals: true },
-      },
-      limit: 100,
-    })
-
-    const existingCourseBonuses = await req.payload.find({
-      req,
-      collection: 'points-transactions',
-      where: {
-        user: { equals: userId },
-        reason: { equals: 'course_completed' },
-      },
-      limit: 1000,
-    })
+    const [roadmapCourses, courseBonuses] = await Promise.all([
+      collectAllPages(
+        ({ page, limit }) =>
+          req.payload.find({
+            req,
+            collection: 'courses',
+            where: {
+              roadmap: { equals: roadmapId },
+              isPublished: { equals: true },
+            },
+            select: {},
+            depth: 0,
+            sort: 'id',
+            page,
+            limit,
+          }),
+        { label: `курсы роадмапа ${roadmapId}` },
+      ),
+      collectAllPages(
+        ({ page, limit }) =>
+          req.payload.find({
+            req,
+            collection: 'points-transactions',
+            where: {
+              user: { equals: userId },
+              reason: { equals: 'course_completed' },
+            },
+            select: { relatedEntity: true },
+            depth: 0,
+            sort: 'id',
+            page,
+            limit,
+          }),
+        { label: `бонусы за курсы пользователя ${userId}` },
+      ),
+    ])
 
     const completedCourseIds = new Set(
-      existingCourseBonuses.docs
-        .filter((t) => t.relatedEntity)
-        .map((t) => String(t.relatedEntity)),
+      courseBonuses.filter((t) => t.relatedEntity).map((t) => String(t.relatedEntity)),
     )
 
     const roadmapCompleted =
-      allRoadmapCourses.totalDocs > 0 &&
-      allRoadmapCourses.docs.every((c) => completedCourseIds.has(String(c.id)))
+      roadmapCourses.length > 0 && roadmapCourses.every((c) => completedCourseIds.has(String(c.id)))
 
     if (roadmapCompleted) {
       await safeCreateTransaction(
@@ -263,14 +291,22 @@ async function safeCreateTransaction(
  */
 async function recalculateTotalPoints(req: PayloadRequest, userId: number) {
   return withSpan('awardPoints.recalculateTotalPoints', { 'user.id': userId }, async () => {
-    const allTransactions = await req.payload.find({
-      req,
-      collection: 'points-transactions',
-      where: { user: { equals: userId } },
-      limit: 10000,
-    })
+    const transactions = await collectAllPages(
+      ({ page, limit }) =>
+        req.payload.find({
+          req,
+          collection: 'points-transactions',
+          where: { user: { equals: userId } },
+          select: { amount: true },
+          depth: 0,
+          sort: 'id',
+          page,
+          limit,
+        }),
+      { label: `транзакции баллов пользователя ${userId}` },
+    )
 
-    const totalPoints = allTransactions.docs.reduce((sum, tx) => sum + (tx.amount ?? 0), 0)
+    const totalPoints = transactions.reduce((sum, tx) => sum + (tx.amount ?? 0), 0)
 
     await req.payload.update({
       req: skipHooksReq(req),

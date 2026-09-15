@@ -21,6 +21,7 @@ import type { Course, Lesson } from '@/payload-types'
 import { applyCurriculum } from '@/lib/course-curricula'
 import { stringToLexicalState } from '@/lib/lexical'
 import { withSpan, logger } from '@/lib/telemetry'
+import { collectAllPages } from '@/lib/paginate'
 
 type LessonContent = NonNullable<Lesson['content']>
 type LinkPlatform = NonNullable<Extract<LessonContent[number], { blockType: 'link' }>['platform']>
@@ -578,14 +579,21 @@ async function warnAboutOrphans(
   warnings: string[],
 ): Promise<void> {
   const touched = new Set(touchedLessonIds)
-  const existing = await payload.find({
-    collection: 'lessons',
-    where: { course: { equals: courseId } },
-    limit: 1000,
-    depth: 0,
-  })
+  const existing = await collectAllPages(
+    ({ page, limit }) =>
+      payload.find({
+        collection: 'lessons',
+        where: { course: { equals: courseId } },
+        select: { title: true },
+        depth: 0,
+        sort: 'id',
+        page,
+        limit,
+      }),
+    { label: `уроки курса ${courseId}` },
+  )
 
-  const orphans = existing.docs.filter((doc) => !touched.has(doc.id))
+  const orphans = existing.filter((doc) => !touched.has(doc.id))
   if (orphans.length === 0) return
 
   const names = orphans.slice(0, 10).map((doc) => `"${doc.title}"`).join(', ')

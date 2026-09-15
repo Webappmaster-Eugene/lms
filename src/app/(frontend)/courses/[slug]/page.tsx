@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, CheckCircle2, ChevronDown, Circle, Clock } from 'lucide-react'
+import { collectAllPages } from '@/lib/paginate'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -40,53 +41,65 @@ export default async function CourseDetailPage({ params }: Props) {
   const course = courseResult.docs[0]
   if (!course) return notFound()
 
-  // Загружаем секции курса
-  const sections = await payload.find({
-    collection: 'sections',
-    where: {
-      course: { equals: course.id },
-      isPublished: { equals: true },
-    },
-    sort: 'order',
-    limit: 100,
-  })
+  const [sectionDocs, lessonDocs, progressDocs] = await Promise.all([
+    collectAllPages(
+      ({ page, limit }) =>
+        payload.find({
+          collection: 'sections',
+          where: {
+            course: { equals: course.id },
+            isPublished: { equals: true },
+          },
+          sort: ['order', 'id'],
+          page,
+          limit,
+        }),
+      { label: `секции курса «${course.slug}»` },
+    ),
+    collectAllPages(
+      ({ page, limit }) =>
+        payload.find({
+          collection: 'lessons',
+          where: {
+            course: { equals: course.id },
+            isPublished: { equals: true },
+          },
+          sort: ['order', 'id'],
+          page,
+          limit,
+        }),
+      { label: `уроки курса «${course.slug}»` },
+    ),
+    user
+      ? collectAllPages(
+          ({ page, limit }) =>
+            payload.find({
+              collection: 'user-progress',
+              where: {
+                user: { equals: user.id },
+                isCompleted: { equals: true },
+              },
+              select: { lesson: true },
+              depth: 0,
+              sort: 'id',
+              page,
+              limit,
+            }),
+          { label: `прогресс пользователя ${user.id}` },
+        )
+      : [],
+  ])
 
-  // Загружаем все уроки курса
-  const lessons = await payload.find({
-    collection: 'lessons',
-    where: {
-      course: { equals: course.id },
-      isPublished: { equals: true },
-    },
-    sort: 'order',
-    limit: 500,
-  })
-
-  // Загружаем прогресс пользователя
-  let completedLessonIds = new Set<string>()
-
-  if (user) {
-    const progress = await payload.find({
-      collection: 'user-progress',
-      where: {
-        user: { equals: user.id },
-        isCompleted: { equals: true },
-      },
-      limit: 5000,
-    })
-    completedLessonIds = new Set(
-      progress.docs.map((p) =>
-        String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson),
-      ),
-    )
-  }
+  const completedLessonIds = new Set(
+    progressDocs.map((p) => String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson)),
+  )
 
   // Группируем уроки по секциям
-  type LessonDoc = (typeof lessons.docs)[number]
+  type LessonDoc = (typeof lessonDocs)[number]
   const sectionLessonsMap = new Map<string, LessonDoc[]>()
   const unsectionedLessons: LessonDoc[] = []
 
-  for (const lesson of lessons.docs) {
+  for (const lesson of lessonDocs) {
     const sectionId = typeof lesson.section === 'object'
       ? lesson.section?.id ? String(lesson.section.id) : null
       : lesson.section ? String(lesson.section) : null
@@ -100,8 +113,8 @@ export default async function CourseDetailPage({ params }: Props) {
     }
   }
 
-  const totalLessons = lessons.docs.length
-  const completedCount = lessons.docs.filter((l) => completedLessonIds.has(String(l.id))).length
+  const totalLessons = lessonDocs.length
+  const completedCount = lessonDocs.filter((l) => completedLessonIds.has(String(l.id))).length
   const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0
 
   const roadmap = typeof course.roadmap === 'object' ? course.roadmap : null
@@ -124,8 +137,8 @@ export default async function CourseDetailPage({ params }: Props) {
         <h1 className="text-2xl font-bold text-foreground">{course.title}</h1>
         <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
           <span>{totalLessons} уроков</span>
-          {sections.docs.length > 0 && (
-            <span>{sections.docs.length} разделов</span>
+          {sectionDocs.length > 0 && (
+            <span>{sectionDocs.length} разделов</span>
           )}
           {course.estimatedHours && (
             <span className="flex items-center gap-1">
@@ -154,7 +167,7 @@ export default async function CourseDetailPage({ params }: Props) {
 
       {/* Секции с уроками */}
       <div className="space-y-4">
-        {sections.docs.map((section) => {
+        {sectionDocs.map((section) => {
           const sectionLessons = sectionLessonsMap.get(String(section.id)) ?? []
           const sectionCompleted = sectionLessons.filter((l) =>
             completedLessonIds.has(String(l.id)),
@@ -196,7 +209,7 @@ export default async function CourseDetailPage({ params }: Props) {
         {/* Уроки без секции */}
         {unsectionedLessons.length > 0 && (
           <div className="space-y-1">
-            {sections.docs.length > 0 && (
+            {sectionDocs.length > 0 && (
               <h3 className="text-sm font-medium text-muted-foreground px-1 mb-2">Другие уроки</h3>
             )}
             {unsectionedLessons.map((lesson) => (
@@ -209,7 +222,7 @@ export default async function CourseDetailPage({ params }: Props) {
           </div>
         )}
 
-        {lessons.docs.length === 0 && (
+        {lessonDocs.length === 0 && (
           <p className="text-center text-muted-foreground py-12">В этом курсе пока нет уроков</p>
         )}
       </div>

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { getPayload } from '@/lib/payload'
 import Link from 'next/link'
 import { Map } from 'lucide-react'
+import { collectAllPages } from '@/lib/paginate'
 
 export const metadata: Metadata = {
   title: 'Роадмапы',
@@ -10,19 +11,24 @@ export const metadata: Metadata = {
 export default async function RoadmapsPage() {
   const payload = await getPayload()
 
-  const roadmaps = await payload.find({
-    collection: 'roadmaps',
-    where: { isPublished: { equals: true } },
-    sort: 'order',
-    limit: 50,
-  })
+  const roadmapDocs = await collectAllPages(
+    ({ page, limit }) =>
+      payload.find({
+        collection: 'roadmaps',
+        where: { isPublished: { equals: true } },
+        sort: ['order', 'id'],
+        page,
+        limit,
+      }),
+    { label: 'список роадмапов' },
+  )
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <h1 className="text-xl font-bold text-foreground sm:text-2xl">Роадмапы</h1>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {roadmaps.docs.map((roadmap) => (
+        {roadmapDocs.map((roadmap) => (
           <Link
             key={roadmap.id}
             href={`/roadmaps/${roadmap.slug}`}
@@ -41,7 +47,7 @@ export default async function RoadmapsPage() {
           </Link>
         ))}
 
-        {roadmaps.docs.length === 0 && (
+        {roadmapDocs.length === 0 && (
           <p className="col-span-full text-center text-muted-foreground py-12">
             Роадмапы пока не опубликованы
           </p>

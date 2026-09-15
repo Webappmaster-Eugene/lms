@@ -3,6 +3,7 @@ import { getPayload } from '@/lib/payload'
 import { HelpCircle, MessageSquare } from 'lucide-react'
 import { FaqAccordion } from '@/components/help/FaqAccordion'
 import { SupportForm } from './SupportForm'
+import { collectAllPages } from '@/lib/paginate'
 
 export const metadata: Metadata = {
   title: 'Помощь',
@@ -11,15 +12,20 @@ export const metadata: Metadata = {
 export default async function HelpPage() {
   const payload = await getPayload()
 
-  const faqItems = await payload.find({
-    collection: 'faq-items',
-    where: { isPublished: { equals: true } },
-    sort: 'order',
-    limit: 50,
-  })
+  const faqDocs = await collectAllPages(
+    ({ page, limit }) =>
+      payload.find({
+        collection: 'faq-items',
+        where: { isPublished: { equals: true } },
+        sort: ['order', 'id'],
+        page,
+        limit,
+      }),
+    { label: 'вопросы FAQ' },
+  )
 
   // Сериализация richText → plain text
-  const serializedFaq = faqItems.docs.map((item) => {
+  const serializedFaq = faqDocs.map((item) => {
     let answerText = ''
     if (item.answer && typeof item.answer === 'object' && 'root' in item.answer) {
       const root = item.answer.root as { children?: Array<{ children?: Array<{ text?: string }> }> }

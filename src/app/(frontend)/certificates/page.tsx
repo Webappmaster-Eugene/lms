@@ -4,18 +4,10 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { Award } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import { collectAllPages } from '@/lib/paginate'
 
 export const metadata: Metadata = {
   title: 'Сертификаты',
-}
-
-type CertificateDoc = {
-  id: string
-  type: string
-  title: string
-  certificateNumber: string
-  issuedAt: string
-  relatedEntity: string
 }
 
 export default async function CertificatesPage() {
@@ -25,15 +17,17 @@ export default async function CertificatesPage() {
 
   if (!user) redirect('/login')
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const certificates = await (payload as any).find({
-    collection: 'certificates',
-    where: { user: { equals: user.id } },
-    sort: '-issuedAt',
-    limit: 50,
-  })
-
-  const docs = (certificates.docs ?? []) as CertificateDoc[]
+  const docs = await collectAllPages(
+    ({ page, limit }) =>
+      payload.find({
+        collection: 'certificates',
+        where: { user: { equals: user.id } },
+        sort: ['-issuedAt', 'id'],
+        page,
+        limit,
+      }),
+    { label: `сертификаты пользователя ${user.id}` },
+  )
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">

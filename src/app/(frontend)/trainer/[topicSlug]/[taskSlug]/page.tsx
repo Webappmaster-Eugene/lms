@@ -11,6 +11,7 @@ import { DIFFICULTY_LABELS, COMPANY_LABELS, TAG_LABELS } from '@/lib/trainer/con
 import { publicCases, normalizeCases, starterCodeFor, taskLanguages } from '@/lib/trainer/spec'
 import { lexicalToMarkdown } from '@/lib/lexical'
 import { cn } from '@/lib/utils'
+import { collectAllPages } from '@/lib/paginate'
 import type { ClientProgress, ClientTaskSpec } from '@/lib/trainer/api'
 import type { TrainerCompany, TrainerTag } from '@/lib/trainer/constants'
 import type { TrainerDifficulty, TrainerLanguage } from '@/lib/trainer/types'
@@ -82,17 +83,22 @@ export default async function TaskPage({ params }: Props) {
   if (!task) notFound()
 
   // Соседи по теме — для навигации «предыдущая / следующая».
-  const siblings = await payload.find({
-    collection: 'trainer-tasks',
-    where: { topic: { equals: topic.id }, isPublished: { equals: true } },
-    sort: 'order',
-    limit: 500,
-    select: { slug: true, title: true, order: true },
-  })
-  const currentIndex = siblings.docs.findIndex((item) => item.id === task.id)
-  const previous = currentIndex > 0 ? siblings.docs[currentIndex - 1] : null
-  const next = currentIndex >= 0 && currentIndex < siblings.docs.length - 1
-    ? siblings.docs[currentIndex + 1]
+  const siblings = await collectAllPages(
+    ({ page, limit }) =>
+      payload.find({
+        collection: 'trainer-tasks',
+        where: { topic: { equals: topic.id }, isPublished: { equals: true } },
+        sort: ['order', 'id'],
+        select: { slug: true, title: true, order: true },
+        page,
+        limit,
+      }),
+    { label: `соседние задачи темы «${topic.slug}»` },
+  )
+  const currentIndex = siblings.findIndex((item) => item.id === task.id)
+  const previous = currentIndex > 0 ? siblings[currentIndex - 1] : null
+  const next = currentIndex >= 0 && currentIndex < siblings.length - 1
+    ? siblings[currentIndex + 1]
     : null
 
   let progress: ClientProgress = {

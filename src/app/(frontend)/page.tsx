@@ -3,10 +3,14 @@ import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import Link from 'next/link'
 import { Award, BookOpen, Clock, Flame, GraduationCap, Map, Star, Trophy } from 'lucide-react'
+import { collectAllPages } from '@/lib/paginate'
 
 export const metadata: Metadata = {
   title: 'Дашборд',
 }
+
+/** Сколько карточек курсов показывает дашборд. */
+const DASHBOARD_COURSES = 6
 
 export default async function DashboardPage() {
   const payload = await getPayload()
@@ -16,18 +20,23 @@ export default async function DashboardPage() {
   if (!user) return null
 
   // Загружаем данные параллельно
-  const [roadmaps, courses, progressData, achievementsData, streakData, certificatesData] = await Promise.all([
-    payload.find({
-      collection: 'roadmaps',
-      where: { isPublished: { equals: true } },
-      sort: 'order',
-      limit: 10,
-    }),
+  const [roadmapDocs, courses, progressData, achievementsData, streakData, certificatesData] = await Promise.all([
+    collectAllPages(
+      ({ page, limit }) =>
+        payload.find({
+          collection: 'roadmaps',
+          where: { isPublished: { equals: true } },
+          sort: ['order', 'id'],
+          page,
+          limit,
+        }),
+      { label: 'роадмапы дашборда' },
+    ),
     payload.find({
       collection: 'courses',
       where: { isPublished: { equals: true } },
-      sort: 'order',
-      limit: 20,
+      sort: ['order', 'id'],
+      limit: DASHBOARD_COURSES,
       depth: 1,
     }),
     payload.find({
@@ -63,40 +72,53 @@ export default async function DashboardPage() {
 
   // Подсчёт прогресса по курсам
   const courseIds = courses.docs.map((c) => String(c.id))
-  const allLessons = courseIds.length > 0
-    ? await payload.find({
-        collection: 'lessons',
-        where: {
-          course: { in: courseIds },
-          isPublished: { equals: true },
-        },
-        limit: 5000,
-      })
-    : { docs: [] }
+  const [lessonDocs, progressDocs] = await Promise.all([
+    courseIds.length > 0
+      ? collectAllPages(
+          ({ page, limit }) =>
+            payload.find({
+              collection: 'lessons',
+              where: {
+                course: { in: courseIds },
+                isPublished: { equals: true },
+              },
+              select: { course: true },
+              depth: 0,
+              sort: 'id',
+              page,
+              limit,
+            }),
+          { label: 'уроки дашборда' },
+        )
+      : [],
+    collectAllPages(
+      ({ page, limit }) =>
+        payload.find({
+          collection: 'user-progress',
+          where: {
+            user: { equals: user.id },
+            isCompleted: { equals: true },
+          },
+          select: { lesson: true },
+          depth: 0,
+          sort: 'id',
+          page,
+          limit,
+        }),
+      { label: `прогресс пользователя ${user.id}` },
+    ),
+  ])
 
   const lessonsByCourse: Record<string, string[]> = {}
-  for (const lesson of allLessons.docs) {
+  for (const lesson of lessonDocs) {
     const cId = String(typeof lesson.course === 'object' ? lesson.course.id : lesson.course)
     if (!lessonsByCourse[cId]) lessonsByCourse[cId] = []
     lessonsByCourse[cId].push(String(lesson.id))
   }
 
-  let completedLessonIds = new Set<string>()
-  if (user) {
-    const userProgress = await payload.find({
-      collection: 'user-progress',
-      where: {
-        user: { equals: user.id },
-        isCompleted: { equals: true },
-      },
-      limit: 5000,
-    })
-    completedLessonIds = new Set(
-      userProgress.docs.map((p) =>
-        String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson),
-      ),
-    )
-  }
+  const completedLessonIds = new Set(
+    progressDocs.map((p) => String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson)),
+  )
 
   const coursesWithProgress = courses.docs.map((course) => {
     const cId = String(course.id)
@@ -145,7 +167,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
-            {coursesWithProgress.slice(0, 6).map((course) => (
+            {coursesWithProgress.map((course) => (
               <Link
                 key={course.id}
                 href={`/courses/${course.slug}`}
@@ -192,7 +214,7 @@ export default async function DashboardPage() {
       <div>
         <h2 className="text-lg font-semibold text-foreground">Роадмапы</h2>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {roadmaps.docs.map((roadmap) => (
+          {roadmapDocs.map((roadmap) => (
             <Link
               key={roadmap.id}
               href={`/roadmaps/${roadmap.slug}`}

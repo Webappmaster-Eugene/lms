@@ -2,6 +2,7 @@ import type { CollectionAfterChangeHook, PayloadRequest } from 'payload'
 import { relationId } from '@/lib/relation-id'
 import { withSpan } from '@/lib/telemetry'
 import { skipHooksReq } from '@/lib/payload-req'
+import { collectAllPages } from '@/lib/paginate'
 
 /**
  * Hook: проверяет и выдаёт достижения при изменении прогресса пользователя.
@@ -30,20 +31,34 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
 
   return withSpan('hook.checkAchievements', { 'user.id': userId }, async () => {
     // Загружаем данные параллельно
-    const [achievements, userAchievements, user, completedLessons, courseTransactions, roadmapTransactions, trainerProgress] =
+    const [achievementDocs, userAchievementDocs, user, completedLessons, courseBonuses, roadmapBonuses, trainerProgress] =
       await Promise.all([
-        req.payload.find({
-          req,
-          collection: 'achievements',
-          where: { isActive: { equals: true } },
-          limit: 100,
-        }),
-        req.payload.find({
-          req,
-          collection: 'user-achievements',
-          where: { user: { equals: userId } },
-          limit: 1000,
-        }),
+        collectAllPages(
+          ({ page, limit }) =>
+            req.payload.find({
+              req,
+              collection: 'achievements',
+              where: { isActive: { equals: true } },
+              sort: 'id',
+              page,
+              limit,
+            }),
+          { label: 'активные достижения' },
+        ),
+        collectAllPages(
+          ({ page, limit }) =>
+            req.payload.find({
+              req,
+              collection: 'user-achievements',
+              where: { user: { equals: userId } },
+              select: { achievement: true },
+              depth: 0,
+              sort: 'id',
+              page,
+              limit,
+            }),
+          { label: `достижения пользователя ${userId}` },
+        ),
         req.payload.findByID({ req, collection: 'users', id: userId }),
         req.payload.find({
           req,
@@ -54,24 +69,40 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
           },
           limit: 0, // только totalDocs
         }),
-        req.payload.find({
-          req,
-          collection: 'points-transactions',
-          where: {
-            user: { equals: userId },
-            reason: { equals: 'course_completed' },
-          },
-          limit: 1000,
-        }),
-        req.payload.find({
-          req,
-          collection: 'points-transactions',
-          where: {
-            user: { equals: userId },
-            reason: { equals: 'roadmap_completed' },
-          },
-          limit: 1000,
-        }),
+        collectAllPages(
+          ({ page, limit }) =>
+            req.payload.find({
+              req,
+              collection: 'points-transactions',
+              where: {
+                user: { equals: userId },
+                reason: { equals: 'course_completed' },
+              },
+              select: { relatedEntity: true },
+              depth: 0,
+              sort: 'id',
+              page,
+              limit,
+            }),
+          { label: `бонусы за курсы пользователя ${userId}` },
+        ),
+        collectAllPages(
+          ({ page, limit }) =>
+            req.payload.find({
+              req,
+              collection: 'points-transactions',
+              where: {
+                user: { equals: userId },
+                reason: { equals: 'roadmap_completed' },
+              },
+              select: { relatedEntity: true },
+              depth: 0,
+              sort: 'id',
+              page,
+              limit,
+            }),
+          { label: `бонусы за роадмапы пользователя ${userId}` },
+        ),
         req.payload.find({
           req,
           collection: 'user-trainer-progress',
@@ -84,28 +115,28 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
       ])
 
     const unlockedIds = new Set(
-      userAchievements.docs.map((ua) =>
+      userAchievementDocs.map((ua) =>
         String(typeof ua.achievement === 'object' ? ua.achievement.id : ua.achievement),
       ),
     )
 
     // Множества конкретных завершённых сущностей
     const completedCourseEntityIds = new Set(
-      courseTransactions.docs
+      courseBonuses
         .filter((t) => t.relatedEntity)
         .map((t) => String(t.relatedEntity)),
     )
 
     const completedRoadmapEntityIds = new Set(
-      roadmapTransactions.docs
+      roadmapBonuses
         .filter((t) => t.relatedEntity)
         .map((t) => String(t.relatedEntity)),
     )
 
     const stats: UserStats = {
       completedLessonCount: completedLessons.totalDocs,
-      completedCourseCount: courseTransactions.totalDocs,
-      completedRoadmapCount: roadmapTransactions.totalDocs,
+      completedCourseCount: courseBonuses.length,
+      completedRoadmapCount: roadmapBonuses.length,
       completedTrainerTaskCount: trainerProgress.totalDocs,
       totalPoints: user.totalPoints ?? 0,
       completedCourseEntityIds,
@@ -114,7 +145,7 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
 
     let pointsAwarded = 0
 
-    for (const achievement of achievements.docs) {
+    for (const achievement of achievementDocs) {
       if (unlockedIds.has(String(achievement.id))) continue
 
       const met = checkCriteria(
@@ -216,14 +247,22 @@ function checkCriteria(
 
 async function recalculateTotalPoints(req: PayloadRequest, userId: number) {
   return withSpan('checkAchievements.recalculateTotalPoints', { 'user.id': userId }, async () => {
-    const allTransactions = await req.payload.find({
-      req,
-      collection: 'points-transactions',
-      where: { user: { equals: userId } },
-      limit: 10000,
-    })
+    const transactions = await collectAllPages(
+      ({ page, limit }) =>
+        req.payload.find({
+          req,
+          collection: 'points-transactions',
+          where: { user: { equals: userId } },
+          select: { amount: true },
+          depth: 0,
+          sort: 'id',
+          page,
+          limit,
+        }),
+      { label: `транзакции баллов пользователя ${userId}` },
+    )
 
-    const totalPoints = allTransactions.docs.reduce((sum, tx) => sum + (tx.amount ?? 0), 0)
+    const totalPoints = transactions.reduce((sum, tx) => sum + (tx.amount ?? 0), 0)
 
     await req.payload.update({
       req: skipHooksReq(req),

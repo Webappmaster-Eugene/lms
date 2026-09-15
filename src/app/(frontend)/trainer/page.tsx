@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import { Code2, ArrowRight, ListFilter } from 'lucide-react'
+import { collectAllPages } from '@/lib/paginate'
 
 export const metadata: Metadata = {
   title: 'Тренажёр кода',
@@ -13,54 +14,57 @@ export default async function TrainerPage() {
   const headersList = await headers()
   const { user } = await payload.auth({ headers: headersList })
 
-  const topics = await payload.find({
-    collection: 'trainer-topics',
-    where: { isPublished: { equals: true } },
-    sort: 'order',
-    limit: 100,
-  })
+  const topics = await collectAllPages(
+    ({ page, limit }) =>
+      payload.find({
+        collection: 'trainer-topics',
+        where: { isPublished: { equals: true } },
+        sort: ['order', 'id'],
+        page,
+        limit,
+      }),
+    { label: 'темы тренажёра' },
+  )
 
   // Подсчитываем кол-во задач и прогресс для каждой темы
   const topicsWithStats = await Promise.all(
-    topics.docs.map(async (topic) => {
-      const tasks = await payload.find({
-        collection: 'trainer-tasks',
-        where: {
-          topic: { equals: topic.id },
-          isPublished: { equals: true },
-        },
-        limit: 0,
-      })
+    topics.map(async (topic) => {
+      const taskIds = (
+        await collectAllPages(
+          ({ page, limit }) =>
+            payload.find({
+              collection: 'trainer-tasks',
+              where: {
+                topic: { equals: topic.id },
+                isPublished: { equals: true },
+              },
+              select: {},
+              depth: 0,
+              sort: 'id',
+              page,
+              limit,
+            }),
+          { label: `задачи темы ${topic.id}` },
+        )
+      ).map((t) => String(t.id))
 
       let completedCount = 0
-      if (user) {
-        const allTasks = await payload.find({
-          collection: 'trainer-tasks',
+      if (user && taskIds.length > 0) {
+        const completed = await payload.find({
+          collection: 'user-trainer-progress',
           where: {
-            topic: { equals: topic.id },
-            isPublished: { equals: true },
+            user: { equals: user.id },
+            task: { in: taskIds },
+            isCompleted: { equals: true },
           },
-          limit: 500,
+          limit: 0, // только totalDocs
         })
-
-        if (allTasks.totalDocs > 0) {
-          const taskIds = allTasks.docs.map((t) => String(t.id))
-          const completed = await payload.find({
-            collection: 'user-trainer-progress',
-            where: {
-              user: { equals: user.id },
-              task: { in: taskIds },
-              isCompleted: { equals: true },
-            },
-            limit: 0,
-          })
-          completedCount = completed.totalDocs
-        }
+        completedCount = completed.totalDocs
       }
 
       return {
         ...topic,
-        totalTasks: tasks.totalDocs,
+        totalTasks: taskIds.length,
         completedTasks: completedCount,
       }
     }),

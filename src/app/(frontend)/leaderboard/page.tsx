@@ -7,20 +7,23 @@ export const metadata: Metadata = {
   title: 'Лидерборд',
 }
 
+/** Сколько студентов помещается в таблицу лидеров. */
+const LEADERBOARD_SIZE = 50
+
 export default async function LeaderboardPage() {
   const payload = await getPayload()
   const headersList = await headers()
   const { user: currentUser } = await payload.auth({ headers: headersList })
 
-  // Загружаем всех активных студентов, сортируем по баллам
+  // Ничьи по баллам разводим по id: иначе порядок в таблице плавает между запросами.
   const users = await payload.find({
     collection: 'users',
     where: {
       role: { equals: 'student' },
       isActive: { equals: true },
     },
-    sort: '-totalPoints',
-    limit: 50,
+    sort: ['-totalPoints', 'id'],
+    limit: LEADERBOARD_SIZE,
   })
 
   return (

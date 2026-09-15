@@ -9,6 +9,7 @@ import { TaskFilters, type TaskFilterValues } from '@/components/trainer/TaskFil
 import { COMPANY_LABELS, DIFFICULTY_LABELS, TAG_LABELS } from '@/lib/trainer/constants'
 import { taskLanguages } from '@/lib/trainer/spec'
 import { cn } from '@/lib/utils'
+import { collectAllPages } from '@/lib/paginate'
 import type { TrainerCompany, TrainerTag } from '@/lib/trainer/constants'
 import type { TrainerDifficulty } from '@/lib/trainer/types'
 
@@ -19,16 +20,6 @@ export const metadata: Metadata = {
 type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }
-
-/**
- * Страница отдаёт весь каталог одним списком.
- *
- * Задач сейчас 133, и ограничение в сотню прятало целые темы: «Все задачи» —
- * единственное место, где можно посмотреть каталог целиком, и обрезать его
- * там нельзя. Запас взят с расчётом на рост; если каталог перерастёт и его,
- * внизу страницы появится предупреждение.
- */
-const PAGE_SIZE = 500
 
 const DIFFICULTY_CLASS: Record<TrainerDifficulty, string> = {
   easy: 'text-success',
@@ -61,16 +52,21 @@ export default async function AllTasksPage({ searchParams }: Props) {
   const headersList = await headers()
   const { user } = await payload.auth({ headers: headersList })
 
-  const topics = await payload.find({
-    collection: 'trainer-topics',
-    where: { isPublished: { equals: true } },
-    sort: 'order',
-    limit: 200,
-    select: { slug: true, title: true },
-  })
+  const topics = await collectAllPages(
+    ({ page, limit }) =>
+      payload.find({
+        collection: 'trainer-topics',
+        where: { isPublished: { equals: true } },
+        sort: ['order', 'id'],
+        select: { slug: true, title: true },
+        page,
+        limit,
+      }),
+    { label: 'темы тренажёра' },
+  )
 
-  const topicBySlug = new Map(topics.docs.map((topic) => [topic.slug, topic]))
-  const topicById = new Map(topics.docs.map((topic) => [String(topic.id), topic]))
+  const topicBySlug = new Map(topics.map((topic) => [topic.slug, topic]))
+  const topicById = new Map(topics.map((topic) => [String(topic.id), topic]))
 
   const conditions: Where[] = [{ isPublished: { equals: true } }]
   if (filters.q) conditions.push({ title: { like: filters.q } })
@@ -82,27 +78,40 @@ export default async function AllTasksPage({ searchParams }: Props) {
   const selectedTopic = filters.topic ? topicBySlug.get(filters.topic) : undefined
   if (selectedTopic) conditions.push({ topic: { equals: selectedTopic.id } })
 
-  const tasks = await payload.find({
-    collection: 'trainer-tasks',
-    where: { and: conditions },
-    sort: ['topic', 'order'],
-    limit: PAGE_SIZE,
-  })
+  const tasks = await collectAllPages(
+    ({ page, limit }) =>
+      payload.find({
+        collection: 'trainer-tasks',
+        where: { and: conditions },
+        sort: ['topic', 'order', 'id'],
+        page,
+        limit,
+      }),
+    { label: 'каталог задач тренажёра' },
+  )
 
   // Прогресс тянем одним запросом по найденным задачам, а не по каждой.
   let completedIds = new Set<string>()
-  if (user && tasks.docs.length > 0) {
-    const progress = await payload.find({
-      collection: 'user-trainer-progress',
-      where: {
-        user: { equals: user.id },
-        task: { in: tasks.docs.map((task) => String(task.id)) },
-        isCompleted: { equals: true },
-      },
-      limit: 500,
-    })
+  if (user && tasks.length > 0) {
+    const progressDocs = await collectAllPages(
+      ({ page, limit }) =>
+        payload.find({
+          collection: 'user-trainer-progress',
+          where: {
+            user: { equals: user.id },
+            task: { in: tasks.map((task) => String(task.id)) },
+            isCompleted: { equals: true },
+          },
+          select: { task: true },
+          depth: 0,
+          sort: 'id',
+          page,
+          limit,
+        }),
+      { label: `прогресс пользователя ${user.id} в тренажёре` },
+    )
     completedIds = new Set(
-      progress.docs.map((record) =>
+      progressDocs.map((record) =>
         String(typeof record.task === 'object' && record.task !== null ? record.task.id : record.task),
       ),
     )
@@ -110,7 +119,7 @@ export default async function AllTasksPage({ searchParams }: Props) {
 
   // Статус — единственный фильтр, который нельзя выразить запросом к задачам:
   // он живёт в другой коллекции и зависит от пользователя.
-  const visible = tasks.docs.filter((task) => {
+  const visible = tasks.filter((task) => {
     if (filters.status === 'solved') return completedIds.has(String(task.id))
     if (filters.status === 'todo') return !completedIds.has(String(task.id))
     return true
@@ -133,7 +142,7 @@ export default async function AllTasksPage({ searchParams }: Props) {
         </Link>
       </div>
 
-      <TaskFilters values={filters} topics={topics.docs} total={visible.length} />
+      <TaskFilters values={filters} topics={topics} total={visible.length} />
 
       {visible.length === 0 ? (
         <p className="py-12 text-center text-muted-foreground">
@@ -217,12 +226,6 @@ export default async function AllTasksPage({ searchParams }: Props) {
             })}
           </ul>
         </div>
-      )}
-
-      {tasks.totalDocs > PAGE_SIZE && (
-        <p className="text-center text-xs text-warning">
-          Показаны первые {PAGE_SIZE} из {tasks.totalDocs} задач — уточните фильтры
-        </p>
       )}
     </div>
   )

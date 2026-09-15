@@ -9,6 +9,7 @@ import { CompletionButton } from '@/components/lesson/CompletionButton'
 import { LessonNotes } from '@/components/lesson/LessonNotes'
 import { LessonComments } from '@/components/lesson/LessonComments'
 import { CourseSidebar } from '@/components/course/CourseSidebar'
+import { collectAllPages } from '@/lib/paginate'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -59,55 +60,71 @@ export default async function LessonPage({ params }: Props) {
   let completedLessonIds = new Set<string>()
 
   if (course) {
-    const [sectionsResult, lessonsResult] = await Promise.all([
-      payload.find({
-        collection: 'sections',
-        where: {
-          course: { equals: course.id },
-          isPublished: { equals: true },
-        },
-        sort: 'order',
-        limit: 100,
-      }),
-      payload.find({
-        collection: 'lessons',
-        where: {
-          course: { equals: course.id },
-          isPublished: { equals: true },
-        },
-        sort: 'order',
-        limit: 500,
-      }),
+    const [sectionDocs, lessonDocs] = await Promise.all([
+      collectAllPages(
+        ({ page, limit }) =>
+          payload.find({
+            collection: 'sections',
+            where: {
+              course: { equals: course.id },
+              isPublished: { equals: true },
+            },
+            sort: ['order', 'id'],
+            page,
+            limit,
+          }),
+        { label: `секции курса ${course.id}` },
+      ),
+      collectAllPages(
+        ({ page, limit }) =>
+          payload.find({
+            collection: 'lessons',
+            where: {
+              course: { equals: course.id },
+              isPublished: { equals: true },
+            },
+            sort: ['order', 'id'],
+            page,
+            limit,
+          }),
+        { label: `уроки курса ${course.id}` },
+      ),
     ])
 
-    allCourseLessons = lessonsResult.docs
+    allCourseLessons = lessonDocs
 
-    // Загружаем прогресс пользователя — только для уроков этого курса
+    // Прогресс — только по урокам этого курса
     if (user) {
-      const courseLessonIds = lessonsResult.docs.map((l) => String(l.id))
+      const courseLessonIds = lessonDocs.map((l) => String(l.id))
       if (courseLessonIds.length > 0) {
-        const progress = await payload.find({
-          collection: 'user-progress',
-          where: {
-            user: { equals: user.id },
-            lesson: { in: courseLessonIds },
-            isCompleted: { equals: true },
-          },
-          limit: 500,
-        })
+        const progressDocs = await collectAllPages(
+          ({ page, limit }) =>
+            payload.find({
+              collection: 'user-progress',
+              where: {
+                user: { equals: user.id },
+                lesson: { in: courseLessonIds },
+                isCompleted: { equals: true },
+              },
+              select: { lesson: true },
+              depth: 0,
+              sort: 'id',
+              page,
+              limit,
+            }),
+          { label: `прогресс пользователя ${user.id} по курсу ${course.id}` },
+        )
         completedLessonIds = new Set(
-          progress.docs.map((p) =>
-            String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson),
-          ),
+          progressDocs.map((p) => String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson)),
         )
       }
     }
 
     // Группируем уроки по секциям
-    const sectionMap = new Map<string, typeof lessonsResult.docs>()
-    const unsectioned: typeof lessonsResult.docs = []
+    const sectionMap = new Map<string, typeof lessonDocs>()
+    const unsectioned: typeof lessonDocs = []
 
-    for (const l of lessonsResult.docs) {
+    for (const l of lessonDocs) {
       const sectionId = typeof l.section === 'object'
         ? l.section?.id ? String(l.section.id) : null
         : l.section ? String(l.section) : null
@@ -121,7 +138,7 @@ export default async function LessonPage({ params }: Props) {
       }
     }
 
-    sidebarSections = sectionsResult.docs.map((s) => {
+    sidebarSections = sectionDocs.map((s) => {
       const sLessons = sectionMap.get(String(s.id)) ?? []
       return {
         id: String(s.id),

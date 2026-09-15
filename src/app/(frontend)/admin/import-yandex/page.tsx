@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { collectAllPages } from '@/lib/paginate'
 import { ImportForm } from './ImportForm'
 
 export const metadata: Metadata = {
@@ -17,13 +18,20 @@ export default async function ImportYandexPage() {
     redirect('/')
   }
 
-  const courses = await payload.find({
-    collection: 'courses',
-    sort: 'title',
-    limit: 100,
-  })
+  const courseDocs = await collectAllPages(
+    ({ page, limit }) =>
+      payload.find({
+        collection: 'courses',
+        sort: ['title', 'id'],
+        select: { title: true },
+        depth: 0,
+        page,
+        limit,
+      }),
+    { label: 'курсы для импорта' },
+  )
 
-  const courseOptions = courses.docs.map((c) => ({
+  const courseOptions = courseDocs.map((c) => ({
     id: String(c.id),
     title: c.title,
   }))

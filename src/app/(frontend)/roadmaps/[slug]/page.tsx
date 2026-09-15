@@ -3,6 +3,7 @@ import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { groupCoursesByNode, summarizeNode } from '@/lib/roadmap-node-courses'
+import { collectAllPages } from '@/lib/paginate'
 import Link from 'next/link'
 import { ArrowLeft, BookOpen, CheckCircle2, Clock, Lock } from 'lucide-react'
 import { MiroEmbed } from '@/components/lesson/MiroEmbed'
@@ -49,61 +50,78 @@ export default async function RoadmapDetailPage({ params }: Props) {
   if (!roadmap) return notFound()
 
   // Загружаем курсы роадмапа
-  const courses = await payload.find({
-    collection: 'courses',
-    where: {
-      roadmap: { equals: roadmap.id },
-      isPublished: { equals: true },
-    },
-    sort: 'order',
-    limit: 100,
-    depth: 1,
-  })
-
-  const courseIds = courses.docs.map((c) => String(c.id))
-
-  // BATCH: загружаем ВСЕ уроки всех курсов роадмапа ОДНИМ запросом
-  const allLessons = courseIds.length > 0
-    ? await payload.find({
-        collection: 'lessons',
+  const courseDocs = await collectAllPages(
+    ({ page, limit }) =>
+      payload.find({
+        collection: 'courses',
         where: {
-          course: { in: courseIds },
+          roadmap: { equals: roadmap.id },
           isPublished: { equals: true },
         },
-        limit: 2000,
-      })
-    : { docs: [], totalDocs: 0 }
+        sort: ['order', 'id'],
+        depth: 1,
+        page,
+        limit,
+      }),
+    { label: `курсы роадмапа «${roadmap.slug}»` },
+  )
+
+  const courseIds = courseDocs.map((c) => String(c.id))
+
+  const [lessonDocs, progressDocs] = await Promise.all([
+    courseIds.length > 0
+      ? collectAllPages(
+          ({ page, limit }) =>
+            payload.find({
+              collection: 'lessons',
+              where: {
+                course: { in: courseIds },
+                isPublished: { equals: true },
+              },
+              select: { course: true },
+              depth: 0,
+              sort: 'id',
+              page,
+              limit,
+            }),
+          { label: `уроки роадмапа «${roadmap.slug}»` },
+        )
+      : [],
+    user
+      ? collectAllPages(
+          ({ page, limit }) =>
+            payload.find({
+              collection: 'user-progress',
+              where: {
+                user: { equals: user.id },
+                isCompleted: { equals: true },
+              },
+              select: { lesson: true },
+              depth: 0,
+              sort: 'id',
+              page,
+              limit,
+            }),
+          { label: `прогресс пользователя ${user.id}` },
+        )
+      : [],
+  ])
 
   // Группируем уроки по курсу
   const lessonsByCourse = new Map<string, string[]>()
-  for (const lesson of allLessons.docs) {
+  for (const lesson of lessonDocs) {
     const cId = String(typeof lesson.course === 'object' ? lesson.course.id : lesson.course)
     const courseLessons = lessonsByCourse.get(cId) ?? []
     courseLessons.push(String(lesson.id))
     lessonsByCourse.set(cId, courseLessons)
   }
 
-  // Прогресс пользователя (один запрос)
-  let completedLessonIds = new Set<string>()
-
-  if (user) {
-    const progress = await payload.find({
-      collection: 'user-progress',
-      where: {
-        user: { equals: user.id },
-        isCompleted: { equals: true },
-      },
-      limit: 5000,
-    })
-    completedLessonIds = new Set(
-      progress.docs.map((p) =>
-        String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson),
-      ),
-    )
-  }
+  const completedLessonIds = new Set(
+    progressDocs.map((p) => String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson)),
+  )
 
   // Вычисляем прогресс для каждого курса (без доп. запросов!)
-  const coursesWithProgress = courses.docs.map((course) => {
+  const coursesWithProgress = courseDocs.map((course) => {
     const cId = String(course.id)
     const courseLessonIds = lessonsByCourse.get(cId) ?? []
     const totalLessons = courseLessonIds.length
@@ -146,28 +164,35 @@ export default async function RoadmapDetailPage({ params }: Props) {
   const overallPercent = totalLessons > 0 ? Math.round((completedTotal / totalLessons) * 100) : 0
 
   // Загружаем узлы и связи графа роадмапа (параллельно)
-  const [nodesResult, edgesResult] = await Promise.all([
-    payload.find({
-      collection: 'roadmap-nodes',
-      where: { roadmap: { equals: roadmap.id } },
-      sort: 'order',
-      limit: 500,
-      depth: 1,
-    }),
-    payload.find({
-      collection: 'roadmap-edges',
-      where: { roadmap: { equals: roadmap.id } },
-      limit: 500,
-      depth: 1,
-    }),
+  const [nodeDocs, edgeDocs] = await Promise.all([
+    collectAllPages(
+      ({ page, limit }) =>
+        payload.find({
+          collection: 'roadmap-nodes',
+          where: { roadmap: { equals: roadmap.id } },
+          sort: ['order', 'id'],
+          depth: 1,
+          page,
+          limit,
+        }),
+      { label: `узлы роадмапа «${roadmap.slug}»` },
+    ),
+    collectAllPages(
+      ({ page, limit }) =>
+        payload.find({
+          collection: 'roadmap-edges',
+          where: { roadmap: { equals: roadmap.id } },
+          sort: 'id',
+          depth: 1,
+          page,
+          limit,
+        }),
+      { label: `связи роадмапа «${roadmap.slug}»` },
+    ),
   ])
 
   // Трансформация в формат ReactFlow
-  const { graphNodes, graphEdges } = buildGraphData(
-    nodesResult.docs,
-    edgesResult.docs,
-    coursesWithProgress,
-  )
+  const { graphNodes, graphEdges } = buildGraphData(nodeDocs, edgeDocs, coursesWithProgress)
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">

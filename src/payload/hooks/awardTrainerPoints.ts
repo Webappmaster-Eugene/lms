@@ -4,6 +4,7 @@ import type { PointsReason } from '@/lib/points-config'
 import { relationId } from '@/lib/relation-id'
 import { withSpan, logger } from '@/lib/telemetry'
 import { skipHooksReq } from '@/lib/payload-req'
+import { collectAllPages } from '@/lib/paginate'
 
 /**
  * Hook: начисляет баллы при решении задачи тренажёра.
@@ -139,14 +140,22 @@ async function safeCreateTransaction(
 
 async function recalculateTotalPoints(req: PayloadRequest, userId: number) {
   return withSpan('awardTrainerPoints.recalculateTotalPoints', { 'user.id': userId }, async () => {
-    const allTransactions = await req.payload.find({
-      req,
-      collection: 'points-transactions',
-      where: { user: { equals: userId } },
-      limit: 10000,
-    })
+    const transactions = await collectAllPages(
+      ({ page, limit }) =>
+        req.payload.find({
+          req,
+          collection: 'points-transactions',
+          where: { user: { equals: userId } },
+          select: { amount: true },
+          depth: 0,
+          sort: 'id',
+          page,
+          limit,
+        }),
+      { label: `транзакции баллов пользователя ${userId}` },
+    )
 
-    const totalPoints = allTransactions.docs.reduce((sum, tx) => sum + (tx.amount ?? 0), 0)
+    const totalPoints = transactions.reduce((sum, tx) => sum + (tx.amount ?? 0), 0)
 
     await req.payload.update({
       req: skipHooksReq(req),

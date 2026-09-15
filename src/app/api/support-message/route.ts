@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { logger } from '@/lib/telemetry'
+import { collectAllPages } from '@/lib/paginate'
 
 type SupportMessageRequest = {
   subject: string
@@ -65,17 +66,24 @@ export async function POST(request: Request) {
     )
   }
 
-  // Find all admin users
-  const admins = await payload.find({
-    collection: 'users',
-    where: { role: { equals: 'admin' } },
-    limit: 50,
-  })
+  const admins = await collectAllPages(
+    ({ page, limit }) =>
+      payload.find({
+        collection: 'users',
+        where: { role: { equals: 'admin' } },
+        select: {},
+        depth: 0,
+        sort: 'id',
+        page,
+        limit,
+      }),
+    { label: 'администраторы' },
+  )
 
   const userName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email
 
   // Create notification for each admin
-  for (const admin of admins.docs) {
+  for (const admin of admins) {
     try {
       await payload.create({
         collection: 'notifications',
