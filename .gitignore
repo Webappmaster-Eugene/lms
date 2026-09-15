@@ -12,6 +12,9 @@ media/
 .env
 .env.local
 
+# Отчёт покрытия
+coverage/
+
 # IDE
 .idea/
 .vscode/
