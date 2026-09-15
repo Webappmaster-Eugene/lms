@@ -1,21 +1,16 @@
 /** Единая точка правды по внешним адресам и навигации.
  *  Раньше LMS_URL был продублирован в четырёх компонентах. */
 
-/** Адрес LMS. Должен совпадать с NEXT_PUBLIC_SERVER_URL платформы —
- *  оттуда же берутся ссылки внутри писем ученикам. */
+/** Держать в синхроне с NEXT_PUBLIC_SERVER_URL платформы: оттуда же ссылки в письмах. */
 export const LMS_URL = 'https://learn.mentorcareer.ru'
 
-/** Канонический адрес лендинга: canonical, og:url, JSON-LD.
- *  astro.config.mjs импортирует эту же константу как `site`. */
+/** canonical, og:url, JSON-LD; astro.config.mjs импортирует её как `site`. */
 export const SITE_URL = 'https://promo.mentorcareer.ru'
 
 export const AUTHOR_URL = 'https://nadtocheev.ru'
 export const TELEGRAM_URL = 'https://t.me/eugene_nadtocheev'
 export const CHAT_URL = 'https://t.me/mentorcareer_chat'
 
-/** Почта поддержки на домене школы. Личный ящик на стороннем хостинге
- *  здесь не годится: адрес публичный и должен жить на том же домене,
- *  с которого уходят письма платформы. */
 export const EMAIL = 'support@mentorcareer.ru'
 
 export interface NavItem {

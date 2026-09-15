@@ -125,8 +125,7 @@ export default buildConfig({
             role: 'admin',
             isActive: true,
           },
-          // Пароль задан через ADMIN_PASSWORD — приглашение «задайте пароль»
-          // этому пользователю не нужно.
+          // Пароль уже задан через ADMIN_PASSWORD — приглашение не нужно.
           context: { skipHooks: true },
         })
         payload.logger.info(`Initial admin user created: ${email}`)

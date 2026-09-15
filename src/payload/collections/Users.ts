@@ -10,19 +10,11 @@ type ForgotPasswordArgs = {
   user?: { firstName?: string | null }
 }
 
-/**
- * Собирает письмо восстановления пароля.
- *
- * Без этого Payload отправляет дефолтное англоязычное письмо со ссылкой на
- * `{serverURL}/admin/reset/{token}` — то есть в админку, а не на страницу
- * `/reset-password`, которая есть у нас во фронтенде.
- */
+/** Дефолт Payload ведёт на `{serverURL}/admin/reset/{token}` — в админку, а не на нашу `/reset-password`. */
 function buildResetPasswordEmail(args: ForgotPasswordArgs | undefined) {
   const token = args?.token
 
   if (!token) {
-    // Отправить письмо с нерабочей ссылкой хуже, чем упасть: студент
-    // потратит попытку и не поймёт, почему восстановление не работает.
     throw new Error('Cannot build reset-password email: Payload did not provide a token')
   }
 
@@ -34,10 +26,7 @@ export const Users: CollectionConfig = {
   auth: {
     tokenExpiration: 60 * 60 * 24 * 7, // 7 дней
     forgotPassword: {
-      // `expiration` здесь намеренно не задан: значение из конфига коллекции
-      // имеет приоритет над поштучным и перекрыло бы 7-дневный срок
-      // токена в письме-приглашении (см. sendInviteEmail).
-      // Токены восстановления живут стандартный час.
+      // `expiration` не задаём намеренно — см. INVITE_TOKEN_TTL_MS в sendNotification.ts.
       generateEmailSubject: (args) => buildResetPasswordEmail(args).subject,
       generateEmailHTML: (args) => buildResetPasswordEmail(args).html,
     },

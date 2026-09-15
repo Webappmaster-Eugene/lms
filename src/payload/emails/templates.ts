@@ -3,10 +3,7 @@ const BASE_URL = (process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000')
 const BRAND_NAME = 'MentorCareer LMS'
 const BRAND_TAGLINE = 'MentorCareer — платформа обучения'
 
-/**
- * Готовое письмо. `text` обязателен: письмо без текстовой части
- * получает заметный штраф у спам-фильтров Mail.ru и Gmail.
- */
+/** `text` обязателен: письмо без текстовой части штрафуется спам-фильтрами Mail.ru и Gmail. */
 export type EmailContent = {
   subject: string
   html: string
@@ -21,11 +18,7 @@ const HTML_ESCAPES: Readonly<Record<string, string>> = {
   "'": '&#39;',
 }
 
-/**
- * Экранирует значение перед вставкой в HTML-письмо.
- * Имена, названия курсов и достижений приходят из пользовательского ввода,
- * поэтому подставлять их в разметку сырыми нельзя.
- */
+/** Имена и названия курсов приходят из пользовательского ввода. */
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char] ?? char)
 }
@@ -84,16 +77,11 @@ function greetingText(firstName: string): string {
   return name ? `Привет, ${name}!` : 'Здравствуйте!'
 }
 
-/** Ссылка на страницу установки/сброса пароля. */
 export function passwordSetupUrl(token: string): string {
   return `${BASE_URL}/reset-password?token=${encodeURIComponent(token)}`
 }
 
-/**
- * Приглашение в LMS. Заменяет прежнее welcome-письмо: аккаунты заводит
- * администратор, поэтому студенту нужен способ задать пароль, а не просто
- * ссылка на форму входа. Пароль в письме не передаётся намеренно.
- */
+/** Пароль в письме не передаётся намеренно — только одноразовый токен. */
 export function inviteEmail(firstName: string, email: string, token: string): EmailContent {
   const url = passwordSetupUrl(token)
 
@@ -128,10 +116,6 @@ ${url}
   }
 }
 
-/**
- * Восстановление пароля. Подставляется в `Users.auth.forgotPassword`,
- * чтобы Payload не слал дефолтное письмо со ссылкой на админку.
- */
 export function resetPasswordEmail(firstName: string, token: string): EmailContent {
   const url = passwordSetupUrl(token)
 
