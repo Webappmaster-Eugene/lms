@@ -5,31 +5,27 @@ import { Bell } from 'lucide-react'
 import Link from 'next/link'
 import { useAsyncData } from '@/hooks/use-async-data'
 import { formatDate } from '@/lib/utils'
-
-type NotificationDoc = {
-  id: string
-  title: string
-  message: string
-  type: string
-  link?: string | null
-  isRead: boolean
-  createdAt: string
-}
+import { requestNotifications, type NotificationDoc } from './notifications-api'
 
 const POLL_INTERVAL_MS = 30_000
 
 export function NotificationsBell() {
   const [open, setOpen] = useState(false)
+  const [sessionExpired, setSessionExpired] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const loadNotifications = useCallback(
     async (signal: AbortSignal): Promise<NotificationDoc[]> => {
-      const res = await fetch('/api/notifications?sort=-createdAt&limit=10&depth=0', {
-        credentials: 'include',
-        signal,
-      })
-      const data = (await res.json()) as { docs?: NotificationDoc[] }
-      return data.docs ?? []
+      const result = await requestNotifications(signal)
+
+      // Сессия истекла при открытой вкладке. Сама она не восстановится, а опрос
+      // продолжает раз в 30 секунд добавлять 403 в лог сервера.
+      if (result.status === 'unauthorized') {
+        setSessionExpired(true)
+        return []
+      }
+
+      return result.docs
     },
     [],
   )
@@ -43,9 +39,11 @@ export function NotificationsBell() {
   const unreadCount = notifications.filter((n) => !n.isRead).length
 
   useEffect(() => {
+    if (sessionExpired) return
+
     const interval = setInterval(reload, POLL_INTERVAL_MS)
     return () => clearInterval(interval)
-  }, [reload])
+  }, [reload, sessionExpired])
 
   // Закрытие по клику вне дропдауна
   useEffect(() => {

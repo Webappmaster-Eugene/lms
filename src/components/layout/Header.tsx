@@ -9,6 +9,7 @@ export async function Header() {
   const payload = await getPayload()
   const headersList = await headers()
 
+  let isAuthenticated = false
   let userName = ''
   let totalPoints = 0
   let streakDays = 0
@@ -16,6 +17,7 @@ export async function Header() {
   try {
     const { user } = await payload.auth({ headers: headersList })
     if (user) {
+      isAuthenticated = true
       userName = `${user.firstName} ${user.lastName}`
       totalPoints = user.totalPoints ?? 0
 
@@ -66,8 +68,9 @@ export async function Header() {
           </div>
         )}
 
-        {/* Notifications */}
-        <NotificationsBell />
+        {/* Notifications — только для вошедших: колокольчик опрашивает закрытую
+            коллекцию по таймеру, и без сессии это бесконечные 403 */}
+        {isAuthenticated && <NotificationsBell />}
 
         {/* User name */}
         {userName && (
