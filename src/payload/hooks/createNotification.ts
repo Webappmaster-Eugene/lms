@@ -35,6 +35,7 @@ export const createPointsNotification: CollectionAfterChangeHook = async ({
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (req.payload as any).create({
+        req,
         collection: 'notifications',
         data: {
           user: userId,
@@ -70,12 +71,14 @@ export const createAchievementNotification: CollectionAfterChangeHook = async ({
         typeof doc.achievement === 'object' ? doc.achievement.id : doc.achievement,
       )
       const achievement = await req.payload.findByID({
+        req,
         collection: 'achievements',
         id: achievementId,
       })
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (req.payload as any).create({
+        req,
         collection: 'notifications',
         data: {
           user: userId,

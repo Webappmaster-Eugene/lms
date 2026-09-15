@@ -27,17 +27,18 @@ export const createCertificate: CollectionAfterChangeHook = async ({
       let type: 'course' | 'roadmap' = 'course'
 
       if (reason === 'course_completed') {
-        const course = await req.payload.findByID({ collection: 'courses', id: entityId })
+        const course = await req.payload.findByID({ req, collection: 'courses', id: entityId })
         title = course.title
         type = 'course'
       } else {
-        const roadmap = await req.payload.findByID({ collection: 'roadmaps', id: entityId })
+        const roadmap = await req.payload.findByID({ req, collection: 'roadmaps', id: entityId })
         title = roadmap.title
         type = 'roadmap'
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const existing = await (req.payload as any).find({
+        req,
         collection: 'certificates',
         where: {
           user: { equals: userId },
@@ -53,6 +54,7 @@ export const createCertificate: CollectionAfterChangeHook = async ({
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (req.payload as any).create({
+        req,
         collection: 'certificates',
         data: {
           user: userId,

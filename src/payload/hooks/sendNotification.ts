@@ -8,24 +8,15 @@ import {
 import { withSpan, logger } from '@/lib/telemetry'
 
 /**
- * Срок жизни токена в письме-приглашении — 7 дней.
- *
- * Передаётся поштучно в `payload.forgotPassword`, а НЕ в `Users.auth.forgotPassword.expiration`:
- * Payload отдаёт приоритет значению из конфига коллекции
- * (`collectionConfig.auth?.forgotPassword?.expiration ?? expiration ?? 3600000`),
- * поэтому глобальная настройка перекрыла бы это значение и заодно растянула бы
- * срок жизни обычных токенов восстановления пароля. Оставляем конфиг коллекции
- * пустым: приглашение живёт 7 дней, восстановление пароля — стандартный час.
+ * Передаётся поштучно в `forgotPassword`, а не в `Users.auth.forgotPassword.expiration`:
+ * Payload читает их как `collectionConfig...expiration ?? expiration ?? 3600000`, то есть
+ * конфиг коллекции перекрыл бы это значение и заодно растянул срок обычных сбросов пароля.
  */
 const INVITE_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
- * Hook для Users: при создании аккаунта отправляет приглашение со ссылкой
- * на установку пароля.
- *
- * Аккаунты заводит администратор (`Users.access.create = isAdmin`), поэтому
- * студент не знает своего пароля. Пароль в письме не передаётся — вместо этого
- * выпускается одноразовый токен, который ведёт на `/reset-password`.
+ * Аккаунты заводит администратор, поэтому студент не знает пароля.
+ * В письме его не передаём — выпускаем одноразовый токен на `/reset-password`.
  */
 export const sendInviteEmail: CollectionAfterChangeHook = async ({ doc, operation, req }) => {
   if (operation !== 'create') return doc
@@ -33,9 +24,8 @@ export const sendInviteEmail: CollectionAfterChangeHook = async ({ doc, operatio
 
   return withSpan('hook.sendInviteEmail', { 'user.email': doc.email }, async () => {
     try {
-      // `req` передаём намеренно: токен должен записаться в той же транзакции,
-      // что и сам пользователь, иначе `forgotPassword` не увидит ещё не
-      // закоммиченную строку и упадёт с "user not found".
+      // Без `req` токен пишется вне транзакции создания пользователя,
+      // и `forgotPassword` не видит ещё не закоммиченную строку.
       const token = await req.payload.forgotPassword({
         collection: 'users',
         data: { email: doc.email },
@@ -76,10 +66,11 @@ export const sendCompletionEmail: CollectionAfterChangeHook = async ({
 
   return withSpan('hook.sendCompletionEmail', { 'user.id': userId, 'points.reason': reason }, async () => {
     try {
-      const user = await req.payload.findByID({ collection: 'users', id: userId })
+      const user = await req.payload.findByID({ req, collection: 'users', id: userId })
 
       if (reason === 'course_completed' && doc.relatedEntity) {
         const course = await req.payload.findByID({
+          req,
           collection: 'courses',
           id: String(doc.relatedEntity),
         })
@@ -93,6 +84,7 @@ export const sendCompletionEmail: CollectionAfterChangeHook = async ({
 
       if (reason === 'roadmap_completed' && doc.relatedEntity) {
         const roadmap = await req.payload.findByID({
+          req,
           collection: 'roadmaps',
           id: String(doc.relatedEntity),
         })
@@ -131,8 +123,8 @@ export const sendAchievementEmail: CollectionAfterChangeHook = async ({
       )
 
       const [user, achievement] = await Promise.all([
-        req.payload.findByID({ collection: 'users', id: userId }),
-        req.payload.findByID({ collection: 'achievements', id: achievementId }),
+        req.payload.findByID({ req, collection: 'users', id: userId }),
+        req.payload.findByID({ req, collection: 'achievements', id: achievementId }),
       ])
 
       const { subject, html, text } = achievementUnlockedEmail(
