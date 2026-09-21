@@ -26,7 +26,16 @@
     "test:smoke": "vitest run tests/smoke",
     "test:watch": "vitest",
     "smoke": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
-    "build:assets": "node scripts/copy-monaco.mjs && node scripts/build-harness.mjs"
+    "build:assets": "node scripts/copy-monaco.mjs && node scripts/build-harness.mjs",
+    "codex": "node scripts/codex/harness.mjs launch",
+    "codex:setup": "node scripts/codex/setup.mjs",
+    "codex:sync": "node scripts/codex/harness.mjs sync",
+    "codex:doctor": "node scripts/codex/harness.mjs doctor",
+    "codex:verify": "node scripts/codex/harness.mjs verify",
+    "codex:test": "node --test scripts/codex/harness.test.mjs",
+    "codex:mcp-check": "node scripts/codex/mcp.mjs probe",
+    "codex:browser-check": "node scripts/codex/mcp.mjs browser-check",
+    "codex:native-check": "node scripts/codex/native-check.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "4.7.0",
@@ -70,6 +79,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@next/eslint-plugin-next": "15.3.9",
     "@tailwindcss/postcss": "4.3.3",
     "@tailwindcss/typography": "0.5.20",

@@ -37,3 +37,8 @@ media
 # Documentation & misc
 *.md
 LICENSE
+
+# Локальная инфраструктура агентов
+.codex
+.agents
+.claude

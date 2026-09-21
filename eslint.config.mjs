@@ -117,9 +117,9 @@ export default tseslint.config(
   },
 
   {
-    // Скрипты дочернего процесса-песочницы: запускаются напрямую через node,
-    // мимо сборки Next.
-    files: ['src/server/trainer/*.mjs', 'scripts/*.mjs'],
+    // Скрипты дочернего процесса-песочницы и инфраструктуры агентов
+    // (scripts/codex): запускаются напрямую через node, мимо сборки Next.
+    files: ['src/server/trainer/*.mjs', 'scripts/**/*.mjs'],
     languageOptions: {
       sourceType: 'module',
       globals: { ...globals.node },

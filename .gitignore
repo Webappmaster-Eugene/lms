@@ -42,3 +42,8 @@ tsconfig.tsbuildinfo
 # Ассеты Monaco: копируются из node_modules скриптом scripts/copy-monaco.mjs
 # (postinstall / prebuild), в git им не место — 13 МБ сгенерированного кода
 public/monaco/
+
+# Локальная инфраструктура агентов: пути и MCP конкретной машины, логи проверок
+.codex/state/
+.codex/config.toml
+.codex/mcp.local.json
