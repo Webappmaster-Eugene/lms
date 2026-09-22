@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 
 /**
  * Сборка SMTP-транспорта из окружения. Ключевое — requireTLS на submission-порту:
@@ -38,6 +38,17 @@ function configureSmtp(overrides: Partial<Record<(typeof SMTP_ENV)[number], stri
   }
 }
 
+/**
+ * Об одной и той же поломке модуль сообщает один раз за процесс, поэтому
+ * тесту деградации нужен свой экземпляр модуля, а не общий на файл.
+ */
+async function freshBuildEmailAdapter(): Promise<typeof buildEmailAdapter> {
+  vi.resetModules()
+  const reloaded = await import('@/payload/email/transport')
+
+  return reloaded.buildEmailAdapter
+}
+
 function transportConfig(): Record<string, unknown> {
   return createTransport.mock.calls[0][0] as Record<string, unknown>
 }
@@ -71,22 +82,63 @@ describe('сборка SMTP-транспорта', () => {
   })
 
   describe('почта настроена наполовину', () => {
-    it.each(['SMTP_USER', 'SMTP_PASS'])('без %s — падаем на старте, а не молчим', (missing) => {
-      configureSmtp({ [missing]: '' } as Record<string, string>)
+    let error: MockInstance<typeof console.error>
 
-      expect(() => buildEmailAdapter()).toThrow(new RegExp(missing))
+    beforeEach(() => {
+      error = vi.spyOn(console, 'error').mockImplementation(() => {})
     })
 
-    it('в сообщении сказано, что делать', () => {
+    afterEach(() => {
+      error.mockRestore()
+    })
+
+    it.each(['SMTP_USER', 'SMTP_PASS'] as const)(
+      'без %s почта выключается, а приложение продолжает работать',
+      async (missing) => {
+        configureSmtp({ [missing]: '' })
+        const build = await freshBuildEmailAdapter()
+
+        expect(build()).toBeUndefined()
+        expect(createTransport).not.toHaveBeenCalled()
+        expect(error).toHaveBeenCalledWith(expect.stringContaining(missing))
+      },
+    )
+
+    it('исключение наружу не выходит: иначе отказывает весь сайт, а не почта', async () => {
       configureSmtp({ SMTP_PASS: '' })
+      const build = await freshBuildEmailAdapter()
 
-      expect(() => buildEmailAdapter()).toThrow(/Set every SMTP_\* variable, or clear SMTP_HOST/)
+      expect(() => build()).not.toThrow()
     })
 
-    it.each(['0', '65536', 'не число', '-1', '12.5'])('порт %j отвергается', (port) => {
-      configureSmtp({ SMTP_PORT: port })
+    it('в логе сказано и что сломано, и чем это грозит', async () => {
+      configureSmtp({ SMTP_PASS: '' })
+      const build = await freshBuildEmailAdapter()
+      build()
 
-      expect(() => buildEmailAdapter()).toThrow(/Invalid SMTP_PORT/)
+      const [message] = error.mock.calls[0] as [string]
+      expect(message).toMatch(/Outgoing email is DISABLED/)
+      expect(message).toMatch(/will not be delivered/)
+      expect(message).toMatch(/Set every SMTP_\* variable, or clear SMTP_HOST/)
+    })
+
+    it.each(['0', '65536', 'не число', '-1', '12.5'])('порт %j отвергается', async (port) => {
+      configureSmtp({ SMTP_PORT: port })
+      const build = await freshBuildEmailAdapter()
+
+      expect(build()).toBeUndefined()
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('Invalid SMTP_PORT'))
+    })
+
+    it('одна и та же поломка не пишется в лог на каждый запрос', async () => {
+      configureSmtp({ SMTP_PASS: '' })
+      const build = await freshBuildEmailAdapter()
+
+      build()
+      build()
+      build()
+
+      expect(error).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -165,6 +217,19 @@ describe('сборка SMTP-транспорта', () => {
       buildEmailAdapter()
 
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('differs from SMTP_USER'))
+      warn.mockRestore()
+    })
+
+    it('предупреждение о несовпадении пишется один раз, а не на каждый запрос', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      configureSmtp({ EMAIL_FROM_ADDRESS: 'hello@other.ru' })
+      const build = await freshBuildEmailAdapter()
+
+      build()
+      build()
+      build()
+
+      expect(warn).toHaveBeenCalledTimes(1)
       warn.mockRestore()
     })
 
