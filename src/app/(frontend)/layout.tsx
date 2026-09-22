@@ -6,6 +6,7 @@ import { SidebarProvider } from '@/components/layout/SidebarContext'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
 import { BottomNav } from '@/components/layout/BottomNav'
+import { Footer } from '@/components/layout/Footer'
 import { ToastProvider } from '@/components/ui/Toast'
 
 const inter = Inter({
@@ -33,7 +34,8 @@ export default function FrontendLayout({ children }: { children: React.ReactNode
                 <Sidebar />
                 <div className="flex min-w-0 flex-1 flex-col lg:ml-64">
                   <Header />
-                  <main className="flex-1 overflow-x-hidden px-4 py-6 pb-24 lg:px-8 lg:pb-6">{children}</main>
+                  <main className="flex-1 overflow-x-hidden px-4 py-6 lg:px-8">{children}</main>
+                  <Footer />
                 </div>
                 <BottomNav />
               </div>

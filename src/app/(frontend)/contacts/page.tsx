@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { getPayload } from '@/lib/payload'
+import { readSiteContacts } from '@/lib/site-settings'
 import { MessageCircle, Globe, Mail, Users, ExternalLink } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -7,15 +7,7 @@ export const metadata: Metadata = {
 }
 
 export default async function ContactsPage() {
-  const payload = await getPayload()
-
-  let contacts: { telegramChannel?: string; telegramGroup?: string; website?: string; email?: string } = {}
-  try {
-    const settings = await payload.findGlobal({ slug: 'site-settings' })
-    contacts = (settings.contacts as typeof contacts) ?? {}
-  } catch {
-    // fallback
-  }
+  const contacts = await readSiteContacts()
 
   const cards = [
     {

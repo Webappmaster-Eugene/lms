@@ -1,38 +1,89 @@
 ---
-import { LMS_URL, AUTHOR_URL, TELEGRAM_URL } from '../config'
+/** Подвал. Не служебная строка, а карта сайта: навигация, связь и авторство —
+ *  на лендинге это последнее, что видит тот, кто не дошёл до блока контактов. */
+import { LMS_URL, AUTHOR_URL, TELEGRAM_URL, CHAT_URL, EMAIL, NAV_ITEMS } from '../config'
 
 const YEAR = new Date().getFullYear()
 
-const LINKS = [
-  { href: LMS_URL, label: 'Платформа', external: false },
-  { href: AUTHOR_URL, label: 'Сайт автора', external: true },
-  { href: TELEGRAM_URL, label: 'Telegram', external: true },
+const PLATFORM_LINKS = [
+  { href: LMS_URL, label: 'войти в платформу', external: false },
+  { href: `${LMS_URL}/trainer`, label: 'тренажёр кода', external: false },
+  { href: `${LMS_URL}/courses`, label: 'курсы', external: false },
+] as const
+
+const CONTACT_LINKS = [
+  { href: TELEGRAM_URL, label: 'telegram', external: true },
+  { href: CHAT_URL, label: 'чат учеников', external: true },
+  { href: `mailto:${EMAIL}`, label: EMAIL, external: false },
+  { href: AUTHOR_URL, label: 'nadtocheev.ru', external: true },
+] as const
+
+const COLUMNS = [
+  { title: 'разделы', span: 'lg:col-span-3', links: NAV_ITEMS.map((item) => ({ ...item, external: false })) },
+  { title: 'платформа', span: 'lg:col-span-2', links: PLATFORM_LINKS },
+  { title: 'связь', span: 'lg:col-span-3', links: CONTACT_LINKS },
 ] as const
 ---
 
-<footer class="border-t border-line py-8">
-  <div class="shell flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
-    <div class="flex items-center gap-2.5">
-      <span
-        aria-hidden="true"
-        class="flex h-5 w-5 items-center justify-center border border-line font-mono text-[0.55rem] text-ink-faint">&gt;_</span
-      >
-      <span class="font-mono text-xs text-ink-faint">MentorCareer © {YEAR}</span>
+<footer class="border-t border-line py-12">
+  <div class="shell grid gap-10 sm:grid-cols-2 lg:grid-cols-12 lg:gap-8">
+    <div class="lg:col-span-4 min-w-0">
+      <div class="flex items-center gap-2.5">
+        <span
+          aria-hidden="true"
+          class="flex h-5 w-5 items-center justify-center border border-line font-mono text-[0.55rem] text-ink-faint"
+          >&gt;_</span
+        >
+        <span class="font-mono text-xs text-ink">MentorCareer</span>
+      </div>
+
+      <p class="mt-4 max-w-xs text-sm leading-relaxed text-ink-dim">
+        Индивидуальное наставничество в разработке: программа под цель, разбор кода и
+        платформа с тренажёром, роадмапами и сертификатами.
+      </p>
+
+      <p class="mt-4 font-mono text-xs text-ink-faint">
+        Автор и ментор — <a
+          href={AUTHOR_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-ink-dim transition-colors hover:text-accent">Евгений Надточеев</a
+        >
+      </p>
     </div>
 
-    <nav class="flex flex-wrap items-center gap-x-6 gap-y-2" aria-label="Служебная навигация">
-      {
-        LINKS.map((link) => (
-          <a
-            href={link.href}
-            target={link.external ? '_blank' : undefined}
-            rel={link.external ? 'noopener noreferrer' : undefined}
-            class="font-mono text-xs text-ink-faint transition-colors hover:text-accent"
-          >
-            {link.label}
-          </a>
-        ))
-      }
-    </nav>
+    {
+      COLUMNS.map((column) => (
+        <nav class:list={['min-w-0', column.span]} aria-label={column.title}>
+          <p class="t-mono mb-3">{column.title}</p>
+          <ul class="space-y-2">
+            {column.links.map((link) => (
+              <li>
+                <a
+                  href={link.href}
+                  target={link.external ? '_blank' : undefined}
+                  rel={link.external ? 'noopener noreferrer' : undefined}
+                  class="font-mono text-xs text-ink-faint transition-colors hover:text-accent"
+                >
+                  {link.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ))
+    }
+  </div>
+
+  <div class="shell mt-10 flex flex-col gap-2 border-t border-line-soft pt-6 sm:flex-row sm:items-center sm:justify-between">
+    <span class="font-mono text-xs text-ink-faint">MentorCareer © {YEAR}</span>
+    <span class="font-mono text-xs text-ink-faint">
+      Сделано <a
+        href={AUTHOR_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="transition-colors hover:text-accent">nadtocheev.ru</a
+      >
+    </span>
   </div>
 </footer>
