@@ -50,5 +50,5 @@ export const MENTOR_PHOTO: string | null = '/mentor.webp'
 /** Коды подтверждения прав из Яндекс Вебмастера и Google Search Console
  *  (атрибут content их meta-тега). Не секрет: тег публичный по определению.
  *  null — тег не выводится; при подтверждении через DNS остаются null. */
-export const YANDEX_VERIFICATION: string | null = null
+export const YANDEX_VERIFICATION: string | null = '5310c7536e000bd4'
 export const GOOGLE_VERIFICATION: string | null = null
