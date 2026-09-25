@@ -1,5 +1,7 @@
-# Dependencies
+# Dependencies (в том числе вложенные: landing/node_modules иначе попадает
+# в контекст и маскирует ошибки, которые проявятся только на сервере)
 node_modules
+**/node_modules
 .pnpm-store
 
 # Build artifacts

@@ -142,6 +142,19 @@ describe('контекст сборки', () => {
     expect(DOCKERIGNORE).toMatch(/^\.env$/m)
     expect(DOCKERIGNORE).toMatch(/^\.env\.\*$/m)
   })
+
+  it('вложенные node_modules не попадают в контекст', () => {
+    // Иначе локальный landing/node_modules маскирует ошибки, которые на сервере
+    // (чистый клон) валят сборку.
+    expect(DOCKERIGNORE).toMatch(/^\*\*\/node_modules$/m)
+  })
+
+  it('проверка типов приложения не заходит в лендинг', () => {
+    // У лендинга свои зависимости (astro): в образе приложения их нет, и next build
+    // падает на первом же импорте из astro.
+    const tsconfig = JSON.parse(read('../../tsconfig.json')) as { exclude?: string[] }
+    expect(tsconfig.exclude).toContain('landing')
+  })
 })
 
 describe('режим сборки Next', () => {
