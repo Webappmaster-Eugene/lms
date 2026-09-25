@@ -1,19 +1,135 @@
 ---
 import '../styles/global.css'
-import { SITE_URL, AUTHOR_URL, TELEGRAM_URL } from '../config'
+import {
+  SITE_URL,
+  AUTHOR_URL,
+  TELEGRAM_URL,
+  CHAT_URL,
+  EMAIL,
+  YANDEX_VERIFICATION,
+  GOOGLE_VERIFICATION,
+} from '../config'
+import { FAQ } from '../data/faq'
 
 interface Props {
   title?: string
   description?: string
+  /** Служебные страницы (404) не должны попадать в индекс. */
+  noindex?: boolean
 }
 
+// Title до ~65 символов, description до ~160: длиннее и Google, и Яндекс
+// обрезают сниппет, а ключевые слова должны остаться в видимой части.
 const {
-  title = 'MentorCareer — Обучение Frontend и Backend с менторством | Трудоустройство в IT',
-  description = 'Персональное менторство по Frontend (React, TypeScript, Next.js) и Backend (Node.js, NestJS, SQL). Трудоустройство за 6-7 месяцев. LMS-платформа с тренажёром кода, геймификацией и сертификатами. Москва.',
+  title = 'Менторство по Frontend и Backend с трудоустройством | MentorCareer',
+  description = 'Индивидуальное менторство по Frontend (React, TypeScript, Next.js) и Backend (Node.js, NestJS): от нуля до оффера за 6–7 месяцев, оплата после трудоустройства.',
+  noindex = false,
 } = Astro.props
 
 const canonicalUrl = new URL(Astro.url.pathname, SITE_URL).href
 const ogImage = new URL('/og.png', SITE_URL).href
+const mentorImage = new URL('/mentor.jpg', SITE_URL).href
+const buildDate = new Date().toISOString().slice(0, 10)
+
+const ORG_ID = `${SITE_URL}/#organization`
+const PERSON_ID = `${SITE_URL}/#mentor`
+const WEBSITE_ID = `${SITE_URL}/#website`
+
+// Связанный граф с @id вместо разрозненных сущностей: так поисковики и
+// нейросети склеивают организацию, ментора и курсы в одну карточку знаний.
+const course = (name: string, description: string, teaches: string[]) => ({
+  '@type': 'Course',
+  name,
+  description,
+  teaches,
+  inLanguage: 'ru',
+  educationalLevel: 'Beginner',
+  provider: { '@id': ORG_ID },
+  hasCourseInstance: {
+    '@type': 'CourseInstance',
+    courseMode: 'online',
+    instructor: { '@id': PERSON_ID },
+  },
+})
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'EducationalOrganization',
+      '@id': ORG_ID,
+      name: 'MentorCareer',
+      url: SITE_URL,
+      description,
+      email: EMAIL,
+      founder: { '@id': PERSON_ID },
+      address: { '@type': 'PostalAddress', addressLocality: 'Москва', addressCountry: 'RU' },
+      areaServed: { '@type': 'Country', name: 'Россия' },
+      contactPoint: {
+        '@type': 'ContactPoint',
+        contactType: 'customer support',
+        email: EMAIL,
+        url: TELEGRAM_URL,
+        availableLanguage: 'ru',
+      },
+      sameAs: [CHAT_URL, AUTHOR_URL],
+    },
+    {
+      '@type': 'Person',
+      '@id': PERSON_ID,
+      name: 'Евгений Надточеев',
+      jobTitle: 'Fullstack-разработчик, ментор',
+      url: AUTHOR_URL,
+      image: mentorImage,
+      worksFor: { '@id': ORG_ID },
+      knowsAbout: [
+        'React', 'TypeScript', 'Next.js', 'Node.js', 'NestJS', 'Go',
+        'PostgreSQL', 'Redis', 'Kafka', 'Kubernetes', 'Docker',
+      ],
+      sameAs: [AUTHOR_URL, TELEGRAM_URL],
+    },
+    {
+      '@type': 'WebSite',
+      '@id': WEBSITE_ID,
+      name: 'MentorCareer',
+      url: SITE_URL,
+      inLanguage: 'ru',
+      publisher: { '@id': ORG_ID },
+    },
+    {
+      '@type': 'WebPage',
+      '@id': `${canonicalUrl}#webpage`,
+      url: canonicalUrl,
+      name: title,
+      description,
+      inLanguage: 'ru',
+      isPartOf: { '@id': WEBSITE_ID },
+      about: { '@id': ORG_ID },
+      primaryImageOfPage: { '@type': 'ImageObject', url: ogImage, width: 1200, height: 630 },
+      dateModified: buildDate,
+    },
+    course(
+      'Frontend-разработчик на React',
+      'Менторский трек Frontend-разработки: React, TypeScript, Next.js — от основ до production-уровня. Компоненты, хуки, SSR, тестирование.',
+      ['React', 'TypeScript', 'Next.js', 'Tailwind CSS', 'Jest'],
+    ),
+    course(
+      'Backend-разработчик на Node.js',
+      'Менторский трек Backend-разработки: Node.js, NestJS, PostgreSQL — серверная архитектура, API, базы данных, деплой и мониторинг.',
+      ['Node.js', 'NestJS', 'PostgreSQL', 'Docker', 'Kubernetes'],
+    ),
+    {
+      '@type': 'FAQPage',
+      '@id': `${canonicalUrl}#faq`,
+      isPartOf: { '@id': `${canonicalUrl}#webpage` },
+      mainEntity: FAQ.map((item) => ({
+        '@type': 'Question',
+        name: item.question,
+        acceptedAnswer: { '@type': 'Answer', text: item.answer },
+      })),
+    },
+  ],
+}
 ---
 
 <!doctype html>
@@ -21,22 +137,24 @@ const ogImage = new URL('/og.png', SITE_URL).href
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
     <meta name="description" content={description} />
+    <meta
+      name="robots"
+      content={noindex ? 'noindex, follow' : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'}
+    />
+    <meta name="author" content="Евгений Надточеев" />
     <meta name="theme-color" content="#0b0b0c" />
+    {YANDEX_VERIFICATION && <meta name="yandex-verification" content={YANDEX_VERIFICATION} />}
+    {GOOGLE_VERIFICATION && <meta name="google-site-verification" content={GOOGLE_VERIFICATION} />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="canonical" href={canonicalUrl} />
+    {!noindex && <link rel="canonical" href={canonicalUrl} />}
 
     <!-- Шрифты самохостятся: ни одного запроса к внешним доменам -->
     <link rel="preload" href="/fonts/golos-text-400-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/golos-text-800-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
 
-    <!-- GEO meta -->
-    <meta name="geo.region" content="RU-MOW" />
-    <meta name="geo.placename" content="Moscow" />
-    <meta name="geo.position" content="55.7558;37.6173" />
-    <meta name="ICBM" content="55.7558, 37.6173" />
-
-    <!-- Open Graph -->
+    <!-- Open Graph: превью в Telegram, VK и сниппетах Яндекса -->
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
@@ -44,6 +162,7 @@ const ogImage = new URL('/og.png', SITE_URL).href
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:site_name" content="MentorCareer" />
     <meta property="og:image" content={ogImage} />
+    <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="MentorCareer — из нуля до оффера в IT за 6–7 месяцев" />
@@ -60,71 +179,7 @@ const ogImage = new URL('/og.png', SITE_URL).href
       document.documentElement.classList.add('js')
     </script>
 
-    <title>{title}</title>
-
-    <!-- JSON-LD Structured Data -->
-    <script type="application/ld+json" set:html={JSON.stringify({
-      "@context": "https://schema.org",
-      "@graph": [
-        {
-          "@type": "EducationalOrganization",
-          "name": "MentorCareer",
-          "url": SITE_URL,
-          "description": "Персональное менторство по Frontend и Backend разработке с гарантией трудоустройства",
-          "address": {
-            "@type": "PostalAddress",
-            "addressLocality": "Москва",
-            "addressCountry": "RU"
-          },
-          "geo": {
-            "@type": "GeoCoordinates",
-            "latitude": 55.7558,
-            "longitude": 37.6173
-          },
-          "areaServed": {
-            "@type": "Country",
-            "name": "Russia"
-          },
-          "sameAs": [AUTHOR_URL, TELEGRAM_URL]
-        },
-        {
-          "@type": "Person",
-          "name": "Евгений Надточеев",
-          "jobTitle": "Fullstack Developer, Ментор",
-          "url": AUTHOR_URL,
-          "knowsAbout": ["React", "TypeScript", "Next.js", "Node.js", "NestJS", "PostgreSQL", "Kubernetes", "Docker"],
-          "sameAs": [AUTHOR_URL, TELEGRAM_URL]
-        },
-        {
-          "@type": "WebSite",
-          "name": "MentorCareer",
-          "url": SITE_URL,
-          "inLanguage": "ru"
-        },
-        {
-          "@type": "Course",
-          "name": "Frontend React",
-          "description": "Полный курс Frontend-разработки: React, TypeScript, Next.js — от основ до production-уровня",
-          "provider": {
-            "@type": "EducationalOrganization",
-            "name": "MentorCareer"
-          },
-          "educationalLevel": "Beginner to Intermediate",
-          "inLanguage": "ru"
-        },
-        {
-          "@type": "Course",
-          "name": "Backend Node.js",
-          "description": "Курс Backend-разработки: Node.js, NestJS, PostgreSQL, Docker, Kubernetes",
-          "provider": {
-            "@type": "EducationalOrganization",
-            "name": "MentorCareer"
-          },
-          "educationalLevel": "Beginner to Intermediate",
-          "inLanguage": "ru"
-        }
-      ]
-    })} />
+    {!noindex && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
   </head>
   <body>
     <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:bg-accent focus:px-4 focus:py-2 focus:font-mono focus:text-xs focus:text-ground">

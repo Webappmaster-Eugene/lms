@@ -1,0 +1,28 @@
+---
+/** Блок 07 — частые вопросы. Ответы раскрыты, а не спрятаны в аккордеон:
+ *  это главный источник цитат для нейропоиска, и читатель видит их сразу. */
+import SectionHead from './SectionHead.astro'
+import { FAQ } from '../data/faq'
+---
+
+<section id="faq" class="band border-t border-line-soft">
+  <div class="shell">
+    <SectionHead
+      index="07"
+      label="вопросы"
+      title="Частые вопросы о менторстве"
+      lead="Сроки, оплата, направления и формат — коротко о том, о чём спрашивают перед стартом."
+    />
+
+    <dl class="grid gap-px border border-line bg-line md:grid-cols-2" data-reveal>
+      {
+        FAQ.map((item) => (
+          <div class="bg-raised p-5 sm:p-6 md:odd:last:col-span-2">
+            <dt class="t-h3 text-ink">{item.question}</dt>
+            <dd class="t-body mt-2">{item.answer}</dd>
+          </div>
+        ))
+      }
+    </dl>
+  </div>
+</section>

@@ -26,6 +26,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: '#program', label: 'программа' },
   { href: '#how-it-works', label: 'как устроено' },
   { href: '#features', label: 'платформа' },
+  { href: '#faq', label: 'вопросы' },
   { href: '#contacts', label: 'контакты' },
 ] as const
 
@@ -38,9 +39,16 @@ export const RAIL_MARKS: readonly NavItem[] = [
   { href: '#how-it-works', label: 'процесс' },
   { href: '#features', label: 'платформа' },
   { href: '#for-mentors', label: 'наставникам' },
+  { href: '#faq', label: 'вопросы' },
   { href: '#contacts', label: 'контакты' },
 ] as const
 
 /** Портрет ментора. Когда файл появится — положить в public/ и указать путь здесь,
  *  разметка подхватит его без других правок. Пропорции кадра: 3:4. */
 export const MENTOR_PHOTO: string | null = '/mentor.webp'
+
+/** Коды подтверждения прав из Яндекс Вебмастера и Google Search Console
+ *  (атрибут content их meta-тега). Не секрет: тег публичный по определению.
+ *  null — тег не выводится; при подтверждении через DNS остаются null. */
+export const YANDEX_VERIFICATION: string | null = null
+export const GOOGLE_VERIFICATION: string | null = null

@@ -1,0 +1,18 @@
+---
+import Layout from '../layouts/Layout.astro'
+import { SITE_URL, LMS_URL } from '../config'
+---
+
+<Layout title="Страница не найдена | MentorCareer" description="Такой страницы на сайте MentorCareer нет." noindex>
+  <main id="main" class="band">
+    <div class="shell">
+      <p class="font-mono text-xs tracking-[0.08em] text-accent">// 404</p>
+      <h1 class="t-display mt-6 text-ink">Страница не найдена</h1>
+      <p class="t-lead mt-6 max-w-lg">Возможно, ссылка устарела. Всё о менторстве — на главной.</p>
+      <div class="mt-9 flex flex-wrap gap-3">
+        <a href={SITE_URL} class="btn btn-solid">На главную <span aria-hidden="true">→</span></a>
+        <a href={LMS_URL} class="btn btn-line">Войти в платформу</a>
+      </div>
+    </div>
+  </main>
+</Layout>
