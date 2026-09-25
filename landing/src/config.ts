@@ -8,7 +8,7 @@ export const LMS_URL = 'https://learn.mentorcareer.ru'
 export const SITE_URL = 'https://promo.mentorcareer.ru'
 
 export const AUTHOR_URL = 'https://nadtocheev.ru'
-export const TELEGRAM_URL = 'https://t.me/eugene_nadtocheev'
+export const TELEGRAM_URL = 'https://t.me/eugene_galera'
 export const CHAT_URL = 'https://t.me/mentorcareer_chat'
 
 export const EMAIL = 'support@mentorcareer.ru'
