@@ -6,6 +6,9 @@ export function validateNativeReport(report, { cwds, skills, servers }) {
     if (!config || config.approval !== "never" || config.permissions !== "lms") {
       failures.push(`${cwd}: project permissions were not loaded`);
     }
+    if (config?.contextWindow !== 600000 || config?.autoCompactLimit !== 540000) {
+      failures.push(`${cwd}: 600k context window with early auto-compact was not loaded`);
+    }
     for (const name of servers) {
       if (!config?.mcp?.includes(name)) failures.push(`${cwd}: MCP configuration missing or disabled: ${name}`);
     }
@@ -16,7 +19,7 @@ export function validateNativeReport(report, { cwds, skills, servers }) {
     }
     const hooks = report.hooks?.data?.find(item => item.cwd === cwd);
     if (!hooks || !Array.isArray(hooks.errors) || hooks.errors.length) failures.push(`${cwd}: hook inventory missing or invalid`);
-    for (const event of ["sessionStart", "stop"]) {
+    for (const event of ["sessionStart", "preToolUse", "stop"]) {
       const matches = hooks?.hooks?.filter(hook => hook.eventName === event) ?? [];
       if (matches.length !== 1 || matches[0].enabled !== true || matches[0].trustStatus !== "trusted") {
         failures.push(`${cwd}: ${event} hook must be enabled, trusted and loaded once`);

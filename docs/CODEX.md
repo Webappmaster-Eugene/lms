@@ -23,6 +23,22 @@ pnpm codex
 проекта, включая `.git`, `.codex`, `.agents`. Запись во весь домашний каталог
 этим не разрешается. Кеши npm и pnpm уводятся в `.codex/state`.
 
+Контекст ограничен 600k токенов (`model_context_window`), авто-компакт
+начинается с 540k (`model_auto_compact_token_limit`) — раньше, чем окно
+заполнится. Это аналог `autoCompactWindow = 600000` в `.claude/settings.json`.
+Усилие рассуждений `high` совпадает с `effortLevel` Claude; до шести ролей
+работают параллельно, чтобы пять ревьюеров `review_multi` шли одновременно.
+
+## Доверие к hooks
+
+Codex хранит доверие к hooks только в `~/.codex/config.toml` (`[hooks.state]`),
+а недоверенные hooks молча пропускает: без них не подгружается память и не
+работает защита команд. `pnpm codex:trust` записывает ровно те записи, что и
+диалог доверия, через штатный `config/batchWrite` и только для hooks этого
+checkout, вызывающих `scripts/codex/hooks.mjs`. Хеш hook меняется вместе с
+`config.toml`, поэтому после `pnpm codex:sync` с изменением hooks или путей
+доверие выдаётся заново. `codex:setup` делает это сам.
+
 ## Что перенесено
 
 | Возможность Claude | Эквивалент Codex |
@@ -37,6 +53,10 @@ pnpm codex
 | Проверки качества | `pnpm codex:verify` поверх `pnpm smoke` и сборки лендинга |
 | Продолжение и память | `.codex/memory/MEMORY.md`, локальный `.codex/state/handoff.md` |
 | Восстановление контекста | Hook SessionStart, включая resume и compact |
+| Auto-memory Claude | SessionStart подмешивает `~/.claude/projects/<slug>/memory` вживую |
+| Deny-список Claude | Hook PreToolUse: правила `Bash(...)` из настроек Claude и базовый список |
+| `autoCompactWindow = 600000` | `model_context_window = 600000`, компакт с 540k |
+| `effortLevel = high` | `model_reasoning_effort = "high"` |
 | Проверка перед завершением | Hook Stop: drift источников и `git diff --check` |
 | Диагностика инфраструктуры | `codex:doctor`, `codex:test`, `codex:mcp-check`, `codex:native-check` |
 
@@ -54,7 +74,8 @@ pnpm codex:test          # проверить поведение самого ha
 pnpm codex:verify        # полный локальный набор проверок
 pnpm codex:mcp-check     # handshake + tools/list по каждому MCP
 pnpm codex:browser-check # реальный list_pages; в отчёте только статус и число вкладок
-pnpm codex:native-check  # фактическая загрузка config/skills/hooks/MCP самим Codex
+pnpm codex:native-check  # фактическая загрузка config/skills/hooks/MCP и окна 600k
+pnpm codex:trust         # доверие к hooks проекта после изменения config.toml
 ```
 
 На новой машине: `pnpm install` в `app`, `npm install` в `app/landing`, затем

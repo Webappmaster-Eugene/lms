@@ -73,5 +73,8 @@ confidence и сценария сбоя.
 со ссылкой на источник и датой. Ход незавершённой задачи — в `.codex/state/handoff.md`:
 цель, сделано, следующий шаг, проверки, блокеры. Обновляй перед compaction/остановкой.
 Не сохраняй токены, пароли, содержимое `.env` и полные логи в памяти.
-SessionStart восстанавливает память, Stop проверяет drift и whitespace; это не
-замена тестам. После изменения Claude-инфраструктуры: `pnpm codex:sync`.
+SessionStart восстанавливает память (включая живую auto-memory Claude),
+PreToolUse блокирует команды из deny-списка Claude, Stop проверяет drift и
+whitespace; это не замена тестам. Отказ PreToolUse не обходи переформулировкой.
+После изменения Claude-инфраструктуры: `pnpm codex:sync`, при изменении hooks —
+ещё `pnpm codex:trust`.

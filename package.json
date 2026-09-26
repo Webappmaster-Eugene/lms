@@ -35,7 +35,8 @@
     "codex:test": "node --test scripts/codex/harness.test.mjs",
     "codex:mcp-check": "node scripts/codex/mcp.mjs probe",
     "codex:browser-check": "node scripts/codex/mcp.mjs browser-check",
-    "codex:native-check": "node scripts/codex/native-check.mjs"
+    "codex:native-check": "node scripts/codex/native-check.mjs",
+    "codex:trust": "node scripts/codex/trust.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "4.7.0",

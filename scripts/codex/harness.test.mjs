@@ -6,7 +6,8 @@ import { tmpdir } from "node:os";
 import { spawnSync, spawn } from "node:child_process";
 import { once } from "node:events";
 import { serverCommand } from "./mcp.mjs";
-import { handleEvent } from "./hooks.mjs";
+import { handleEvent, deniedCommand, claudeDenyPatterns, claudeMemoryDir } from "./hooks.mjs";
+import { hooksToTrust } from "./trust.mjs";
 import { configText, verificationPlan, configuredServers, repo } from "./harness.mjs";
 import { validateNativeReport } from "./native-report.mjs";
 import { stopChild } from "./process.mjs";
@@ -63,6 +64,61 @@ test("Stop continuation is bounded even when checks keep failing", () => {
   assert.notEqual(result.decision, "block");
 });
 
+test("PreToolUse applies Claude deny rules to every shell segment, including nested shells", () => {
+  const patterns = ["sudo *", "git reset --hard*", "git clean*", "rm -rf ~/.ssh*", "rm -rf /usr*", "dd *"];
+  for (const command of [
+    "sudo ls",
+    "pnpm lint && git reset --hard HEAD~1",
+    "git -C app clean -fdx",
+    "cd app; env FOO=1 git reset --hard",
+    'bash -lc "git clean -fd"',
+    "rm -rf $HOME/.ssh/keys",
+    "rm -rf /home/me/.ssh",
+    "echo $(dd if=/dev/zero of=/tmp/x)",
+  ]) assert.ok(deniedCommand(command, patterns, "/home/me"), command);
+  for (const command of ["git reset --soft HEAD~1", "git status", "rm -rf node_modules/.cache", "pnpm add dd-trace", "echo sudo"]) {
+    assert.equal(deniedCommand(command, patterns, "/home/me"), null, command);
+  }
+});
+
+test("PreToolUse denies through the Codex hook protocol and ignores non-shell tools", () => {
+  const denied = handleEvent({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: ["bash", "-lc", "git reset --hard"] } });
+  assert.equal(denied.hookSpecificOutput.permissionDecision, "deny");
+  assert.match(denied.hookSpecificOutput.permissionDecisionReason, /git reset --hard/);
+  assert.deepEqual(handleEvent({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "pnpm test" } }), {});
+  assert.deepEqual(handleEvent({ hook_event_name: "PreToolUse", tool_name: "apply_patch", tool_input: { patch: "*** Begin Patch" } }), {});
+});
+
+test("Claude deny rules are read from settings files, with a fallback when none exist", () => {
+  const dir = mkdtempSync(join(tmpdir(), "lms-deny-"));
+  try {
+    const file = join(dir, "settings.json");
+    writeFileSync(file, JSON.stringify({ permissions: { deny: ["Bash(terraform destroy:*)", "Read(./.env)"] } }));
+    const patterns = claudeDenyPatterns([file, join(dir, "missing.json")]);
+    assert.ok(patterns.includes("terraform destroy*"));
+    assert.ok(patterns.includes("git reset --hard*"));
+    assert.ok(!patterns.some(pattern => pattern.includes(".env")));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("Claude auto-memory directory follows Claude's project slug", () => {
+  assert.match(claudeMemoryDir("/home/me"), /^\/home\/me\/\.claude\/projects\/-[A-Za-z0-9-]+\/memory$/);
+});
+
+test("hook trust targets only this harness's untrusted hooks in project configs", () => {
+  const hook = (overrides) => ({ key: "k", source: "project", sourcePath: "/p/.codex/config.toml", command: "node /p/app/scripts/codex/hooks.mjs", trustStatus: "untrusted", currentHash: `sha256:${"a".repeat(64)}`, ...overrides });
+  const inventory = { data: [{ hooks: [
+    hook({ key: "ours" }),
+    hook({ key: "trusted", trustStatus: "trusted" }),
+    hook({ key: "foreign", command: "curl evil" }),
+    hook({ key: "user", source: "user" }),
+    hook({ key: "elsewhere", sourcePath: "/other/.codex/config.toml" }),
+    hook({ key: "nohash", currentHash: null }),
+  ] }] };
+  const keys = hooksToTrust(inventory, { configs: ["/p/.codex/config.toml"], script: "/p/app/scripts/codex/hooks.mjs" }).map(item => item.key);
+  assert.deepEqual(keys, ["ours"]);
+});
+
 test("verification covers the harness, the app quality gate and the separate landing package", () => {
   const plan = verificationPlan();
   for (const needed of [
@@ -80,9 +136,9 @@ test("verification covers the harness, the app quality gate and the separate lan
 const nativeExpected = { cwds: ["/project", "/project/app"], skills: ["self-review", "project-harness"], servers: ["context7"] };
 function nativeFixture() {
   return {
-    configs: nativeExpected.cwds.map(cwd => ({ cwd, approval: "never", permissions: "lms", mcp: ["context7"] })),
+    configs: nativeExpected.cwds.map(cwd => ({ cwd, approval: "never", permissions: "lms", contextWindow: 600000, autoCompactLimit: 540000, mcp: ["context7"] })),
     skills: nativeExpected.cwds.map(cwd => ({ cwd, errors: [], skills: nativeExpected.skills.map(name => ({ name, enabled: true })) })),
-    hooks: { data: nativeExpected.cwds.map(cwd => ({ cwd, errors: [], hooks: ["sessionStart", "stop"].map(eventName => ({ eventName, enabled: true, trustStatus: "trusted" })) })) },
+    hooks: { data: nativeExpected.cwds.map(cwd => ({ cwd, errors: [], hooks: ["sessionStart", "preToolUse", "stop"].map(eventName => ({ eventName, enabled: true, trustStatus: "trusted" })) })) },
     mcp: [{ name: "context7", tools: 2 }],
   };
 }
@@ -97,6 +153,8 @@ test("native check rejects missing, disabled and untrusted capabilities", () => 
     report => { report.configs[1].mcp = []; },
     report => { report.configs[0].approval = "on-request"; },
     report => { report.configs[0].permissions = "workspace-write"; },
+    report => { report.configs[0].contextWindow = 272000; },
+    report => { delete report.configs[1].autoCompactLimit; },
     report => { delete report.skills; },
     report => { report.skills = []; },
     report => { report.skills.pop(); },
@@ -121,7 +179,7 @@ test("native check rejects missing, disabled and untrusted capabilities", () => 
 test("standalone setup preserves memory and detects context, source and skill drift", () => {
   const sandbox = mkdtempSync(join(tmpdir(), "lms-harness-"));
   const checkout = join(sandbox, "checkout");
-  const execute = (script) => spawnSync(process.execPath, ["--input-type=module", "-e", script], { cwd: checkout, encoding: "utf8", timeout: 60000 });
+  const execute = (script) => spawnSync(process.execPath, ["--input-type=module", "-e", script], { cwd: checkout, encoding: "utf8", timeout: 60000, env: { ...process.env, LMS_CODEX_SKIP_TRUST: "1" } });
   try {
     mkdirSync(checkout);
     for (const path of ["scripts/codex", ".claude/skills", ".agents", ".codex/context", ".codex/memory", "docs/CODEX.md", "AGENTS.md", "package.json"]) {

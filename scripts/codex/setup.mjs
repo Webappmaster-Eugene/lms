@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { repo, sync } from "./harness.mjs";
+import { trustProjectHooks } from "./trust.mjs";
 
 const seed = (path, value) => {
   const target = join(repo, path);
@@ -50,7 +51,9 @@ description: Настроить, проверить или восстанови�
 Работай из корня Git-репозитория app. Прочитай [руководство](../../../docs/CODEX.md).
 Сначала pnpm codex:doctor. После изменения источников — pnpm codex:sync.
 Для первого запуска или новой машины — pnpm codex:setup после pnpm install в app
-и npm install в landing. Конфиги только локальные, глобальные ~/.codex не изменять.
+и npm install в landing. Конфиги только локальные; из глобального ~/.codex
+меняется лишь доверие к hooks этого проекта — через pnpm codex:trust (штатный
+config API Codex), после каждого изменения hooks или путей в config.toml.
 Проверяй pnpm codex:test и pnpm lint. Для полного quality gate — pnpm codex:verify;
 он включает сборку, которой нужны DATABASE_URL и PAYLOAD_SECRET. Для MCP handshake
 и tools/list — pnpm codex:mcp-check; это не проверка токенов API и не разрешение
@@ -69,3 +72,16 @@ if (!existsSync(join(skillTarget, "SKILL.md"))) {
   copyFileSync(join(frontend, "LICENSE"), join(skillTarget, "LICENSE.txt"));
 }
 sync();
+// Untrusted hooks are skipped silently by Codex: memory and guardrails would be absent.
+// Throwaway checkouts in tests must not leave trust entries in ~/.codex.
+if (process.env.LMS_CODEX_SKIP_TRUST === "1") {
+  console.log("Hook trust skipped (LMS_CODEX_SKIP_TRUST=1).");
+} else {
+  try {
+    const { total } = await trustProjectHooks();
+    console.log(`Project hooks trusted: ${total}.`);
+  } catch (error) {
+    console.error(`Hook trust failed: ${error.message}. Run pnpm codex:trust or trust the hooks in the Codex UI.`);
+    process.exitCode = 1;
+  }
+}

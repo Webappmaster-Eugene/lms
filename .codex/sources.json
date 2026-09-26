@@ -1,5 +1,5 @@
 {
-  "../.claude/settings.json": "da70c5db9ba162de21bc8d22234ca92bc36f48733455ddfb3b114622e21916d3",
+  "../.claude/settings.json": "9a159c8c0b5a585c307fca6fc6eb2b6a4927ce644464ee53b5e4ef1894e2c516",
   "../.claude/settings.local.json": "c530be885f980b0767a1c04e962dd0f7d63ca9214bb0a265b15fa1e51d8116e5",
   "../CLAUDE.md": "ff1cf8a2949b97163cccdc8e7baa7215a679a8d32543db85e7c524e729716621",
   "../expert_info/lms/agents/code-cartographer.md": "3d81a258a6489a881ad3b2ef27f3436f3d1ae806fccd9a38d116843397fdb0f6",
@@ -19,13 +19,15 @@
   ".claude/skills/deploy-check/SKILL.md": "e70703dd1eadad580dc5b822d14e2d94b0efb10862173b72001bf8d2cba5c9fb",
   ".claude/skills/prod-check/SKILL.md": "724f04e720242bdbdeed59b1562053806ee2a24d4b5e42743b78bc4496271b1c",
   ".claude/skills/self-review/SKILL.md": "ec3937c5665b0a34b236769bfb7b4ad01d4d8299c5fc02854a735f9439ececb6",
-  "scripts/codex/config.template.toml": "56b77293fd1b42afbf902026ce635c5dab238d291d909907fd4b055ef1ff774f",
-  "scripts/codex/harness.mjs": "9b7394572ff73810cd479e495178519f76cc8d8af563f3cf7a4c93e4f4dc62d1",
-  "scripts/codex/harness.test.mjs": "27797cf1f84f30fefc2bdee138f8eba8abd04364b337c49cb1134bc856ac8836",
-  "scripts/codex/hooks.mjs": "78a402a1120c3804c666e46c3fb5e721863124ec8c916e1cb2ba55f82fffc8b0",
+  "scripts/codex/app-server.mjs": "e2b7c26660a5b9b32f9177a34e452cb8330f3ef3bf5bd2c4cedd349a786788f1",
+  "scripts/codex/config.template.toml": "0dd9395c1054f872f2a003c4a30e23d03d675b98bd1885ff65434fc3536c3a10",
+  "scripts/codex/harness.mjs": "b26e6e6ff1bc1ab1c2058ac2c2dd43c32bd81629daef04bb8a8322deab164612",
+  "scripts/codex/harness.test.mjs": "a216de1db7cc12ea4d47d03ffe7ce397ef93435d092eacf2006f59dfa7cbf8c3",
+  "scripts/codex/hooks.mjs": "dea9d8130730d619aaee39743268a197522f3d09e1ef461bc0a87a33416e7fa5",
   "scripts/codex/mcp.mjs": "2fd66b3d77051b0ddfbd6f7e3183ae3668421dbcdf107bca7c65dd8322d5230a",
-  "scripts/codex/native-check.mjs": "82599b42ba4e6841bc7c451d71e714ce2144cbc02f678da490bccfffa341e6bc",
-  "scripts/codex/native-report.mjs": "7e1dd98d7bbe826b9703bc60d820f7eff173d9ba72e06bce3b092862961c3211",
+  "scripts/codex/native-check.mjs": "befe6e68e60091fa7f66420c93971f4de9b7dcdca165149d3d9f1117d5986056",
+  "scripts/codex/native-report.mjs": "71afc5ae10550726d01f1fd8f651ab18539171fcce3f52b505dfac9a9a36fd0f",
   "scripts/codex/process.mjs": "c401caafe842386136de39703e54ed2563063d61ee471da3f5ce952c9a8e5924",
-  "scripts/codex/setup.mjs": "1dcfd9720fd56ee01ae88c9a46da997267775ddd24144ad46b0d441ba5c681d9"
+  "scripts/codex/setup.mjs": "6ad7f8735af892f84310895b38a694287bcad6540ec92e81d47c4ffd3e14fc36",
+  "scripts/codex/trust.mjs": "4f16ec1f84bb1c2149d0e60721ec0cf7c3eb0691ff883b1ae43af4ae2b53cb27"
 }

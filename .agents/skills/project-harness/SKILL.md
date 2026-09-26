@@ -6,7 +6,9 @@ description: Настроить, проверить или восстанови�
 Работай из корня Git-репозитория app. Прочитай [руководство](../../../docs/CODEX.md).
 Сначала pnpm codex:doctor. После изменения источников — pnpm codex:sync.
 Для первого запуска или новой машины — pnpm codex:setup после pnpm install в app
-и npm install в landing. Конфиги только локальные, глобальные ~/.codex не изменять.
+и npm install в landing. Конфиги только локальные; из глобального ~/.codex
+меняется лишь доверие к hooks этого проекта — через pnpm codex:trust (штатный
+config API Codex), после каждого изменения hooks или путей в config.toml.
 Проверяй pnpm codex:test и pnpm lint. Для полного quality gate — pnpm codex:verify;
 он включает сборку, которой нужны DATABASE_URL и PAYLOAD_SECRET. Для MCP handshake
 и tools/list — pnpm codex:mcp-check; это не проверка токенов API и не разрешение

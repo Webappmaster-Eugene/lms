@@ -4,6 +4,12 @@ approval_policy = "never"
 default_permissions = "lms"
 web_search = "live"
 project_doc_max_bytes = 65536
+# Parity with Claude effortLevel = "high".
+model_reasoning_effort = "high"
+# Parity with Claude autoCompactWindow = 600000: the window is capped at 600k and
+# compaction starts at 90% of it, before the effective limit (95%) is reached.
+model_context_window = 600000
+model_auto_compact_token_limit = 540000
 
 [features]
 hooks = true
@@ -11,7 +17,8 @@ multi_agent = true
 
 [agents]
 enabled = true
-max_concurrent_threads_per_session = 3
+# review_multi runs five rev-* reviewers side by side.
+max_concurrent_threads_per_session = 6
 
 [permissions.lms]
 description = "Full project access, Git, agent configuration and network"

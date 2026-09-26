@@ -83,6 +83,8 @@ export function configuredServers() {
   return result;
 }
 
+export const hookEvents = [["SessionStart", 30], ["PreToolUse", 10], ["Stop", 30]];
+
 export function configText() {
   let config = read(join(repo, "scripts/codex/config.template.toml"));
   config += `\n[permissions.lms.workspace_roots]\n${q(workspace)} = true\n`;
@@ -100,8 +102,9 @@ export function configText() {
     }
   }
   // Native SessionStart also runs after compaction. One source per config layer.
-  for (const event of ["SessionStart", "Stop"]) {
-    config += `\n[[hooks.${event}]]\n[[hooks.${event}.hooks]]\ntype = "command"\ncommand = ${q([process.execPath, join(repo, "scripts/codex/hooks.mjs")].map(shellQuote).join(" "))}\ntimeout = 30\n`;
+  // PreToolUse fires on every tool call, so it gets a short timeout.
+  for (const [event, timeout] of hookEvents) {
+    config += `\n[[hooks.${event}]]\n[[hooks.${event}.hooks]]\ntype = "command"\ncommand = ${q([process.execPath, join(repo, "scripts/codex/hooks.mjs")].map(shellQuote).join(" "))}\ntimeout = ${timeout}\n`;
   }
   return config;
 }
