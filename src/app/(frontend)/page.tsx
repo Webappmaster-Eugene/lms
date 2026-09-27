@@ -2,8 +2,11 @@ import type { Metadata } from 'next'
 import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import Link from 'next/link'
-import { Award, BookOpen, Clock, Flame, GraduationCap, Map, Star, Trophy } from 'lucide-react'
+import { ArrowRight, Award, BookOpen, Clock, Flame, GraduationCap, Map as MapIcon, Star, Trophy } from 'lucide-react'
 import { collectAllPages } from '@/lib/paginate'
+import { pluralize } from '@/lib/utils'
+import { loadCourseLessons, relationKey } from '@/lib/course-lessons'
+import { nextLesson, recentCourseIds } from '@/lib/roadmap-next-step'
 
 export const metadata: Metadata = {
   title: 'Дашборд',
@@ -70,59 +73,73 @@ export default async function DashboardPage() {
   const streakDays = (streakData.docs[0] as { currentStreak?: number } | undefined)?.currentStreak ?? 0
   const certificatesCount = certificatesData.totalDocs ?? 0
 
-  // Подсчёт прогресса по курсам
-  const courseIds = courses.docs.map((c) => String(c.id))
-  const [lessonDocs, progressDocs] = await Promise.all([
-    courseIds.length > 0
-      ? collectAllPages(
+  // Курсы ученика — по последней активности, а не первые в каталоге: иначе начатый
+  // курс из середины каталога на дашборд не попадал.
+  const progressDocs = await collectAllPages(
+    ({ page, limit }) =>
+      payload.find({
+        collection: 'user-progress',
+        where: { user: { equals: user.id }, isCompleted: { equals: true } },
+        select: { lesson: true, updatedAt: true },
+        depth: 0,
+        sort: 'id',
+        page,
+        limit,
+      }),
+    { label: `прогресс пользователя ${user.id}` },
+  )
+  const completedLessonIds = new Set(progressDocs.flatMap((p) => relationKey(p.lesson) ?? []))
+
+  const touchedLessons =
+    completedLessonIds.size > 0
+      ? await collectAllPages(
           ({ page, limit }) =>
             payload.find({
               collection: 'lessons',
-              where: {
-                course: { in: courseIds },
-                isPublished: { equals: true },
-              },
+              where: { id: { in: [...completedLessonIds] } },
               select: { course: true },
               depth: 0,
               sort: 'id',
               page,
               limit,
             }),
-          { label: 'уроки дашборда' },
+          { label: `курсы пройденных уроков ${user.id}` },
         )
-      : [],
-    collectAllPages(
-      ({ page, limit }) =>
-        payload.find({
-          collection: 'user-progress',
-          where: {
-            user: { equals: user.id },
-            isCompleted: { equals: true },
-          },
-          select: { lesson: true },
-          depth: 0,
-          sort: 'id',
-          page,
-          limit,
-        }),
-      { label: `прогресс пользователя ${user.id}` },
-    ),
-  ])
-
-  const lessonsByCourse: Record<string, string[]> = {}
-  for (const lesson of lessonDocs) {
-    const cId = String(typeof lesson.course === 'object' ? lesson.course.id : lesson.course)
-    if (!lessonsByCourse[cId]) lessonsByCourse[cId] = []
-    lessonsByCourse[cId].push(String(lesson.id))
-  }
-
-  const completedLessonIds = new Set(
-    progressDocs.map((p) => String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson)),
+      : []
+  const courseOfLesson = new Map(
+    touchedLessons.flatMap((l) => {
+      const courseId = relationKey(l.course)
+      return courseId ? [[String(l.id), courseId] as const] : []
+    }),
+  )
+  const recentIds = recentCourseIds(
+    progressDocs.flatMap((p) => {
+      const lessonId = relationKey(p.lesson)
+      return lessonId ? [{ lessonId, at: p.updatedAt }] : []
+    }),
+    courseOfLesson,
   )
 
-  const coursesWithProgress = courses.docs.map((course) => {
+  const startedCourses =
+    recentIds.length > 0
+      ? (
+          await payload.find({
+            collection: 'courses',
+            where: { id: { in: recentIds }, isPublished: { equals: true } },
+            select: { title: true, slug: true, estimatedHours: true },
+            depth: 0,
+            limit: recentIds.length,
+          })
+        ).docs.sort((a, b) => recentIds.indexOf(String(a.id)) - recentIds.indexOf(String(b.id)))
+      : []
+  const hasStarted = startedCourses.length > 0
+  const shownCourses = hasStarted ? startedCourses.slice(0, DASHBOARD_COURSES) : courses.docs
+
+  const courseLessons = await loadCourseLessons(payload, shownCourses.map((c) => c.id), 'дашборд')
+
+  const coursesWithProgress = shownCourses.map((course) => {
     const cId = String(course.id)
-    const courseLessonIds = lessonsByCourse[cId] ?? []
+    const courseLessonIds = courseLessons.allIds.get(cId) ?? []
     const totalLessons = courseLessonIds.length
     const completedCount = courseLessonIds.filter((id) => completedLessonIds.has(id)).length
     const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0
@@ -135,8 +152,12 @@ export default async function DashboardPage() {
       totalLessons,
       completedCount,
       progressPercent,
+      next: nextLesson(courseLessons.ordered.get(cId) ?? [], completedLessonIds),
     }
   })
+
+  // Продолжить — самый свежий из незаконченных курсов.
+  const resume = hasStarted ? coursesWithProgress.find((c) => c.next && c.completedCount < c.totalLessons) : undefined
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -147,6 +168,25 @@ export default async function DashboardPage() {
         </h1>
         <p className="mt-1 text-muted-foreground">Продолжай обучение</p>
       </div>
+
+      {resume?.next && (
+        <Link
+          href={`/lessons/${resume.next.slug}`}
+          className="flex flex-col gap-3 rounded-xl border border-primary/40 bg-primary/5 p-4 transition-colors hover:bg-primary/10 sm:flex-row sm:items-center sm:p-5"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium uppercase tracking-wide text-primary">Продолжить с того места, где остановились</p>
+            <p className="mt-1 truncate font-semibold text-foreground">{resume.next.title}</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {resume.title} · {resume.completedCount}/{resume.totalLessons} уроков
+            </p>
+          </div>
+          <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+            Продолжить
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </span>
+        </Link>
+      )}
 
       {/* Статистика — горизонтальный скролл на мобильных */}
       <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide sm:grid sm:grid-cols-5 sm:gap-4 sm:overflow-visible sm:pb-0">
@@ -161,7 +201,7 @@ export default async function DashboardPage() {
       {coursesWithProgress.length > 0 && (
         <div>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">Мои курсы</h2>
+            <h2 className="text-lg font-semibold text-foreground">{hasStarted ? 'Мои курсы' : 'С чего начать'}</h2>
             <Link href="/courses" className="text-sm text-primary hover:text-primary/80 transition-colors">
               Все курсы
             </Link>
@@ -182,13 +222,13 @@ export default async function DashboardPage() {
                       {course.title}
                     </h3>
                     <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{course.totalLessons} уроков</span>
-                      {course.estimatedHours != null && (
+                      <span>{pluralize(course.totalLessons, 'урок', 'урока', 'уроков')}</span>
+                      {course.estimatedHours ? (
                         <span className="flex items-center gap-0.5">
                           <Clock className="h-3 w-3" />
                           {course.estimatedHours}ч
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -222,7 +262,7 @@ export default async function DashboardPage() {
             >
               <div className="flex items-start gap-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <Map className="h-5 w-5 text-primary" />
+                  <MapIcon className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1">
                   <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">

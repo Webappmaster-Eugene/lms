@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Map as MapIcon } from 'lucide-react'
 import { collectAllPages } from '@/lib/paginate'
 import { relationId } from '@/lib/relation-id'
+import { pluralize } from '@/lib/utils'
 
 export const metadata: Metadata = {
   title: 'Роадмапы',
@@ -119,7 +120,7 @@ export default async function RoadmapsPage() {
                     {roadmap.title}
                   </h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {courses} курсов · {lessons} уроков · {status}
+                    {pluralize(courses, 'курс', 'курса', 'курсов')} · {pluralize(lessons, 'урок', 'урока', 'уроков')} · {status}
                   </p>
                 </div>
               </div>

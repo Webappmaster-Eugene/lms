@@ -3,8 +3,11 @@ import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, CheckCircle2, ChevronDown, Circle, Clock } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, Circle, Clock, PartyPopper } from 'lucide-react'
 import { collectAllPages } from '@/lib/paginate'
+import { relationKey } from '@/lib/course-lessons'
+import { pluralize } from '@/lib/utils'
+import { nextLesson, orderCourseLessons } from '@/lib/roadmap-next-step'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -119,6 +122,21 @@ export default async function CourseDetailPage({ params }: Props) {
 
   const roadmap = typeof course.roadmap === 'object' ? course.roadmap : null
 
+  const sectionRank = new Map(sectionDocs.map((section, index) => [String(section.id), index]))
+  const ordered = orderCourseLessons(
+    lessonDocs.map((l) => ({
+      id: String(l.id),
+      slug: l.slug,
+      title: l.title,
+      courseId: String(course.id),
+      sectionId: relationKey(l.section),
+      order: l.order ?? 0,
+    })),
+    sectionRank,
+  ).get(String(course.id)) ?? []
+  const next = nextLesson(ordered, completedLessonIds)
+  const nextId = next ? ordered.find((l) => l.slug === next.slug)?.id ?? null : null
+
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       {/* Навигация */}
@@ -136,16 +154,16 @@ export default async function CourseDetailPage({ params }: Props) {
       <div>
         <h1 className="text-2xl font-bold text-foreground">{course.title}</h1>
         <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
-          <span>{totalLessons} уроков</span>
+          <span>{pluralize(totalLessons, 'урок', 'урока', 'уроков')}</span>
           {sectionDocs.length > 0 && (
-            <span>{sectionDocs.length} разделов</span>
+            <span>{pluralize(sectionDocs.length, 'раздел', 'раздела', 'разделов')}</span>
           )}
-          {course.estimatedHours && (
+          {course.estimatedHours ? (
             <span className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
               ~{course.estimatedHours}ч
             </span>
-          )}
+          ) : null}
         </div>
 
         {/* Progress bar */}
@@ -164,6 +182,40 @@ export default async function CourseDetailPage({ params }: Props) {
           </div>
         </div>
       </div>
+
+      {next ? (
+        <Link
+          href={`/lessons/${next.slug}`}
+          className="flex items-center gap-4 rounded-xl border border-primary/40 bg-primary/5 p-4 transition-colors hover:bg-primary/10"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium uppercase tracking-wide text-primary">
+              {completedCount > 0 ? 'Продолжить с урока' : 'Начать курс'}
+            </p>
+            <p className="mt-1 truncate font-semibold text-foreground">{next.title}</p>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+            {completedCount > 0 ? 'Продолжить' : 'Начать'}
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </span>
+        </Link>
+      ) : totalLessons > 0 && completedCount === totalLessons ? (
+        <div className="flex items-center gap-3 rounded-xl border border-success/40 bg-success/10 p-4">
+          <PartyPopper className="h-6 w-6 shrink-0 text-success" aria-hidden="true" />
+          <p className="text-sm text-foreground">
+            Курс пройден.{' '}
+            {roadmap ? (
+              <Link href={`/roadmaps/${roadmap.slug}`} className="font-medium underline underline-offset-2">
+                Что дальше по роадмапу
+              </Link>
+            ) : (
+              <Link href="/certificates" className="font-medium underline underline-offset-2">
+                Сертификаты
+              </Link>
+            )}
+          </p>
+        </div>
+      ) : null}
 
       {/* Секции с уроками */}
       <div className="space-y-4">
@@ -196,6 +248,7 @@ export default async function CourseDetailPage({ params }: Props) {
                     key={lesson.id}
                     lesson={lesson}
                     isCompleted={completedLessonIds.has(String(lesson.id))}
+                    isNext={String(lesson.id) === nextId}
                   />
                 ))}
                 {sectionLessons.length === 0 && (
@@ -217,6 +270,7 @@ export default async function CourseDetailPage({ params }: Props) {
                 key={lesson.id}
                 lesson={lesson}
                 isCompleted={completedLessonIds.has(String(lesson.id))}
+                isNext={String(lesson.id) === nextId}
               />
             ))}
           </div>
@@ -233,14 +287,19 @@ export default async function CourseDetailPage({ params }: Props) {
 function LessonItem({
   lesson,
   isCompleted,
+  isNext,
 }: {
   lesson: { id: number | string; slug: string; title: string; description?: string | null; estimatedMinutes?: number | null }
   isCompleted: boolean
+  isNext: boolean
 }) {
   return (
     <Link
       href={`/lessons/${lesson.slug}`}
-      className="group flex items-center gap-3 rounded-lg px-4 py-3 transition-colors hover:bg-accent/50"
+      aria-current={isNext ? 'step' : undefined}
+      className={`group flex items-center gap-3 rounded-lg px-4 py-3 transition-colors hover:bg-accent/50 ${
+        isNext ? 'bg-primary/5 ring-1 ring-primary/40' : ''
+      }`}
     >
       {isCompleted ? (
         <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-success" />
@@ -257,6 +316,11 @@ function LessonItem({
         )}
       </div>
 
+      {isNext && (
+        <span className="flex-shrink-0 rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">
+          Следующий
+        </span>
+      )}
       {lesson.estimatedMinutes && (
         <span className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
           <Clock className="h-3 w-3" />

@@ -14,6 +14,7 @@ const refresh = vi.fn()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh }),
 }))
+vi.mock('next/link', async () => (await import('../helpers/component-mocks')).linkMock())
 
 function lastRequest() {
   const calls = vi.mocked(global.fetch).mock.calls
@@ -214,6 +215,44 @@ describe('кнопка завершения урока', () => {
 
       await waitFor(() => expect(global.fetch).toHaveBeenCalled())
       expect(lastRequest().init.credentials).toBe('include')
+    })
+  })
+
+  describe('что дальше после отметки', () => {
+    const next = { slug: 'lesson-3', title: 'Хуки' }
+
+    it('после отметки ведёт в следующий урок', async () => {
+      render(<CompletionButton lessonId={42} isCompleted={false} next={next} courseHref="/courses/react" />)
+      expect(screen.queryByRole('link', { name: /Следующий урок/ })).not.toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button'))
+
+      expect(await screen.findByRole('link', { name: /Следующий урок: Хуки/ })).toHaveAttribute('href', '/lessons/lesson-3')
+    })
+
+    it('последний урок завершает курс, если остальные пройдены', async () => {
+      render(<CompletionButton lessonId={42} isCompleted={false} completesCourse courseHref="/courses/react" />)
+
+      await userEvent.click(screen.getByRole('button'))
+
+      expect(await screen.findByText('Курс пройден!')).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Вернуться к курсу' })).toHaveAttribute('href', '/courses/react')
+    })
+
+    it('последний урок при непройденных других подсказывает вернуться к программе', () => {
+      render(<CompletionButton lessonId={42} isCompleted progressId="p-1" courseHref="/courses/react" />)
+
+      expect(screen.getByText(/остались непройденные/)).toBeInTheDocument()
+    })
+
+    it('сбой сохранения не показывает переход дальше', async () => {
+      global.fetch = vi.fn(async () => new Response(null, { status: 500 })) as unknown as typeof fetch
+      render(<CompletionButton lessonId={42} isCompleted={false} next={next} />)
+
+      await userEvent.click(screen.getByRole('button'))
+
+      await waitFor(() => expect(screen.getByText(/Не удалось обновить прогресс/)).toBeInTheDocument())
+      expect(screen.queryByRole('link', { name: /Следующий урок/ })).not.toBeInTheDocument()
     })
   })
 })

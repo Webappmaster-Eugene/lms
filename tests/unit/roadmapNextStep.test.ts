@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
   blockingPrerequisites,
+  lessonPosition,
   nextLesson,
   orderCourseLessons,
   pickNextStep,
+  recentCourseIds,
   type LessonRef,
   type StepCourse,
 } from '@/lib/roadmap-next-step'
@@ -115,5 +117,50 @@ describe('что закрывает курс', () => {
       (id) => complete.get(id) ?? null,
     )
     expect(blocking).toEqual(['TypeScript'])
+  })
+})
+
+describe('место урока в курсе', () => {
+  const ordered = [lesson('1'), lesson('2'), lesson('3')]
+
+  it('соседи и номер из порядка страницы курса', () => {
+    expect(lessonPosition(ordered, '2')).toEqual({
+      index: 2,
+      total: 3,
+      prev: { slug: 'l-1', title: 'Урок 1' },
+      next: { slug: 'l-3', title: 'Урок 3' },
+    })
+  })
+
+  it('у первого нет предыдущего, у последнего — следующего', () => {
+    expect(lessonPosition(ordered, '1')?.prev).toBeNull()
+    expect(lessonPosition(ordered, '3')?.next).toBeNull()
+  })
+
+  it('урок вне программы — без навигации', () => {
+    expect(lessonPosition(ordered, '99')).toBeNull()
+  })
+})
+
+describe('недавние курсы', () => {
+  it('сначала курс с самой свежей активностью, без повторов', () => {
+    const courseOf = new Map([
+      ['a1', 'A'],
+      ['a2', 'A'],
+      ['b1', 'B'],
+    ])
+    const ids = recentCourseIds(
+      [
+        { lessonId: 'a1', at: '2026-09-01T10:00:00Z' },
+        { lessonId: 'b1', at: '2026-09-02T10:00:00Z' },
+        { lessonId: 'a2', at: '2026-09-03T10:00:00Z' },
+      ],
+      courseOf,
+    )
+    expect(ids).toEqual(['A', 'B'])
+  })
+
+  it('урок неизвестного курса пропускается', () => {
+    expect(recentCourseIds([{ lessonId: 'x', at: '2026-09-01' }], new Map())).toEqual([])
   })
 })

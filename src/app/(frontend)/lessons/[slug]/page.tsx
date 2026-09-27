@@ -10,6 +10,8 @@ import { LessonNotes } from '@/components/lesson/LessonNotes'
 import { LessonComments } from '@/components/lesson/LessonComments'
 import { CourseSidebar } from '@/components/course/CourseSidebar'
 import { collectAllPages } from '@/lib/paginate'
+import { relationKey } from '@/lib/course-lessons'
+import { lessonPosition, orderCourseLessons, type LessonPosition } from '@/lib/roadmap-next-step'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -58,6 +60,7 @@ export default async function LessonPage({ params }: Props) {
   }> = []
   let allCourseLessons: typeof lessonResult.docs = []
   let completedLessonIds = new Set<string>()
+  let position: LessonPosition | null = null
 
   if (course) {
     const [sectionDocs, lessonDocs] = await Promise.all([
@@ -92,6 +95,21 @@ export default async function LessonPage({ params }: Props) {
     ])
 
     allCourseLessons = lessonDocs
+
+    // Порядок как на странице курса: секции по их порядку, уроки скрытых секций не участвуют.
+    const sectionRank = new Map(sectionDocs.map((section, index) => [String(section.id), index]))
+    const ordered = orderCourseLessons(
+      lessonDocs.map((l) => ({
+        id: String(l.id),
+        slug: l.slug,
+        title: l.title,
+        courseId: String(course.id),
+        sectionId: relationKey(l.section),
+        order: l.order ?? 0,
+      })),
+      sectionRank,
+    )
+    position = lessonPosition(ordered.get(String(course.id)) ?? [], String(lesson.id))
 
     // Прогресс — только по урокам этого курса
     if (user) {
@@ -169,29 +187,8 @@ export default async function LessonPage({ params }: Props) {
     }
   }
 
-  // Prev/Next навигация (учитываем порядок секций)
-  let prevLesson: { slug: string; title: string } | null = null
-  let nextLesson: { slug: string; title: string } | null = null
-
-  if (allCourseLessons.length > 0) {
-    // Сортируем по section.order → lesson.order
-    const sorted = [...allCourseLessons].sort((a, b) => {
-      const aSectionOrder = typeof a.section === 'object' && a.section ? (a.section.order ?? 0) : 999
-      const bSectionOrder = typeof b.section === 'object' && b.section ? (b.section.order ?? 0) : 999
-      if (aSectionOrder !== bSectionOrder) return aSectionOrder - bSectionOrder
-      return (a.order ?? 0) - (b.order ?? 0)
-    })
-
-    const currentIndex = sorted.findIndex((l) => l.id === lesson.id)
-    if (currentIndex > 0) {
-      const prev = sorted[currentIndex - 1]
-      prevLesson = { slug: prev.slug, title: prev.title }
-    }
-    if (currentIndex < sorted.length - 1) {
-      const next = sorted[currentIndex + 1]
-      nextLesson = { slug: next.slug, title: next.title }
-    }
-  }
+  const prevLesson = position?.prev ?? null
+  const nextLesson = position?.next ?? null
 
   // Прогресс этого урока — используем уже загруженные данные + отдельный запрос для progressId
   const isCompleted = completedLessonIds.has(String(lesson.id))
@@ -218,6 +215,8 @@ export default async function LessonPage({ params }: Props) {
   const hasSidebar = sidebarSections.length > 0
   const totalLessons = allCourseLessons.length
   const totalCompleted = allCourseLessons.filter((l) => completedLessonIds.has(String(l.id))).length
+  // Остальные уроки курса пройдены — отметка этого завершает курс.
+  const othersDone = allCourseLessons.every((l) => l.id === lesson.id || completedLessonIds.has(String(l.id)))
 
   return (
     <div className={hasSidebar ? 'flex gap-6' : ''}>
@@ -240,10 +239,18 @@ export default async function LessonPage({ params }: Props) {
           {lesson.description && (
             <p className="text-muted-foreground">{lesson.description}</p>
           )}
-          {lesson.estimatedMinutes && (
-            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              ~{lesson.estimatedMinutes} мин
+          {(position || lesson.estimatedMinutes) && (
+            <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              {position && (
+                <span>
+                  Урок {position.index} из {position.total}
+                </span>
+              )}
+              {lesson.estimatedMinutes && (
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-4 w-4" />~{lesson.estimatedMinutes} мин
+                </span>
+              )}
             </p>
           )}
         </div>
@@ -260,16 +267,14 @@ export default async function LessonPage({ params }: Props) {
             lessonId={lesson.id}
             isCompleted={isCompleted}
             progressId={progressId}
+            next={nextLesson}
+            completesCourse={othersDone}
+            courseHref={course ? `/courses/${course.slug}` : null}
           />
         </div>
 
-        {/* Обсуждение */}
-        <div className="border-t border-border pt-8">
-          <LessonComments lessonId={lesson.id} />
-        </div>
-
         {/* Навигация prev/next */}
-        <div className="flex items-center justify-between border-t border-border pt-6">
+        <div className="flex items-center justify-between gap-4">
           {prevLesson ? (
             <Link
               href={`/lessons/${prevLesson.slug}`}
@@ -292,6 +297,11 @@ export default async function LessonPage({ params }: Props) {
           ) : (
             <div />
           )}
+        </div>
+
+        {/* Обсуждение */}
+        <div className="border-t border-border pt-8">
+          <LessonComments lessonId={lesson.id} />
         </div>
       </div>
 

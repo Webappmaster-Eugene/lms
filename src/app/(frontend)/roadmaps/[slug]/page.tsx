@@ -12,6 +12,7 @@ import {
   type LessonRef,
 } from '@/lib/roadmap-next-step'
 import { collectAllPages } from '@/lib/paginate'
+import { pluralize } from '@/lib/utils'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, PartyPopper } from 'lucide-react'
 import { MiroEmbed } from '@/components/lesson/MiroEmbed'
@@ -263,8 +264,8 @@ export default async function RoadmapDetailPage({ params }: Props) {
       <div>
         <h1 className="text-2xl font-bold text-foreground">{roadmap.title}</h1>
         <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
-          <span>{coursesWithProgress.length} курсов</span>
-          <span>{totalLessons} уроков</span>
+          <span>{pluralize(coursesWithProgress.length, 'курс', 'курса', 'курсов')}</span>
+          <span>{pluralize(totalLessons, 'урок', 'урока', 'уроков')}</span>
           {graphNodes.length > 0 && (
             <span className="hidden sm:inline">
               Нажмите на тему, чтобы увидеть её курсы и продолжить

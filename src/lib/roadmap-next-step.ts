@@ -92,3 +92,35 @@ export function blockingPrerequisites(
 ): string[] {
   return prerequisites.filter((p) => isCourseComplete(p.id) === false).map((p) => p.title)
 }
+
+export type LessonPosition = {
+  /** Номер урока в курсе, с единицы. */
+  index: number
+  total: number
+  prev: LessonLink | null
+  next: LessonLink | null
+}
+
+/** Место урока в курсе. null — урок не виден в программе (скрытая секция). */
+export function lessonPosition(ordered: LessonRef[], lessonId: string): LessonPosition | null {
+  const i = ordered.findIndex((l) => l.id === lessonId)
+  if (i === -1) return null
+  const link = (l: LessonRef | undefined) => (l ? { slug: l.slug, title: l.title } : null)
+  return { index: i + 1, total: ordered.length, prev: link(ordered[i - 1]), next: link(ordered[i + 1]) }
+}
+
+export type ProgressTouch = { lessonId: string; at: string }
+
+/**
+ * Курсы в порядке последней активности ученика: к тому, чем он занимался
+ * вчера, возвращаются чаще, чем к первому курсу каталога.
+ */
+export function recentCourseIds(touches: ProgressTouch[], courseOfLesson: Map<string, string>): string[] {
+  const sorted = [...touches].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+  const seen = new Set<string>()
+  for (const touch of sorted) {
+    const courseId = courseOfLesson.get(touch.lessonId)
+    if (courseId) seen.add(courseId)
+  }
+  return [...seen]
+}

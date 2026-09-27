@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import Link from 'next/link'
+import { pluralize } from '@/lib/utils'
 import { BookOpen, Clock } from 'lucide-react'
 import { collectAllPages } from '@/lib/paginate'
 
@@ -129,13 +130,13 @@ export default async function CoursesListPage() {
                       {course.roadmapTitle}
                     </span>
                   )}
-                  <span>{course.totalLessons} уроков</span>
-                  {course.estimatedHours != null && (
+                  <span>{pluralize(course.totalLessons, 'урок', 'урока', 'уроков')}</span>
+                  {course.estimatedHours ? (
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       {course.estimatedHours}ч
                     </span>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
