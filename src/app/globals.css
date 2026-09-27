@@ -164,3 +164,11 @@ body {
 .dark .shiki {
   background-color: var(--shiki-dark-bg) !important;
 }
+
+/* Печать (сертификат в PDF): тёмная тема не должна уходить на бумагу фоном. */
+@media print {
+  html,
+  body {
+    background: #fff !important;
+  }
+}
