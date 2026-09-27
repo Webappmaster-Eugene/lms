@@ -1,9 +1,8 @@
 import type { Metadata } from 'next'
 import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
-import Link from 'next/link'
-import { pluralize } from '@/lib/utils'
-import { BookOpen, Clock } from 'lucide-react'
+import { BookOpen } from 'lucide-react'
+import { CourseCatalog } from '@/components/course/CourseCatalog'
 import { collectAllPages } from '@/lib/paginate'
 
 export const metadata: Metadata = {
@@ -113,48 +112,7 @@ export default async function CoursesListPage() {
       {coursesWithProgress.length === 0 ? (
         <p className="text-center text-muted-foreground py-12">Курсы скоро появятся</p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {coursesWithProgress.map((course) => (
-            <Link
-              key={course.id}
-              href={`/courses/${course.slug}`}
-              className="group flex flex-col rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/50 hover:bg-accent/50 sm:p-5"
-            >
-              <div className="flex-1">
-                <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                  {course.title}
-                </h3>
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  {course.roadmapTitle && (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">
-                      {course.roadmapTitle}
-                    </span>
-                  )}
-                  <span>{pluralize(course.totalLessons, 'урок', 'урока', 'уроков')}</span>
-                  {course.estimatedHours ? (
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {course.estimatedHours}ч
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-1.5">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{course.completedCount}/{course.totalLessons}</span>
-                  <span>{course.progressPercent}%</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all"
-                    style={{ width: `${course.progressPercent}%` }}
-                  />
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+        <CourseCatalog courses={coursesWithProgress} />
       )}
     </div>
   )
