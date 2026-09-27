@@ -12,6 +12,7 @@ import { publicCases, normalizeCases, starterCodeFor, taskLanguages } from '@/li
 import { lexicalToMarkdown } from '@/lib/lexical'
 import { cn } from '@/lib/utils'
 import { collectAllPages } from '@/lib/paginate'
+import { nextUnsolvedTask } from '@/lib/trainer/next-task'
 import type { ClientProgress, ClientTaskSpec } from '@/lib/trainer/api'
 import type { TrainerCompany, TrainerTag } from '@/lib/trainer/constants'
 import type { TrainerDifficulty, TrainerLanguage } from '@/lib/trainer/types'
@@ -100,6 +101,31 @@ export default async function TaskPage({ params }: Props) {
   const next = currentIndex >= 0 && currentIndex < siblings.length - 1
     ? siblings[currentIndex + 1]
     : null
+
+  const solvedInTopic =
+    user && siblings.length > 0
+      ? await collectAllPages(
+          ({ page, limit }) =>
+            payload.find({
+              collection: 'user-trainer-progress',
+              where: {
+                user: { equals: user.id },
+                task: { in: siblings.map((t) => t.id) },
+                isCompleted: { equals: true },
+              },
+              select: { task: true },
+              depth: 0,
+              sort: 'id',
+              page,
+              limit,
+            }),
+          { label: `решённые задачи темы «${topic.slug}»` },
+        )
+      : []
+  const solvedIds = new Set(
+    solvedInTopic.map((p) => String(typeof p.task === 'object' && p.task ? p.task.id : p.task)),
+  )
+  const nextOpen = nextUnsolvedTask(siblings, task.id, solvedIds)
 
   let progress: ClientProgress = {
     isCompleted: false,
@@ -249,7 +275,12 @@ export default async function TaskPage({ params }: Props) {
         </div>
 
         <div className="min-w-0 lg:h-full lg:min-h-0">
-          <TrainerWorkspace task={clientTask} progress={progress} />
+          <TrainerWorkspace
+            task={clientTask}
+            progress={progress}
+            nextTask={nextOpen ? { href: `/trainer/${topicSlug}/${nextOpen.slug}`, title: nextOpen.title } : null}
+            topicHref="/trainer"
+          />
         </div>
       </div>
     </div>

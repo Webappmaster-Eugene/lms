@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
 /**
  * Заглушки внешних пакетов для компонентных тестов.
@@ -153,24 +153,51 @@ export function linkMock() {
 }
 
 /** Редактор кода: textarea вместо Monaco — событий и значения достаточно. */
+/** Команды, которые редактор зарегистрировал через addCommand: ключ — сочетание клавиш. */
+export const monacoCommands = new Map<number, () => void>()
+
+/** Коды клавиш Monaco, которыми пользуется редактор тренажёра. */
+export const MONACO_KEYS = { CtrlCmd: 2048, Shift: 1024, Enter: 3 } as const
+
 export function monacoMock() {
-  return {
-    default: ({
-      value,
-      onChange,
-      language,
-    }: {
-      value?: string
-      onChange?: (value: string | undefined) => void
-      language?: string
-    }) => (
+  const fakeMonaco = {
+    KeyMod: { CtrlCmd: MONACO_KEYS.CtrlCmd, Shift: MONACO_KEYS.Shift },
+    KeyCode: { Enter: MONACO_KEYS.Enter },
+  }
+  const fakeInstance = {
+    addCommand: (keybinding: number, handler: () => void) => monacoCommands.set(keybinding, handler),
+    createDecorationsCollection: () => ({ set: () => {} }),
+    getModel: () => null,
+  }
+
+  function MonacoStub({
+    value,
+    onChange,
+    language,
+    onMount,
+  }: {
+    value?: string
+    onChange?: (value: string | undefined) => void
+    language?: string
+    onMount?: (instance: unknown, monaco: unknown) => void
+  }) {
+    useEffect(() => {
+      onMount?.(fakeInstance, fakeMonaco)
+      // Monaco вызывает onMount один раз — как и заглушка.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+    return (
       <textarea
         data-testid="monaco"
         data-language={language}
         value={value ?? ''}
         onChange={(event) => onChange?.(event.target.value)}
       />
-    ),
+    )
+  }
+
+  return {
+    default: MonacoStub,
     loader: { config: vi.fn() },
     useMonaco: () => null,
   }

@@ -11,6 +11,7 @@ vi.mock('@/components/ui/Toast', () => ({ useToast: () => ({ toast }) }))
 vi.mock('@monaco-editor/react', async () => (await import('../helpers/component-mocks')).monacoMock())
 vi.mock('react-markdown', async () => (await import('../helpers/component-mocks')).markdownMock())
 vi.mock('remark-gfm', () => ({ default: () => {} }))
+vi.mock('next/link', async () => (await import('../helpers/component-mocks')).linkMock())
 vi.mock('rehype-raw', () => ({ default: () => {} }))
 
 const run = vi.fn()
@@ -19,6 +20,7 @@ vi.mock('@/components/trainer/useCodeRunner', () => ({
 }))
 
 const { TrainerWorkspace } = await import('@/components/trainer/TrainerWorkspace')
+const { monacoCommands, MONACO_KEYS } = await import('../helpers/component-mocks')
 const { TaskSidePanel } = await import('@/components/trainer/TaskSidePanel')
 
 import type { ClientProgress, ClientTaskSpec } from '@/lib/trainer/api'
@@ -171,6 +173,54 @@ describe('рабочее место тренажёра', () => {
       await user.click(screen.getByRole('button', { name: /Отправить/ }))
 
       await waitFor(() => expect(toast).toHaveBeenCalled())
+    })
+  })
+
+  describe('после решения', () => {
+    const nextTask = { href: '/trainer/js-core/debounce', title: 'Debounce' }
+
+    it('ведёт в следующую нерешённую задачу', async () => {
+      const user = userEvent.setup()
+      render(<TrainerWorkspace task={task} progress={progress} nextTask={nextTask} topicHref="/trainer" />)
+      expect(screen.queryByRole('link', { name: /Debounce/ })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: /Отправить/ }))
+
+      expect(await screen.findByRole('link', { name: /Debounce/ })).toHaveAttribute('href', nextTask.href)
+    })
+
+    it('когда в теме всё решено — возврат к темам', () => {
+      render(<TrainerWorkspace task={task} progress={{ ...progress, isCompleted: true }} topicHref="/trainer" />)
+
+      expect(screen.getByText('Все задачи темы решены.')).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'К темам тренажёра' })).toHaveAttribute('href', '/trainer')
+    })
+
+    it('непройденная проверка переход не показывает', async () => {
+      global.fetch = vi.fn(async () =>
+        Response.json({ result: { ...passed, status: 'failed', passedCount: 0 }, attempts: 1 }),
+      ) as unknown as typeof fetch
+      const user = userEvent.setup()
+      render(<TrainerWorkspace task={task} progress={progress} nextTask={nextTask} />)
+
+      await user.click(screen.getByRole('button', { name: /Отправить/ }))
+
+      await waitFor(() => expect(global.fetch).toHaveBeenCalled())
+      expect(screen.queryByRole('link', { name: /Debounce/ })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('горячие клавиши', () => {
+    it('Ctrl+Enter запускает в браузере, Ctrl+Shift+Enter отправляет на сервер', async () => {
+      render(<TrainerWorkspace task={task} progress={progress} />)
+
+      monacoCommands.get(MONACO_KEYS.CtrlCmd | MONACO_KEYS.Enter)?.()
+      await waitFor(() => expect(run).toHaveBeenCalled())
+      expect(global.fetch).not.toHaveBeenCalled()
+
+      await waitFor(() => screen.getByRole('button', { name: /Запустить/ }))
+      monacoCommands.get(MONACO_KEYS.CtrlCmd | MONACO_KEYS.Shift | MONACO_KEYS.Enter)?.()
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/trainer/submit', expect.anything()))
     })
   })
 

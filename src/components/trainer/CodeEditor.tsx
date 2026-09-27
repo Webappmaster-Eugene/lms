@@ -31,6 +31,10 @@ type CodeEditorProps = {
   /** Строка, к которой относится ошибка прогона. */
   errorLine?: number
   height?: number | string
+  /** Ctrl/⌘+Enter — как «Запустить» в LeetCode и Codewars. */
+  onRun?: () => void
+  /** Ctrl/⌘+Shift+Enter — отправка на проверку. */
+  onSubmit?: () => void
 }
 
 /**
@@ -105,11 +109,19 @@ export function CodeEditor({
   diagnostics,
   errorLine,
   height = '100%',
+  onRun,
+  onSubmit,
 }: CodeEditorProps) {
   const { resolvedTheme } = useTheme()
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<Monaco | null>(null)
   const decorationsRef = useRef<editor.IEditorDecorationsCollection | null>(null)
+  // Команды Monaco регистрируются один раз при монтировании, а обработчики
+  // меняются на каждом рендере — поэтому вызываются через ref.
+  const shortcutsRef = useRef({ onRun, onSubmit })
+  useEffect(() => {
+    shortcutsRef.current = { onRun, onSubmit }
+  }, [onRun, onSubmit])
 
   // Темы регистрируются ДО создания редактора: если сделать это в onMount,
   // первый кадр отрисуется дефолтной темой Monaco — в тёмном интерфейсе это
@@ -123,6 +135,10 @@ export function CodeEditor({
     editorRef.current = instance
     monacoRef.current = monaco
     decorationsRef.current = instance.createDecorationsCollection([])
+    instance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => shortcutsRef.current.onRun?.())
+    instance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter, () =>
+      shortcutsRef.current.onSubmit?.(),
+    )
   }, [])
 
   // Маркеры диагностик из серверного компилятора: свои, отдельно от тех, что

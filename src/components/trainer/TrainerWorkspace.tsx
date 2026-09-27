@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Play, RotateCcw, Send, Trophy } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowRight, Play, RotateCcw, Send, Trophy } from 'lucide-react'
 
 import { CodeEditor } from './CodeEditor'
 import { TestResultsPanel } from './TestResultsPanel'
@@ -29,6 +30,10 @@ import type { TrainerDiagnostic, TrainerLanguage, TrainerRunResult } from '@/lib
 type TrainerWorkspaceProps = {
   task: ClientTaskSpec
   progress: ClientProgress
+  /** Ближайшая нерешённая задача темы — к ней ведёт кнопка после решения. */
+  nextTask?: { href: string; title: string } | null
+  /** Куда вернуться, когда в теме решено всё. */
+  topicHref?: string
 }
 
 /**
@@ -63,7 +68,7 @@ function writeDraft(taskId: string, language: TrainerLanguage, code: string): vo
   }
 }
 
-export function TrainerWorkspace({ task, progress }: TrainerWorkspaceProps) {
+export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }: TrainerWorkspaceProps) {
   const router = useRouter()
   const { toast: showToast } = useToast()
   const runner = useCodeRunner()
@@ -322,6 +327,7 @@ export function TrainerWorkspace({ task, progress }: TrainerWorkspaceProps) {
           type="button"
           onClick={handleRun}
           disabled={busy || code.trim().length === 0}
+          title="Ctrl+Enter (⌘+Enter на Mac)"
           className="inline-flex min-h-[38px] items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
         >
           <Play className="h-4 w-4" />
@@ -332,6 +338,7 @@ export function TrainerWorkspace({ task, progress }: TrainerWorkspaceProps) {
           type="button"
           onClick={handleSubmit}
           disabled={busy || code.trim().length === 0}
+          title="Ctrl+Shift+Enter (⌘+Shift+Enter на Mac)"
           className="inline-flex min-h-[38px] items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
         >
           <Send className="h-4 w-4" />
@@ -368,6 +375,8 @@ export function TrainerWorkspace({ task, progress }: TrainerWorkspaceProps) {
           diagnostics={diagnostics}
           errorLine={focusLine}
           height="100%"
+          onRun={handleRun}
+          onSubmit={handleSubmit}
         />
       </div>
 
@@ -385,6 +394,32 @@ export function TrainerWorkspace({ task, progress }: TrainerWorkspaceProps) {
       />
 
       {hiddenNote && <p className="text-xs text-muted-foreground">{hiddenNote}</p>}
+
+      {/* Решено — следующий шаг сразу под результатом, а не кнопкой «Далее» в шапке. */}
+      {completed && !busy && (nextTask || topicHref) && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-success/40 bg-success/10 p-3">
+          <p className="flex-1 text-sm text-foreground">
+            {nextTask ? 'Задача решена. Следующая нерешённая в теме:' : 'Все задачи темы решены.'}
+          </p>
+          {nextTask ? (
+            <Link
+              href={nextTask.href}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <span className="truncate">{nextTask.title}</span>
+              <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+            </Link>
+          ) : topicHref ? (
+            <Link href={topicHref} className="text-sm font-medium text-primary underline-offset-2 hover:underline">
+              К темам тренажёра
+            </Link>
+          ) : null}
+        </div>
+      )}
+
+      <p className="hidden text-xs text-muted-foreground lg:block">
+        Ctrl+Enter — запустить, Ctrl+Shift+Enter — отправить (на Mac — ⌘)
+      </p>
     </div>
   )
 }

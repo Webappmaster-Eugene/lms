@@ -26,49 +26,61 @@ export default async function TrainerPage() {
     { label: 'темы тренажёра' },
   )
 
-  // Подсчитываем кол-во задач и прогресс для каждой темы
-  const topicsWithStats = await Promise.all(
-    topics.map(async (topic) => {
-      const taskIds = (
-        await collectAllPages(
+  // Задачи и прогресс по всем темам сразу: по паре запросов на тему страница
+  // заметно тормозила на каталоге из десятка тем.
+  const topicIds = topics.map((t) => t.id)
+  const taskDocs =
+    topicIds.length > 0
+      ? await collectAllPages(
           ({ page, limit }) =>
             payload.find({
               collection: 'trainer-tasks',
-              where: {
-                topic: { equals: topic.id },
-                isPublished: { equals: true },
-              },
-              select: {},
+              where: { topic: { in: topicIds }, isPublished: { equals: true } },
+              select: { topic: true },
               depth: 0,
               sort: 'id',
               page,
               limit,
             }),
-          { label: `задачи темы ${topic.id}` },
+          { label: 'задачи тренажёра' },
         )
-      ).map((t) => String(t.id))
+      : []
+  const solvedDocs =
+    user && taskDocs.length > 0
+      ? await collectAllPages(
+          ({ page, limit }) =>
+            payload.find({
+              collection: 'user-trainer-progress',
+              where: {
+                user: { equals: user.id },
+                task: { in: taskDocs.map((t) => t.id) },
+                isCompleted: { equals: true },
+              },
+              select: { task: true },
+              depth: 0,
+              sort: 'id',
+              page,
+              limit,
+            }),
+          { label: `решённые задачи пользователя ${user.id}` },
+        )
+      : []
 
-      let completedCount = 0
-      if (user && taskIds.length > 0) {
-        const completed = await payload.find({
-          collection: 'user-trainer-progress',
-          where: {
-            user: { equals: user.id },
-            task: { in: taskIds },
-            isCompleted: { equals: true },
-          },
-          limit: 0, // только totalDocs
-        })
-        completedCount = completed.totalDocs
-      }
+  const idOf = (ref: unknown): string =>
+    String(ref !== null && typeof ref === 'object' ? (ref as { id: unknown }).id : ref)
+  const solved = new Set(solvedDocs.map((p) => idOf(p.task)))
+  const stats = new Map<string, { total: number; done: number }>()
+  for (const t of taskDocs) {
+    const entry = stats.get(idOf(t.topic)) ?? { total: 0, done: 0 }
+    entry.total += 1
+    if (solved.has(String(t.id))) entry.done += 1
+    stats.set(idOf(t.topic), entry)
+  }
 
-      return {
-        ...topic,
-        totalTasks: taskIds.length,
-        completedTasks: completedCount,
-      }
-    }),
-  )
+  const topicsWithStats = topics.map((topic) => {
+    const { total = 0, done = 0 } = stats.get(String(topic.id)) ?? {}
+    return { ...topic, totalTasks: total, completedTasks: done }
+  })
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
