@@ -24,6 +24,9 @@ export default tseslint.config(
       'public/monaco/**',
       // Харнесс тренажёра вшивается строкой; генерируется build-harness.mjs
       'src/lib/trainer/harness-source.generated.ts',
+      // Отчёты и артефакты Playwright
+      'playwright-report/**',
+      'test-results/**',
     ],
   },
 

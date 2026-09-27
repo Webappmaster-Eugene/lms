@@ -20,7 +20,7 @@
 | Серверная песочница тренажёра | `app/src/server/trainer/` |
 | Каталог задач тренажёра (кодом) | `app/src/data/trainer/` |
 | Компоненты | `app/src/components/` |
-| Тесты | `app/tests/` — `unit/`, `components/`, `smoke/` |
+| Тесты | `app/tests/` — `unit/`, `components/`, `smoke/` (без БД), `integration/`, `e2e/` (Docker); см. `app/docs/testing.md` |
 | Лендинг (отдельный npm-пакет) | `app/landing/` |
 | Документация | `app/docs/` |
 | Инфраструктура агентов | `app/scripts/codex/`, `app/docs/CODEX.md` |
@@ -42,6 +42,18 @@ pnpm build
 pnpm smoke         # lint + typecheck + test + build именно в этом порядке
 ```
 
+Тесты с настоящей БД — в одноразовом Docker-контейнере `lms-test-pg` (порт 55433),
+подробности в `app/docs/testing.md`:
+
+```sh
+pnpm test:integration   # Payload Local API + PostgreSQL: схема, права, хуки, миграции, сиды, API
+pnpm test:e2e           # Playwright против next start с фиксированным сидом (+ HTTP API)
+pnpm test:content       # SEO лендинга, битые ссылки, axe-core
+pnpm test:visual        # скриншоты в контейнере mcr.microsoft.com/playwright
+pnpm test:visual:update # переснять эталоны скриншотов
+pnpm test:db:down       # удалить тестовый контейнер
+```
+
 Порядок в `smoke` не случайный: линтер и типы отрабатывают за секунды, сборка —
 за минуты. Ставить сборку первой значит долго ждать ради неиспользованного импорта.
 
@@ -56,7 +68,9 @@ pnpm seed:trainer             # каталог задач тренажёра, и
 `pnpm build` требует `DATABASE_URL` и `PAYLOAD_SECRET`: Payload собирает конфиг на
 этапе сборки. Без них сборка не проходит — это не повод объявлять её пройденной.
 
-Postgres локально не предполагается. `pnpm test` БД не поднимает и не требует.
+Постоянный Postgres локально не предполагается. `pnpm test` БД не поднимает и не требует;
+`test:integration`, `test:e2e`, `test:content` и `test:visual` поднимают одноразовый
+контейнер сами (нужен Docker).
 
 ## 3. Правила работы
 
@@ -166,3 +180,20 @@ Codex видит те же скиллы через адаптеры в `app/.age
 В итоговом ответе: что сделано, какие проверки реально выполнены и что осталось
 непроверенным. Недоступный инструмент или отсутствующая переменная окружения —
 это пропущенная проверка, а не пройденная; так и пиши.
+
+## 10. Сайты `mentorcareer-site` и `webappmaster-site`: тесты
+
+Это отдельные Git-репозитории (Next.js 15 + Payload 3 + PostgreSQL), не часть `app/`.
+Инфраструктура тестов у них одинаковая; всё, что отличается, — в `tests/support/site.mjs`
+(порты, домен, тексты кнопок, известные дефекты). Подробности — раздел «Тесты» в
+`CLAUDE.md` каждого сайта.
+
+| Сайт | Тестовая PostgreSQL (Docker) | e2e-сервер |
+|---|---|---|
+| mentorcareer-site | `sites-test-mc-pg`, порт 55434 | 3200 |
+| webappmaster-site | `sites-test-wam-pg`, порт 55435 | 3210 |
+
+`pnpm test:integration` (Payload Local API), `pnpm test:e2e` (Playwright: API, e2e,
+контент/SEO/a11y, CMS → сайт, админка), `pnpm test:visual` (скриншоты только в
+контейнере Playwright). CI — `.github/workflows/tests.yml` в каждом репозитории.
+Контейнеры и тома тестов называются с префиксом `sites-test-`.

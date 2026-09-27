@@ -36,6 +36,11 @@ media
 # Logs
 *.log
 
+# Отчёты, артефакты и сессии Playwright
+playwright-report
+test-results
+tests/e2e/.auth
+
 # Documentation & misc
 *.md
 LICENSE

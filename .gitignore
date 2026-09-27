@@ -47,3 +47,8 @@ public/monaco/
 .codex/state/
 .codex/config.toml
 .codex/mcp.local.json
+
+# Playwright: отчёты, артефакты и сохранённые сессии тестов
+playwright-report/
+test-results/
+tests/e2e/.auth/

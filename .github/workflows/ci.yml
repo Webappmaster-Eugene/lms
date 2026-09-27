@@ -1,0 +1,152 @@
+name: CI
+
+# Проверки на каждый PR и push в main. Сам деплой делает Dokploy по push в main —
+# этот workflow его не запускает и не блокирует, но красный CI — повод не мержить.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+  ASTRO_TELEMETRY_DISABLED: '1'
+  # Версия образа должна совпадать с @playwright/test в package.json:
+  # эталоны скриншотов сняты именно в нём (scripts/visual-docker.mjs).
+  PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
+
+jobs:
+  quality:
+    name: lint · typecheck · unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  integration:
+    name: integration (Payload + PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: lms
+          POSTGRES_PASSWORD: lms
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U lms" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      # scripts/test-db.mjs не поднимает свой контейнер, если адрес задан явно.
+      TEST_PG_URL: postgresql://lms:lms@localhost:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:integration
+
+  e2e:
+    name: e2e · api · content/a11y
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: lms
+          POSTGRES_PASSWORD: lms
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U lms" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      TEST_PG_URL: postgresql://lms:lms@postgres:5432
+      E2E_BUILD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-landing-${{ hashFiles('landing/package-lock.json') }}
+      - run: pnpm install --frozen-lockfile
+      - run: npm ci --prefix landing
+      - run: pnpm test:e2e:all
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-e2e-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  visual:
+    name: visual regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: lms
+          POSTGRES_PASSWORD: lms
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U lms" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      TEST_PG_URL: postgresql://lms:lms@postgres:5432
+      E2E_BUILD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-landing-${{ hashFiles('landing/package-lock.json') }}
+      - run: pnpm install --frozen-lockfile
+      - run: npm ci --prefix landing
+      # Уже внутри контейнера Playwright: браузер и шрифты те же, что при съёмке эталонов.
+      - run: pnpm exec playwright test --project=visual
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-visual-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
