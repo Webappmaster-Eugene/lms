@@ -31,13 +31,21 @@ export default function FrontendLayout({ children }: { children: React.ReactNode
           <ToastProvider>
             <SidebarProvider>
               <div className="flex min-h-screen overflow-x-hidden">
-                <Sidebar />
-                <div className="flex min-w-0 flex-1 flex-col lg:ml-64">
-                  <Header />
-                  <main className="flex-1 overflow-x-hidden px-4 py-6 lg:px-8">{children}</main>
-                  <Footer />
+                <div className="contents print:hidden">
+                  <Sidebar />
                 </div>
-                <BottomNav />
+                <div className="flex min-w-0 flex-1 flex-col lg:ml-64 print:ml-0">
+                  <div className="contents print:hidden">
+                    <Header />
+                  </div>
+                  <main className="flex-1 overflow-x-hidden px-4 py-6 lg:px-8">{children}</main>
+                  <div className="contents print:hidden">
+                    <Footer />
+                  </div>
+                </div>
+                <div className="contents print:hidden">
+                  <BottomNav />
+                </div>
               </div>
             </SidebarProvider>
           </ToastProvider>

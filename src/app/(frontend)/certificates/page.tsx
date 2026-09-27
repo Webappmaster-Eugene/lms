@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { Award } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { collectAllPages } from '@/lib/paginate'
@@ -41,13 +42,17 @@ export default async function CertificatesPage() {
           <p className="text-muted-foreground">
             Завершите курс или роадмап, чтобы получить сертификат
           </p>
+          <Link href="/" className="text-sm font-medium text-primary underline-offset-2 hover:underline">
+            Продолжить обучение
+          </Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {docs.map((cert) => (
-            <div
+            <Link
               key={cert.id}
-              className="rounded-xl border border-border bg-card p-6 space-y-4"
+              href={`/certificates/${cert.id}`}
+              className="block rounded-xl border border-border bg-card p-6 space-y-4 transition-colors hover:border-primary/50"
             >
               <div className="flex items-start gap-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-warning/10">
@@ -80,7 +85,7 @@ export default async function CertificatesPage() {
                   {user.firstName} {user.lastName}
                 </p>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}
