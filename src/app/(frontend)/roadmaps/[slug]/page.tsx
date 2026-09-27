@@ -3,13 +3,21 @@ import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { groupCoursesByNode, summarizeNode } from '@/lib/roadmap-node-courses'
+import {
+  blockingPrerequisites,
+  nextLesson,
+  orderCourseLessons,
+  pickNextStep,
+  type LessonLink,
+  type LessonRef,
+} from '@/lib/roadmap-next-step'
 import { collectAllPages } from '@/lib/paginate'
 import Link from 'next/link'
-import { ArrowLeft, BookOpen, CheckCircle2, Clock, Lock } from 'lucide-react'
+import { ArrowLeft, ArrowRight, PartyPopper } from 'lucide-react'
 import { MiroEmbed } from '@/components/lesson/MiroEmbed'
-import { RoadmapGraph } from '@/components/roadmap/RoadmapGraph'
-import type { GraphEdge, AnnotationGraphNode, AnyRoadmapNode } from '@/components/roadmap/types'
-import { STAGE_ANNOTATIONS, STAGE_LEVELS } from '@/components/roadmap/stage-colors'
+import { RoadmapExplorer } from '@/components/roadmap/RoadmapExplorer'
+import type { GraphEdge, AnnotationGraphNode, AnyRoadmapNode, NodeCourse } from '@/components/roadmap/types'
+import { STAGE_ANNOTATIONS, STAGE_LEVELS, STAGE_ORDER } from '@/components/roadmap/stage-colors'
 import type {
   RoadmapNode as PayloadRoadmapNode,
   RoadmapEdge as PayloadRoadmapEdge,
@@ -68,7 +76,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
 
   const courseIds = courseDocs.map((c) => String(c.id))
 
-  const [lessonDocs, progressDocs] = await Promise.all([
+  const [lessonDocs, sectionDocs, progressDocs] = await Promise.all([
     courseIds.length > 0
       ? collectAllPages(
           ({ page, limit }) =>
@@ -78,13 +86,30 @@ export default async function RoadmapDetailPage({ params }: Props) {
                 course: { in: courseIds },
                 isPublished: { equals: true },
               },
-              select: { course: true },
+              select: { course: true, section: true, order: true, slug: true, title: true },
               depth: 0,
               sort: 'id',
               page,
               limit,
             }),
           { label: `уроки роадмапа «${roadmap.slug}»` },
+        )
+      : [],
+    // Порядок секций нужен, чтобы «Продолжить» вёл в тот же урок, что первым
+    // стоит на странице курса.
+    courseIds.length > 0
+      ? collectAllPages(
+          ({ page, limit }) =>
+            payload.find({
+              collection: 'sections',
+              where: { course: { in: courseIds }, isPublished: { equals: true } },
+              select: { order: true },
+              depth: 0,
+              sort: ['order', 'id'],
+              page,
+              limit,
+            }),
+          { label: `секции роадмапа «${roadmap.slug}»` },
         )
       : [],
     user
@@ -120,6 +145,22 @@ export default async function RoadmapDetailPage({ params }: Props) {
     progressDocs.map((p) => String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson)),
   )
 
+  const sectionRank = new Map(sectionDocs.map((section, index) => [String(section.id), index]))
+  const lessonRefs: LessonRef[] = lessonDocs.map((lesson) => ({
+    id: String(lesson.id),
+    slug: lesson.slug,
+    title: lesson.title,
+    courseId: String(resolveRelationId(lesson.course)),
+    sectionId: resolveRelationId(lesson.section),
+    order: lesson.order ?? 0,
+  }))
+  const orderedLessons = orderCourseLessons(lessonRefs, sectionRank)
+
+  const isCourseComplete = (courseId: string): boolean | null => {
+    const ids = lessonsByCourse.get(courseId)
+    return ids && ids.length > 0 ? ids.every((id) => completedLessonIds.has(id)) : null
+  }
+
   // Вычисляем прогресс для каждого курса (без доп. запросов!)
   const coursesWithProgress = courseDocs.map((course) => {
     const cId = String(course.id)
@@ -144,11 +185,17 @@ export default async function RoadmapDetailPage({ params }: Props) {
       }
     }
 
+    const prerequisites = (course.prerequisites ?? []).flatMap((p) =>
+      typeof p === 'object' ? [{ id: String(p.id), title: p.title }] : [],
+    )
+
     return {
       id: cId,
       title: course.title,
       slug: course.slug,
       estimatedHours: course.estimatedHours,
+      nextLesson: nextLesson(orderedLessons.get(cId) ?? [], completedLessonIds),
+      blockedBy: prerequisitesMet ? [] : blockingPrerequisites(prerequisites, isCourseComplete),
       nodeId: resolveRelationId(course.roadmapNode),
       totalLessons,
       completedCount,
@@ -162,6 +209,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
   const totalLessons = coursesWithProgress.reduce((s, c) => s + c.totalLessons, 0)
   const completedTotal = coursesWithProgress.reduce((s, c) => s + c.completedCount, 0)
   const overallPercent = totalLessons > 0 ? Math.round((completedTotal / totalLessons) * 100) : 0
+  const nextStep = pickNextStep(coursesWithProgress)
 
   // Загружаем узлы и связи графа роадмапа (параллельно)
   const [nodeDocs, edgeDocs] = await Promise.all([
@@ -192,7 +240,15 @@ export default async function RoadmapDetailPage({ params }: Props) {
   ])
 
   // Трансформация в формат ReactFlow
-  const { graphNodes, graphEdges } = buildGraphData(nodeDocs, edgeDocs, coursesWithProgress)
+  const { graphNodes, graphEdges, placedCourseIds } = buildGraphData(
+    nodeDocs,
+    edgeDocs,
+    coursesWithProgress,
+    nextStep?.id ?? null,
+  )
+  const nextStepNodeId =
+    graphNodes.find((n) => n.type !== 'annotation' && (n.data as { isNextStep?: boolean }).isNextStep)?.id ?? null
+  const looseCourses = coursesWithProgress.filter((c) => !placedCourseIds.has(c.id)).map(toNodeCourse)
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
@@ -211,7 +267,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
           <span>{totalLessons} уроков</span>
           {graphNodes.length > 0 && (
             <span className="hidden sm:inline">
-              Клик по узлу графа → переход к курсу
+              Нажмите на тему, чтобы увидеть её курсы и продолжить
             </span>
           )}
         </div>
@@ -230,13 +286,22 @@ export default async function RoadmapDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Interactive roadmap graph — главный инструмент навигации */}
-      {graphNodes.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-lg font-semibold text-foreground">Карта навыков</h2>
-          <RoadmapGraph nodes={graphNodes} edges={graphEdges} />
-        </section>
-      )}
+      <NextStepCard
+        nextStep={nextStep}
+        allDone={totalLessons > 0 && completedTotal === totalLessons}
+      />
+
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-foreground">
+          {graphNodes.length > 0 ? 'Карта навыков' : 'Курсы роадмапа'}
+        </h2>
+        <RoadmapExplorer
+          nodes={graphNodes}
+          edges={graphEdges}
+          looseCourses={looseCourses}
+          nextStepNodeId={nextStepNodeId}
+        />
+      </section>
 
       {/* Miro embed — вторичный вид, сырая доска */}
       {roadmap.miroEmbedUrl && typeof roadmap.miroEmbedUrl === 'string' && (
@@ -254,76 +319,6 @@ export default async function RoadmapDetailPage({ params }: Props) {
         </details>
       )}
 
-      {/* Список курсов — свёрнут, как вспомогательный способ навигации */}
-      {/* Пока карта не нарисована, список курсов — единственная навигация */}
-      <details open={graphNodes.length === 0} className="rounded-xl border border-border bg-card p-4">
-        <summary className="cursor-pointer text-lg font-semibold text-foreground">
-          Все курсы роадмапа списком ({coursesWithProgress.length})
-        </summary>
-        <div className="mt-4 space-y-3">
-          {coursesWithProgress.map((course) => {
-            const isLocked = !course.prerequisitesMet
-
-            return (
-              <div
-                key={course.id}
-                className={`rounded-lg border bg-background p-4 transition-colors ${
-                  isLocked ? 'border-border opacity-60' : 'border-border hover:border-primary/50'
-                }`}
-              >
-                {isLocked ? (
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                      <Lock className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-foreground">{course.title}</h3>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Пройдите предыдущие курсы для разблокировки
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <Link href={`/courses/${course.slug}`} className="block">
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        {course.isCompleted ? (
-                          <CheckCircle2 className="h-5 w-5 text-success" />
-                        ) : (
-                          <BookOpen className="h-5 w-5 text-primary" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-foreground">{course.title}</h3>
-                        <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-                          <span>
-                            {course.completedCount}/{course.totalLessons} уроков
-                          </span>
-                          {course.estimatedHours != null && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {course.estimatedHours}ч
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <span className="text-sm font-medium text-muted-foreground">
-                        {course.progressPercent}%
-                      </span>
-                    </div>
-                    <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-                      <div
-                        className="h-full rounded-full bg-primary transition-all duration-500"
-                        style={{ width: `${course.progressPercent}%` }}
-                      />
-                    </div>
-                  </Link>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </details>
     </div>
   )
 }
@@ -333,6 +328,8 @@ type CourseWithProgress = {
   title: string
   slug: string
   estimatedHours: number | null | undefined
+  nextLesson: LessonLink | null
+  blockedBy: string[]
   /** Тема карты, к которой курс привязан (может быть не задана). */
   nodeId: string | null
   totalLessons: number
@@ -340,6 +337,65 @@ type CourseWithProgress = {
   isCompleted: boolean
   prerequisitesMet: boolean
   progressPercent: number
+}
+
+function toNodeCourse(course: CourseWithProgress): NodeCourse {
+  return {
+    slug: course.slug,
+    title: course.title,
+    totalLessons: course.totalLessons,
+    completedLessons: course.completedCount,
+    nextLesson: course.nextLesson,
+    blockedBy: course.blockedBy,
+  }
+}
+
+function NextStepCard({ nextStep, allDone }: { nextStep: CourseWithProgress | null; allDone: boolean }) {
+  if (allDone) {
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-success/40 bg-success/10 p-4">
+        <PartyPopper className="h-6 w-6 shrink-0 text-success" aria-hidden="true" />
+        <p className="text-sm text-foreground">
+          Все курсы роадмапа пройдены. Сертификаты — в разделе{' '}
+          <Link href="/certificates" className="font-medium underline underline-offset-2">
+            «Сертификаты»
+          </Link>
+          .
+        </p>
+      </div>
+    )
+  }
+  if (!nextStep?.nextLesson) return null
+
+  const started = nextStep.completedCount > 0
+  return (
+    <div className="flex flex-col gap-4 rounded-xl border border-primary/40 bg-primary/5 p-4 sm:flex-row sm:items-center">
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium uppercase tracking-wide text-primary">
+          {started ? 'Продолжить обучение' : 'Следующий шаг'}
+        </p>
+        <p className="mt-1 font-semibold text-foreground">{nextStep.nextLesson.title}</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          Курс «{nextStep.title}» · {nextStep.completedCount}/{nextStep.totalLessons} уроков
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={`/lessons/${nextStep.nextLesson.slug}`}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          {started ? 'Продолжить' : 'Начать'}
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
+        <Link
+          href={`/courses/${nextStep.slug}`}
+          className="inline-flex items-center rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
+        >
+          Программа курса
+        </Link>
+      </div>
+    </div>
+  )
 }
 
 function resolveRelationId(ref: unknown): string | null {
@@ -370,11 +426,13 @@ function buildGraphData(
   rawNodes: PayloadRoadmapNode[],
   rawEdges: PayloadRoadmapEdge[],
   coursesWithProgress: CourseWithProgress[],
-): { graphNodes: AnyRoadmapNode[]; graphEdges: GraphEdge[] } {
+  nextStepCourseId: string | null,
+): { graphNodes: AnyRoadmapNode[]; graphEdges: GraphEdge[]; placedCourseIds: Set<string> } {
   const courseMap = new Map(coursesWithProgress.map((c) => [c.id, c]))
   const byNode = groupCoursesByNode(coursesWithProgress)
 
   const nodeIdSet = new Set<string>()
+  const placedCourseIds = new Set<string>()
 
   const graphNodes: AnyRoadmapNode[] = rawNodes.map((n) => {
     nodeIdSet.add(n.nodeId)
@@ -390,6 +448,8 @@ function buildGraphData(
       n.nodeType === 'category',
     )
     const { courses: nodeCourses, totalLessons, completedLessons, progressPercent, status, comingSoon } = summary
+    const fullCourses = nodeCourses.flatMap((c) => courseMap.get(c.id) ?? [])
+    if (n.nodeType !== 'category') for (const c of fullCourses) placedCourseIds.add(c.id)
 
     const bullets = Array.isArray(n.bullets)
       ? n.bullets.map((b) => b.text).filter((t): t is string => typeof t === 'string' && t.length > 0)
@@ -403,14 +463,7 @@ function buildGraphData(
         label: n.label,
         nodeType: n.nodeType,
         courseSlug: comingSoon ? null : (linkedCourse ?? nodeCourses[0])?.slug ?? null,
-        courses: comingSoon
-          ? []
-          : nodeCourses.map((c) => ({
-              slug: c.slug,
-              title: c.title,
-              totalLessons: c.totalLessons,
-              completedLessons: c.completedCount,
-            })),
+        courses: comingSoon ? [] : fullCourses.map(toNodeCourse),
         comingSoon,
         icon: n.icon ?? null,
         description: n.description ?? null,
@@ -421,6 +474,8 @@ function buildGraphData(
         stage: n.stage ?? null,
         color: n.color ?? null,
         bullets,
+        isNextStep:
+          n.nodeType !== 'category' && nextStepCourseId !== null && fullCourses.some((c) => c.id === nextStepCourseId),
       },
     }
   })
@@ -446,7 +501,7 @@ function buildGraphData(
       return valid
     })
 
-  return { graphNodes, graphEdges }
+  return { graphNodes, graphEdges, placedCourseIds }
 }
 
 type StageRange = { minY: number; maxY: number; minX: number; maxX: number }
@@ -490,9 +545,6 @@ function buildAnnotationNodes(rawNodes: PayloadRoadmapNode[]): AnnotationGraphNo
   }
   const centerX = Math.round((globalMinX + globalMaxX) / 2)
 
-  // Стадии в порядке обучения
-  const stageOrder: string[] = ['start', 'base', 'stage1', 'stage2', 'practice', 'advanced', 'growth']
-
   for (const ann of STAGE_ANNOTATIONS) {
     const range = stageRanges.get(ann.stage)
     if (!range) continue
@@ -526,8 +578,8 @@ function buildAnnotationNodes(rawNodes: PayloadRoadmapNode[]): AnnotationGraphNo
     // Level badge — между текущей и предыдущей стадией
     const level = STAGE_LEVELS[ann.stage as keyof typeof STAGE_LEVELS]
     if (level) {
-      const stageIdx = stageOrder.indexOf(ann.stage)
-      const prevStage = stageIdx > 0 ? stageOrder[stageIdx - 1] : null
+      const stageIdx = STAGE_ORDER.indexOf(ann.stage)
+      const prevStage = stageIdx > 0 ? STAGE_ORDER[stageIdx - 1] : null
       const prevRange = prevStage ? stageRanges.get(prevStage) : null
       const badgeY = prevRange
         ? Math.round((prevRange.maxY + range.minY) / 2)

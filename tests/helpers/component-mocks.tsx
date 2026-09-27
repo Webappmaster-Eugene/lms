@@ -9,6 +9,12 @@ import { useCallback, useState, type ReactNode } from 'react'
  * `vi.mock('@xyflow/react', async () => (await import('../helpers/component-mocks')).xyflowMock())`.
  */
 
+/** Узлы последнего рендера ReactFlow — из них заглушка useReactFlow().getNode отвечает. */
+const renderedFlowNodes: { current: { id: string; position?: { x: number; y: number } }[] } = { current: [] }
+
+/** Центрирование карты: проверяется, что поиск и «К моему шагу» ведут к нужной теме. */
+export const flowSetCenter = vi.fn(async () => true)
+
 /** Из @xyflow/react компоненты берут только Handle и Position. */
 export function xyflowMock() {
   return {
@@ -22,24 +28,34 @@ export function xyflowMock() {
     ReactFlow: ({
       nodes = [],
       nodeTypes = {},
+      onNodeClick,
       children,
     }: {
-      nodes?: { id: string; type?: string; data?: unknown }[]
+      nodes?: { id: string; type?: string; data?: unknown; position?: { x: number; y: number } }[]
       nodeTypes?: Record<string, (props: { data: unknown }) => ReactNode>
+      onNodeClick?: (event: unknown, node: unknown) => void
       children?: ReactNode
-    }) => (
-      <div data-testid="react-flow" data-node-count={nodes.length}>
-        {nodes.map((node) => {
-          const NodeComponent = node.type ? nodeTypes[node.type] : undefined
-          return (
-            <div key={node.id} data-testid="flow-node" data-node-type={node.type}>
-              {NodeComponent ? <NodeComponent data={node.data} /> : null}
-            </div>
-          )
-        })}
-        {children}
-      </div>
-    ),
+    }) => {
+      renderedFlowNodes.current = nodes
+      return (
+        <div data-testid="react-flow" data-node-count={nodes.length}>
+          {nodes.map((node) => {
+            const NodeComponent = node.type ? nodeTypes[node.type] : undefined
+            return (
+              <div
+                key={node.id}
+                data-testid="flow-node"
+                data-node-type={node.type}
+                onClick={(event) => onNodeClick?.(event, node)}
+              >
+                {NodeComponent ? <NodeComponent data={node.data} /> : null}
+              </div>
+            )
+          })}
+          {children}
+        </div>
+      )
+    },
     Background: () => <div data-testid="flow-background" />,
     Controls: () => <div data-testid="flow-controls" />,
     MiniMap: () => <div data-testid="flow-minimap" />,
@@ -47,7 +63,12 @@ export function xyflowMock() {
     BackgroundVariant: { Dots: 'dots', Lines: 'lines', Cross: 'cross' },
     ConnectionLineType: { SmoothStep: 'smoothstep', Bezier: 'default', Straight: 'straight' },
     Panel: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-    useReactFlow: () => ({ fitView: vi.fn(), screenToFlowPosition: (p: unknown) => p }),
+    useReactFlow: () => ({
+      fitView: vi.fn(),
+      screenToFlowPosition: (p: unknown) => p,
+      getNode: (id: string) => renderedFlowNodes.current.find((n) => n.id === id),
+      setCenter: flowSetCenter,
+    }),
     // Состояние графа реализовано по-настоящему: редактор роадмапа строит на
     // нём всю логику, и заглушка-пустышка сделала бы его тесты бессмысленными.
     useNodesState: useElementsState,

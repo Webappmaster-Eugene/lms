@@ -1,5 +1,6 @@
 import type { Node, Edge, BuiltInNode } from '@xyflow/react'
 import type { NodeColor, NodeStage } from './stage-colors'
+import type { LessonLink } from '@/lib/roadmap-next-step'
 
 export type NodeStatus = 'locked' | 'available' | 'in-progress' | 'completed'
 
@@ -9,6 +10,10 @@ export type NodeCourse = {
   title: string
   totalLessons: number
   completedLessons: number
+  /** Урок, с которого продолжать; null — курс пройден или пуст. */
+  nextLesson: LessonLink | null
+  /** Непройденные курсы, которые закрывают этот. Пусто — курс открыт. */
+  blockedBy: string[]
 }
 
 export type RoadmapNodeData = {
@@ -29,6 +34,8 @@ export type RoadmapNodeData = {
   stage: NodeStage | null
   color: NodeColor | null
   bullets: string[]
+  /** Здесь курс, который карта предлагает ученику следующим. */
+  isNextStep: boolean
 }
 
 export type AnnotationNodeData = {
@@ -47,4 +54,6 @@ export type AnyRoadmapNode = GraphNode | AnnotationGraphNode | BuiltInNode
 export type RoadmapGraphProps = {
   nodes: AnyRoadmapNode[]
   edges: GraphEdge[]
+  /** Тема со следующим шагом ученика — к ней ведёт кнопка «К моему шагу». */
+  nextStepNodeId?: string | null
 }

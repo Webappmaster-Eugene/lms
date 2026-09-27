@@ -139,3 +139,17 @@ export const STAGE_LEVELS: Record<NodeStage, string | null> = {
   advanced: 'Senior',
   growth: null,
 }
+
+/** Порядок стадий в обучении — по нему идут этапы в списке тем. */
+export const STAGE_ORDER: NodeStage[] = ['start', 'base', 'stage1', 'stage2', 'practice', 'advanced', 'growth']
+
+/** Названия этапов для списка тем: там нет подписей карты по бокам. */
+export const STAGE_TITLES: Record<NodeStage, string> = {
+  start: 'Старт',
+  base: 'Повторяем базу',
+  stage1: 'Стажёр: основа',
+  stage2: 'Junior: инструменты',
+  practice: 'Middle: практика и подготовка к собеседованиям',
+  advanced: 'Senior: продвинутые темы',
+  growth: 'Рост',
+}

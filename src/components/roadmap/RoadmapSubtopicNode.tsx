@@ -13,7 +13,7 @@ export function RoadmapSubtopicNode({ data }: NodeProps) {
   const nodeData = data as RoadmapNodeData
   const isLocked = nodeData.status === 'locked'
   const isCompleted = nodeData.status === 'completed'
-  const isClickable = nodeData.courseSlug !== null && !isLocked
+  const isClickable = !nodeData.comingSoon
   const classes = getNodeClasses(nodeData.color, nodeData.stage, nodeData.status)
 
   return (
@@ -27,6 +27,7 @@ export function RoadmapSubtopicNode({ data }: NodeProps) {
         classes.ring,
         nodeData.comingSoon && 'opacity-60',
         isClickable && 'cursor-pointer hover:scale-[1.03] hover:shadow-md',
+        nodeData.isNextStep && 'ring-4 ring-primary ring-offset-2 ring-offset-background',
       )}
     >
       {isLocked && (

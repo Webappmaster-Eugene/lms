@@ -10,7 +10,7 @@ const { RoadmapSubtopicNode } = await import('@/components/roadmap/RoadmapSubtop
 const { RoadmapAnnotationNode } = await import('@/components/roadmap/RoadmapAnnotationNode')
 const { RoadmapIcon } = await import('@/components/roadmap/RoadmapIcon')
 
-import type { RoadmapNodeData } from '@/components/roadmap/types'
+import type { NodeCourse, RoadmapNodeData } from '@/components/roadmap/types'
 
 /**
  * Узлы карты навыков. Цвет и статус узла — единственный способ показать
@@ -34,8 +34,13 @@ function nodeData(overrides: Partial<RoadmapNodeData> = {}): RoadmapNodeData {
     stage: 'stage1',
     color: null,
     bullets: [],
+    isNextStep: false,
     ...overrides,
   }
+}
+
+function nodeCourse(overrides: Partial<NodeCourse> = {}): NodeCourse {
+  return { slug: 'c', title: 'Курс', totalLessons: 4, completedLessons: 0, nextLesson: null, blockedBy: [], ...overrides }
 }
 
 /** Узлы объявлены через NodeProps, но читают из него только data. */
@@ -72,9 +77,9 @@ describe('карточка темы', () => {
   it('список курсов показывается, когда их больше одного', () => {
     renderNode(RoadmapTopicNode, {
       courses: [
-        { slug: 'a', title: 'Первый курс' },
-        { slug: 'b', title: 'Второй курс' },
-      ] as RoadmapNodeData['courses'],
+        nodeCourse({ slug: 'a', title: 'Первый курс' }),
+        nodeCourse({ slug: 'b', title: 'Второй курс' }),
+      ],
     })
 
     expect(screen.getByText('Первый курс')).toBeInTheDocument()
@@ -83,7 +88,7 @@ describe('карточка темы', () => {
 
   it('единственный курс отдельным списком не дублируется', () => {
     renderNode(RoadmapTopicNode, {
-      courses: [{ slug: 'a', title: 'Единственный' }] as RoadmapNodeData['courses'],
+      courses: [nodeCourse({ slug: 'a', title: 'Единственный' })],
     })
 
     expect(screen.queryByText('Единственный')).not.toBeInTheDocument()

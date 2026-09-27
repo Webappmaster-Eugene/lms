@@ -1,5 +1,5 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { CheckCircle2, Lock } from 'lucide-react'
+import { CheckCircle2, Lock, Play } from 'lucide-react'
 import type { RoadmapNodeData } from './types'
 import { RoadmapIcon } from './RoadmapIcon'
 import { getNodeClasses } from './stage-colors'
@@ -18,7 +18,9 @@ export function RoadmapTopicNode({ data }: NodeProps) {
   const isLocked = nodeData.status === 'locked'
   const isCompleted = nodeData.status === 'completed'
   const hasProgress = nodeData.totalLessons > 0
-  const isClickable = nodeData.courseSlug !== null && !isLocked
+  // Клик открывает панель темы, в том числе у закрытой: там сказано, что её открывает.
+  const isClickable = !comingSoon
+  const firstBlocker = nodeData.courses.find((c) => c.blockedBy.length > 0)?.blockedBy[0]
 
   const classes = getNodeClasses(nodeData.color, nodeData.stage, nodeData.status)
 
@@ -33,8 +35,15 @@ export function RoadmapTopicNode({ data }: NodeProps) {
         classes.ring,
         comingSoon && 'opacity-60',
         isClickable && 'cursor-pointer hover:scale-[1.02] hover:shadow-lg',
+        nodeData.isNextStep && 'ring-4 ring-primary ring-offset-2 ring-offset-background',
       )}
     >
+      {nodeData.isNextStep && (
+        <div className="flex items-center gap-1.5 rounded-t-md bg-primary px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
+          <Play className="h-3 w-3" aria-hidden="true" />
+          Ваш следующий шаг
+        </div>
+      )}
       {/* Header */}
       <div className={cn('flex items-center gap-2 border-b px-3 py-2', classes.border)}>
         <div className={cn('flex h-6 w-6 flex-shrink-0 items-center justify-center rounded', classes.accent)}>
@@ -103,7 +112,11 @@ export function RoadmapTopicNode({ data }: NodeProps) {
 
       {isLocked && (
         <div className={cn('border-t px-3 py-1.5 text-[10px]', classes.border, classes.accent)}>
-          {comingSoon ? 'Материалы готовятся' : 'Пройдите предыдущие курсы'}
+          {comingSoon
+            ? 'Материалы готовятся'
+            : firstBlocker
+              ? `Сначала: ${firstBlocker}`
+              : 'Пройдите предыдущие курсы'}
         </div>
       )}
 
