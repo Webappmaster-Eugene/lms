@@ -33,6 +33,7 @@ const SEGMENT_SAMPLES: Record<string, readonly string[]> = {
   slug: ['deep-react', 'next.js'],
   topicSlug: ['js-core', 'node.js'],
   taskSlug: ['create-counter', 'array.map'],
+  id: ['42'],
 }
 
 function collectPageRoutes(dir: string, urlPrefix = ''): string[] {
