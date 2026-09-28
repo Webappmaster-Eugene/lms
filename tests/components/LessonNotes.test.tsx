@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-import { LessonNotes } from '@/components/lesson/LessonNotes'
+vi.mock('next/link', async () => (await import('../helpers/component-mocks')).linkMock())
+
+const { LessonNotes } = await import('@/components/lesson/LessonNotes')
 
 /**
  * Личные заметки к уроку — единственные данные, которые ученик вводит руками
@@ -90,6 +92,16 @@ describe('заметки к уроку', () => {
       expect(container.querySelectorAll('span.rounded-full.bg-primary')).toHaveLength(0)
     })
 
+    it('ответ сервера с ошибкой — тоже отказ загрузки, а не «заметки нет»', async () => {
+      mockApi({ load: () => new Response(null, { status: 500 }) })
+      const user = userEvent.setup()
+      render(<LessonNotes lessonId={42} />)
+
+      await open(user)
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось загрузить')
+    })
+
     it('отказ загрузки не ломает панель — можно писать заново', async () => {
       global.fetch = vi.fn(async () => {
         throw new Error('сеть недоступна')
@@ -174,6 +186,61 @@ describe('заметки к уроку', () => {
 
       await waitFor(() => expect(toast).toHaveBeenCalled())
       expect(screen.getByRole('textbox')).toHaveValue('Важная мысль')
+    })
+  })
+
+  describe('несохранённая правка', () => {
+    it('помечается, пока текст не ушёл на сервер', async () => {
+      const user = userEvent.setup()
+      render(<LessonNotes lessonId={42} />)
+      await open(user)
+
+      await user.type(screen.getByRole('textbox'), 'Черновик')
+      expect(screen.getByText('Не сохранено')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: /Сохранить/ }))
+      await waitFor(() => expect(screen.queryByText('Не сохранено')).not.toBeInTheDocument())
+    })
+
+    it('без правок сохранять нечего', async () => {
+      mockApi({ load: existingNote })
+      const user = userEvent.setup()
+      render(<LessonNotes lessonId={42} />)
+      await open(user)
+
+      expect(screen.getByRole('button', { name: /Сохранить/ })).toBeDisabled()
+    })
+
+    it('Ctrl+Enter сохраняет, не отрываясь от клавиатуры', async () => {
+      const calls = mockApi({})
+      const user = userEvent.setup()
+      render(<LessonNotes lessonId={42} />)
+      await open(user)
+
+      await user.type(screen.getByRole('textbox'), 'Быстро{Control>}{Enter}{/Control}')
+
+      await waitFor(() => expect(calls.some((call) => call.init?.method === 'POST')).toBe(true))
+      expect(screen.getByRole('textbox')).toHaveValue('Быстро')
+    })
+
+    it('закрытие вкладки с правкой браузер переспрашивает', async () => {
+      const user = userEvent.setup()
+      render(<LessonNotes lessonId={42} />)
+      await open(user)
+      await user.type(screen.getByRole('textbox'), 'Черновик')
+
+      const event = new Event('beforeunload', { cancelable: true })
+      window.dispatchEvent(event)
+
+      expect(event.defaultPrevented).toBe(true)
+    })
+
+    it('ссылка ведёт на все заметки', async () => {
+      const user = userEvent.setup()
+      render(<LessonNotes lessonId={42} />)
+      await open(user)
+
+      expect(screen.getByRole('link', { name: 'все заметки' })).toHaveAttribute('href', '/notes')
     })
   })
 

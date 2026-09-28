@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { StickyNote, Save, Loader2, Trash2 } from 'lucide-react'
 import { useToast } from '@/components/ui/Toast'
 
@@ -16,6 +17,9 @@ type NoteDoc = {
 
 export function LessonNotes({ lessonId }: Props) {
   const [note, setNote] = useState('')
+  // Текст, который лежит на сервере: по нему видно, есть ли несохранённая правка.
+  const [saved, setSaved] = useState('')
+  const [loadFailed, setLoadFailed] = useState(false)
   const [noteId, setNoteId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -30,14 +34,17 @@ export function LessonNotes({ lessonId }: Props) {
           `/api/notes?where[lesson][equals]=${lessonId}&limit=1`,
           { credentials: 'include' },
         )
-        const data = await res.json()
-        if (data.docs?.length > 0) {
-          const n = data.docs[0] as NoteDoc
+        if (!res.ok) throw new Error(`GET /api/notes → ${res.status}`)
+        const data = (await res.json()) as { docs?: NoteDoc[] }
+        const n = data.docs?.[0]
+        if (n) {
           setNote(n.content)
+          setSaved(n.content)
           setNoteId(n.id)
         }
-      } catch {
-        // No existing note
+      } catch (error) {
+        console.error('Не удалось загрузить заметку к уроку', error)
+        setLoadFailed(true)
       } finally {
         setLoading(false)
       }
@@ -67,6 +74,7 @@ export function LessonNotes({ lessonId }: Props) {
         const data = await res.json()
         setNoteId(data.doc?.id)
       }
+      setSaved(note)
       toast('Заметка сохранена', 'success')
     } catch {
       toast('Не удалось сохранить заметку', 'error')
@@ -85,6 +93,7 @@ export function LessonNotes({ lessonId }: Props) {
       })
       if (!res.ok) throw new Error(`DELETE /api/notes → ${res.status}`)
       setNote('')
+      setSaved('')
       setNoteId(null)
       toast('Заметка удалена', 'info')
     } catch {
@@ -94,15 +103,29 @@ export function LessonNotes({ lessonId }: Props) {
     }
   }
 
+  const dirty = note !== saved
+  const canSave = !saving && note.trim() !== '' && dirty
+
+  // Ушедшая вкладка забирает с собой несохранённый текст — браузер спросит перед закрытием.
+  useEffect(() => {
+    if (!dirty) return
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
+
   return (
     <div className="rounded-xl border border-border bg-card">
       <button
+        type="button"
+        aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center gap-3 px-5 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
       >
         <StickyNote className="h-4 w-4" />
         Мои заметки
         {noteId && <span className="h-2 w-2 rounded-full bg-primary" />}
+        {dirty && <span className="ml-auto text-xs font-normal text-warning">Не сохранено</span>}
       </button>
 
       {expanded && (
@@ -113,19 +136,38 @@ export function LessonNotes({ lessonId }: Props) {
             </div>
           ) : (
             <>
+              {loadFailed && (
+                <p role="alert" className="text-sm text-destructive">
+                  Не удалось загрузить сохранённую заметку — обновите страницу, прежде чем писать новую
+                </p>
+              )}
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && canSave) {
+                    e.preventDefault()
+                    void handleSave()
+                  }
+                }}
+                aria-label="Заметка к уроку"
+                aria-describedby="lesson-note-hint"
                 placeholder="Запишите ключевые моменты урока..."
                 maxLength={5000}
                 rows={5}
                 className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20 resize-none"
               />
               <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">{note.length}/5000</span>
+                <span id="lesson-note-hint" className="text-xs text-muted-foreground">
+                  <span>{note.length}/5000</span> · Ctrl/⌘+Enter — сохранить ·{' '}
+                  <Link href="/notes" className="underline-offset-2 hover:text-foreground hover:underline">
+                    все заметки
+                  </Link>
+                </span>
                 <div className="flex gap-2">
                   {noteId && (
                     <button
+                      type="button"
                       onClick={handleDelete}
                       disabled={saving}
                       className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors"
@@ -135,8 +177,9 @@ export function LessonNotes({ lessonId }: Props) {
                     </button>
                   )}
                   <button
+                    type="button"
                     onClick={handleSave}
-                    disabled={saving || !note.trim()}
+                    disabled={!canSave}
                     className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
                   >
                     {saving ? (

@@ -72,7 +72,7 @@ test('«Отметить пройденным» начисляет баллы: �
   await expect(page.getByText('Дней подряд', { exact: true }).locator('..')).toContainText('1')
 })
 
-test('заметка к уроку сохраняется и переживает перезагрузку', async ({ page }) => {
+test('заметка к уроку сохраняется, переживает перезагрузку и видна среди всех заметок', async ({ page }) => {
   const text = `Заметка e2e ${Date.now()}`
   await page.goto(`/lessons/${second.slug}`)
   await page.getByRole('button', { name: 'Мои заметки' }).click()
@@ -85,6 +85,14 @@ test('заметка к уроку сохраняется и переживае�
   await page.getByRole('button', { name: 'Мои заметки' }).click()
   await expect(page.getByPlaceholder('Запишите ключевые моменты урока...')).toHaveValue(text)
 
+  // Та же заметка — на общей странице, со ссылкой обратно на урок.
+  await page.goto('/notes')
+  const card = page.getByRole('listitem').filter({ hasText: text })
+  await expect(card.getByRole('link', { name: second.title })).toHaveAttribute('href', `/lessons/${second.slug}`)
+  await card.getByRole('link', { name: second.title }).click()
+  await expect(page).toHaveURL(`/lessons/${second.slug}`)
+
+  await page.getByRole('button', { name: 'Мои заметки' }).click()
   await page.getByRole('button', { name: 'Удалить' }).click()
   await expect(page.getByText('Заметка удалена')).toBeVisible()
 })

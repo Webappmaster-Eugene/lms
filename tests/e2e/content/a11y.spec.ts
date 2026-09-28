@@ -52,6 +52,7 @@ const INNER: [string, string][] = [
   ['роадмапы', '/roadmaps'],
   ['лидерборд', '/leaderboard'],
   ['профиль', '/profile'],
+  ['заметки', '/notes'],
   ['помощь', '/help'],
 ]
 

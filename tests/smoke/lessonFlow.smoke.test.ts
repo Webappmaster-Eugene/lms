@@ -26,8 +26,8 @@ describe('сохранение прогресса не теряет ошибки
     expect(COMPLETION).toContain('setError(')
   })
 
-  it('заметки проверяют статус на сохранении и удалении', () => {
-    expect(NOTES.match(/if \(!res\.ok\)/g) ?? []).toHaveLength(3)
+  it('заметки проверяют статус на загрузке, сохранении и удалении', () => {
+    expect(NOTES.match(/if \(!res\.ok\)/g) ?? []).toHaveLength(4)
   })
 })
 
