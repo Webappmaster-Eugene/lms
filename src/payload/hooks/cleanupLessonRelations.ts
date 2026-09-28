@@ -3,7 +3,7 @@ import type { CollectionBeforeDeleteHook } from 'payload'
 import { logger } from '@/lib/telemetry'
 
 /** Коллекции, которые ссылаются на урок и без очистки держат его в базе. */
-const DEPENDENTS = ['user-progress', 'notes', 'comments'] as const
+const DEPENDENTS = ['user-progress', 'notes', 'comments', 'bookmarks'] as const
 
 /**
  * Удаляет записи, привязанные к уроку.

@@ -42,6 +42,7 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   'user-achievements': (ctx) => ({ user: ctx.studentId, achievement: ctx.achievementId, unlockedAt: new Date().toISOString() }),
   'points-transactions': (ctx) => ({ user: ctx.studentId, amount: 1, reason: 'admin_adjustment' }),
   notes: (ctx) => ({ user: ctx.studentId, lesson: ctx.lessonId, content: 'Заметка' }),
+  bookmarks: (ctx) => ({ user: ctx.studentId, lesson: ctx.lessonId }),
   comments: (ctx) => ({ user: ctx.studentId, lesson: ctx.lessonId, content: 'Комментарий' }),
   notifications: (ctx) => ({ user: ctx.studentId, title: 'Заголовок', message: 'Текст' }),
   certificates: (ctx) => ({
@@ -85,6 +86,10 @@ export async function buildFixtureContext(payload: Payload): Promise<FixtureCont
  */
 export async function makeValid(payload: Payload, slug: string, ctx: FixtureContext, owner?: number): Promise<Data> {
   const data = VALID[slug](ctx)
+  // Закладка уникальна по паре «пользователь + урок» — каждой копии свой урок.
+  if (slug === 'bookmarks') {
+    data.lesson = (await payload.create({ collection: 'lessons', data: { title: `Урок ${uid()}`, course: ctx.courseId } as never })).id
+  }
   if ('user' in data) {
     if (owner !== undefined) data.user = owner
     else if (UNIQUE_PER_USER.has(slug)) data.user = (await createStudent(payload)).id

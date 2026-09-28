@@ -6,6 +6,8 @@ import { ArrowLeft, ArrowRight, ChevronLeft } from 'lucide-react'
 
 import { getPayload } from '@/lib/payload'
 import { TrainerWorkspace } from '@/components/trainer/TrainerWorkspace'
+import { BookmarkButton } from '@/components/bookmarks/BookmarkButton'
+import { findBookmarkId } from '@/lib/bookmarks'
 import { TaskSidePanel } from '@/components/trainer/TaskSidePanel'
 import { DIFFICULTY_LABELS, COMPANY_LABELS, TAG_LABELS } from '@/lib/trainer/constants'
 import { publicCases, normalizeCases, starterCodeFor, taskLanguages } from '@/lib/trainer/spec'
@@ -183,6 +185,8 @@ export default async function TaskPage({ params }: Props) {
     task.descriptionMd?.trim() ||
     (task.description ? lexicalToMarkdown(task.description) : '')
 
+  const bookmarkId = user ? await findBookmarkId(payload, user.id, { task: task.id }) : null
+
   const hints = Array.isArray(task.hints)
     ? task.hints.map((item, index) => ({ hint: String(item?.hint ?? ''), id: item?.id ?? String(index) }))
     : []
@@ -236,6 +240,7 @@ export default async function TaskPage({ params }: Props) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          {user && <BookmarkButton target={{ task: task.id }} initialId={bookmarkId} />}
           {previous && (
             <Link
               href={`/trainer/${topicSlug}/${previous.slug}`}

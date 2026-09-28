@@ -19,13 +19,14 @@ beforeEach(() => {
 })
 
 describe('удаление урока', () => {
-  it('снимает прогресс, заметки и комментарии — иначе внешние ключи не дадут удалить', async () => {
+  it('снимает прогресс, заметки, комментарии и закладки — иначе внешние ключи не дадут удалить', async () => {
     await run(847)
 
     expect(remove.mock.calls.map(([args]) => args.collection)).toEqual([
       'user-progress',
       'notes',
       'comments',
+      'bookmarks',
     ])
     expect(remove.mock.calls.every(([args]) => args.where.lesson.equals === 847)).toBe(true)
   })

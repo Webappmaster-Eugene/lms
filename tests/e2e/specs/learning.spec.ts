@@ -180,3 +180,27 @@ test.describe('видео досмотрено — предложение отм
     await expect(page).toHaveURL(new RegExp(`/lessons/${second.slug}$`))
   })
 })
+
+test('«Сохранить» урок и задачу: они в «Сохранённом», оттуда же убираются', async ({ page }) => {
+  await page.goto(`/lessons/${third.slug}`)
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Сохранено' })).toHaveAttribute('aria-pressed', 'true')
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Сохранено' })).toBeVisible()
+
+  await page.goto(`/trainer/${CONTENT.topic.slug}/${CONTENT.task.slug}`)
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Сохранено' })).toBeVisible()
+
+  await page.goto('/saved')
+  await expect(page.getByRole('link', { name: third.title })).toHaveAttribute('href', `/lessons/${third.slug}`)
+  await expect(page.getByRole('link', { name: CONTENT.task.title })).toHaveAttribute(
+    'href',
+    `/trainer/${CONTENT.topic.slug}/${CONTENT.task.slug}`,
+  )
+  await page.getByRole('button', { name: `Убрать «${third.title}» из сохранённого` }).click()
+  await page.getByRole('button', { name: `Убрать «${CONTENT.task.title}» из сохранённого` }).click()
+  await expect(page.getByText(/Здесь пока пусто/)).toBeVisible()
+  await page.reload()
+  await expect(page.getByText(/Здесь пока пусто/)).toBeVisible()
+})

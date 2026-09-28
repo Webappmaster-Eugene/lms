@@ -3,6 +3,7 @@ import type { CollectionConfig, FieldAccess } from 'payload'
 import { isAdmin } from '@/payload/access/isAdmin'
 import { isPublishedOrAdmin } from '@/payload/access/isPublishedOrAdmin'
 import { generateSlug } from '@/payload/hooks/generateSlug'
+import { cleanupTaskRelations } from '@/payload/hooks/cleanupOwnedRelations'
 import {
   CHECK_MODE_OPTIONS,
   COMPANY_OPTIONS,
@@ -44,6 +45,7 @@ export const TrainerTasks: CollectionConfig = {
   },
   hooks: {
     beforeValidate: [generateSlug],
+    beforeDelete: [cleanupTaskRelations],
   },
   fields: [
     {

@@ -35,10 +35,17 @@ export const cleanupUserRelations = cleanupDependents('пользователь'
   { collection: 'notifications', field: 'user' },
   { collection: 'streaks', field: 'user' },
   { collection: 'notes', field: 'user' },
+  { collection: 'bookmarks', field: 'user' },
   { collection: 'comments', field: 'user' },
 ])
 
 /** Выданные экземпляры достижения; начисленные за него баллы остаются в истории */
 export const cleanupAchievementRelations = cleanupDependents('достижение', [
   { collection: 'user-achievements', field: 'achievement' },
+])
+
+/** Прогресс и закладки задачи тренажёра: без них удаление задачи упиралось в NOT NULL */
+export const cleanupTaskRelations = cleanupDependents('задача тренажёра', [
+  { collection: 'user-trainer-progress', field: 'task' },
+  { collection: 'bookmarks', field: 'task' },
 ])

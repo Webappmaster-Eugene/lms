@@ -80,6 +80,7 @@ export interface Config {
     'user-achievements': UserAchievement;
     'points-transactions': PointsTransaction;
     notes: Note;
+    bookmarks: Bookmark;
     comments: Comment;
     notifications: Notification;
     certificates: Certificate;
@@ -109,6 +110,7 @@ export interface Config {
     'user-achievements': UserAchievementsSelect<false> | UserAchievementsSelect<true>;
     'points-transactions': PointsTransactionsSelect<false> | PointsTransactionsSelect<true>;
     notes: NotesSelect<false> | NotesSelect<true>;
+    bookmarks: BookmarksSelect<false> | BookmarksSelect<true>;
     comments: CommentsSelect<false> | CommentsSelect<true>;
     notifications: NotificationsSelect<false> | NotificationsSelect<true>;
     certificates: CertificatesSelect<false> | CertificatesSelect<true>;
@@ -592,94 +594,13 @@ export interface Note {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "comments".
+ * via the `definition` "bookmarks".
  */
-export interface Comment {
+export interface Bookmark {
   id: number;
   user: number | User;
-  lesson: number | Lesson;
-  content: string;
-  /**
-   * Оставьте пустым для корневого комментария
-   */
-  parentComment?: (number | null) | Comment;
-  isResolved?: boolean | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "notifications".
- */
-export interface Notification {
-  id: number;
-  user: number | User;
-  title: string;
-  message: string;
-  type:
-    | 'info'
-    | 'achievement'
-    | 'course_completed'
-    | 'roadmap_completed'
-    | 'comment'
-    | 'trainer_task'
-    | 'support_message';
-  link?: string | null;
-  isRead?: boolean | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "certificates".
- */
-export interface Certificate {
-  id: number;
-  user: number | User;
-  type: 'course' | 'roadmap';
-  title: string;
-  relatedEntity: string;
-  issuedAt: string;
-  certificateNumber: string;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "streaks".
- */
-export interface Streak {
-  id: number;
-  user: number | User;
-  currentStreak: number;
-  longestStreak: number;
-  lastActivityDate?: string | null;
-  totalActiveDays?: number | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "trainer-topics".
- */
-export interface TrainerTopic {
-  id: number;
-  title: string;
-  /**
-   * Генерируется автоматически из названия
-   */
-  slug: string;
-  description?: string | null;
-  /**
-   * Используется для группировки и фильтров в каталоге задач.
-   */
-  category: 'javascript' | 'typescript' | 'algorithms' | 'leetcode' | 'companies' | 'patterns' | 'webapi';
-  /**
-   * Emoji или имя иконки lucide (например: "code", "braces", "terminal")
-   */
-  icon?: string | null;
-  order?: number | null;
-  isPublished?: boolean | null;
+  lesson?: (number | null) | Lesson;
+  task?: (number | null) | TrainerTask;
   updatedAt: string;
   createdAt: string;
 }
@@ -824,6 +745,99 @@ export interface TrainerTask {
   leetcodeNumber?: number | null;
   pointsReward?: number | null;
   isPublished?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trainer-topics".
+ */
+export interface TrainerTopic {
+  id: number;
+  title: string;
+  /**
+   * Генерируется автоматически из названия
+   */
+  slug: string;
+  description?: string | null;
+  /**
+   * Используется для группировки и фильтров в каталоге задач.
+   */
+  category: 'javascript' | 'typescript' | 'algorithms' | 'leetcode' | 'companies' | 'patterns' | 'webapi';
+  /**
+   * Emoji или имя иконки lucide (например: "code", "braces", "terminal")
+   */
+  icon?: string | null;
+  order?: number | null;
+  isPublished?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "comments".
+ */
+export interface Comment {
+  id: number;
+  user: number | User;
+  lesson: number | Lesson;
+  content: string;
+  /**
+   * Оставьте пустым для корневого комментария
+   */
+  parentComment?: (number | null) | Comment;
+  isResolved?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notifications".
+ */
+export interface Notification {
+  id: number;
+  user: number | User;
+  title: string;
+  message: string;
+  type:
+    | 'info'
+    | 'achievement'
+    | 'course_completed'
+    | 'roadmap_completed'
+    | 'comment'
+    | 'trainer_task'
+    | 'support_message';
+  link?: string | null;
+  isRead?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "certificates".
+ */
+export interface Certificate {
+  id: number;
+  user: number | User;
+  type: 'course' | 'roadmap';
+  title: string;
+  relatedEntity: string;
+  issuedAt: string;
+  certificateNumber: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "streaks".
+ */
+export interface Streak {
+  id: number;
+  user: number | User;
+  currentStreak: number;
+  longestStreak: number;
+  lastActivityDate?: string | null;
+  totalActiveDays?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -981,6 +995,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'notes';
         value: number | Note;
+      } | null)
+    | ({
+        relationTo: 'bookmarks';
+        value: number | Bookmark;
       } | null)
     | ({
         relationTo: 'comments';
@@ -1372,6 +1390,17 @@ export interface NotesSelect<T extends boolean = true> {
   user?: T;
   lesson?: T;
   content?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bookmarks_select".
+ */
+export interface BookmarksSelect<T extends boolean = true> {
+  user?: T;
+  lesson?: T;
+  task?: T;
   updatedAt?: T;
   createdAt?: T;
 }

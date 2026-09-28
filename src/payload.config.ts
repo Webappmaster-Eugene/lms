@@ -20,6 +20,7 @@ import { UserProgress } from '@/payload/collections/UserProgress'
 import { Achievements } from '@/payload/collections/Achievements'
 import { UserAchievements } from '@/payload/collections/UserAchievements'
 import { PointsTransactions } from '@/payload/collections/PointsTransactions'
+import { Bookmarks } from '@/payload/collections/Bookmarks'
 import { Notes } from '@/payload/collections/Notes'
 import { Comments } from '@/payload/collections/Comments'
 import { Notifications } from '@/payload/collections/Notifications'
@@ -70,6 +71,7 @@ export default buildConfig({
     UserAchievements,
     PointsTransactions,
     Notes,
+    Bookmarks,
     Comments,
     Notifications,
     Certificates,

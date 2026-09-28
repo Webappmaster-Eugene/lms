@@ -54,6 +54,7 @@ const INNER: [string, string][] = [
   ['профиль', '/profile'],
   ['заметки', '/notes'],
   ['вопросы', '/questions'],
+  ['сохранённое', '/saved'],
   ['помощь', '/help'],
 ]
 

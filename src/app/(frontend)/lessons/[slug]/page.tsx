@@ -10,6 +10,8 @@ import { LessonNotes } from '@/components/lesson/LessonNotes'
 import { LessonComments } from '@/components/lesson/LessonComments'
 import { LessonKeyboardNav } from '@/components/lesson/LessonKeyboardNav'
 import { CourseSidebar } from '@/components/course/CourseSidebar'
+import { BookmarkButton } from '@/components/bookmarks/BookmarkButton'
+import { findBookmarkId } from '@/lib/bookmarks'
 import { collectAllPages } from '@/lib/paginate'
 import { relationKey } from '@/lib/course-lessons'
 import { lessonPosition, orderCourseLessons, type LessonPosition } from '@/lib/roadmap-next-step'
@@ -210,6 +212,8 @@ export default async function LessonPage({ params }: Props) {
     }
   }
 
+  const bookmarkId = user ? await findBookmarkId(payload, user.id, { lesson: lesson.id }) : null
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const blocks = (lesson.content ?? []) as any[]
 
@@ -236,7 +240,10 @@ export default async function LessonPage({ params }: Props) {
 
         {/* Заголовок */}
         <div className="space-y-2">
-          <h1 className="text-xl font-bold text-foreground sm:text-2xl">{lesson.title}</h1>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <h1 className="text-xl font-bold text-foreground sm:text-2xl">{lesson.title}</h1>
+            {user && <BookmarkButton target={{ lesson: lesson.id }} initialId={bookmarkId} />}
+          </div>
           {lesson.description && (
             <p className="text-muted-foreground">{lesson.description}</p>
           )}

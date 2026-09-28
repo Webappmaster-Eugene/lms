@@ -35,6 +35,7 @@ const MATRIX: Record<string, Matrix> = {
   'user-achievements': { create: 'admin', read: 'own', update: 'admin', delete: 'admin' },
   'points-transactions': { create: 'admin', read: 'own', update: 'nobody', delete: 'admin' },
   notes: { create: 'auth', read: 'own', update: 'own', delete: 'own' },
+  bookmarks: { create: 'auth', read: 'own', update: 'own', delete: 'own' },
   comments: { create: 'auth', read: 'own', update: 'own', delete: 'admin' },
   notifications: { create: 'admin', read: 'own', update: 'own', delete: 'admin' },
   certificates: { create: 'admin', read: 'own', update: 'admin', delete: 'admin' },
@@ -61,6 +62,7 @@ const PATCH: Record<string, Record<string, unknown>> = {
   'user-achievements': { unlockedAt: new Date().toISOString() },
   'points-transactions': { description: 'обновлено' },
   notes: { content: 'обновлено' },
+  bookmarks: { task: null },
   comments: { content: 'обновлено' },
   notifications: { isRead: true },
   certificates: { title: 'обновлено' },
@@ -276,7 +278,7 @@ describe('попытки эскалации прав', () => {
     expect((await payload.findByID({ collection: 'users', id: other.id })).firstName).not.toBe('Взломан')
   })
 
-  it.each(['user-progress', 'notes', 'comments'])('%s: владелец на создании подставляется хуком, чужой user игнорируется', async (slug) => {
+  it.each(['user-progress', 'notes', 'comments', 'bookmarks'])('%s: владелец на создании подставляется хуком, чужой user игнорируется', async (slug) => {
     const data = await makeValid(payload, slug, ctx, other.id)
     const doc = await payload.create({ collection: slug as CollectionSlug, data: data as never, user: owner, overrideAccess: false })
     expect((doc as { user: number | { id: number } }).user).toEqual(expect.objectContaining({ id: owner.id }))

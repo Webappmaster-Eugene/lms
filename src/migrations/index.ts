@@ -7,6 +7,7 @@ import * as migration_20260911_233042_payload_389_sessions_kv from './20260911_2
 import * as migration_20260914_140000_course_roadmap_node from './20260914_140000_course_roadmap_node';
 import * as migration_20260914_161713_trainer_leetcode from './20260914_161713_trainer_leetcode';
 import * as migration_20260914_170505_trainer_setup_types from './20260914_170505_trainer_setup_types';
+import * as migration_20260928_220510_bookmarks from './20260928_220510_bookmarks';
 
 export const migrations = [
   {
@@ -52,6 +53,11 @@ export const migrations = [
   {
     up: migration_20260914_170505_trainer_setup_types.up,
     down: migration_20260914_170505_trainer_setup_types.down,
-    name: '20260914_170505_trainer_setup_types'
+    name: '20260914_170505_trainer_setup_types',
+  },
+  {
+    up: migration_20260928_220510_bookmarks.up,
+    down: migration_20260928_220510_bookmarks.down,
+    name: '20260928_220510_bookmarks',
   },
 ];
