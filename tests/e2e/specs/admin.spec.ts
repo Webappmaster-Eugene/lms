@@ -52,6 +52,18 @@ test('студент в админку не попадает', async ({ browser 
   })
 })
 
+test('страницы ментора на платформе: чужих уводят настоящим редиректом, а не страницей с кодом 200', async ({ browser }) => {
+  for (const state of [{ cookies: [], origins: [] }, storageStateOf('student')]) {
+    const context = await browser.newContext({ storageState: state })
+    for (const path of ['/admin/questions', '/admin/import-yandex']) {
+      const response = await context.request.get(path, { maxRedirects: 0 })
+      expect(response.status(), path).toBe(307)
+      expect(new URL(response.headers().location ?? '', 'http://x').pathname, path).toBe('/')
+    }
+    await context.close()
+  }
+})
+
 test.describe.serial('урок: создание → публикация → правка → снятие с публикации', () => {
   const title = `Урок из админки ${Date.now()}`
   let lessonId = ''
