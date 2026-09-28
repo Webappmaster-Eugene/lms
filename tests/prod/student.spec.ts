@@ -122,7 +122,7 @@ test('заметки: Ctrl+Enter, общая страница, выгрузка,
   await expect(page.getByText('Заметка удалена')).toBeVisible()
 })
 
-test('видео: скорость запоминается между загрузками (если в уроке есть видео)', async ({ page }) => {
+test('видео: скорость запоминается, метка времени вставляется в заметку (если в уроке есть видео)', async ({ page }) => {
   let found = false
   for (const lesson of [firstLesson, secondLesson].filter(Boolean) as string[]) {
     await page.goto(lesson)
@@ -133,6 +133,15 @@ test('видео: скорость запоминается между загр�
     await page.reload()
     await expect(page.getByRole('group', { name: 'Скорость воспроизведения' }).first().getByRole('button', { name: '1,5×' })).toHaveAttribute('aria-pressed', 'true')
     await speed.getByRole('button', { name: '1×' }).click()
+
+    // Метка времени видео в заметке: вставка и кнопка перехода. Заметку не сохраняем.
+    await page.getByRole('button', { name: /Мои заметки/ }).click()
+    await page.getByRole('button', { name: /Вставить время видео/ }).click()
+    const area = page.getByRole('textbox', { name: 'Заметка к уроку' })
+    await expect(area).toHaveValue(/^\[\d+:\d{2}\] $/)
+    const label = (await area.inputValue()).slice(1, -2)
+    await page.getByRole('group', { name: 'Перейти к моменту видео' }).getByRole('button', { name: label }).click()
+    await expect(page.locator('video').first()).toBeInViewport()
     break
   }
   test.skip(!found, 'в первых уроках курса нет видео с Яндекс.Диска')
