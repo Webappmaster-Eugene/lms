@@ -1,3 +1,6 @@
+// Скелетон только для списков и дашборда: они не отвечают 404. Страницы, которые
+// могут вызвать notFound() (курс, урок, задача, сертификат), лежат вне группы:
+// под loading.tsx Next начинает стримить ответ до notFound(), и 404 уходил со статусом 200.
 export default function FrontendLoading() {
   return (
     <div className="mx-auto max-w-5xl space-y-8 animate-pulse">

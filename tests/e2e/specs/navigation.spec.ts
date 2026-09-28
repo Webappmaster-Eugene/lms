@@ -89,9 +89,9 @@ test('неизвестный адрес — своя страница 404 с м�
   await expect(page.locator('aside').last().getByRole('link', { name: 'Курсы', exact: true })).toBeVisible()
 })
 
-// Регрессия e5b1744: catch-all [...rest] + loading.tsx — ответ начинает стримиться
-// до notFound(), и неизвестный адрес отдаёт 200 вместо 404 (до коммита было 404).
-test.fail('БАГ: неизвестный адрес отвечает HTTP 404', async ({ request }) => {
+// loading.tsx есть только у списков (группа (lists)): иначе ответ начинал
+// стримиться до notFound(), и неизвестный адрес отдавал 200.
+test('неизвестный адрес отвечает HTTP 404', async ({ request }) => {
   const response = await request.get('/definitely-not-a-page')
   expect(response.status()).toBe(404)
 })

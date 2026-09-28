@@ -54,6 +54,20 @@ function collectPageRoutes(dir: string, urlPrefix = ''): string[] {
   return routes
 }
 
+/** Файл страницы по её адресу: группы маршрутов вроде (lists) в адрес не входят. */
+function findPageFile(dir: string, route: string, urlPrefix = ''): string {
+  if ((urlPrefix || '/') === route && readdirSync(dir).includes('page.tsx')) return path.join(dir, 'page.tsx')
+  for (const name of readdirSync(dir)) {
+    const full = path.join(dir, name)
+    if (!statSync(full).isDirectory()) continue
+    const nested = `${urlPrefix}${ROUTE_GROUP.test(name) ? '' : `/${name}`}`
+    if (!route.startsWith(nested)) continue
+    const found = findPageFile(full, route, nested)
+    if (found) return found
+  }
+  return ''
+}
+
 function expand(route: string): string[] {
   const dynamic = route.match(/\[(\w+)\]/)
   if (!dynamic) return [route]
@@ -110,7 +124,7 @@ describe('доступ ко всем страницам приложения', (
   })
 
   it.each([...SELF_GUARDED_PAGES])('проверяет доступ сама: %s', (route) => {
-    const file = path.join(APP_DIR, '(frontend)', route, 'page.tsx')
+    const file = findPageFile(path.join(APP_DIR, '(frontend)'), route)
     const source = readFileSync(file, 'utf8')
 
     expect(source, `${route} не запрашивает пользователя`).toMatch(/payload\.auth\(/)

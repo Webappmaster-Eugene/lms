@@ -122,7 +122,7 @@ describe('каталог тренажёра: инварианты', () => {
     // Единственное место, где каталог виден целиком: любой лимит здесь делает
     // часть тем недостижимой без фильтра, причём молча.
     const source = await import('node:fs').then((fs) =>
-      fs.readFileSync('src/app/(frontend)/trainer/tasks/page.tsx', 'utf8'),
+      fs.readFileSync('src/app/(frontend)/(lists)/trainer/tasks/page.tsx', 'utf8'),
     )
 
     expect(source, 'выборка каталога должна идти через collectAllPages').toContain('collectAllPages')

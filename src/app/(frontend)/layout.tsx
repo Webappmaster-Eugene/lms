@@ -8,6 +8,8 @@ import { Header } from '@/components/layout/Header'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { Footer } from '@/components/layout/Footer'
 import { ToastProvider } from '@/components/ui/Toast'
+import { NavigationProgress } from '@/components/layout/NavigationProgress'
+import { Suspense } from 'react'
 
 const inter = Inter({
   subsets: ['cyrillic', 'latin'],
@@ -29,6 +31,9 @@ export default function FrontendLayout({ children }: { children: React.ReactNode
       <body>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           <ToastProvider>
+            <Suspense fallback={null}>
+              <NavigationProgress />
+            </Suspense>
             <SidebarProvider>
               <div className="flex min-h-screen overflow-x-hidden">
                 <div className="contents print:hidden">

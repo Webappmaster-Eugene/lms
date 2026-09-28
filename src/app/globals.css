@@ -172,3 +172,13 @@ body {
     background: #fff !important;
   }
 }
+
+/* Полоса перехода между страницами: быстро до трети, дальше замедляется и не доходит до конца. */
+@keyframes nav-progress {
+  from {
+    width: 0;
+  }
+  to {
+    width: 90%;
+  }
+}

@@ -44,8 +44,8 @@ test.describe('внутренние страницы', () => {
     }
   })
 
-  // Next с loading.tsx начинает стримить ответ до notFound(), и статус уже 200.
-  test.fail('БАГ: черновик/несуществующий урок отдаёт HTTP 404, а не «мягкий» 404 со статусом 200', async ({ request }) => {
+  // Страница урока вне группы со скелетоном: notFound() успевает до начала стрима.
+  test('черновик/несуществующий урок отдаёт HTTP 404, а не «мягкий» 404 со статусом 200', async ({ request }) => {
     const response = await request.get(`/lessons/${CONTENT.draftLesson.slug}`)
     expect(await response.text()).toContain(NOT_FOUND_HEADING)
     expect(response.status()).toBe(404)
