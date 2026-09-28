@@ -14,6 +14,7 @@ const NAV: [string, RegExp, string][] = [
   ['Тренажёр', /\/trainer$/, 'Тренажёр кода'],
   ['Лидерборд', /\/leaderboard$/, 'Лидерборд'],
   ['Сертификаты', /\/certificates$/, 'Мои сертификаты'],
+  ['Заметки', /\/notes$/, 'Мои заметки'],
   ['Профиль', /\/profile$/, `${USERS.doer.firstName} ${USERS.doer.lastName}`],
   ['Контакты', /\/contacts$/, 'Контакты'],
   ['Помощь', /\/help$/, 'Помощь'],
@@ -58,18 +59,30 @@ test('переключатель темы меняет класс html и зап
 
 test('поиск в шапке находит урок и переходит к нему', async ({ page }) => {
   await page.goto('/')
-  await page.getByPlaceholder('Поиск курсов и уроков...').first().fill('HTML')
-  const result = page.getByRole('button', { name: new RegExp(CONTENT.lessons[0].title) })
+  await page.getByRole('combobox', { name: /Поиск/ }).first().fill('HTML')
+  const result = page.getByRole('option', { name: new RegExp(CONTENT.lessons[0].title) })
   await expect(result).toBeVisible()
   await result.click()
   await expect(page).toHaveURL(new RegExp(`/lessons/${CONTENT.lessons[0].slug}$`))
 })
 
-test('поиск не показывает черновики', async ({ page }) => {
+test('поиск с клавиатуры: «/» ставит фокус, стрелка и Enter открывают задачу тренажёра', async ({ page }) => {
   await page.goto('/')
-  await page.getByPlaceholder('Поиск курсов и уроков...').first().fill('Черновик')
-  await page.waitForTimeout(800)
-  await expect(page.getByRole('button', { name: new RegExp(CONTENT.draftLesson.title) })).toHaveCount(0)
+  await page.locator('body').press('/')
+  const input = page.getByRole('combobox', { name: /Поиск/ }).first()
+  await expect(input).toBeFocused()
+  await page.keyboard.type(CONTENT.task.title)
+  await expect(page.getByRole('option', { name: new RegExp(CONTENT.task.title) })).toBeVisible()
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(new RegExp(`/trainer/${CONTENT.topic.slug}/${CONTENT.task.slug}$`))
+})
+
+test('поиск не показывает черновики и честно говорит, что ничего нет', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('combobox', { name: /Поиск/ }).first().fill('Черновик')
+  await expect(page.getByText('По запросу «Черновик» ничего не нашлось')).toBeVisible()
+  await expect(page.getByRole('option', { name: new RegExp(CONTENT.draftLesson.title) })).toHaveCount(0)
 })
 
 test('роадмап: граф с узлами, клик по узлу открывает панель темы с курсом', async ({ page }) => {

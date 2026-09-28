@@ -44,7 +44,7 @@ export async function Header() {
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur-sm lg:px-8">
       {/* Search — desktop inline, mobile icon+overlay */}
       <div className="hidden flex-1 lg:block lg:max-w-md">
-        <SearchBar />
+        <SearchBar hotkey />
       </div>
       <MobileSearchOverlay />
 
