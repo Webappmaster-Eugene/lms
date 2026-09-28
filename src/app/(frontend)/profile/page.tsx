@@ -3,8 +3,10 @@ import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { BookOpen, Pencil, Star, Trophy } from 'lucide-react'
+import { BookOpen, Pencil, Star, Target, Trophy } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import { collectAllPages } from '@/lib/paginate'
+import { nearestGoals } from '@/lib/achievement-progress'
 
 export const metadata: Metadata = {
   title: 'Профиль',
@@ -18,7 +20,7 @@ export default async function ProfilePage() {
   if (!user) redirect('/login')
 
   // Загружаем данные параллельно
-  const [progressData, achievementsData, recentTransactions] = await Promise.all([
+  const [progressData, achievementsData, recentTransactions, activeAchievements, unlockedDocs, trainerSolved, completionBonuses] = await Promise.all([
     payload.find({
       collection: 'user-progress',
       where: {
@@ -40,7 +42,68 @@ export default async function ProfilePage() {
       sort: '-createdAt',
       limit: 10,
     }),
+    collectAllPages(
+      ({ page, limit }) =>
+        payload.find({
+          collection: 'achievements',
+          where: { isActive: { equals: true } },
+          sort: 'id',
+          page,
+          limit,
+        }),
+      { label: 'активные достижения' },
+    ),
+    collectAllPages(
+      ({ page, limit }) =>
+        payload.find({
+          collection: 'user-achievements',
+          where: { user: { equals: user.id } },
+          select: { achievement: true },
+          depth: 0,
+          sort: 'id',
+          page,
+          limit,
+        }),
+      { label: `достижения пользователя ${user.id}` },
+    ),
+    payload.find({
+      collection: 'user-trainer-progress',
+      where: { user: { equals: user.id }, isCompleted: { equals: true } },
+      limit: 0,
+    }),
+    // Завершённые курсы и роадмапы хук достижений считает по бонусам за них — здесь так же.
+    collectAllPages(
+      ({ page, limit }) =>
+        payload.find({
+          collection: 'points-transactions',
+          where: { user: { equals: user.id }, reason: { in: ['course_completed', 'roadmap_completed'] } },
+          select: { reason: true, relatedEntity: true },
+          depth: 0,
+          sort: 'id',
+          page,
+          limit,
+        }),
+      { label: `бонусы за завершение ${user.id}` },
+    ),
   ])
+
+  const entityIds = (reason: string) =>
+    new Set(completionBonuses.filter((t) => t.reason === reason && t.relatedEntity).map((t) => String(t.relatedEntity)))
+  const completedCourseIds = entityIds('course_completed')
+  const completedRoadmapIds = entityIds('roadmap_completed')
+  const goals = nearestGoals(
+    activeAchievements,
+    new Set(unlockedDocs.map((u) => String(typeof u.achievement === 'object' ? u.achievement.id : u.achievement))),
+    {
+      lessons: progressData.totalDocs,
+      courses: completedCourseIds.size,
+      roadmaps: completedRoadmapIds.size,
+      trainerTasks: trainerSolved.totalDocs,
+      points: user.totalPoints ?? 0,
+      completedCourseIds,
+      completedRoadmapIds,
+    },
+  )
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
@@ -109,6 +172,38 @@ export default async function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Ближайшие цели: видно, что осталось до следующей награды */}
+      {goals.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">Ближайшие достижения</h2>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {goals.map((goal) => (
+              <div key={goal.id} className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4">
+                <div className="flex items-start gap-2">
+                  <Target className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  <p className="flex-1 text-sm font-medium text-foreground">{goal.title}</p>
+                  {goal.pointsReward > 0 && <span className="text-xs font-medium text-warning">+{goal.pointsReward}</span>}
+                </div>
+                {goal.description && <p className="text-xs text-muted-foreground">{goal.description}</p>}
+                <div
+                  className="mt-auto h-1.5 rounded-full bg-muted"
+                  role="progressbar"
+                  aria-valuenow={goal.percent}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`Прогресс к достижению «${goal.title}»`}
+                >
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${goal.percent}%` }} />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {goal.remaining} · {goal.current}/{goal.target}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Достижения */}
       <div>

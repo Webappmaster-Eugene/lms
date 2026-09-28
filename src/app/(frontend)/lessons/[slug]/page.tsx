@@ -8,6 +8,7 @@ import { ContentBlockRenderer } from '@/components/lesson/ContentBlockRenderer'
 import { CompletionButton } from '@/components/lesson/CompletionButton'
 import { LessonNotes } from '@/components/lesson/LessonNotes'
 import { LessonComments } from '@/components/lesson/LessonComments'
+import { LessonKeyboardNav } from '@/components/lesson/LessonKeyboardNav'
 import { CourseSidebar } from '@/components/course/CourseSidebar'
 import { collectAllPages } from '@/lib/paginate'
 import { relationKey } from '@/lib/course-lessons'
@@ -274,10 +275,15 @@ export default async function LessonPage({ params }: Props) {
         </div>
 
         {/* Навигация prev/next */}
+        <LessonKeyboardNav
+          prevHref={prevLesson ? `/lessons/${prevLesson.slug}` : null}
+          nextHref={nextLesson ? `/lessons/${nextLesson.slug}` : null}
+        />
         <div className="flex items-center justify-between gap-4">
           {prevLesson ? (
             <Link
               href={`/lessons/${prevLesson.slug}`}
+              title="Предыдущий урок (←)"
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -289,6 +295,7 @@ export default async function LessonPage({ params }: Props) {
           {nextLesson ? (
             <Link
               href={`/lessons/${nextLesson.slug}`}
+              title="Следующий урок (→)"
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <span className="max-w-[200px] truncate">{nextLesson.title}</span>
