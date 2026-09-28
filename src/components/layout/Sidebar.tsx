@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Map,
   MessageCircle,
+  MessagesSquare,
   StickyNote,
   Trophy,
   Upload,
@@ -31,12 +32,14 @@ const NAV_ITEMS = [
   { href: '/leaderboard', label: 'Лидерборд', icon: Trophy },
   { href: '/certificates', label: 'Сертификаты', icon: Award },
   { href: '/notes', label: 'Заметки', icon: StickyNote },
+  { href: '/questions', label: 'Вопросы', icon: MessagesSquare },
   { href: '/profile', label: 'Профиль', icon: User },
   { href: '/contacts', label: 'Контакты', icon: MessageCircle },
   { href: '/help', label: 'Помощь', icon: HelpCircle },
 ] as const
 
 const ADMIN_NAV_ITEMS = [
+  { href: '/admin/questions', label: 'Вопросы учеников', icon: MessagesSquare },
   { href: '/admin/import-yandex', label: 'Импорт из YD', icon: Upload },
 ] as const
 

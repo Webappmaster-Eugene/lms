@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { CheckCircle2, CornerDownRight, Loader2, MessageSquare, Send } from 'lucide-react'
 import { useAsyncData } from '@/hooks/use-async-data'
 import { useToast } from '@/components/ui/Toast'
-import { authorName, groupThreads, isMentorReply, type CommentDoc, type Thread } from '@/lib/comment-threads'
+import { authorName, groupThreads, isMentorReply, threadStatus, STATUS_LABELS, type CommentDoc, type Thread, type ThreadStatus } from '@/lib/comment-threads'
 import { cn, formatDate } from '@/lib/utils'
 
 type Props = {
@@ -143,7 +143,7 @@ export function LessonComments({ lessonId }: Props) {
 
 function ThreadItem({ thread, lessonId, onPosted }: { thread: Thread; lessonId: number; onPosted: () => void }) {
   const { question, replies } = thread
-  const answered = replies.some((r) => isMentorReply(r, question))
+  const status = threadStatus(thread)
   const [replying, setReplying] = useState(false)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
@@ -169,16 +169,7 @@ function ThreadItem({ thread, lessonId, onPosted }: { thread: Thread; lessonId: 
   return (
     <li id={`comment-${question.id}`} className="scroll-mt-24 space-y-3 rounded-lg border border-border bg-card px-4 py-3">
       <CommentBody comment={question}>
-        {question.isResolved ? (
-          <Badge className="bg-success/10 text-foreground">
-            <CheckCircle2 className="h-3 w-3 text-success" aria-hidden="true" />
-            Решён
-          </Badge>
-        ) : answered ? (
-          <Badge className="bg-info/10 text-foreground">Есть ответ</Badge>
-        ) : (
-          <Badge className="bg-muted text-muted-foreground">Ждёт ответа</Badge>
-        )}
+        <StatusBadge status={status} />
       </CommentBody>
 
       {replies.length > 0 && (
@@ -245,6 +236,22 @@ function CommentBody({ comment, children }: { comment: CommentDoc; children?: Re
       </div>
       <p className="whitespace-pre-wrap text-sm text-foreground">{comment.content}</p>
     </div>
+  )
+}
+
+export function StatusBadge({ status }: { status: ThreadStatus }) {
+  if (status === 'resolved') {
+    return (
+      <Badge className="bg-success/10 text-foreground">
+        <CheckCircle2 className="h-3 w-3 text-success" aria-hidden="true" />
+        {STATUS_LABELS.resolved}
+      </Badge>
+    )
+  }
+  return (
+    <Badge className={status === 'answered' ? 'bg-info/10 text-foreground' : 'bg-muted text-muted-foreground'}>
+      {STATUS_LABELS[status]}
+    </Badge>
   )
 }
 

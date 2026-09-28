@@ -31,6 +31,7 @@ const INNER: [string, string][] = [
   ['contacts', '/contacts'],
   ['certificates', '/certificates'],
   ['notes', '/notes'],
+  ['questions', '/questions'],
 ]
 
 for (const theme of ['light', 'dark'] as Theme[]) {

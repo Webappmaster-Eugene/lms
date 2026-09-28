@@ -26,7 +26,7 @@ const PUBLIC_PAGES = new Set(['/login', '/forgot-password', '/reset-password'])
  * Пропускаются по префиксу `/admin`, отданному админке Payload, поэтому
  * обязаны проверять доступ сами — и строже: middleware видит только куку.
  */
-const SELF_GUARDED_PAGES = new Set(['/admin/import-yandex'])
+const SELF_GUARDED_PAGES = new Set(['/admin/import-yandex', '/admin/questions'])
 
 /** Слаг с точкой обязателен: по суффиксу он неотличим от статики. */
 const SEGMENT_SAMPLES: Record<string, readonly string[]> = {

@@ -113,12 +113,16 @@ test('вопрос к уроку: ментор отвечает, ученик в
   await expect(thread.getByText('Ждёт ответа')).toBeVisible()
   const questionId = (await thread.getAttribute('id'))?.replace('comment-', '')
 
-  // Ментор отвечает из-под своей учётки — как из админки.
+  // Ментор отвечает со своей страницы вопросов.
   const mentor = await browser.newContext({ baseURL: APP_URL, storageState: storageStateOf('admin') })
-  const reply = await mentor.request.post('/api/comments', {
-    data: { content: 'Ответ ментора e2e', parentComment: Number(questionId) },
-  })
-  expect(reply.ok()).toBe(true)
+  const mentorPage = await mentor.newPage()
+  await mentorPage.goto('/admin/questions')
+  const card = mentorPage.locator(`#comment-${questionId}`)
+  await card.getByRole('textbox', { name: /Ответ ученику/ }).fill('Ответ ментора e2e')
+  await card.getByRole('button', { name: 'Ответить' }).click()
+  await expect(mentorPage.getByText('Ответ отправлен — ученик получит уведомление')).toBeVisible()
+  await mentorPage.getByRole('button', { name: /Есть ответ/ }).click()
+  await expect(mentorPage.locator(`#comment-${questionId}`)).toContainText('Ответ ментора e2e')
   await mentor.close()
 
   await page.reload()
@@ -128,4 +132,12 @@ test('вопрос к уроку: ментор отвечает, ученик в
 
   await page.getByRole('button', { name: /Уведомления/ }).click()
   await expect(page.getByText(`Ответ на ваш вопрос к уроку «${second.title}»`)).toBeVisible()
+
+  await page.goto('/questions')
+  const item = page.getByRole('listitem').filter({ hasText: text })
+  await expect(item.getByText('Ответ ментора e2e')).toBeVisible()
+  await expect(item.getByRole('link', { name: second.title })).toHaveAttribute(
+    'href',
+    `/lessons/${second.slug}#comment-${questionId}`,
+  )
 })

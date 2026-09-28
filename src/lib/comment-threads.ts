@@ -36,7 +36,7 @@ export function authorName(user: CommentDoc['user']): string {
   return 'Ментор'
 }
 
-const authorId = (user: CommentDoc['user']) =>
+export const authorId = (user: CommentDoc['user']) =>
   user && typeof user === 'object' ? String(user.id ?? '') : user === null ? '' : String(user)
 
 /**
@@ -45,3 +45,21 @@ const authorId = (user: CommentDoc['user']) =>
  */
 export const isMentorReply = (reply: CommentDoc, question: CommentDoc) =>
   authorId(reply.user) !== authorId(question.user)
+
+export type ThreadStatus = 'resolved' | 'answered' | 'waiting'
+
+/**
+ * Ждёт ответа — последнее слово за учеником: вопрос без ответа или уточнение
+ * после ответа ментора. Решённую ветку ментор закрыл сам.
+ */
+export function threadStatus({ question, replies }: Thread): ThreadStatus {
+  if (question.isResolved) return 'resolved'
+  const last = replies.at(-1)
+  return last && isMentorReply(last, question) ? 'answered' : 'waiting'
+}
+
+export const STATUS_LABELS: Record<ThreadStatus, string> = {
+  resolved: 'Решён',
+  answered: 'Есть ответ',
+  waiting: 'Ждёт ответа',
+}

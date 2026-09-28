@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import type { Payload } from 'payload'
 
 import type { Comment } from '@/payload-types'
+import { loadQuestionThreads } from '@/lib/questions'
 import { createAdmin, createCourseTree, createStudent, getTestPayload, type CourseTree, type TestUser } from '../helpers/payload'
 
 /**
@@ -75,11 +76,11 @@ describe('ветка вопроса', () => {
     expect(note?.title).toContain(tree.lessons[0].title)
   })
 
-  it('ментор получает уведомление о новом вопросе со ссылкой в админку', async () => {
+  it('ментор получает уведомление о новом вопросе со ссылкой на страницу ответов', async () => {
     const question = await ask(asker, 'Вопрос ментору')
 
     const note = (await notificationsOf(mentor)).find((n) => n.message === 'Вопрос ментору')
-    expect(note?.link).toBe(`/admin/collections/comments/${question.id}`)
+    expect(note?.link).toBe(`/admin/questions#comment-${question.id}`)
   })
 
   it('уточнение в своей ветке разрешено и не шлёт уведомление самому себе', async () => {
@@ -137,5 +138,44 @@ describe('ветка вопроса', () => {
     const after = await payload.findByID({ collection: 'comments', id: mine.id, depth: 0 })
     expect(after.parentComment ?? null).toBeNull()
     expect(await visibleTo(stranger)).not.toContain('Мой вопрос')
+  })
+})
+
+describe('страницы «Мои вопросы» и «Вопросы учеников»', () => {
+  it('ученик получает только свои ветки вместе с ответами ментора и уроком', async () => {
+    const question = await ask(asker, 'Вопрос для страницы')
+    await ask(mentor, 'Ответ для страницы', { parentComment: question.id })
+    await ask(stranger, 'Чужой вопрос для страницы')
+
+    const threads = await loadQuestionThreads(payload, asker)
+    const mine = threads.find((t) => t.question.content === 'Вопрос для страницы')
+
+    expect(mine?.replies.map((r) => r.content)).toEqual(['Ответ для страницы'])
+    expect(mine?.lesson).toEqual({ title: tree.lessons[0].title, slug: tree.lessons[0].slug })
+    expect(threads.some((t) => t.question.content === 'Чужой вопрос для страницы')).toBe(false)
+  })
+
+  it('ментор получает ветки всех учеников', async () => {
+    const threads = await loadQuestionThreads(payload, mentor)
+
+    expect(threads.map((t) => t.question.content)).toEqual(
+      expect.arrayContaining(['Вопрос для страницы', 'Чужой вопрос для страницы']),
+    )
+  })
+
+  it('у вопроса к снятому уроку ссылки нет, а переписка остаётся', async () => {
+    const hidden = await createCourseTree(payload, { lessons: 1 })
+    await payload.create({
+      collection: 'comments',
+      data: { lesson: hidden.lessons[0].id, content: 'Вопрос к снятому уроку' } as never,
+      user: asker,
+      overrideAccess: false,
+    })
+    await payload.update({ collection: 'lessons', id: hidden.lessons[0].id, data: { isPublished: false } })
+
+    const thread = (await loadQuestionThreads(payload, asker)).find((t) => t.question.content === 'Вопрос к снятому уроку')
+
+    expect(thread).toBeDefined()
+    expect(thread?.lesson).toBeNull()
   })
 })

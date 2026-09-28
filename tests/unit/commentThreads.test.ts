@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { authorName, groupThreads, isMentorReply, type CommentDoc } from '@/lib/comment-threads'
+import { authorName, groupThreads, isMentorReply, threadStatus, type CommentDoc } from '@/lib/comment-threads'
 
 const c = (id: number, createdAt: string, parentComment: number | null = null, user: CommentDoc['user'] = { id: 1, firstName: 'Анна' }): CommentDoc => ({
   id,
@@ -47,5 +47,27 @@ describe('ответ ментора', () => {
     expect(isMentorReply(c(2, '2026-09-02', 1, { id: 3, firstName: 'Евгений' }), question)).toBe(true)
     expect(isMentorReply(c(3, '2026-09-02', 1, 3), question)).toBe(true)
     expect(isMentorReply(c(4, '2026-09-02', 1, { id: 7 }), question)).toBe(false)
+  })
+})
+
+describe('статус ветки', () => {
+  const question = { ...c(1, '2026-09-01', null, { id: 7 }), isResolved: false }
+  const mentor = (id: number) => c(id, `2026-09-0${id}`, 1, { id: 3 })
+  const student = (id: number) => c(id, `2026-09-0${id}`, 1, { id: 7 })
+
+  it('без ответа — ждёт', () => {
+    expect(threadStatus({ question, replies: [] })).toBe('waiting')
+  })
+
+  it('последним ответил ментор — есть ответ', () => {
+    expect(threadStatus({ question, replies: [mentor(2)] })).toBe('answered')
+  })
+
+  it('уточнение после ответа снова ждёт ментора', () => {
+    expect(threadStatus({ question, replies: [mentor(2), student(3)] })).toBe('waiting')
+  })
+
+  it('решённый — решён, что бы ни было в ветке', () => {
+    expect(threadStatus({ question: { ...question, isResolved: true }, replies: [student(2)] })).toBe('resolved')
   })
 })

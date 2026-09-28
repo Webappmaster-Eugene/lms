@@ -132,7 +132,7 @@ export const notifyCommentThread: CollectionAfterChangeHook = async ({ doc, oper
             title: `Вопрос к уроку «${lesson.title}»`,
             message: excerpt(doc.content),
             type: 'comment',
-            link: `/admin/collections/comments/${doc.id}`,
+            link: `/admin/questions#comment-${doc.id}`,
             isRead: false,
           },
         })

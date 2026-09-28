@@ -53,6 +53,7 @@ const INNER: [string, string][] = [
   ['лидерборд', '/leaderboard'],
   ['профиль', '/profile'],
   ['заметки', '/notes'],
+  ['вопросы', '/questions'],
   ['помощь', '/help'],
 ]
 
