@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowRight, Award, BookOpen, Clock, Flame, GraduationCap, Map as MapIcon, Star, Trophy } from 'lucide-react'
 import { collectAllPages } from '@/lib/paginate'
 import { pluralize } from '@/lib/utils'
+import { streakView } from '@/lib/streak'
 import { loadCourseLessons, relationKey } from '@/lib/course-lessons'
 import { nextLesson, recentCourseIds } from '@/lib/roadmap-next-step'
 
@@ -70,7 +71,7 @@ export default async function DashboardPage() {
   ])
 
   const completedLessons = progressData.totalDocs
-  const streakDays = (streakData.docs[0] as { currentStreak?: number } | undefined)?.currentStreak ?? 0
+  const streak = streakView(streakData.docs[0])
   const certificatesCount = certificatesData.totalDocs ?? 0
 
   // Курсы ученика — по последней активности, а не первые в каталоге: иначе начатый
@@ -166,7 +167,18 @@ export default async function DashboardPage() {
         <h1 className="text-xl font-bold text-foreground sm:text-2xl">
           Привет, {user.firstName}!
         </h1>
-        <p className="mt-1 text-muted-foreground">Продолжай обучение</p>
+        {streak.status === 'at-risk' ? (
+          <p className="mt-1 flex items-center gap-1.5 text-foreground">
+            <Flame className="h-4 w-4 shrink-0 text-[hsl(var(--streak))]" aria-hidden="true" />
+            Серия {pluralize(streak.days, 'день', 'дня', 'дней')} подряд — пройдите урок сегодня, чтобы её не прервать
+          </p>
+        ) : streak.status === 'today' ? (
+          <p className="mt-1 text-muted-foreground">
+            Сегодня урок уже пройден — серия {pluralize(streak.days, 'день', 'дня', 'дней')} подряд
+          </p>
+        ) : (
+          <p className="mt-1 text-muted-foreground">Продолжай обучение</p>
+        )}
       </div>
 
       {resume?.next && (
@@ -192,7 +204,7 @@ export default async function DashboardPage() {
       <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide sm:grid sm:grid-cols-5 sm:gap-4 sm:overflow-visible sm:pb-0">
         <StatCard icon={BookOpen} color="info" value={completedLessons} label="Уроков" />
         <StatCard icon={Star} color="warning" value={user.totalPoints ?? 0} label="Баллов" />
-        <StatCard icon={Flame} color="streak" value={streakDays} label="Дней подряд" />
+        <StatCard icon={Flame} color="streak" value={streak.days} label="Дней подряд" />
         <StatCard icon={Trophy} color="success" value={achievementsData.totalDocs} label="Достижений" />
         <StatCard icon={Award} color="primary" value={certificatesCount} label="Сертификатов" />
       </div>

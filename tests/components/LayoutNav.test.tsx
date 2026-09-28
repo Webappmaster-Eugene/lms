@@ -93,7 +93,7 @@ describe('шапка', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     auth.mockResolvedValue({ user })
-    find.mockResolvedValue({ docs: [{ currentStreak: 12 }] })
+    find.mockResolvedValue({ docs: [{ currentStreak: 12, lastActivityDate: new Date().toISOString().slice(0, 10) }] })
   })
 
   it('показывает имя, баллы и серию', async () => {
@@ -106,6 +106,14 @@ describe('шапка', () => {
 
   it('нулевая серия не показывается — пустой огонёк выглядит поломкой', async () => {
     find.mockResolvedValue({ docs: [{ currentStreak: 0 }] })
+
+    render(await Header())
+
+    expect(screen.queryByText(/🔥/)).not.toBeInTheDocument()
+  })
+
+  it('прерванная серия не показывается — в базе остаётся старое число', async () => {
+    find.mockResolvedValue({ docs: [{ currentStreak: 12, lastActivityDate: '2020-01-01' }] })
 
     render(await Header())
 

@@ -4,6 +4,7 @@ import { Star } from 'lucide-react'
 import { NotificationsBell } from './NotificationsBell'
 import { SearchBar } from './SearchBar'
 import { MobileSearchOverlay } from './MobileSearchOverlay'
+import { streakView } from '@/lib/streak'
 
 export async function Header() {
   const payload = await getPayload()
@@ -23,21 +24,19 @@ export async function Header() {
 
       // Загружаем streak
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const streakResult = await (payload as any).find({
+        const streakResult = await payload.find({
           collection: 'streaks',
           where: { user: { equals: user.id } },
           limit: 1,
         })
-        if (streakResult.docs?.length > 0) {
-          streakDays = streakResult.docs[0].currentStreak ?? 0
-        }
-      } catch {
-        // streak not available yet
+        streakDays = streakView(streakResult.docs[0]).days
+      } catch (error) {
+        // Шапка есть на каждой странице: без серии она показывается дальше.
+        console.error('Шапка: не удалось загрузить серию', error)
       }
     }
-  } catch {
-    // auth failed
+  } catch (error) {
+    console.error('Шапка: не удалось определить пользователя', error)
   }
 
   return (
