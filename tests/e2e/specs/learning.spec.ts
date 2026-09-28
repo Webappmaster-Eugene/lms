@@ -141,3 +141,27 @@ test('вопрос к уроку: ментор отвечает, ученик в
     `/lessons/${second.slug}#comment-${questionId}`,
   )
 })
+
+test.describe('видео досмотрено — предложение отметить урок', () => {
+  // Отдельный ученик: отметка урока не должна менять состояние doer и student.
+  test.use({ storageState: storageStateOf('leader'), viewport: { width: 375, height: 812 } })
+
+  test('на телефоне предложение над нижней навигацией, отметка ведёт к следующему уроку', async ({ page }) => {
+    await page.goto(`/lessons/${first.slug}`)
+    await expect(page.getByRole('button', { name: 'Отметить пройденным' })).toBeVisible()
+    // В сиде нет видео — конец ролика сообщает сам плеер этим событием.
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('lms:video-ended')))
+
+    const dialog = page.getByRole('dialog', { name: 'Видео досмотрено' })
+    await expect(dialog).toBeInViewport()
+    const dialogBox = await dialog.boundingBox()
+    const navBox = await page.locator('nav').filter({ hasText: 'Главная' }).boundingBox()
+    expect((dialogBox?.y ?? 0) + (dialogBox?.height ?? 0)).toBeLessThanOrEqual(navBox?.y ?? 0)
+
+    await dialog.getByRole('button', { name: 'Отметить' }).click()
+    await expect(dialog.getByRole('link', { name: `Дальше: ${second.title}` })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Урок пройден' })).toBeVisible()
+    await dialog.getByRole('link', { name: `Дальше: ${second.title}` }).click()
+    await expect(page).toHaveURL(new RegExp(`/lessons/${second.slug}$`))
+  })
+})
