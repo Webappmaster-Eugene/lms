@@ -59,11 +59,11 @@ test('«Отметить пройденным» начисляет баллы: �
   await expect(page.getByText('Уроков пройдено', { exact: true }).locator('..')).toContainText('1')
   await expect(page.getByText('Пройдите первый урок')).toBeVisible()
   await expect(page.getByRole('img', { name: /Календарь занятий\. 1 активный день: 1 урок/ })).toBeVisible()
+  await expect(page.getByText('Урок пройден', { exact: true })).toBeVisible()
 
   // Остались первые два урока: 15 + 20 минут по оценке из сида.
   await page.goto(`/courses/${CONTENT.course.slug}`)
   await expect(page.getByText('Осталось ~35 мин')).toBeVisible()
-  await expect(page.getByText('Урок пройден', { exact: true })).toBeVisible()
 
   // В рейтинге doer поднялся выше студента без баллов и помечен «(вы)».
   await page.goto('/leaderboard')
