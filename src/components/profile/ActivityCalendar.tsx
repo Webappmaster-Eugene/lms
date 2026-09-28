@@ -37,8 +37,10 @@ export function ActivityCalendar({ grid }: { grid: ActivityCell[][] }) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">{caption}</p>
-      <div className="overflow-x-auto pb-1">
-        <div className="inline-flex gap-2" role="img" aria-label={`Календарь занятий. ${caption}`}>
+      {/* data-dynamic: сетка сдвигается каждую неделю — визуальные тесты её маскируют. */}
+      <div className="overflow-x-auto pb-1" data-dynamic>
+        {/* Отступ справа — под подпись месяца в последней неделе, она шире клетки. */}
+        <div className="inline-flex gap-2 pr-6" role="img" aria-label={`Календарь занятий. ${caption}`}>
           <div className="grid grid-rows-[auto_repeat(7,12px)] gap-[3px] pt-px text-[10px] leading-3 text-muted-foreground">
             <span className="h-3" />
             {DAY_LABELS.map((label, i) => (
