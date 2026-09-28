@@ -8,12 +8,14 @@ function run(args: {
   operation?: 'create' | 'update'
   user?: { id: number; role: string } | null
   data?: Record<string, unknown>
+  originalDoc?: Record<string, unknown>
   skipHooks?: boolean
 }) {
   const data = args.data ?? {}
   return assignOwner({
     operation: args.operation ?? 'create',
     data,
+    originalDoc: args.originalDoc,
     req: { user: args.user ?? null, context: args.skipHooks ? { skipHooks: true } : {} },
   } as unknown as HookArgs) as Record<string, unknown>
 }
@@ -36,11 +38,31 @@ describe('владелец записи при создании', () => {
   })
 })
 
-describe('когда хук не вмешивается', () => {
-  it('при обновлении владелец не переписывается', () => {
-    expect(run({ operation: 'update', user: { id: 5, role: 'student' }, data: { user: 42 } }).user).toBe(42)
+describe('владелец при обновлении', () => {
+  it('студент не переписывает свою запись на другого пользователя', () => {
+    expect(
+      run({ operation: 'update', user: { id: 5, role: 'student' }, data: { user: 42 }, originalDoc: { user: 5 } }).user,
+    ).toBe(5)
   })
 
+  it('владелец берётся из исходной записи, даже если она пришла развёрнутой', () => {
+    expect(
+      run({ operation: 'update', user: { id: 5, role: 'student' }, data: { user: 42 }, originalDoc: { user: { id: 5 } } }).user,
+    ).toBe(5)
+  })
+
+  it('админ может передать запись другому пользователю', () => {
+    expect(
+      run({ operation: 'update', user: { id: 1, role: 'admin' }, data: { user: 42 }, originalDoc: { user: 5 } }).user,
+    ).toBe(42)
+  })
+
+  it('обновление без поля user его не добавляет', () => {
+    expect(run({ operation: 'update', user: { id: 5, role: 'student' }, data: { content: 'x' }, originalDoc: { user: 5 } })).not.toHaveProperty('user')
+  })
+})
+
+describe('когда хук не вмешивается', () => {
   it('вызовы из других хуков (skipHooks) проходят как есть', () => {
     expect(run({ user: { id: 5, role: 'student' }, data: { user: 42 }, skipHooks: true }).user).toBe(42)
   })

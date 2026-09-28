@@ -236,19 +236,19 @@ export async function down({ db, payload, req }: MigrateDownArgs): Promise<void>
   DROP TABLE "user_trainer_progress" CASCADE;
   DROP TABLE "faq_items" CASCADE;
   DROP TABLE "yandex_disk_imports" CASCADE;
-  ALTER TABLE "lessons" DROP CONSTRAINT "lessons_section_id_sections_id_fk";
+  ALTER TABLE "lessons" DROP CONSTRAINT IF EXISTS "lessons_section_id_sections_id_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_sections_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_sections_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_trainer_topics_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_trainer_topics_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_trainer_tasks_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_trainer_tasks_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_user_trainer_progress_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_user_trainer_progress_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_faq_items_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_faq_items_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_yandex_disk_imports_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_yandex_disk_imports_fk";
   
   DROP INDEX IF EXISTS "lessons_section_idx";
   DROP INDEX IF EXISTS "payload_locked_documents_rels_sections_id_idx";
@@ -278,10 +278,12 @@ export async function down({ db, payload, req }: MigrateDownArgs): Promise<void>
   DROP TYPE "public"."enum_points_transactions_reason";
   CREATE TYPE "public"."enum_points_transactions_reason" AS ENUM('lesson_completed', 'course_completed', 'roadmap_completed', 'achievement_unlocked', 'admin_adjustment');
   ALTER TABLE "public"."points_transactions" ALTER COLUMN "reason" SET DATA TYPE "public"."enum_points_transactions_reason" USING "reason"::"public"."enum_points_transactions_reason";
+  ALTER TABLE "public"."notifications" ALTER COLUMN "type" DROP DEFAULT;
   ALTER TABLE "public"."notifications" ALTER COLUMN "type" SET DATA TYPE text;
   DROP TYPE "public"."enum_notifications_type";
   CREATE TYPE "public"."enum_notifications_type" AS ENUM('info', 'achievement', 'course_completed', 'roadmap_completed', 'comment');
   ALTER TABLE "public"."notifications" ALTER COLUMN "type" SET DATA TYPE "public"."enum_notifications_type" USING "type"::"public"."enum_notifications_type";
+  ALTER TABLE "public"."notifications" ALTER COLUMN "type" SET DEFAULT 'info';
   DROP TYPE "public"."enum_trainer_tasks_difficulty";
   DROP TYPE "public"."enum_yandex_disk_imports_status";`)
 }

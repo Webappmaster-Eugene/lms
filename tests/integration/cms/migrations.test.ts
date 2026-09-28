@@ -140,18 +140,17 @@ describe('миграции на чистой базе', () => {
 })
 
 /**
- * down-функции ранних миграций сгенерированы Payload с ошибкой порядка:
- * `DROP TABLE … CASCADE` уже удаляет внешний ключ, а следующая строка
- * `DROP CONSTRAINT` (без IF EXISTS) падает. Прод down не выполняет, но
- * ручной откат этих миграций невозможен — см. отчёт.
+ * Откат проверяется до двух ранних миграций: их down Payload сгенерировал с
+ * `DROP CONSTRAINT` после `DROP TABLE … CASCADE`, и без `IF EXISTS` он падал.
+ * Ещё раньше — исходная схема, её откат снёс бы всё и проверять нечего.
  */
-const BROKEN_DOWN = ['20260404_202710', '20260402_095341']
+const EARLY_DOWN = ['20260404_202710', '20260402_095341']
 
 describe('откат миграций (down) в обратном порядке', () => {
   const reversed = () => [...migrations].reverse()
   const rollbackable = () => {
     const list = reversed()
-    return list.slice(0, list.findIndex((m) => BROKEN_DOWN.includes(m.name)))
+    return list.slice(0, list.findIndex((m) => EARLY_DOWN.includes(m.name)))
   }
 
   it('down всех миграций новее 20260404_202710 выполняются по очереди без ошибок', async () => {
@@ -168,10 +167,16 @@ describe('откат миграций (down) в обратном порядке'
     expect(tables).toContain('roadmap_nodes')
   })
 
-  it.fails('down 20260404_202710 откатывается (баг: DROP CONSTRAINT после DROP TABLE … CASCADE)', async () => {
+  it('ранние миграции откатываются: внешние ключи, снятые CASCADE, не удаляются повторно', async () => {
     const req = await createLocalReq({}, payload)
-    const broken = migrations.find((m) => m.name === '20260404_202710')!
-    await broken.down({ db: db().drizzle, payload, req } as never)
+    for (const name of EARLY_DOWN) {
+      const migration = migrations.find((m) => m.name === name)!
+      await expect(migration.down({ db: db().drizzle, payload, req } as never), `down ${name}`).resolves.toBeUndefined()
+      await raw(`delete from payload_migrations where name = '${name}'`)
+    }
+    const tables = await publicTables()
+    expect(tables).not.toContain('roadmap_nodes')
+    expect(tables).not.toContain('sections')
   })
 
   it('после отката миграции накатываются заново и схема снова совпадает с конфигом', async () => {

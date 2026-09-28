@@ -335,7 +335,7 @@ describe('попытки эскалации прав', () => {
     expect(fresh.isActive).toBe(false)
   })
 
-  it.fails('БАГ: владелец заметки не должен переписать её на другого пользователя через update', async () => {
+  it('владелец заметки не переписывает её на другого пользователя через update', async () => {
     const note = await payload.create({
       collection: 'notes', data: { user: owner.id, lesson: ctx.lessonId, content: 'моё' }, user: owner, overrideAccess: false,
     })

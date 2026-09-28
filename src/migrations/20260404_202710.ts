@@ -97,9 +97,9 @@ export async function down({ db, payload, req }: MigrateDownArgs): Promise<void>
   ALTER TABLE "roadmap_edges" DISABLE ROW LEVEL SECURITY;
   DROP TABLE "roadmap_nodes" CASCADE;
   DROP TABLE "roadmap_edges" CASCADE;
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_roadmap_nodes_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_roadmap_nodes_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_roadmap_edges_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_roadmap_edges_fk";
   
   DROP INDEX IF EXISTS "payload_locked_documents_rels_roadmap_nodes_id_idx";
   DROP INDEX IF EXISTS "payload_locked_documents_rels_roadmap_edges_id_idx";
