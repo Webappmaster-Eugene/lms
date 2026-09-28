@@ -58,6 +58,11 @@ test('«Отметить пройденным» начисляет баллы: �
   await expect(page.getByText('Баллов', { exact: true }).locator('..')).toContainText('15')
   await expect(page.getByText('Уроков пройдено', { exact: true }).locator('..')).toContainText('1')
   await expect(page.getByText('Пройдите первый урок')).toBeVisible()
+  await expect(page.getByRole('img', { name: /Календарь занятий\. 1 активный день: 1 урок/ })).toBeVisible()
+
+  // Остались первые два урока: 15 + 20 минут по оценке из сида.
+  await page.goto(`/courses/${CONTENT.course.slug}`)
+  await expect(page.getByText('Осталось ~35 мин')).toBeVisible()
   await expect(page.getByText('Урок пройден', { exact: true })).toBeVisible()
 
   // В рейтинге doer поднялся выше студента без баллов и помечен «(вы)».
@@ -70,6 +75,7 @@ test('«Отметить пройденным» начисляет баллы: �
 
   await page.goto('/')
   await expect(page.getByText('Дней подряд', { exact: true }).locator('..')).toContainText('1')
+  await expect(page.getByText('Сегодня урок уже пройден — серия 1 день подряд')).toBeVisible()
 })
 
 test('заметка к уроку сохраняется, переживает перезагрузку и видна среди всех заметок', async ({ page }) => {

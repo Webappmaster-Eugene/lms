@@ -7,6 +7,8 @@ import { BookOpen, Pencil, Star, Target, Trophy } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { collectAllPages } from '@/lib/paginate'
 import { nearestGoals } from '@/lib/achievement-progress'
+import { activityGrid, activityStart, countByDay } from '@/lib/activity'
+import { ActivityCalendar } from '@/components/profile/ActivityCalendar'
 
 export const metadata: Metadata = {
   title: 'Профиль',
@@ -86,6 +88,45 @@ export default async function ProfilePage() {
       { label: `бонусы за завершение ${user.id}` },
     ),
   ])
+
+  // Отдельно от счётчиков выше: календарю нужны даты, а не только количество.
+  const now = new Date()
+  const since = activityStart(now).toISOString()
+  const [lessonDone, tasksDone] = await Promise.all([
+    collectAllPages(
+      ({ page, limit }) =>
+        payload.find({
+          collection: 'user-progress',
+          where: { user: { equals: user.id }, isCompleted: { equals: true }, completedAt: { greater_than_equal: since } },
+          select: { completedAt: true },
+          depth: 0,
+          sort: 'id',
+          page,
+          limit,
+        }),
+      { label: `активность по урокам ${user.id}` },
+    ),
+    collectAllPages(
+      ({ page, limit }) =>
+        payload.find({
+          collection: 'user-trainer-progress',
+          where: { user: { equals: user.id }, isCompleted: { equals: true }, completedAt: { greater_than_equal: since } },
+          select: { completedAt: true },
+          depth: 0,
+          sort: 'id',
+          page,
+          limit,
+        }),
+      { label: `активность в тренажёре ${user.id}` },
+    ),
+  ])
+  const activity = activityGrid(
+    countByDay(
+      lessonDone.map((p) => p.completedAt),
+      tasksDone.map((p) => p.completedAt),
+    ),
+    now,
+  )
 
   const entityIds = (reason: string) =>
     new Set(completionBonuses.filter((t) => t.reason === reason && t.relatedEntity).map((t) => String(t.relatedEntity)))
@@ -170,6 +211,13 @@ export default async function ProfilePage() {
             <p className="text-2xl font-bold text-foreground">{achievementsData.totalDocs}</p>
             <p className="text-sm text-muted-foreground">Достижений</p>
           </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-lg font-semibold text-foreground">Активность</h2>
+        <div className="mt-4 rounded-xl border border-border bg-card p-5">
+          <ActivityCalendar grid={activity} />
         </div>
       </div>
 

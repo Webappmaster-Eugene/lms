@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, Circle, Clock, PartyP
 import { collectAllPages } from '@/lib/paginate'
 import { relationKey } from '@/lib/course-lessons'
 import { pluralize } from '@/lib/utils'
+import { remainingTime } from '@/lib/course-time'
 import { nextLesson, orderCourseLessons } from '@/lib/roadmap-next-step'
 
 type Props = {
@@ -119,6 +120,8 @@ export default async function CourseDetailPage({ params }: Props) {
   const totalLessons = lessonDocs.length
   const completedCount = lessonDocs.filter((l) => completedLessonIds.has(String(l.id))).length
   const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0
+  // До первого урока ученику нужна оценка курса целиком — она уже есть в шапке.
+  const timeLeft = completedCount > 0 ? remainingTime(lessonDocs, completedLessonIds) : null
 
   const roadmap = typeof course.roadmap === 'object' ? course.roadmap : null
 
@@ -174,6 +177,7 @@ export default async function CourseDetailPage({ params }: Props) {
               {completedCount}/{totalLessons} ({progressPercent}%)
             </span>
           </div>
+          {timeLeft && <p className="mt-1 text-sm text-muted-foreground">{timeLeft}</p>}
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-secondary">
             <div
               className="h-full rounded-full bg-primary transition-all duration-500"
