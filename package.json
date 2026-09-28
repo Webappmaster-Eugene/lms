@@ -29,6 +29,7 @@
     "test:content": "playwright test --project=content",
     "test:e2e:all": "playwright test --project=e2e --project=api --project=content",
     "test:visual": "node scripts/visual-docker.mjs",
+    "test:prod": "node scripts/prod-test-accounts.mjs run",
     "test:visual:update": "node scripts/visual-docker.mjs --update-snapshots",
     "test:e2e:report": "playwright show-report",
     "test:db:up": "node scripts/test-db.mjs up",
