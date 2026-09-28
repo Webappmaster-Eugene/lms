@@ -23,15 +23,7 @@ async function audit(page: Page, name: string): Promise<string[]> {
  * Подтверждённые нарушения (см. отчёт). Тест помечен test.fail: когда нарушение
  * исправят, он сообщит «expected to fail, but passed» — запись нужно удалить.
  */
-const KNOWN: Record<string, string> = {
-  'dark-урок': 'critical button-name: кнопка отправки комментария (иконка без aria-label)',
-  'light-урок': 'critical button-name (комментарий) + serious color-contrast бейджей боковой панели курса',
-  'light-курс': 'serious color-contrast: бейджи на странице курса в светлой теме',
-  'light-задача': 'serious color-contrast: text-success и теги bg-muted в светлой теме',
-  'light-лидерборд': 'serious color-contrast: бейджи bg-warning/10 в светлой теме',
-  'landing-375': 'serious color-contrast (подписи text-ink-faint) + definition-list (<dl> с лишними потомками)',
-  'landing-1440': 'serious color-contrast (подписи text-ink-faint) + definition-list (<dl> с лишними потомками)',
-}
+const KNOWN: Record<string, string> = {}
 
 function knownViolation(key: string) {
   test.fail(key in KNOWN, KNOWN[key])

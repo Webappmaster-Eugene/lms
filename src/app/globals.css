@@ -57,9 +57,10 @@
   --radius: 0.5rem;
 
   /* LMS accent colors */
-  --success: 142 72% 29%;
+  /* Статусы темнее: проходят 4,5:1 и на белом, и на своём фоне bg-*/10 */
+  --success: 142 72% 26%;
   --success-foreground: 0 0% 100%;
-  --warning: 32 95% 36%;
+  --warning: 30 95% 31%;
   --warning-foreground: 0 0% 100%;
   --info: 221 83% 45%;
   --info-foreground: 0 0% 100%;
