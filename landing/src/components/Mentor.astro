@@ -89,10 +89,11 @@ const FACTS = [
         <dl class="grid gap-px border border-line bg-line sm:grid-cols-2">
           {
             FACTS.map((fact) => (
-              <div class="bg-raised p-5">
-                <dd class="t-num text-2xl text-accent">{fact.value}</dd>
-                <dt class="t-h3 mt-1.5 text-[0.9375rem] text-ink">{fact.label}</dt>
-                <p class="t-body mt-1 text-[0.8125rem]">{fact.desc}</p>
+              <div class="flex flex-col bg-raised p-5">
+                {/* В <dl> только dt и dd, dt первым; порядок на экране задаёт order */}
+                <dt class="t-h3 order-2 mt-1.5 text-[0.9375rem] text-ink">{fact.label}</dt>
+                <dd class="t-num order-1 text-2xl text-accent">{fact.value}</dd>
+                <dd class="t-body order-3 mt-1 text-[0.8125rem]">{fact.desc}</dd>
               </div>
             ))
           }

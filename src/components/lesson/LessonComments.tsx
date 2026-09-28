@@ -79,6 +79,7 @@ export function LessonComments({ lessonId }: Props) {
         <textarea
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
+          aria-label="Комментарий к уроку"
           placeholder="Задайте вопрос или оставьте комментарий..."
           maxLength={2000}
           rows={2}
@@ -87,6 +88,7 @@ export function LessonComments({ lessonId }: Props) {
         <button
           onClick={handleSubmit}
           disabled={submitting || !newComment.trim()}
+          aria-label={submitting ? 'Отправляем комментарий' : 'Отправить комментарий'}
           className="flex h-10 w-10 items-center justify-center self-end rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
           {submitting ? (

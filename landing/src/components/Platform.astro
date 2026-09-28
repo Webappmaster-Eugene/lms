@@ -75,8 +75,9 @@ const GAME = [
       {
         INVENTORY.map((item) => (
           <div class="flex items-baseline gap-2">
-            <dd class="t-num text-xl text-accent">{item.value}</dd>
-            <dt class="t-mono">{item.label}</dt>
+            {/* dt первым по разметке (так требует <dl>), цифра первой визуально */}
+            <dt class="t-mono order-2">{item.label}</dt>
+            <dd class="t-num order-1 text-xl text-accent">{item.value}</dd>
           </div>
         ))
       }
