@@ -14,6 +14,9 @@ const MAX_ENTRIES = 200
 /** Видео урока досмотрено — кнопка прохождения предлагает отметить урок. */
 export const VIDEO_ENDED_EVENT = 'lms:video-ended'
 
+/** Перемотать основное видео урока: detail — { seconds }. Шлют метки времени из заметок. */
+export const VIDEO_SEEK_EVENT = 'lms:video-seek'
+
 export const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 1.75, 2] as const
 
 /** Меньше этого с начала — «продолжать» нечего. */
@@ -111,4 +114,32 @@ export function formatTime(seconds: number): string {
 
   const mm = hours > 0 ? String(minutes).padStart(2, '0') : String(minutes)
   return `${hours > 0 ? `${hours}:` : ''}${mm}:${String(secs).padStart(2, '0')}`
+}
+
+/** «12:34», «1:02:05», в квадратных скобках или без — как их вставляет кнопка заметок. */
+const TIMESTAMP = /\[?\b(?:(\d{1,2}):)?(\d{1,2}):(\d{2})\b\]?/g
+
+export type Timestamp = { label: string; seconds: number; index: number; length: number }
+
+export function parseTimestamps(text: string): Timestamp[] {
+  const found: Timestamp[] = []
+  for (const match of text.matchAll(TIMESTAMP)) {
+    const [raw, h, m, sec] = match
+    if (Number(sec) > 59 || (h !== undefined && Number(m) > 59)) continue
+    const seconds = Number(h ?? 0) * 3600 + Number(m) * 60 + Number(sec)
+    found.push({ label: formatTime(seconds), seconds, index: match.index ?? 0, length: raw.length })
+  }
+  return found
+}
+
+/** Уникальные метки по порядку появления — для кнопок под заметкой. */
+export function uniqueTimestamps(text: string): Timestamp[] {
+  const seen = new Set<number>()
+  return parseTimestamps(text).filter((t) => !seen.has(t.seconds) && seen.add(t.seconds))
+}
+
+/** `?t=754` из ссылки «Мои заметки» → секунды; мусор — null. */
+export function parseTimeParam(value: string | null): number | null {
+  if (!value || !/^\d{1,6}$/.test(value)) return null
+  return Number(value)
 }

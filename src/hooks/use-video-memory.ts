@@ -8,9 +8,21 @@ import {
   readRate,
   resumeTarget,
   savePosition,
+  parseTimeParam,
   saveRate,
   VIDEO_ENDED_EVENT,
+  VIDEO_SEEK_EVENT,
 } from '@/lib/video-memory'
+
+/**
+ * Метку `?t=` забирает первое видео страницы, один раз на адрес: иначе
+ * перерисовка плеера снова прыгала бы на метку, а переход по SPA к другой
+ * метке — наоборот, игнорировался бы.
+ */
+let consumedHref: string | null = null
+
+/** Основное видео урока — первое на странице: к нему относятся метки из заметок. */
+const isPrimary = (video: HTMLVideoElement) => document.querySelector('video') === video
 
 /** Как часто записывать позицию во время просмотра. */
 const SAVE_EVERY_SECONDS = 5
@@ -36,6 +48,8 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
   const [resumedFrom, setResumedFrom] = useState<number | null>(null)
   const [rate, setRateState] = useState(1)
   const pendingRef = useRef<number | null>(null)
+  // «Продолжили с …» — только про возврат к месту остановки, не про переход по метке заметки.
+  const announceRef = useRef(true)
   const lastSavedRef = useRef(0)
   const rateRef = useRef(1)
 
@@ -43,7 +57,11 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
     const video = videoRef.current
     if (!video) return
 
-    pendingRef.current = resumeTarget(readPosition(key), duration)
+    const href = window.location.href
+    const fromLink =
+      consumedHref !== href && isPrimary(video) ? parseTimeParam(new URL(href).searchParams.get('t')) : null
+    if (fromLink !== null) consumedHref = href
+    pendingRef.current = fromLink ?? resumeTarget(readPosition(key), duration)
     const initialRate = readRate()
     rateRef.current = initialRate
     setRateState(initialRate)
@@ -54,7 +72,7 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
       if (target === null || !canSeek(video, target)) return
       pendingRef.current = null
       video.currentTime = target
-      setResumedFrom(target)
+      if (announceRef.current) setResumedFrom(target)
     }
 
     const onTime = () => {
@@ -89,6 +107,17 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
       saveRate(video.playbackRate)
     }
 
+    const onSeek = (event: Event) => {
+      const seconds = (event as CustomEvent<{ seconds?: number }>).detail?.seconds
+      if (typeof seconds !== 'number' || !isPrimary(video)) return
+      announceRef.current = false
+      pendingRef.current = seconds
+      setResumedFrom(null)
+      tryResume()
+      video.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+    }
+
+    window.addEventListener(VIDEO_SEEK_EVENT, onSeek)
     video.addEventListener('loadedmetadata', onMetadata)
     video.addEventListener('progress', tryResume)
     video.addEventListener('canplay', tryResume)
@@ -102,6 +131,7 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
     return () => {
       // Переход на другой урок посреди просмотра — паузы не будет, фиксируем здесь.
       if (!finished) onPause()
+      window.removeEventListener(VIDEO_SEEK_EVENT, onSeek)
       video.removeEventListener('loadedmetadata', onMetadata)
       video.removeEventListener('progress', tryResume)
       video.removeEventListener('canplay', tryResume)

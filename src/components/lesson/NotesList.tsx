@@ -6,6 +6,7 @@ import { Download, Search, StickyNote } from 'lucide-react'
 
 import { filterNotes, groupNotesByCourse, notesToMarkdown, OTHER_GROUP_TITLE, type NoteEntry } from '@/lib/notes'
 import { formatDate, pluralize } from '@/lib/utils'
+import { parseTimestamps } from '@/lib/video-memory'
 
 function download(markdown: string) {
   const url = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }))
@@ -99,7 +100,9 @@ export function NotesList({ notes }: { notes: NoteEntry[] }) {
                     )}
                     <span className="text-xs text-muted-foreground">{formatDate(note.updatedAt)}</span>
                   </div>
-                  <p className="whitespace-pre-wrap break-words text-sm text-foreground">{note.content}</p>
+                  <p className="whitespace-pre-wrap break-words text-sm text-foreground">
+                    <NoteText content={note.content} lessonSlug={note.lesson?.slug ?? null} />
+                  </p>
                 </li>
               ))}
             </ul>
@@ -108,4 +111,28 @@ export function NotesList({ notes }: { notes: NoteEntry[] }) {
       )}
     </div>
   )
+}
+
+/** Метки времени видео в заметке — ссылки в урок сразу на этот момент. */
+function NoteText({ content, lessonSlug }: { content: string; lessonSlug: string | null }) {
+  const stamps = lessonSlug ? parseTimestamps(content) : []
+  if (stamps.length === 0) return <>{content}</>
+  const parts: React.ReactNode[] = []
+  let cursor = 0
+  for (const t of stamps) {
+    parts.push(content.slice(cursor, t.index))
+    parts.push(
+      <Link
+        key={t.index}
+        href={`/lessons/${lessonSlug}?t=${t.seconds}`}
+        title={`Открыть видео урока на ${t.label}`}
+        className="rounded bg-primary/10 px-1 tabular-nums text-foreground underline-offset-2 hover:underline"
+      >
+        {t.label}
+      </Link>,
+    )
+    cursor = t.index + t.length
+  }
+  parts.push(content.slice(cursor))
+  return <>{parts}</>
 }

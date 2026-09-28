@@ -157,4 +157,33 @@ describe('память видео', () => {
     expect(element.currentTime).toBe(300)
     expect(screen.getByText('Продолжили с 5:00')).toBeInTheDocument()
   })
+
+  it('метка из заметки перематывает основное видео без «Продолжили с …»', () => {
+    const { container } = renderPlayer()
+    loadMetadata(video(container))
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('lms:video-seek', { detail: { seconds: 125 } }))
+    })
+
+    expect(video(container).currentTime).toBe(125)
+    expect(screen.queryByText(/Продолжили/)).not.toBeInTheDocument()
+  })
+
+  it('ссылка с ?t= открывает видео на метке, а не на месте остановки', () => {
+    window.localStorage.setItem('lms:video-positions', JSON.stringify({ [URL_A]: { t: 300, at: 1 } }))
+    window.history.replaceState(null, '', '/lessons/a?t=90')
+    const { container, unmount } = renderPlayer()
+    loadMetadata(video(container))
+
+    expect(video(container).currentTime).toBe(90)
+    play(video(container), 200)
+    unmount()
+
+    // Повторная отрисовка на том же адресе метку не применяет — работает память.
+    const again = renderPlayer()
+    loadMetadata(video(again.container))
+    expect(video(again.container).currentTime).toBe(200)
+    window.history.replaceState(null, '', '/')
+  })
 })

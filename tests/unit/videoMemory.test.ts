@@ -107,3 +107,38 @@ describe('формат времени', () => {
     expect(formatTime(seconds)).toBe(expected)
   })
 })
+
+describe('метки времени в заметках', () => {
+  it('находит метки со скобками и без, с часами', async () => {
+    const { parseTimestamps } = await import('@/lib/video-memory')
+    expect(parseTimestamps('[12:34] хуки, потом 1:02:05 и 0:07').map((t) => [t.label, t.seconds])).toEqual([
+      ['12:34', 754],
+      ['1:02:05', 3725],
+      ['0:07', 7],
+    ])
+  })
+
+  it('позиция и длина метки — для подсветки в тексте', async () => {
+    const { parseTimestamps } = await import('@/lib/video-memory')
+    const [t] = parseTimestamps('см. [2:05] тут')
+    expect('см. [2:05] тут'.slice(t.index, t.index + t.length)).toBe('[2:05]')
+  })
+
+  it('не метки: 12:75, счёт 3:1, время без секунд', async () => {
+    const { parseTimestamps } = await import('@/lib/video-memory')
+    expect(parseTimestamps('12:75 и счёт 3:1')).toEqual([])
+  })
+
+  it('повторы убираются для кнопок', async () => {
+    const { uniqueTimestamps } = await import('@/lib/video-memory')
+    expect(uniqueTimestamps('[1:00] и снова 1:00, потом 2:00').map((t) => t.label)).toEqual(['1:00', '2:00'])
+  })
+
+  it('?t= из ссылки — только целые секунды', async () => {
+    const { parseTimeParam } = await import('@/lib/video-memory')
+    expect(parseTimeParam('754')).toBe(754)
+    expect(parseTimeParam(null)).toBeNull()
+    expect(parseTimeParam('12:34')).toBeNull()
+    expect(parseTimeParam('-5')).toBeNull()
+  })
+})

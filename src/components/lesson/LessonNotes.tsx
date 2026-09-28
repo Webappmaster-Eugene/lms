@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { StickyNote, Save, Loader2, Trash2 } from 'lucide-react'
+import { StickyNote, Save, Loader2, Trash2, Clock, Play } from 'lucide-react'
+
+import { formatTime, uniqueTimestamps, VIDEO_SEEK_EVENT } from '@/lib/video-memory'
 import { useToast } from '@/components/ui/Toast'
 
 type Props = {
@@ -24,6 +26,27 @@ export function LessonNotes({ lessonId }: Props) {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [hasVideo, setHasVideo] = useState(false)
+  const areaRef = useRef<HTMLTextAreaElement>(null)
+
+
+  /** Текущее время видео в заметку — туда, где стоит курсор. */
+  function insertTime() {
+    const video = document.querySelector('video')
+    const area = areaRef.current
+    if (!video || !area) return
+    const stamp = `[${formatTime(video.currentTime)}] `
+    const start = area.selectionStart ?? note.length
+    const end = area.selectionEnd ?? note.length
+    const next = `${note.slice(0, start)}${stamp}${note.slice(end)}`.slice(0, 5000)
+    setNote(next)
+    requestAnimationFrame(() => {
+      area.focus()
+      area.setSelectionRange(start + stamp.length, start + stamp.length)
+    })
+  }
+
+  const stamps = hasVideo ? uniqueTimestamps(note) : []
   const { toast } = useToast()
 
   useEffect(() => {
@@ -119,7 +142,11 @@ export function LessonNotes({ lessonId }: Props) {
       <button
         type="button"
         aria-expanded={expanded}
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => {
+          // Видео рендерит плеер урока рядом, а не заметки — ищем его на странице.
+          setHasVideo(document.querySelector('video') !== null)
+          setExpanded(!expanded)
+        }}
         className="flex w-full items-center gap-3 px-5 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
       >
         <StickyNote className="h-4 w-4" />
@@ -142,6 +169,7 @@ export function LessonNotes({ lessonId }: Props) {
                 </p>
               )}
               <textarea
+                ref={areaRef}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 onKeyDown={(e) => {
@@ -157,6 +185,33 @@ export function LessonNotes({ lessonId }: Props) {
                 rows={5}
                 className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20 resize-none"
               />
+              {hasVideo && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={insertTime}
+                    className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                    Вставить время видео
+                  </button>
+                  {stamps.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5" role="group" aria-label="Перейти к моменту видео">
+                      {stamps.map((t) => (
+                        <button
+                          key={t.seconds}
+                          type="button"
+                          onClick={() => window.dispatchEvent(new CustomEvent(VIDEO_SEEK_EVENT, { detail: { seconds: t.seconds } }))}
+                          className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs tabular-nums text-foreground transition-colors hover:bg-primary/20"
+                        >
+                          <Play className="h-3 w-3" aria-hidden="true" />
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <span id="lesson-note-hint" className="text-xs text-muted-foreground">
                   <span>{note.length}/5000</span> · Ctrl/⌘+Enter — сохранить ·{' '}

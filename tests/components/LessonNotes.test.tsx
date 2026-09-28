@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 vi.mock('next/link', async () => (await import('../helpers/component-mocks')).linkMock())
@@ -241,6 +241,54 @@ describe('заметки к уроку', () => {
       await open(user)
 
       expect(screen.getByRole('link', { name: 'все заметки' })).toHaveAttribute('href', '/notes')
+    })
+  })
+
+  describe('метки времени видео', () => {
+    function withVideo(currentTime: number) {
+      const el = document.createElement('video')
+      el.currentTime = currentTime
+      document.body.appendChild(el)
+      return el
+    }
+
+    it('без видео на странице кнопки нет', async () => {
+      const user = userEvent.setup()
+      render(<LessonNotes lessonId={42} />)
+      await open(user)
+
+      expect(screen.queryByRole('button', { name: /Вставить время видео/ })).not.toBeInTheDocument()
+    })
+
+    it('вставляет текущее время видео туда, где курсор', async () => {
+      const el = withVideo(754)
+      const user = userEvent.setup()
+      render(<LessonNotes lessonId={42} />)
+      await open(user)
+
+      await user.type(screen.getByRole('textbox'), 'хуки')
+      await user.click(screen.getByRole('button', { name: /Вставить время видео/ }))
+
+      expect(screen.getByRole('textbox')).toHaveValue('хуки[12:34] ')
+      el.remove()
+    })
+
+    it('метки из текста — кнопки перехода к моменту видео', async () => {
+      const el = withVideo(0)
+      mockApi({ load: () => Response.json({ docs: [{ id: 'n-1', content: '[1:05] начало, 2:30 пример' }] }) })
+      const seek = vi.fn()
+      window.addEventListener('lms:video-seek', seek)
+      const user = userEvent.setup()
+      render(<LessonNotes lessonId={42} />)
+      await open(user)
+      await waitFor(() => expect(screen.getByRole('textbox')).toHaveValue('[1:05] начало, 2:30 пример'))
+
+      const group = screen.getByRole('group', { name: 'Перейти к моменту видео' })
+      await user.click(within(group).getByRole('button', { name: /2:30/ }))
+
+      expect((seek.mock.calls[0][0] as CustomEvent).detail).toEqual({ seconds: 150 })
+      window.removeEventListener('lms:video-seek', seek)
+      el.remove()
     })
   })
 

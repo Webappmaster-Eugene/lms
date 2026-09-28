@@ -79,4 +79,11 @@ describe('мои заметки', () => {
     const blob = createObjectURL.mock.calls[0][0]
     expect(await blob.text()).toContain('### Хуки\n\nuseEffect запускается после отрисовки')
   })
+
+  it('метка времени ведёт в урок сразу на этот момент видео', () => {
+    render(<NotesList notes={[{ ...notes[0], content: 'Смотри [12:34] про эффекты' }]} />)
+
+    expect(screen.getByRole('link', { name: '12:34' })).toHaveAttribute('href', '/lessons/hooks?t=754')
+    expect(screen.getByText(/про эффекты/)).toBeInTheDocument()
+  })
 })
