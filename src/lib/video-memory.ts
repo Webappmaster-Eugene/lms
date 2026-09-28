@@ -11,6 +11,9 @@ const RATE_KEY = 'lms:video-rate'
 /** Сколько роликов помним: старые вытесняются, чтобы запись не росла бесконечно. */
 const MAX_ENTRIES = 200
 
+/** Видео урока досмотрено — кнопка прохождения предлагает отметить урок. */
+export const VIDEO_ENDED_EVENT = 'lms:video-ended'
+
 export const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 1.75, 2] as const
 
 /** Меньше этого с начала — «продолжать» нечего. */

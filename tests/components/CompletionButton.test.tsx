@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { CompletionButton } from '@/components/lesson/CompletionButton'
+import { VIDEO_ENDED_EVENT } from '@/lib/video-memory'
 
 /**
  * Кнопка «Отметить пройденным». Id урока обязан уходить числом: строковые id
@@ -253,6 +254,59 @@ describe('кнопка завершения урока', () => {
 
       await waitFor(() => expect(screen.getByText(/Не удалось обновить прогресс/)).toBeInTheDocument())
       expect(screen.queryByRole('link', { name: /Следующий урок/ })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('видео досмотрено', () => {
+    const next = { slug: 'hooks', title: 'Хуки' }
+    const videoEnded = () => act(() => void window.dispatchEvent(new CustomEvent(VIDEO_ENDED_EVENT)))
+
+    it('до конца видео предложения нет', () => {
+      render(<CompletionButton lessonId={1} isCompleted={false} next={next} />)
+
+      expect(screen.queryByRole('dialog', { name: 'Видео досмотрено' })).not.toBeInTheDocument()
+    })
+
+    it('после видео предлагает отметить урок, не прокручивая к кнопке', async () => {
+      const user = userEvent.setup()
+      render(<CompletionButton lessonId={1} isCompleted={false} next={next} />)
+      videoEnded()
+
+      const dialog = screen.getByRole('dialog', { name: 'Видео досмотрено' })
+      await user.click(within(dialog).getByRole('button', { name: 'Отметить' }))
+
+      await waitFor(() => expect(lastRequest().body).toMatchObject({ lesson: 1, isCompleted: true }))
+      expect(await within(dialog).findByRole('link', { name: /Дальше: Хуки/ })).toHaveAttribute('href', '/lessons/hooks')
+    })
+
+    it('пройденный урок после видео сразу ведёт дальше', () => {
+      render(<CompletionButton lessonId={1} isCompleted progressId="5" next={next} />)
+      videoEnded()
+
+      const dialog = screen.getByRole('dialog', { name: 'Видео досмотрено' })
+      expect(within(dialog).getByRole('link', { name: /Дальше: Хуки/ })).toBeInTheDocument()
+      expect(within(dialog).queryByRole('button', { name: 'Отметить' })).not.toBeInTheDocument()
+    })
+
+    it('последний урок пройден — предложение исчезает, остаётся «Курс пройден»', async () => {
+      const user = userEvent.setup()
+      render(<CompletionButton lessonId={1} isCompleted={false} completesCourse />)
+      videoEnded()
+
+      await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Отметить' }))
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      expect(screen.getByText('Курс пройден!')).toBeInTheDocument()
+    })
+
+    it('закрывается крестиком', async () => {
+      const user = userEvent.setup()
+      render(<CompletionButton lessonId={1} isCompleted={false} next={next} />)
+      videoEnded()
+
+      await user.click(screen.getByRole('button', { name: 'Закрыть' }))
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
   })
 })

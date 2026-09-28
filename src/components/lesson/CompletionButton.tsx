@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, CheckCircle2, Circle, Loader2, PartyPopper } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Circle, Loader2, PartyPopper, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+
+import { VIDEO_ENDED_EVENT } from '@/lib/video-memory'
 
 type Props = {
   /** Числовой id — Payload отвергает строковые id в relationship-полях. */
@@ -37,6 +39,14 @@ export function CompletionButton({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
+  // Видео досмотрено, а кнопка — внизу страницы: предлагаем отметить урок прямо здесь.
+  const [prompt, setPrompt] = useState(false)
+
+  useEffect(() => {
+    const onEnded = () => setPrompt(true)
+    window.addEventListener(VIDEO_ENDED_EVENT, onEnded)
+    return () => window.removeEventListener(VIDEO_ENDED_EVENT, onEnded)
+  }, [])
 
   async function toggleCompletion() {
     setLoading(true)
@@ -93,9 +103,52 @@ export function CompletionButton({
     }
   }
 
+  const showPrompt = prompt && (!completed || (next !== null && !loading))
+
   return (
     <div className="flex flex-col items-center gap-2">
+      {showPrompt && (
+        <div
+          role="dialog"
+          aria-label="Видео досмотрено"
+          className="fixed inset-x-4 bottom-20 z-40 mx-auto flex max-w-md items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-xl sm:inset-x-auto sm:right-6 sm:bottom-6"
+        >
+          <div className="min-w-0 flex-1 text-sm">
+            {completed && next ? (
+              <Link href={`/lessons/${next.slug}`} className="flex items-center gap-2 font-medium text-foreground hover:text-primary">
+                <span className="truncate">Дальше: {next.title}</span>
+                <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+              </Link>
+            ) : (
+              <>
+                <p className="font-medium text-foreground">Видео досмотрено</p>
+                <p className="text-muted-foreground">Отметить урок пройденным?</p>
+              </>
+            )}
+          </div>
+          {!completed && (
+            <button
+              type="button"
+              onClick={toggleCompletion}
+              disabled={loading}
+              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              Отметить
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setPrompt(false)}
+            aria-label="Закрыть"
+            className="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
       <button
+        type="button"
         onClick={toggleCompletion}
         disabled={loading}
         className={`flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-colors ${

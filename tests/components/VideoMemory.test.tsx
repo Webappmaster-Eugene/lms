@@ -86,6 +86,17 @@ describe('память видео', () => {
     expect(video(second.container).currentTime).toBe(103)
   })
 
+  it('конец видео сообщается странице — кнопка урока предложит отметку', () => {
+    const listener = vi.fn()
+    window.addEventListener('lms:video-ended', listener)
+    const { container } = renderPlayer()
+
+    fireEvent(video(container), new Event('ended'))
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    window.removeEventListener('lms:video-ended', listener)
+  })
+
   it('досмотренное видео начинается сначала', () => {
     const first = renderPlayer()
     loadMetadata(video(first.container))

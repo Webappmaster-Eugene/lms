@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 
-import { clearPosition, readPosition, readRate, resumeTarget, savePosition, saveRate } from '@/lib/video-memory'
+import {
+  clearPosition,
+  readPosition,
+  readRate,
+  resumeTarget,
+  savePosition,
+  saveRate,
+  VIDEO_ENDED_EVENT,
+} from '@/lib/video-memory'
 
 /** Как часто записывать позицию во время просмотра. */
 const SAVE_EVERY_SECONDS = 5
@@ -63,6 +71,7 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
     const onEnded = () => {
       finished = true
       clearPosition(key)
+      window.dispatchEvent(new CustomEvent(VIDEO_ENDED_EVENT))
     }
     const onPlay = () => {
       finished = false
