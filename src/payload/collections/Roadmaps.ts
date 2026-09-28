@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
-import { isAuthenticated } from '@/payload/access/isAuthenticated'
+import { isPublishedOrAdmin } from '@/payload/access/isPublishedOrAdmin'
 import { generateSlug } from '@/payload/hooks/generateSlug'
 import {
   normalizeLexicalAfterRead,
@@ -17,7 +17,7 @@ export const Roadmaps: CollectionConfig = {
   },
   access: {
     create: isAdmin,
-    read: isAuthenticated,
+    read: isPublishedOrAdmin,
     update: isAdmin,
     delete: isAdmin,
   },

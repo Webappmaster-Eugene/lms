@@ -30,6 +30,16 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // Админке общий CSP не подходит (свои скрипты и стили Payload), но встраивать её
+        // во фрейм нельзя: иначе кликджекинг действий администратора
+        source: '/admin/:path*',
+        headers: [
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+        ],
+      },
+      {
         source: '/((?!admin|api).*)',
         headers: [
           {

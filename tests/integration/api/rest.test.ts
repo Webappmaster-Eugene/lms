@@ -129,7 +129,7 @@ describe('коллекции через REST', () => {
     expect((json.testCases as { hidden: boolean }[]).some((c) => !c.hidden)).toBe(true)
   })
 
-  it.fails('БАГ: скрытые табличные кейсы (hidden) не должны отдаваться студенту через REST', async () => {
+  it('скрытые табличные кейсы (hidden) не отдаются студенту через REST', async () => {
     const task = await createSumTask(payload)
     const { json } = await rest('GET', `/trainer-tasks/${task.id}`, { token: studentToken })
     const hidden = (json.testCases as { hidden: boolean; argsCode?: string; expectedCode?: string }[]).filter((c) => c.hidden)

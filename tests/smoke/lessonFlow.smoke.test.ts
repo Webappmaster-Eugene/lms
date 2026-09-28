@@ -101,7 +101,7 @@ describe('владелец записи проставляется одинак�
   it.each(['UserProgress', 'Notes', 'Comments'])('%s использует общий хук assignOwner', (name) => {
     const source = read(`../../src/payload/collections/${name}.ts`)
 
-    expect(source).toContain('beforeChange: [assignOwner]')
+    expect(source).toMatch(/beforeChange: \[assignOwner[,\]]/)
     // Прежняя логика «только не-админам» роняла создание записи у админа
     expect(source).not.toMatch(/role !== 'admin'/)
   })

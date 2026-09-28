@@ -17,9 +17,17 @@ function directive(name: string): string {
 }
 
 describe('область действия заголовков', () => {
+  const sources = [...NEXT_CONFIG.matchAll(/source:\s*'([^']+)'/g)].map((m) => m[1])
+
   it('админка и API исключены из общего набора заголовков', () => {
-    const source = NEXT_CONFIG.match(/source:\s*'([^']+)'/)?.[1]
-    expect(source).toBe('/((?!admin|api).*)')
+    expect(sources).toContain('/((?!admin|api).*)')
+  })
+
+  it('админке отдельно запрещено встраивание во фрейм', () => {
+    expect(sources).toContain('/admin/:path*')
+    const adminBlock = NEXT_CONFIG.slice(NEXT_CONFIG.indexOf("source: '/admin/:path*'"))
+    expect(adminBlock).toMatch(/key: 'X-Frame-Options',\s*value: 'DENY'/)
+    expect(adminBlock).toMatch(/frame-ancestors 'none'/)
   })
 })
 

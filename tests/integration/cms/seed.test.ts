@@ -144,10 +144,22 @@ describe('каталог в базе: каждая задача решаема �
 })
 
 describe('pnpm seed (базовый сид src/seed.ts)', () => {
-  it.fails('БАГ: `pnpm seed` создаёт базовые данные — сейчас модуль только экспортирует функцию и ничего не делает', async () => {
+  it('`pnpm seed` создаёт базовые данные', async () => {
     const run = cli(['seed'], { PAYLOAD_MIGRATING: 'true' })
     expect(run.status, run.out).toBe(0)
     const { rows } = await sql.query('select count(*)::int as n from faq_items')
     expect(rows[0].n).toBeGreaterThan(0)
+
+    // Повторный запуск не падает на уникальных полях и не плодит дубли
+    const count = async () =>
+      (await sql.query(`select
+        (select count(*) from faq_items)::int as faq,
+        (select count(*) from lessons)::int as lessons,
+        (select count(*) from achievements)::int as achievements,
+        (select count(*) from trainer_tasks)::int as tasks`)).rows[0]
+    const before = await count()
+    const again = cli(['seed'], { PAYLOAD_MIGRATING: 'true' })
+    expect(again.status, again.out).toBe(0)
+    expect(await count()).toEqual(before)
   }, 300_000)
 })

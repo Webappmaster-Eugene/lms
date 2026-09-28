@@ -124,8 +124,12 @@ describe('POST /api/support-message', () => {
     it('считаются только обращения этого пользователя и только за последний час', async () => {
       await POST(request(VALID))
 
-      const [args] = find.mock.calls[0] as [{ where: Record<string, { equals?: unknown; greater_than?: string }> }]
+      const calls = find.mock.calls as unknown as [{ collection: string; where: Record<string, { equals?: unknown; greater_than?: string }> }][]
+      const [args] = calls.find(([a]) => a.collection === 'notifications') ?? []
+      if (!args) throw new Error('лимит не проверялся')
 
+      // Копии одного обращения есть у каждого админа - считаем только у первого
+      expect(args.where.user).toEqual({ equals: ADMINS[0].id })
       expect(args.where.type).toEqual({ equals: 'support_message' })
       expect(args.where.link).toEqual({ equals: `/admin/collections/users/${USER.id}` })
 

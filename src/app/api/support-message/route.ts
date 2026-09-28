@@ -46,26 +46,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Сообщение не должно превышать 5000 символов' }, { status: 400 })
   }
 
-  // Rate limiting: check recent support messages from this user
-  // We search by link field which contains the user's admin URL
-  const userLink = `/admin/collections/users/${user.id}`
-  const recentMessages = await payload.find({
-    collection: 'notifications',
-    where: {
-      type: { equals: 'support_message' },
-      link: { equals: userLink },
-      createdAt: { greater_than: new Date(Date.now() - 3600000).toISOString() },
-    },
-    limit: 0,
-  })
-
-  if (recentMessages.totalDocs >= 5) {
-    return NextResponse.json(
-      { error: 'Слишком много обращений. Попробуйте позже.' },
-      { status: 429 },
-    )
-  }
-
   const admins = await collectAllPages(
     ({ page, limit }) =>
       payload.find({
@@ -80,6 +60,30 @@ export async function POST(request: Request) {
     { label: 'администраторы' },
   )
 
+  // Лимит - по обращениям, а не по уведомлениям: уведомлений на одно обращение столько,
+  // сколько админов. Считаем копии одного получателя (первого админа)
+  const userLink = `/admin/collections/users/${user.id}`
+  const firstAdmin = admins[0]
+  const recentMessages = firstAdmin
+    ? await payload.find({
+        collection: 'notifications',
+        where: {
+          user: { equals: firstAdmin.id },
+          type: { equals: 'support_message' },
+          link: { equals: userLink },
+          createdAt: { greater_than: new Date(Date.now() - 3600000).toISOString() },
+        },
+        limit: 0,
+      })
+    : { totalDocs: 0 }
+
+  if (recentMessages.totalDocs >= 5) {
+    return NextResponse.json(
+      { error: 'Слишком много обращений. Попробуйте позже.' },
+      { status: 429 },
+    )
+  }
+
   const userName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email
 
   // Create notification for each admin
@@ -92,7 +96,7 @@ export async function POST(request: Request) {
           title: `Обращение от ${userName}: ${subject.trim()}`,
           message: message.trim(),
           type: 'support_message',
-          link: `/admin/collections/users/${user.id}`,
+          link: userLink,
           isRead: false,
         },
         context: { skipHooks: true },

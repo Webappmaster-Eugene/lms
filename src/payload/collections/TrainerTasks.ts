@@ -1,7 +1,7 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, FieldAccess } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
-import { isAuthenticated } from '@/payload/access/isAuthenticated'
+import { isPublishedOrAdmin } from '@/payload/access/isPublishedOrAdmin'
 import { generateSlug } from '@/payload/hooks/generateSlug'
 import {
   CHECK_MODE_OPTIONS,
@@ -22,6 +22,13 @@ const showForModes =
   (data: Partial<{ checkMode: string }>): boolean =>
     modes.includes(data?.checkMode ?? 'stdout')
 
+/**
+ * Данные скрытого кейса (аргументы и ожидаемое значение) видит только админ: иначе студент
+ * подсматривает их через REST и подгоняет решение под проверку. Сервер берёт кейсы с overrideAccess.
+ */
+const readUnlessHiddenCase: FieldAccess = ({ req, siblingData }) =>
+  req.user?.role === 'admin' || !(siblingData as { hidden?: boolean } | undefined)?.hidden
+
 export const TrainerTasks: CollectionConfig = {
   slug: 'trainer-tasks',
   admin: {
@@ -31,7 +38,7 @@ export const TrainerTasks: CollectionConfig = {
   },
   access: {
     create: isAdmin,
-    read: isAuthenticated,
+    read: isPublishedOrAdmin,
     update: isAdmin,
     delete: isAdmin,
   },
@@ -201,6 +208,7 @@ export const TrainerTasks: CollectionConfig = {
         {
           name: 'argsCode',
           type: 'textarea',
+          access: { read: readUnlessHiddenCase },
           // Не обязательное: функция может вызываться без аргументов,
           // а пустую строку Payload считает отсутствующим значением.
           label: 'Аргументы (код)',
@@ -213,6 +221,7 @@ export const TrainerTasks: CollectionConfig = {
           name: 'expectedCode',
           type: 'textarea',
           required: true,
+          access: { read: readUnlessHiddenCase },
           label: 'Ожидаемое значение (код)',
         },
         {

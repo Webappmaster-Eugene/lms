@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
-import { isAuthenticated } from '@/payload/access/isAuthenticated'
+import { isPublishedOrAdmin } from '@/payload/access/isPublishedOrAdmin'
 import { cleanupLessonRelations } from '@/payload/hooks/cleanupLessonRelations'
 import { generateSlug } from '@/payload/hooks/generateSlug'
 import { TextBlock } from '@/payload/blocks/TextBlock'
@@ -20,7 +20,7 @@ export const Lessons: CollectionConfig = {
   },
   access: {
     create: isAdmin,
-    read: isAuthenticated,
+    read: isPublishedOrAdmin,
     update: isAdmin,
     delete: isAdmin,
   },

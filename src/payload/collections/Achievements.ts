@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
 import { isAuthenticated } from '@/payload/access/isAuthenticated'
+import { cleanupAchievementRelations } from '@/payload/hooks/cleanupOwnedRelations'
 
 export const Achievements: CollectionConfig = {
   slug: 'achievements',
@@ -15,6 +16,9 @@ export const Achievements: CollectionConfig = {
     read: isAuthenticated,
     update: isAdmin,
     delete: isAdmin,
+  },
+  hooks: {
+    beforeDelete: [cleanupAchievementRelations],
   },
   fields: [
     {

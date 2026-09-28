@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
-import { isAuthenticated } from '@/payload/access/isAuthenticated'
+import { isPublishedOrAdmin } from '@/payload/access/isPublishedOrAdmin'
 import { generateSlug } from '@/payload/hooks/generateSlug'
 import { TOPIC_CATEGORY_OPTIONS } from '@/lib/trainer/constants'
 
@@ -14,7 +14,7 @@ export const TrainerTopics: CollectionConfig = {
   },
   access: {
     create: isAdmin,
-    read: isAuthenticated,
+    read: isPublishedOrAdmin,
     update: isAdmin,
     delete: isAdmin,
   },

@@ -4,6 +4,7 @@ import { isAdmin } from '@/payload/access/isAdmin'
 import { isAuthenticated } from '@/payload/access/isAuthenticated'
 import { resetPasswordEmail } from '@/payload/emails/templates'
 import { sendInviteEmail } from '@/payload/hooks/sendNotification'
+import { cleanupUserRelations } from '@/payload/hooks/cleanupOwnedRelations'
 
 type ForgotPasswordArgs = {
   token?: string
@@ -38,6 +39,7 @@ export const Users: CollectionConfig = {
   },
   hooks: {
     afterChange: [sendInviteEmail],
+    beforeDelete: [cleanupUserRelations],
   },
   access: {
     create: isAdmin,

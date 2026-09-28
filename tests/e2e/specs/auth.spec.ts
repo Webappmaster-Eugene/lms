@@ -69,7 +69,7 @@ test.describe('вход и выход через интерфейс', () => {
     expect(cookie).toMatchObject({ httpOnly: true, sameSite: 'Lax' })
   })
 
-  test.fail('БАГ: redirect после входа не уводит на внешний сайт (open redirect)', async ({ page }) => {
+  test('redirect после входа не уводит на внешний сайт (open redirect)', async ({ page }) => {
     await page.route('https://evil.example/**', (route) => route.fulfill({ status: 200, body: 'phishing' }))
     await page.goto('/login?redirect=https://evil.example/steal')
     await page.getByLabel('Email').fill(USERS.student.email)

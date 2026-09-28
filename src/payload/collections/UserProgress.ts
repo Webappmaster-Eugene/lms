@@ -6,6 +6,7 @@ import { isAdminOrSelf } from '@/payload/access/isAdminOrSelf'
 import { awardPoints } from '@/payload/hooks/awardPoints'
 import { checkAchievements } from '@/payload/hooks/checkAchievements'
 import { updateStreak } from '@/payload/hooks/updateStreak'
+import { lockUserProgress } from '@/payload/hooks/lockUserProgress'
 import { assignOwner } from '@/payload/hooks/assignOwner'
 
 export const UserProgress: CollectionConfig = {
@@ -21,7 +22,7 @@ export const UserProgress: CollectionConfig = {
     delete: isAdmin,
   },
   hooks: {
-    beforeChange: [assignOwner],
+    beforeChange: [assignOwner, lockUserProgress],
     afterChange: [awardPoints, checkAchievements, updateStreak],
   },
   fields: [

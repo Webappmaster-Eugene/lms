@@ -1,14 +1,20 @@
-import type { Payload } from 'payload'
+import { getPayload, type CollectionSlug, type Payload } from 'payload'
+import config from '@payload-config'
 import {
   findOrCreateRoadmap,
   findOrCreateCourse,
   createSection,
   createLessonsForSection,
+  type LessonInput,
 } from '@/lib/seed-helpers'
 
 /**
  * Seed-скрипт: создаёт начальные данные для LMS.
  * Запуск: pnpm seed
+ *
+ * Идемпотентен: записи ищутся по естественному ключу (email, slug, title,
+ * question) и создаются, только если их ещё нет — повторный запуск и запуск
+ * после `pnpm seed:trainer` не падают на уникальных полях.
  */
 export const seed = async (payload: Payload) => {
   console.log('Seeding LMS database...')
@@ -40,33 +46,19 @@ export const seed = async (payload: Payload) => {
     console.log('Admin user already exists:', adminEmail)
   }
 
-  // 2. Создаём тестовых студентов
-  const student1 = await payload.create({
-    collection: 'users',
-    data: {
-      email: 'student1@test.com',
-      password: 'student123',
-      firstName: 'Иван',
-      lastName: 'Петров',
-      role: 'student',
-      isActive: true,
-    },
-    context: { skipHooks: true },
-  })
-
-  const student2 = await payload.create({
-    collection: 'users',
-    data: {
-      email: 'student2@test.com',
-      password: 'student123',
-      firstName: 'Анна',
-      lastName: 'Сидорова',
-      role: 'student',
-      isActive: true,
-    },
-    context: { skipHooks: true },
-  })
-  console.log('Students created:', student1.email, student2.email)
+  // 2. Создаём тестовых студентов (если ещё не существуют)
+  for (const student of [
+    { email: 'student1@test.com', firstName: 'Иван', lastName: 'Петров' },
+    { email: 'student2@test.com', firstName: 'Анна', lastName: 'Сидорова' },
+  ]) {
+    if (await findIdBy(payload, 'users', 'email', student.email)) continue
+    await payload.create({
+      collection: 'users',
+      data: { ...student, password: 'student123', role: 'student', isActive: true },
+      context: { skipHooks: true },
+    })
+  }
+  console.log('Students ready: student1@test.com student2@test.com')
 
   // 3. Настройки сайта (включая контакты и баллы тренажёра)
   await payload.updateGlobal({
@@ -108,20 +100,23 @@ export const seed = async (payload: Payload) => {
   })
 
   // Создаём секции для курса JS
-  const jsSection1 = await createSection(payload, { title: '1. Основы языка', courseId: jsBasics.id, order: 1 })
-  const jsSection2 = await createSection(payload, { title: '2. Продвинутые концепции', courseId: jsBasics.id, order: 2 })
-
-  const jsLessons1 = [
-    { title: 'Переменные и типы данных', estimatedMinutes: 30 },
-    { title: 'Функции и замыкания', estimatedMinutes: 45 },
-    { title: 'Массивы и объекты', estimatedMinutes: 40 },
-  ]
-  const jsLessons2 = [
-    { title: 'Асинхронность: Promise и async/await', estimatedMinutes: 60 },
-    { title: 'ES6+ возможности', estimatedMinutes: 35 },
-  ]
-  await createLessonsForSection(payload, jsBasics.id, jsSection1.id, jsLessons1)
-  await createLessonsForSection(payload, jsBasics.id, jsSection2.id, jsLessons2)
+  await seedSections(payload, jsBasics.id, [
+    {
+      title: '1. Основы языка',
+      lessons: [
+        { title: 'Переменные и типы данных', estimatedMinutes: 30 },
+        { title: 'Функции и замыкания', estimatedMinutes: 45 },
+        { title: 'Массивы и объекты', estimatedMinutes: 40 },
+      ],
+    },
+    {
+      title: '2. Продвинутые концепции',
+      lessons: [
+        { title: 'Асинхронность: Promise и async/await', estimatedMinutes: 60 },
+        { title: 'ES6+ возможности', estimatedMinutes: 35 },
+      ],
+    },
+  ])
 
   const reactFundamentals = await findOrCreateCourse(payload, {
     title: 'React Fundamentals',
@@ -132,17 +127,22 @@ export const seed = async (payload: Payload) => {
     prerequisites: [jsBasics.id],
   })
 
-  const reactSection1 = await createSection(payload, { title: '1. Введение в React', courseId: reactFundamentals.id, order: 1 })
-  const reactSection2 = await createSection(payload, { title: '2. Хуки и состояние', courseId: reactFundamentals.id, order: 2 })
-
-  await createLessonsForSection(payload, reactFundamentals.id, reactSection1.id, [
-    { title: 'Введение в React и JSX', estimatedMinutes: 30 },
-    { title: 'Компоненты и пропсы', estimatedMinutes: 45 },
-  ])
-  await createLessonsForSection(payload, reactFundamentals.id, reactSection2.id, [
-    { title: 'useState и управление состоянием', estimatedMinutes: 50 },
-    { title: 'useEffect и жизненный цикл', estimatedMinutes: 55 },
-    { title: 'Формы и события', estimatedMinutes: 40 },
+  await seedSections(payload, reactFundamentals.id, [
+    {
+      title: '1. Введение в React',
+      lessons: [
+        { title: 'Введение в React и JSX', estimatedMinutes: 30 },
+        { title: 'Компоненты и пропсы', estimatedMinutes: 45 },
+      ],
+    },
+    {
+      title: '2. Хуки и состояние',
+      lessons: [
+        { title: 'useState и управление состоянием', estimatedMinutes: 50 },
+        { title: 'useEffect и жизненный цикл', estimatedMinutes: 55 },
+        { title: 'Формы и события', estimatedMinutes: 40 },
+      ],
+    },
   ])
 
   console.log('React roadmap created with courses, sections and lessons')
@@ -163,17 +163,22 @@ export const seed = async (payload: Payload) => {
     estimatedHours: 20,
   })
 
-  const nodeSection1 = await createSection(payload, { title: '1. Базовые концепции', courseId: nodeBasics.id, order: 1 })
-  const nodeSection2 = await createSection(payload, { title: '2. Работа с сетью', courseId: nodeBasics.id, order: 2 })
-
-  await createLessonsForSection(payload, nodeBasics.id, nodeSection1.id, [
-    { title: 'Введение в Node.js и npm', estimatedMinutes: 30 },
-    { title: 'Модули и файловая система', estimatedMinutes: 40 },
-    { title: 'Event Loop и асинхронность', estimatedMinutes: 60 },
-  ])
-  await createLessonsForSection(payload, nodeBasics.id, nodeSection2.id, [
-    { title: 'Streams и буферы', estimatedMinutes: 50 },
-    { title: 'Работа с HTTP', estimatedMinutes: 45 },
+  await seedSections(payload, nodeBasics.id, [
+    {
+      title: '1. Базовые концепции',
+      lessons: [
+        { title: 'Введение в Node.js и npm', estimatedMinutes: 30 },
+        { title: 'Модули и файловая система', estimatedMinutes: 40 },
+        { title: 'Event Loop и асинхронность', estimatedMinutes: 60 },
+      ],
+    },
+    {
+      title: '2. Работа с сетью',
+      lessons: [
+        { title: 'Streams и буферы', estimatedMinutes: 50 },
+        { title: 'Работа с HTTP', estimatedMinutes: 45 },
+      ],
+    },
   ])
 
   console.log('Node.js roadmap created with courses, sections and lessons')
@@ -191,25 +196,17 @@ export const seed = async (payload: Payload) => {
   ]
 
   for (const ach of achievementData) {
+    if (await findIdBy(payload, 'achievements', 'title', ach.title)) continue
     await payload.create({ collection: 'achievements', data: { ...ach, isActive: true } })
   }
-  console.log('Achievements created:', achievementData.length)
+  console.log('Achievements ready:', achievementData.length)
 
   // 7. Тренажёр: темы и задачи
-  const topicVariables = await payload.create({
-    collection: 'trainer-topics',
-    data: { title: 'Переменные и типы данных', slug: 'variables', category: 'javascript', order: 1, isPublished: true, description: 'Основы работы с переменными в JavaScript' },
-  })
+  const topicVariables = await findOrCreateTopic(payload, { title: 'Переменные и типы данных', slug: 'variables', category: 'javascript', order: 1, isPublished: true, description: 'Основы работы с переменными в JavaScript' })
 
-  const topicFunctions = await payload.create({
-    collection: 'trainer-topics',
-    data: { title: 'Функции', slug: 'functions', category: 'javascript', order: 2, isPublished: true, description: 'Функции, замыкания и области видимости' },
-  })
+  const topicFunctions = await findOrCreateTopic(payload, { title: 'Функции', slug: 'functions', category: 'javascript', order: 2, isPublished: true, description: 'Функции, замыкания и области видимости' })
 
-  const topicArrays = await payload.create({
-    collection: 'trainer-topics',
-    data: { title: 'Массивы и объекты', slug: 'arrays-objects', category: 'javascript', order: 3, isPublished: true, description: 'Работа с массивами, объектами и их методами' },
-  })
+  const topicArrays = await findOrCreateTopic(payload, { title: 'Массивы и объекты', slug: 'arrays-objects', category: 'javascript', order: 3, isPublished: true, description: 'Работа с массивами, объектами и их методами' })
 
   // Задачи: Переменные
   const variableTasks = [
@@ -240,6 +237,7 @@ export const seed = async (payload: Payload) => {
   ]
 
   for (const task of variableTasks) {
+    if (await findIdBy(payload, 'trainer-tasks', 'slug', task.slug)) continue
     await payload.create({
       collection: 'trainer-tasks',
       data: {
@@ -284,6 +282,7 @@ export const seed = async (payload: Payload) => {
   ]
 
   for (const task of functionTasks) {
+    if (await findIdBy(payload, 'trainer-tasks', 'slug', task.slug)) continue
     await payload.create({
       collection: 'trainer-tasks',
       data: {
@@ -328,6 +327,7 @@ export const seed = async (payload: Payload) => {
   ]
 
   for (const task of arrayTasks) {
+    if (await findIdBy(payload, 'trainer-tasks', 'slug', task.slug)) continue
     await payload.create({
       collection: 'trainer-tasks',
       data: {
@@ -343,7 +343,7 @@ export const seed = async (payload: Payload) => {
     })
   }
 
-  console.log('Trainer topics and tasks created')
+  console.log('Trainer topics and tasks ready')
 
   // 8. FAQ
   const faqData = [
@@ -356,6 +356,7 @@ export const seed = async (payload: Payload) => {
   ]
 
   for (let i = 0; i < faqData.length; i++) {
+    if (await findIdBy(payload, 'faq-items', 'question', faqData[i].question)) continue
     await payload.create({
       collection: 'faq-items',
       data: {
@@ -377,12 +378,61 @@ export const seed = async (payload: Payload) => {
       },
     })
   }
-  console.log('FAQ items created:', faqData.length)
+  console.log('FAQ items ready:', faqData.length)
 
   console.log('Seeding complete!')
 }
 
 // --- Helpers ---
+
+/** id первой записи коллекции, у которой `field` равно `value`. */
+async function findIdBy(
+  payload: Payload,
+  collection: CollectionSlug,
+  field: string,
+  value: string,
+): Promise<number | undefined> {
+  const { docs } = await payload.find({
+    collection,
+    where: { [field]: { equals: value } },
+    limit: 1,
+    depth: 0,
+    pagination: false,
+  })
+  return docs[0]?.id as number | undefined
+}
+
+/**
+ * Секции с уроками для курса. У секций и уроков slug с отметкой времени, поэтому
+ * по slug их не найти — если у курса секции уже есть, курс считаем заполненным.
+ */
+async function seedSections(
+  payload: Payload,
+  courseId: number,
+  sections: { title: string; lessons: LessonInput[] }[],
+): Promise<void> {
+  const { totalDocs } = await payload.count({ collection: 'sections', where: { course: { equals: courseId } } })
+  if (totalDocs > 0) return
+  for (const [i, section] of sections.entries()) {
+    const created = await createSection(payload, { title: section.title, courseId, order: i + 1 })
+    await createLessonsForSection(payload, courseId, created.id, section.lessons)
+  }
+}
+
+type TopicInput = {
+  title: string
+  slug: string
+  category: 'javascript'
+  order: number
+  isPublished: boolean
+  description: string
+}
+
+async function findOrCreateTopic(payload: Payload, data: TopicInput): Promise<{ id: number }> {
+  const id = await findIdBy(payload, 'trainer-topics', 'slug', data.slug)
+  if (id) return { id }
+  return payload.create({ collection: 'trainer-topics', data })
+}
 
 function makeRichText(text: string) {
   return {
@@ -399,4 +449,6 @@ function makeRichText(text: string) {
   }
 }
 
-export default seed
+const payload = await getPayload({ config })
+await seed(payload)
+process.exit(0)

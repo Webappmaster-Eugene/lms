@@ -207,7 +207,7 @@ describe('прохождение урока → баллы, серия, дост
     expect(lessonTx).toHaveLength(1)
   })
 
-  it.fails('БАГ: параллельные отметки разных уроков все сохраняются (сейчас одна падает с deadlock на users)', async () => {
+  it('параллельные отметки разных уроков все сохраняются (без deadlock на users)', async () => {
     const student = await createStudent(payload)
     const tree = await createCourseTree(payload, { lessons: 5 })
     // Пять уроков разом: гонка за строку users в recalculateTotalPoints воспроизводится стабильно.
@@ -425,7 +425,7 @@ describe('удаление документов со связями', () => {
     expect((await transactions(student.id)).some((t) => t.relatedEntity === String(lessonId))).toBe(true)
   })
 
-  it.fails('БАГ: полученное кем-то достижение должно удаляться (сейчас — ошибка NOT NULL в user_achievements)', async () => {
+  it('полученное кем-то достижение удаляется вместе с выдачами', async () => {
     const student = await createStudent(payload)
     const achievement = await payload.create({
       collection: 'achievements',
@@ -439,7 +439,7 @@ describe('удаление документов со связями', () => {
     await payload.delete({ collection: 'achievements', id: achievement.id })
   })
 
-  it.fails('БАГ: студента с прогрессом должно быть можно удалить (сейчас — ошибка NOT NULL в зависимых таблицах)', async () => {
+  it('студента с прогрессом можно удалить (зависимые записи чистятся)', async () => {
     const student = await createStudent(payload)
     const tree = await createCourseTree(payload, { lessons: 2 })
     await completeLesson(student, tree.lessons[0].id)

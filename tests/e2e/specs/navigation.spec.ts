@@ -127,7 +127,7 @@ test('редактирование профиля: «О себе» сохран�
   await expect(page.getByText(bio)).toBeVisible()
 })
 
-test.fail('БАГ: студент может загрузить аватар в профиле (сейчас POST /api/media только для админа)', async ({ page }) => {
+test('студент может загрузить аватар в профиле', async ({ page }) => {
   const loaded = page.waitForResponse((r) => r.url().endsWith('/api/users/me'))
   await page.goto('/profile/edit')
   await loaded

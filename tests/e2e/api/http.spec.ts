@@ -25,7 +25,7 @@ test.describe('заголовки безопасности', () => {
     })
   }
 
-  test.fail('БАГ: админка тоже не встраивается во фрейм (сейчас /admin без X-Frame-Options/frame-ancestors)', async ({ request }) => {
+  test('админка тоже не встраивается во фрейм', async ({ request }) => {
     const headers = (await request.get('/admin/login')).headers()
     const protectedFromFraming =
       headers['x-frame-options'] !== undefined || /frame-ancestors/.test(headers['content-security-policy'] ?? '')

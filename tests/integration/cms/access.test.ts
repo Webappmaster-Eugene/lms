@@ -11,23 +11,25 @@ import { createAdmin, createStudent, createSumTask, getTestPayload, login, type 
  * прав: изменение `access` в коллекции без правки матрицы роняет тест.
  */
 type Who = 'anon' | 'owner' | 'other' | 'admin'
-type Rule = 'public' | 'auth' | 'own' | 'admin' | 'nobody'
+// published — опубликованное видит любой вошедший, черновики — только админ
+type Rule = 'public' | 'auth' | 'published' | 'own' | 'admin' | 'nobody'
 
 type Matrix = { create: Rule; read: Rule; update: Rule; delete: Rule }
 
 const CONTENT: Matrix = { create: 'admin', read: 'auth', update: 'admin', delete: 'admin' }
+const PUBLISHABLE: Matrix = { ...CONTENT, read: 'published' }
 
 const MATRIX: Record<string, Matrix> = {
   users: { create: 'admin', read: 'auth', update: 'own', delete: 'admin' },
-  roadmaps: CONTENT,
+  roadmaps: PUBLISHABLE,
   'roadmap-nodes': CONTENT,
   'roadmap-edges': CONTENT,
-  courses: CONTENT,
-  sections: CONTENT,
-  lessons: CONTENT,
+  courses: PUBLISHABLE,
+  sections: PUBLISHABLE,
+  lessons: PUBLISHABLE,
   achievements: CONTENT,
-  'trainer-topics': CONTENT,
-  'trainer-tasks': CONTENT,
+  'trainer-topics': PUBLISHABLE,
+  'trainer-tasks': PUBLISHABLE,
   'faq-items': { create: 'admin', read: 'public', update: 'admin', delete: 'admin' },
   'user-progress': { create: 'auth', read: 'own', update: 'own', delete: 'admin' },
   'user-achievements': { create: 'admin', read: 'own', update: 'admin', delete: 'admin' },
@@ -82,6 +84,7 @@ function allowed(rule: Rule, who: Who): boolean {
     case 'public':
       return true
     case 'auth':
+    case 'published':
       return who !== 'anon'
     case 'own':
       // У users «своё» — это сам пользователь (документом выступает сам owner).
@@ -94,14 +97,14 @@ function allowed(rule: Rule, who: Who): boolean {
 }
 
 /** Документ, которым владеет owner (для users — сам owner). */
-async function ownedDoc(slug: string): Promise<number> {
+async function ownedDoc(slug: string, overrides: Record<string, unknown> = {}): Promise<number> {
   if (slug === 'users') return owner.id
   if (slug === 'streaks') {
     // Серия у пользователя одна — берём существующую, если она уже есть.
     const existing = await payload.find({ collection: 'streaks', where: { user: { equals: owner.id } }, limit: 1 })
     if (existing.docs[0]) return existing.docs[0].id
   }
-  const data = await makeValid(payload, slug, ctx, owner.id)
+  const data = { ...(await makeValid(payload, slug, ctx, owner.id)), ...overrides }
   // Пара (user, task) уникальна — под каждый документ своя задача.
   if (slug === 'user-trainer-progress') data.task = (await createSumTask(payload)).id
   const doc = await payload.create({ collection: slug as CollectionSlug, data: data as never, context: { skipHooks: true } })
@@ -140,8 +143,7 @@ const WHO: Who[] = ['anon', 'owner', 'other', 'admin']
 describe.each(Object.keys(MATRIX))('права: %s', (slug) => {
   const rules = MATRIX[slug]
 
-  it.each(WHO)('read — %s', async (who) => {
-    const id = await ownedDoc(slug)
+  async function visibleTo(who: Who, id: number): Promise<boolean> {
     let visible = false
     const outcome = await attempt(async () => {
       const result = await payload.find({
@@ -153,8 +155,20 @@ describe.each(Object.keys(MATRIX))('права: %s', (slug) => {
       })
       visible = result.totalDocs === 1
     })
-    expect(outcome === 'ok' && visible).toBe(allowed(rules.read, who))
+    return outcome === 'ok' && visible
+  }
+
+  it.each(WHO)('read — %s', async (who) => {
+    const id = await ownedDoc(slug, rules.read === 'published' ? { isPublished: true } : {})
+    expect(await visibleTo(who, id)).toBe(allowed(rules.read, who))
   })
+
+  if (rules.read === 'published') {
+    it.each(WHO)('read черновика — %s', async (who) => {
+      const id = await ownedDoc(slug, { isPublished: false })
+      expect(await visibleTo(who, id)).toBe(who === 'admin')
+    })
+  }
 
   it.each(WHO)('create — %s', async (who) => {
     if (slug === 'users' && who === 'owner') return
@@ -330,7 +344,7 @@ describe('попытки эскалации прав', () => {
     expect(fresh.user).toBe(owner.id)
   })
 
-  it.fails('БАГ: студент не должен читать неопубликованные уроки через API', async () => {
+  it('студент не читает неопубликованные уроки через API', async () => {
     const draft = await payload.create({
       collection: 'lessons', data: { title: `Черновик ${Date.now()}`, course: ctx.courseId, isPublished: false } as never,
     })
