@@ -29,10 +29,6 @@ export function groupThreads(comments: CommentDoc[]): Thread[] {
   return [...threads.values()].reverse()
 }
 
-/**
- * Имя автора. Чужой профиль ученику не раскрывается, а в его ветку, кроме него
- * самого, пишет только ментор — поэтому неразвёрнутый автор и есть ментор.
- */
 export function authorName(user: CommentDoc['user']): string {
   if (user && typeof user === 'object') {
     return `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Пользователь'
@@ -40,4 +36,12 @@ export function authorName(user: CommentDoc['user']): string {
   return 'Ментор'
 }
 
-export const isMentor = (user: CommentDoc['user']) => !(user && typeof user === 'object')
+const authorId = (user: CommentDoc['user']) =>
+  user && typeof user === 'object' ? String(user.id ?? '') : user === null ? '' : String(user)
+
+/**
+ * Ответ ментора — ответ не от автора вопроса: писать в чужую ветку сервер
+ * разрешает только администраторам (restrictCommentThread).
+ */
+export const isMentorReply = (reply: CommentDoc, question: CommentDoc) =>
+  authorId(reply.user) !== authorId(question.user)

@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { CheckCircle2, CornerDownRight, Loader2, MessageSquare, Send } from 'lucide-react'
 import { useAsyncData } from '@/hooks/use-async-data'
 import { useToast } from '@/components/ui/Toast'
-import { authorName, groupThreads, isMentor, type CommentDoc, type Thread } from '@/lib/comment-threads'
+import { authorName, groupThreads, isMentorReply, type CommentDoc, type Thread } from '@/lib/comment-threads'
 import { cn, formatDate } from '@/lib/utils'
 
 type Props = {
@@ -143,7 +143,7 @@ export function LessonComments({ lessonId }: Props) {
 
 function ThreadItem({ thread, lessonId, onPosted }: { thread: Thread; lessonId: number; onPosted: () => void }) {
   const { question, replies } = thread
-  const answered = replies.some((r) => isMentor(r.user))
+  const answered = replies.some((r) => isMentorReply(r, question))
   const [replying, setReplying] = useState(false)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
@@ -183,11 +183,18 @@ function ThreadItem({ thread, lessonId, onPosted }: { thread: Thread; lessonId: 
 
       {replies.length > 0 && (
         <ul className="space-y-3 border-l-2 border-border pl-4">
-          {replies.map((reply) => (
-            <li key={reply.id} className={cn(isMentor(reply.user) && 'rounded-md bg-primary/5 p-2 -ml-2')}>
-              <CommentBody comment={reply} />
-            </li>
-          ))}
+          {replies.map((reply) => {
+            const mentor = isMentorReply(reply, question)
+            return (
+              <li key={reply.id} className={cn(mentor && '-ml-2 rounded-md bg-primary/5 p-2')}>
+                <CommentBody comment={reply}>
+                  {mentor && reply.user && typeof reply.user === 'object' && (
+                    <Badge className="bg-primary/10 text-foreground">Ментор</Badge>
+                  )}
+                </CommentBody>
+              </li>
+            )
+          })}
         </ul>
       )}
 

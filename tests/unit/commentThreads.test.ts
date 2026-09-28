@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { authorName, groupThreads, type CommentDoc } from '@/lib/comment-threads'
+import { authorName, groupThreads, isMentorReply, type CommentDoc } from '@/lib/comment-threads'
 
 const c = (id: number, createdAt: string, parentComment: number | null = null, user: CommentDoc['user'] = { id: 1, firstName: 'Анна' }): CommentDoc => ({
   id,
@@ -38,5 +38,14 @@ describe('автор', () => {
     expect(authorName({ firstName: 'Анна', lastName: 'Ли' })).toBe('Анна Ли')
     expect(authorName({})).toBe('Пользователь')
     expect(authorName(3)).toBe('Ментор')
+  })
+})
+
+describe('ответ ментора', () => {
+  it('ответ не от автора вопроса — ментора, развёрнут автор или нет', () => {
+    const question = c(1, '2026-09-01', null, { id: 7 })
+    expect(isMentorReply(c(2, '2026-09-02', 1, { id: 3, firstName: 'Евгений' }), question)).toBe(true)
+    expect(isMentorReply(c(3, '2026-09-02', 1, 3), question)).toBe(true)
+    expect(isMentorReply(c(4, '2026-09-02', 1, { id: 7 }), question)).toBe(false)
   })
 })

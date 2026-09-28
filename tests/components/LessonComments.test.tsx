@@ -97,6 +97,18 @@ describe('вопросы к уроку', () => {
       expect(within(thread).getByText('Есть ответ')).toBeInTheDocument()
     })
 
+    it('развёрнутый профиль ментора — имя и метка «Ментор»', async () => {
+      mockApi({
+        pages: [[comment(1), comment(2, { content: 'Ответ', user: { id: 3, firstName: 'Евгений' }, parentComment: 1 })]],
+      })
+      render(<LessonComments lessonId={42} />)
+
+      const thread = (await screen.findByText('Ответ')).closest('li[id]') as HTMLElement
+      expect(within(thread).getByText('Евгений')).toBeInTheDocument()
+      expect(within(thread).getByText('Ментор')).toBeInTheDocument()
+      expect(within(thread).getByText('Есть ответ')).toBeInTheDocument()
+    })
+
     it('без ответа ментора вопрос помечен как ждущий', async () => {
       mockApi({ pages: [[comment(1), comment(2, { content: 'Уточняю', parentComment: 1 })]] })
       render(<LessonComments lessonId={42} />)
