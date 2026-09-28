@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { CheckCircle2, CornerDownRight, Loader2, MessageSquare, Send } from 'lucide-react'
 import { useAsyncData } from '@/hooks/use-async-data'
 import { useToast } from '@/components/ui/Toast'
+import { markAnswersRead } from '@/lib/answer-notifications'
 import { authorName, groupThreads, isMentorReply, threadStatus, STATUS_LABELS, type CommentDoc, type Thread, type ThreadStatus } from '@/lib/comment-threads'
 import { cn, formatDate } from '@/lib/utils'
 
@@ -60,6 +61,12 @@ export function LessonComments({ lessonId }: Props) {
 
   const { data, loading, reload } = useAsyncData<Loaded>(loadComments, { threads: [], failed: false })
   const { threads, failed } = data
+
+  // Ответ на экране — уведомление о нём больше не нужно.
+  const hasAnswers = threads.some((t) => t.replies.some((r) => isMentorReply(r, t.question)))
+  useEffect(() => {
+    if (hasAnswers) void markAnswersRead(`${window.location.pathname}#comment-`)
+  }, [hasAnswers])
 
   // Ссылка из уведомления «Ответ на ваш вопрос» ведёт на #comment-<id>, а ветки
   // появляются после загрузки — браузер сам к ним не прокрутит.

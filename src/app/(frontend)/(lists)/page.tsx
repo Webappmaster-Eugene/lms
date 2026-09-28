@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import Link from 'next/link'
-import { ArrowRight, Award, BookOpen, Clock, Flame, GraduationCap, Map as MapIcon, Star, Trophy } from 'lucide-react'
+import { ArrowRight, Award, BookOpen, Clock, Flame, GraduationCap, Map as MapIcon, MessagesSquare, Star, Trophy } from 'lucide-react'
 import { collectAllPages } from '@/lib/paginate'
 import { pluralize } from '@/lib/utils'
 import { streakView } from '@/lib/streak'
@@ -24,7 +24,7 @@ export default async function DashboardPage() {
   if (!user) return null
 
   // Загружаем данные параллельно
-  const [roadmapDocs, courses, progressData, achievementsData, streakData, certificatesData] = await Promise.all([
+  const [roadmapDocs, courses, progressData, achievementsData, streakData, certificatesData, answers] = await Promise.all([
     collectAllPages(
       ({ page, limit }) =>
         payload.find({
@@ -67,6 +67,20 @@ export default async function DashboardPage() {
       collection: 'certificates',
       where: { user: { equals: user.id } },
       limit: 0,
+    }),
+    // Непрочитанные ответы ментора: прочитанными их отмечает ветка урока или «Мои вопросы».
+    payload.find({
+      collection: 'notifications',
+      where: {
+        user: { equals: user.id },
+        type: { equals: 'comment' },
+        isRead: { equals: false },
+        link: { like: '/lessons/' },
+      },
+      select: { title: true, message: true, link: true },
+      sort: ['-createdAt', 'id'],
+      limit: 3,
+      depth: 0,
     }),
   ])
 
@@ -198,6 +212,30 @@ export default async function DashboardPage() {
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </span>
         </Link>
+      )}
+
+      {answers.totalDocs > 0 && (
+        <section aria-labelledby="mentor-answers" className="rounded-xl border border-info/40 bg-info/5 p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="mentor-answers" className="flex items-center gap-2 font-semibold text-foreground">
+              <MessagesSquare className="h-5 w-5 text-info" aria-hidden="true" />
+              Ментор ответил на {answers.totalDocs === 1 ? 'ваш вопрос' : `ваши вопросы (${answers.totalDocs})`}
+            </h2>
+            <Link href="/questions" className="text-sm text-foreground underline-offset-2 hover:underline">
+              Все вопросы
+            </Link>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {answers.docs.map((n) => (
+              <li key={n.id}>
+                <Link href={n.link ?? '/questions'} className="block rounded-lg bg-card px-3 py-2 transition-colors hover:bg-accent">
+                  <span className="block truncate text-sm font-medium text-foreground">{n.title}</span>
+                  {n.message && <span className="block truncate text-sm text-muted-foreground">{n.message}</span>}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {/* Статистика — горизонтальный скролл на мобильных */}

@@ -79,7 +79,8 @@ test('«Отметить пройденным» начисляет баллы: �
 })
 
 test('заметка к уроку сохраняется, переживает перезагрузку и видна среди всех заметок', async ({ page }) => {
-  const text = `Заметка e2e ${Date.now()}`
+  const base = `Заметка e2e ${Date.now()}`
+  const text = `${base} [1:05]`
   await page.goto(`/lessons/${second.slug}`)
   await page.getByRole('button', { name: 'Мои заметки' }).click()
   const area = page.getByPlaceholder('Запишите ключевые моменты урока...')
@@ -93,7 +94,9 @@ test('заметка к уроку сохраняется, переживает 
 
   // Та же заметка — на общей странице, со ссылкой обратно на урок.
   await page.goto('/notes')
-  const card = page.getByRole('listitem').filter({ hasText: text })
+  // На странице заметок метка становится ссылкой «1:05» — без скобок.
+  const card = page.getByRole('listitem').filter({ hasText: base })
+  await expect(card.getByRole('link', { name: '1:05' })).toHaveAttribute('href', `/lessons/${second.slug}?t=65`)
   await expect(card.getByRole('link', { name: second.title })).toHaveAttribute('href', `/lessons/${second.slug}`)
   await card.getByRole('link', { name: second.title }).click()
   await expect(page).toHaveURL(`/lessons/${second.slug}`)
@@ -125,7 +128,19 @@ test('вопрос к уроку: ментор отвечает, ученик в
   await expect(mentorPage.locator(`#comment-${questionId}`)).toContainText('Ответ ментора e2e')
   await mentor.close()
 
-  await page.reload()
+  // Дашборд зовёт прочитать ответ; просмотр ветки убирает карточку.
+  await page.goto('/')
+  const answers = page.getByRole('region', { name: /Ментор ответил/ })
+  await expect(answers).toContainText('Ответ ментора e2e')
+  await answers.getByRole('link', { name: /Ответ на ваш вопрос/ }).click()
+  await expect(page).toHaveURL(new RegExp(`/lessons/${second.slug}#comment-${questionId}$`))
+  await expect(thread.getByText('Ответ ментора e2e')).toBeVisible()
+  await expect(async () => {
+    await page.goto('/')
+    await expect(page.getByRole('region', { name: /Ментор ответил/ })).toHaveCount(0)
+  }).toPass({ timeout: 15_000 })
+
+  await page.goto(`/lessons/${second.slug}`)
   await expect(thread.getByText('Ответ ментора e2e')).toBeVisible()
   await expect(thread.getByText('Ментор', { exact: true })).toBeVisible()
   await expect(thread.getByText('Есть ответ')).toBeVisible()

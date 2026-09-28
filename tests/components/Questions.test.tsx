@@ -30,6 +30,25 @@ const answered = thread(2, {
 const threads = [thread(1), answered, thread(3, { lesson: null })]
 
 describe('мои вопросы', () => {
+  beforeEach(() => {
+    global.fetch = vi.fn(async () => Response.json({ docs: [] })) as unknown as typeof fetch
+  })
+
+  it('ответы видны списком — уведомления об ответах ученику прочитаны', async () => {
+    render(<MyQuestions threads={threads} />)
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled())
+    const [url, init] = vi.mocked(global.fetch).mock.calls[0] as unknown as [string, RequestInit]
+    expect(init.method).toBe('PATCH')
+    expect(decodeURIComponent(url)).toContain('where[link][like]=/lessons/')
+  })
+
+  it('без ответов уведомления не трогаются', () => {
+    render(<MyQuestions threads={[thread(1)]} />)
+
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
   it('вопрос ведёт к своей ветке в уроке', () => {
     render(<MyQuestions threads={threads} />)
 

@@ -97,7 +97,7 @@ test('урок: стрелки листают соседние уроки', asyn
 })
 
 test('заметки: Ctrl+Enter, общая страница, выгрузка, удаление', async ({ page }) => {
-  const text = `${MARK}: заметка к уроку`
+  const text = `${MARK}: заметка к уроку [1:05]`
   await page.goto(firstLesson)
   await page.getByRole('button', { name: /Мои заметки/ }).click()
   const area = page.getByRole('textbox', { name: 'Заметка к уроку' })
@@ -108,13 +108,14 @@ test('заметки: Ctrl+Enter, общая страница, выгрузка,
   await expect(page.getByText('Не сохранено')).toHaveCount(0)
 
   await page.goto('/notes')
-  const card = page.getByRole('listitem').filter({ hasText: text })
+  const card = page.getByRole('listitem').filter({ hasText: `${MARK}: заметка к уроку` })
   await expect(card).toBeVisible()
+  await expect(card.getByRole('link', { name: '1:05' })).toHaveAttribute('href', `${firstLesson}?t=65`)
   const download = page.waitForEvent('download')
   await page.getByRole('button', { name: /Скачать все/ }).click()
   expect(await readFile(await (await download).path(), 'utf8')).toContain(text)
 
-  await card.getByRole('link').first().click()
+  await card.getByRole('link', { name: /./ }).filter({ hasNotText: '1:05' }).first().click()
   await expect(page).toHaveURL(new RegExp(`${firstLesson}$`))
   await page.getByRole('button', { name: /Мои заметки/ }).click()
   await page.getByRole('button', { name: 'Удалить' }).click()

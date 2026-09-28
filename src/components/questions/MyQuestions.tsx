@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { MessageSquare } from 'lucide-react'
 
 import { StatusBadge } from '@/components/lesson/LessonComments'
-import { authorName, threadStatus, STATUS_LABELS, type ThreadStatus } from '@/lib/comment-threads'
+import { markAnswersRead } from '@/lib/answer-notifications'
+import { authorName, isMentorReply, threadStatus, STATUS_LABELS, type ThreadStatus } from '@/lib/comment-threads'
 import type { QuestionThread } from '@/lib/questions'
 import { cn, formatDate, pluralize } from '@/lib/utils'
 
@@ -24,6 +25,12 @@ export function MyQuestions({ threads }: { threads: QuestionThread[] }) {
     return result
   }, [threads.length, withStatus])
   const shown = withStatus.filter(({ status }) => filter === 'all' || status === filter)
+
+  // Все ответы видны списком — уведомления о них прочитаны.
+  const hasAnswers = threads.some((t) => t.replies.some((r) => isMentorReply(r, t.question)))
+  useEffect(() => {
+    if (hasAnswers) void markAnswersRead('/lessons/')
+  }, [hasAnswers])
 
   if (threads.length === 0) {
     return (

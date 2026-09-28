@@ -38,7 +38,18 @@ test('вопрос ученика, ответ ментора, уведомлен
   await card.getByRole('button', { name: 'Ответить' }).click()
   await expect(mentorPage.getByText('Ответ отправлен — ученик получит уведомление')).toBeVisible()
 
-  await page.reload()
+  await page.goto('/')
+  const answers = page.getByRole('region', { name: /Ментор ответил/ })
+  await expect(answers).toContainText(answer)
+  await answers.getByRole('link', { name: /Ответ на ваш вопрос/ }).first().click()
+  await expect(page).toHaveURL(new RegExp(`#comment-${questionId}$`))
+  await expect(thread.getByText(answer)).toBeVisible()
+  await expect(async () => {
+    await page.goto('/')
+    await expect(page.getByRole('region', { name: /Ментор ответил/ })).toHaveCount(0)
+  }).toPass({ timeout: 15_000 })
+
+  await page.goto(lessonPath)
   await expect(thread.getByText(answer)).toBeVisible()
   await expect(thread.getByText('Ментор', { exact: true })).toBeVisible()
   await expect(thread.getByText('Есть ответ')).toBeVisible()

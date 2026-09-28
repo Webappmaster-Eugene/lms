@@ -39,6 +39,7 @@ let posted: Record<string, unknown>[] = []
 function mockApi({ pages = [[]] as Comment[][], postOk = true, loadOk = true } = {}) {
   posted = []
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.method === 'PATCH') return Response.json({ docs: [] })
     if (init?.method === 'POST') {
       posted.push(JSON.parse(String(init.body)) as Record<string, unknown>)
       return postOk ? Response.json({ doc: { id: 99 } }) : new Response('нет', { status: 500 })
@@ -107,6 +108,26 @@ describe('вопросы к уроку', () => {
       expect(within(thread).getByText('Евгений')).toBeInTheDocument()
       expect(within(thread).getByText('Ментор')).toBeInTheDocument()
       expect(within(thread).getByText('Есть ответ')).toBeInTheDocument()
+    })
+
+    it('ответ ментора на экране — уведомление о нём отмечается прочитанным', async () => {
+      mockApi({ pages: [[comment(1), comment(2, { content: 'Ответ', user: 3, parentComment: 1 })]] })
+      render(<LessonComments lessonId={42} />)
+
+      await screen.findByText('Ответ')
+      await waitFor(() => {
+        const patch = vi.mocked(global.fetch).mock.calls.find(([, init]) => init?.method === 'PATCH')
+        expect(String(patch?.[0])).toContain('/api/notifications?')
+        expect(decodeURIComponent(String(patch?.[0]))).toContain(`where[link][like]=${window.location.pathname}#comment-`)
+      })
+    })
+
+    it('без ответов уведомления не трогаются', async () => {
+      mockApi({ pages: [[comment(1)]] })
+      render(<LessonComments lessonId={42} />)
+
+      await screen.findByText('Вопрос 1')
+      expect(vi.mocked(global.fetch).mock.calls.some(([, init]) => init?.method === 'PATCH')).toBe(false)
     })
 
     it('без ответа ментора вопрос помечен как ждущий', async () => {

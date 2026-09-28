@@ -179,3 +179,27 @@ describe('страницы «Мои вопросы» и «Вопросы уче�
     expect(thread?.lesson).toBeNull()
   })
 })
+
+describe('отметка ответов прочитанными', () => {
+  it('массовая отметка ученика задевает только его уведомления об ответах', async () => {
+    const mine = await ask(asker, 'Вопрос для прочтения')
+    await ask(mentor, 'Ответ для прочтения', { parentComment: mine.id })
+    const theirs = await ask(stranger, 'Чужой вопрос для прочтения')
+    await ask(mentor, 'Чужой ответ для прочтения', { parentComment: theirs.id })
+
+    // Тот же запрос, что шлёт markAnswersRead: PATCH /api/notifications?where[...]
+    await payload.update({
+      collection: 'notifications',
+      where: { type: { equals: 'comment' }, isRead: { equals: false }, link: { like: '/lessons/' } },
+      data: { isRead: true },
+      user: asker,
+      overrideAccess: false,
+    })
+
+    const unread = async (user: TestUser) =>
+      (await notificationsOf(user)).filter((n) => !n.isRead).map((n) => n.message)
+    expect(await unread(asker)).not.toContain('Ответ для прочтения')
+    expect(await unread(stranger)).toContain('Чужой ответ для прочтения')
+    expect(await unread(mentor)).toContain('Чужой вопрос для прочтения')
+  })
+})
