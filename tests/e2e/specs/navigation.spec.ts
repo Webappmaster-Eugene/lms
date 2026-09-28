@@ -16,6 +16,7 @@ const NAV: [string, RegExp, string][] = [
   ['Сертификаты', /\/certificates$/, 'Мои сертификаты'],
   ['Заметки', /\/notes$/, 'Мои заметки'],
   ['Вопросы', /\/questions$/, 'Мои вопросы'],
+  ['Сохранённое', /\/saved$/, 'Сохранённое'],
   ['Профиль', /\/profile$/, `${USERS.doer.firstName} ${USERS.doer.lastName}`],
   ['Контакты', /\/contacts$/, 'Контакты'],
   ['Помощь', /\/help$/, 'Помощь'],
@@ -149,4 +150,16 @@ test('студент может загрузить аватар в профил�
   await page.locator('input[type="file"]').setInputFiles({ name: 'avatar.png', mimeType: 'image/png', buffer: png })
   await page.getByRole('button', { name: 'Сохранить' }).click()
   await expect(page.getByText('Профиль обновлён. Перенаправление...')).toBeVisible({ timeout: 5000 })
+})
+
+test('«?» открывает список горячих клавиш, кнопка в меню — тоже', async ({ page }) => {
+  await page.goto('/')
+  await page.locator('body').press('?')
+  const dialog = page.getByRole('dialog', { name: 'Горячие клавиши' })
+  await expect(dialog).toContainText('Поиск по курсам, урокам и задачам')
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+
+  await page.locator('aside').last().getByRole('button', { name: 'Горячие клавиши' }).click()
+  await expect(dialog).toBeVisible()
 })

@@ -111,7 +111,8 @@ function leftovers(env) {
        (SELECT count(*) FROM notifications WHERE message LIKE '${marker}' OR user_id IN (${env.PROD_STUDENT_ID}, ${env.PROD_ADMIN_ID})) AS notifications,
        (SELECT count(*) FROM user_progress WHERE user_id IN (${env.PROD_STUDENT_ID}, ${env.PROD_ADMIN_ID})) AS progress,
        (SELECT count(*) FROM points_transactions WHERE user_id IN (${env.PROD_STUDENT_ID}, ${env.PROD_ADMIN_ID})) AS points,
-       (SELECT count(*) FROM streaks WHERE user_id IN (${env.PROD_STUDENT_ID}, ${env.PROD_ADMIN_ID})) AS streaks;`,
+       (SELECT count(*) FROM streaks WHERE user_id IN (${env.PROD_STUDENT_ID}, ${env.PROD_ADMIN_ID})) AS streaks,
+       (SELECT count(*) FROM bookmarks WHERE user_id IN (${env.PROD_STUDENT_ID}, ${env.PROD_ADMIN_ID})) AS bookmarks;`,
   )
 }
 
@@ -139,7 +140,7 @@ async function remove() {
   }
 
   let left = leftovers(env)
-  if (left !== '0|0|0|0|0|0|0') {
+  if (left !== '0|0|0|0|0|0|0|0') {
     // Запасной путь: хуки не отработали — удаляем напрямую, в той же последовательности.
     const ids = `${env.PROD_STUDENT_ID}, ${env.PROD_ADMIN_ID}`
     const marker = `%e2e-prod ${env.PROD_RUN_ID}%`
@@ -153,12 +154,13 @@ async function remove() {
       DELETE FROM user_achievements WHERE user_id IN (${ids});
       DELETE FROM certificates WHERE user_id IN (${ids});
       DELETE FROM streaks WHERE user_id IN (${ids});
+      DELETE FROM bookmarks WHERE user_id IN (${ids});
       DELETE FROM users WHERE id IN (${ids});
       COMMIT;`)
     left = leftovers(env)
   }
-  if (left !== '0|0|0|0|0|0|0') {
-    throw new Error(`После удаления на проде остались записи (users|comments|notes|notifications|progress|points|streaks): ${left}`)
+  if (left !== '0|0|0|0|0|0|0|0') {
+    throw new Error(`После удаления на проде остались записи (users|comments|notes|notifications|progress|points|streaks|bookmarks): ${left}`)
   }
   rmSync(ENV_FILE)
   // Куки сессий удалённых аккаунтов уже недействительны, но хранить их незачем.

@@ -5,9 +5,11 @@ import { usePathname } from 'next/navigation'
 import {
   Award,
   BookOpen,
+  Bookmark,
   Code2,
   GraduationCap,
   HelpCircle,
+  Keyboard,
   LayoutDashboard,
   Map,
   MessageCircle,
@@ -21,6 +23,7 @@ import {
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { ThemeToggle } from './ThemeToggle'
+import { SHORTCUTS_OPEN_EVENT } from './KeyboardShortcuts'
 import { cn } from '@/lib/utils'
 import { useSidebar } from './SidebarContext'
 
@@ -33,6 +36,7 @@ const NAV_ITEMS = [
   { href: '/certificates', label: 'Сертификаты', icon: Award },
   { href: '/notes', label: 'Заметки', icon: StickyNote },
   { href: '/questions', label: 'Вопросы', icon: MessagesSquare },
+  { href: '/saved', label: 'Сохранённое', icon: Bookmark },
   { href: '/profile', label: 'Профиль', icon: User },
   { href: '/contacts', label: 'Контакты', icon: MessageCircle },
   { href: '/help', label: 'Помощь', icon: HelpCircle },
@@ -136,7 +140,18 @@ export function Sidebar() {
       {/* Footer */}
       <div className="border-t border-border p-3 space-y-1">
         <div className="flex items-center justify-between px-3">
-          <ThemeToggle />
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent(SHORTCUTS_OPEN_EVENT))}
+              aria-label="Горячие клавиши"
+              title="Горячие клавиши (?)"
+              className="hidden min-h-[44px] items-center rounded-lg px-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:flex"
+            >
+              <Keyboard className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
           <button
             onClick={handleLogout}
             className="flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"

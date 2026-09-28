@@ -9,6 +9,7 @@ import { BottomNav } from '@/components/layout/BottomNav'
 import { Footer } from '@/components/layout/Footer'
 import { ToastProvider } from '@/components/ui/Toast'
 import { NavigationProgress } from '@/components/layout/NavigationProgress'
+import { KeyboardShortcuts } from '@/components/layout/KeyboardShortcuts'
 import { Suspense } from 'react'
 
 const inter = Inter({
@@ -33,6 +34,7 @@ export default function FrontendLayout({ children }: { children: React.ReactNode
           <ToastProvider>
             <Suspense fallback={null}>
               <NavigationProgress />
+              <KeyboardShortcuts />
             </Suspense>
             <SidebarProvider>
               <div className="flex min-h-screen overflow-x-hidden">

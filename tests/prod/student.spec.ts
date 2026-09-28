@@ -33,7 +33,7 @@ async function pickCourse(page: Page): Promise<Course> {
 test('меню: все разделы на месте, ментора нет', async ({ page }) => {
   await page.goto('/')
   const sidebar = page.locator('aside').last()
-  for (const item of ['Дашборд', 'Курсы', 'Роадмапы', 'Тренажёр', 'Лидерборд', 'Сертификаты', 'Заметки', 'Вопросы', 'Профиль', 'Помощь']) {
+  for (const item of ['Дашборд', 'Курсы', 'Роадмапы', 'Тренажёр', 'Лидерборд', 'Сертификаты', 'Заметки', 'Вопросы', 'Сохранённое', 'Профиль', 'Помощь']) {
     await expect(sidebar.getByRole('link', { name: item, exact: true })).toBeVisible()
   }
   await expect(sidebar.getByRole('link', { name: 'Вопросы учеников' })).toHaveCount(0)
@@ -182,6 +182,21 @@ test('после урока: серия на дашборде, календар�
   await expect(page.getByRole('link', { name: /Продолжить с урока/ })).toBeVisible()
 })
 
+test('«Сохранить» урок, «Сохранённое», подсказка по «?»', async ({ page }) => {
+  await page.goto(firstLesson)
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Сохранено' })).toHaveAttribute('aria-pressed', 'true')
+  const title = (await page.locator('h1').innerText()).trim()
+
+  await page.goto('/saved')
+  await expect(page.getByRole('link', { name: title })).toHaveAttribute('href', firstLesson)
+  await page.getByRole('button', { name: `Убрать «${title}» из сохранённого` }).click()
+  await expect(page.getByText(/Здесь пока пусто/)).toBeVisible()
+
+  await page.locator('body').press('?')
+  await expect(page.getByRole('dialog', { name: 'Горячие клавиши' })).toBeVisible()
+})
+
 test('сертификаты и тренажёр открываются', async ({ page }) => {
   await page.goto('/certificates')
   await expect(page.getByRole('heading', { name: 'Мои сертификаты', level: 1 })).toBeVisible()
@@ -191,5 +206,10 @@ test('сертификаты и тренажёр открываются', async 
   await expect(task).toBeVisible()
   await task.click()
   await expect(page.locator('.monaco-editor').first()).toBeVisible({ timeout: 30_000 })
+  // Закладка на задачу — и сразу снять, чтобы не оставлять записей.
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Сохранено' })).toBeVisible()
+  await page.getByRole('button', { name: 'Сохранено' }).click()
+  await expect(page.getByRole('button', { name: 'Сохранить', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /Отправить/ }).first()).toBeVisible()
 })
