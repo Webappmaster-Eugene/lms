@@ -39,7 +39,7 @@ export function SavedList({ items: initial }: { items: SavedItem[] }) {
           <Bookmark className="h-8 w-8 text-muted-foreground" />
         </div>
         <p className="max-w-sm text-muted-foreground">
-          Здесь пока пусто. Нажмите «Сохранить» на уроке или задаче тренажёра, чтобы вернуться к ним позже
+          Здесь пока пусто. Нажмите «В сохранённое» на уроке или задаче тренажёра, чтобы вернуться к ним позже
         </p>
         <Link href="/courses" className="text-sm font-medium text-primary underline-offset-2 hover:underline">
           К курсам

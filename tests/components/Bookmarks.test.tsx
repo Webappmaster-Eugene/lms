@@ -24,13 +24,13 @@ beforeEach(() => {
   mockApi()
 })
 
-describe('кнопка «Сохранить»', () => {
+describe('кнопка «В сохранённое»', () => {
   it('сохраняет урок числовым id и показывает состояние', async () => {
     render(<BookmarkButton target={{ lesson: 5 }} initialId={null} />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
+    await userEvent.click(screen.getByRole('button', { name: 'В сохранённое' }))
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранено' })).toHaveAttribute('aria-pressed', 'true'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'В сохранённом' })).toHaveAttribute('aria-pressed', 'true'))
     expect(calls[0]).toMatchObject({ url: '/api/bookmarks', init: { method: 'POST' } })
     expect(JSON.parse(String(calls[0].init?.body))).toEqual({ lesson: 5 })
   })
@@ -38,7 +38,7 @@ describe('кнопка «Сохранить»', () => {
   it('задача сохраняется так же', async () => {
     render(<BookmarkButton target={{ task: 9 }} initialId={null} />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
+    await userEvent.click(screen.getByRole('button', { name: 'В сохранённое' }))
 
     await waitFor(() => expect(calls).toHaveLength(1))
     expect(JSON.parse(String(calls[0].init?.body))).toEqual({ task: 9 })
@@ -47,9 +47,9 @@ describe('кнопка «Сохранить»', () => {
   it('повторное нажатие убирает закладку по её id', async () => {
     render(<BookmarkButton target={{ lesson: 5 }} initialId={31} />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Сохранено' }))
+    await userEvent.click(screen.getByRole('button', { name: 'В сохранённом' }))
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить' })).toHaveAttribute('aria-pressed', 'false'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'В сохранённое' })).toHaveAttribute('aria-pressed', 'false'))
     expect(calls[0]).toMatchObject({ url: '/api/bookmarks/31', init: { method: 'DELETE' } })
   })
 
@@ -58,10 +58,10 @@ describe('кнопка «Сохранить»', () => {
     mockApi(false)
     render(<BookmarkButton target={{ lesson: 5 }} initialId={null} />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
+    await userEvent.click(screen.getByRole('button', { name: 'В сохранённое' }))
 
     await waitFor(() => expect(toast).toHaveBeenCalledWith('Не удалось сохранить — попробуйте ещё раз', 'error'))
-    expect(screen.getByRole('button', { name: 'Сохранить' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'В сохранённое' })).toHaveAttribute('aria-pressed', 'false')
   })
 })
 
@@ -100,6 +100,6 @@ describe('«Сохранённое»', () => {
   it('пустой список объясняет, как сохранять', () => {
     render(<SavedList items={[]} />)
 
-    expect(screen.getByText(/Нажмите «Сохранить» на уроке или задаче/)).toBeInTheDocument()
+    expect(screen.getByText(/Нажмите «В сохранённое» на уроке или задаче/)).toBeInTheDocument()
   })
 })

@@ -183,14 +183,14 @@ test.describe('видео досмотрено — предложение отм
 
 test('«Сохранить» урок и задачу: они в «Сохранённом», оттуда же убираются', async ({ page }) => {
   await page.goto(`/lessons/${third.slug}`)
-  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Сохранено' })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'В сохранённое' }).click()
+  await expect(page.getByRole('button', { name: 'В сохранённом' })).toHaveAttribute('aria-pressed', 'true')
   await page.reload()
-  await expect(page.getByRole('button', { name: 'Сохранено' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'В сохранённом' })).toBeVisible()
 
   await page.goto(`/trainer/${CONTENT.topic.slug}/${CONTENT.task.slug}`)
-  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Сохранено' })).toBeVisible()
+  await page.getByRole('button', { name: 'В сохранённое' }).click()
+  await expect(page.getByRole('button', { name: 'В сохранённом' })).toBeVisible()
 
   await page.goto('/saved')
   await expect(page.getByRole('link', { name: third.title })).toHaveAttribute('href', `/lessons/${third.slug}`)

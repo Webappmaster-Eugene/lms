@@ -70,7 +70,8 @@ export function BookmarkButton({ target, initialId, className }: Props) {
       ) : (
         <Bookmark className="h-4 w-4" aria-hidden="true" />
       )}
-      {saved ? 'Сохранено' : 'Сохранить'}
+      {/* Не «Сохранить»: на уроке рядом кнопка сохранения заметки. */}
+      {saved ? 'В сохранённом' : 'В сохранённое'}
     </button>
   )
 }
