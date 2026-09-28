@@ -1,10 +1,12 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { ExternalLink, Play, Clock, AlertTriangle } from 'lucide-react'
 
+import { useVideoMemory } from '@/hooks/use-video-memory'
 import { parsePublicResourceUrl } from '@/lib/yandex-disk-url'
 import { TransportStreamPlayer } from './TransportStreamPlayer'
+import { VideoMemoryBar } from './VideoMemoryBar'
 
 type Props = {
   title: string
@@ -109,21 +111,12 @@ export function VideoPlayer({ title, videoUrl, displayMode, description, duratio
           <TransportStreamPlayer
             key={videoUrl}
             src={getProxyUrl(videoUrl)}
+            memoryKey={videoUrl}
             durationMinutes={durationMinutes}
             onFailure={handleStreamFailure}
           />
         ) : (
-          <div className="overflow-hidden rounded-xl border border-border bg-black">
-            <video
-              key={videoUrl}
-              src={getStreamUrl(videoUrl)}
-              className="aspect-video w-full"
-              controls
-              preload="metadata"
-              controlsList="nodownload"
-              onError={handleNativeFailure}
-            />
-          </div>
+          <NativeVideo key={videoUrl} videoUrl={videoUrl} onFailure={handleNativeFailure} />
         )}
       </div>
     )
@@ -143,6 +136,28 @@ export function VideoPlayer({ title, videoUrl, displayMode, description, duratio
         />
       </div>
     </div>
+  )
+}
+
+function NativeVideo({ videoUrl, onFailure }: { videoUrl: string; onFailure: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const memory = useVideoMemory(videoRef, videoUrl)
+
+  return (
+    <>
+      <div className="overflow-hidden rounded-xl border border-border bg-black">
+        <video
+          ref={videoRef}
+          src={getStreamUrl(videoUrl)}
+          className="aspect-video w-full"
+          controls
+          preload="metadata"
+          controlsList="nodownload"
+          onError={onFailure}
+        />
+      </div>
+      <VideoMemoryBar {...memory} />
+    </>
   )
 }
 

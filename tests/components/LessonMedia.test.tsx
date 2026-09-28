@@ -122,6 +122,7 @@ describe('плеер потока MPEG-TS', () => {
     render(
       <TransportStreamPlayer
         src="/api/yandex-disk/stream?url=x"
+        memoryKey="https://disk.yandex.ru/i/x"
         durationMinutes={10}
         onFailure={vi.fn()}
       />,
@@ -134,6 +135,7 @@ describe('плеер потока MPEG-TS', () => {
     const { unmount } = render(
       <TransportStreamPlayer
         src="/api/yandex-disk/stream?url=x"
+        memoryKey="https://disk.yandex.ru/i/x"
         durationMinutes={10}
         onFailure={vi.fn()}
       />,
@@ -149,6 +151,7 @@ describe('плеер потока MPEG-TS', () => {
     const { container } = render(
       <TransportStreamPlayer
         src="/api/yandex-disk/stream?url=x"
+        memoryKey="https://disk.yandex.ru/i/x"
         durationMinutes={10}
         onFailure={vi.fn()}
       />,
