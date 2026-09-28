@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { CONTENT, USERS, NOT_FOUND_HEADING } from '../fixtures/data'
-import { storageStateOf } from '../fixtures/env'
+import { APP_URL, storageStateOf } from '../fixtures/env'
 
 /**
  * Путь студента по курсу: дашборд → курс → урок → «Отметить пройденным» →
@@ -103,12 +103,29 @@ test('заметка к уроку сохраняется, переживает 
   await expect(page.getByText('Заметка удалена')).toBeVisible()
 })
 
-test('вопрос к уроку появляется в обсуждении', async ({ page }) => {
+test('вопрос к уроку: ментор отвечает, ученик видит ответ и уведомление', async ({ page, browser }) => {
   const text = `Вопрос e2e ${Date.now()}`
   await page.goto(`/lessons/${second.slug}`)
-  await page.getByPlaceholder('Задайте вопрос или оставьте комментарий...').fill(text)
-  await page.getByPlaceholder('Задайте вопрос или оставьте комментарий...').press('Tab')
-  await page.keyboard.press('Enter')
-  await expect(page.getByText('Комментарий добавлен')).toBeVisible()
-  await expect(page.getByText(text)).toBeVisible()
+  await page.getByRole('textbox', { name: 'Вопрос к уроку' }).fill(text)
+  await page.getByRole('button', { name: 'Отправить вопрос' }).click()
+  await expect(page.getByText('Вопрос отправлен ментору')).toBeVisible()
+  const thread = page.getByRole('listitem').filter({ hasText: text })
+  await expect(thread.getByText('Ждёт ответа')).toBeVisible()
+  const questionId = (await thread.getAttribute('id'))?.replace('comment-', '')
+
+  // Ментор отвечает из-под своей учётки — как из админки.
+  const mentor = await browser.newContext({ baseURL: APP_URL, storageState: storageStateOf('admin') })
+  const reply = await mentor.request.post('/api/comments', {
+    data: { content: 'Ответ ментора e2e', parentComment: Number(questionId) },
+  })
+  expect(reply.ok()).toBe(true)
+  await mentor.close()
+
+  await page.reload()
+  await expect(thread.getByText('Ответ ментора e2e')).toBeVisible()
+  await expect(thread.getByText('Ментор', { exact: true })).toBeVisible()
+  await expect(thread.getByText('Есть ответ')).toBeVisible()
+
+  await page.getByRole('button', { name: /Уведомления/ }).click()
+  await expect(page.getByText(`Ответ на ваш вопрос к уроку «${second.title}»`)).toBeVisible()
 })
