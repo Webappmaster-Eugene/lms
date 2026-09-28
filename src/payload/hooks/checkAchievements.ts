@@ -159,8 +159,9 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
 
       // Выдаём достижение
       try {
+        // Без skipHooks: хуки достижения шлют письмо и уведомление в колокольчик
         await req.payload.create({
-          req: skipHooksReq(req),
+          req,
           collection: 'user-achievements',
           data: {
             user: userId,

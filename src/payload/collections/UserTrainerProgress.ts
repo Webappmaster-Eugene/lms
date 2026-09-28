@@ -2,7 +2,6 @@ import type { CollectionConfig } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
 import { isAdminOrSelf } from '@/payload/access/isAdminOrSelf'
-import { isAuthenticated } from '@/payload/access/isAuthenticated'
 import { awardTrainerPoints } from '@/payload/hooks/awardTrainerPoints'
 import { LANGUAGE_OPTIONS, TRAINER_LIMITS } from '@/lib/trainer/constants'
 
@@ -12,10 +11,12 @@ export const UserTrainerProgress: CollectionConfig = {
     defaultColumns: ['user', 'task', 'isCompleted', 'attempts', 'completedAt'],
     group: 'Тренажёр',
   },
+  // Прогресс пишет только сервер (/api/trainer/submit, overrideAccess) после проверки в песочнице.
+  // Запись студентом через REST давала баллы за «решено» и открывала эталон через failedAttempts
   access: {
-    create: isAuthenticated,
+    create: isAdmin,
     read: isAdminOrSelf,
-    update: isAdminOrSelf,
+    update: isAdmin,
     delete: isAdmin,
   },
   hooks: {

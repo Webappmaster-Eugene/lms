@@ -1,5 +1,7 @@
 import type { CollectionAfterChangeHook } from 'payload'
 import { withSpan, logger } from '@/lib/telemetry'
+import { relationId } from '@/lib/relation-id'
+import { skipHooksReq } from '@/lib/payload-req'
 
 /**
  * Hook: создаёт in-app уведомление при важных событиях.
@@ -12,7 +14,8 @@ export const createPointsNotification: CollectionAfterChangeHook = async ({
   if (operation !== 'create') return doc
   if (req.context?.skipHooks) return doc
 
-  const userId = String(typeof doc.user === 'object' ? doc.user.id : doc.user)
+  // Числом: запись в поле связи строку не принимает
+  const userId = relationId(doc.user)
   const reason = doc.reason as string
 
   const notificationMap: Record<string, { title: string; type: string; link: string }> = {
@@ -35,7 +38,7 @@ export const createPointsNotification: CollectionAfterChangeHook = async ({
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (req.payload as any).create({
-        req,
+        req: skipHooksReq(req),
         collection: 'notifications',
         data: {
           user: userId,
@@ -45,7 +48,6 @@ export const createPointsNotification: CollectionAfterChangeHook = async ({
           link: config.link,
           isRead: false,
         },
-        context: { skipHooks: true },
       })
     } catch (err) {
       logger.error('Failed to create notification', err, { 'user.id': userId, 'notification.type': config.type })
@@ -63,7 +65,8 @@ export const createAchievementNotification: CollectionAfterChangeHook = async ({
   if (operation !== 'create') return doc
   if (req.context?.skipHooks) return doc
 
-  const userId = String(typeof doc.user === 'object' ? doc.user.id : doc.user)
+  // Числом: запись в поле связи строку не принимает
+  const userId = relationId(doc.user)
 
   return withSpan('hook.createAchievementNotification', { 'user.id': userId }, async () => {
     try {
@@ -78,7 +81,7 @@ export const createAchievementNotification: CollectionAfterChangeHook = async ({
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (req.payload as any).create({
-        req,
+        req: skipHooksReq(req),
         collection: 'notifications',
         data: {
           user: userId,
@@ -88,7 +91,6 @@ export const createAchievementNotification: CollectionAfterChangeHook = async ({
           link: '/profile',
           isRead: false,
         },
-        context: { skipHooks: true },
       })
     } catch (err) {
       logger.error('Failed to create achievement notification', err, { 'user.id': userId })

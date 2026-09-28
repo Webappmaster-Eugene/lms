@@ -1,6 +1,8 @@
 import type { CollectionAfterChangeHook } from 'payload'
 import { randomBytes } from 'node:crypto'
 import { withSpan, logger } from '@/lib/telemetry'
+import { relationId } from '@/lib/relation-id'
+import { skipHooksReq } from '@/lib/payload-req'
 
 /**
  * Hook: создаёт сертификат при завершении курса/роадмапа.
@@ -16,7 +18,8 @@ export const createCertificate: CollectionAfterChangeHook = async ({
   const reason = doc.reason as string
   if (reason !== 'course_completed' && reason !== 'roadmap_completed') return doc
 
-  const userId = String(typeof doc.user === 'object' ? doc.user.id : doc.user)
+  // Числом: запись в поле связи строку не принимает (ValidationError «Пользователь»)
+  const userId = relationId(doc.user)
   const entityId = String(doc.relatedEntity ?? '')
 
   if (!entityId) return doc
@@ -54,7 +57,6 @@ export const createCertificate: CollectionAfterChangeHook = async ({
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (req.payload as any).create({
-        req,
         collection: 'certificates',
         data: {
           user: userId,
@@ -64,7 +66,8 @@ export const createCertificate: CollectionAfterChangeHook = async ({
           issuedAt: new Date().toISOString(),
           certificateNumber: certNumber,
         },
-        context: { skipHooks: true },
+        // Наследник req: context в самой операции Payload вмерживает в общий req и глушит соседние хуки
+        req: skipHooksReq(req),
       })
 
       logger.info('Certificate created', { 'certificate.number': certNumber, 'user.id': userId, 'certificate.type': type })

@@ -95,6 +95,11 @@ export const Users: CollectionConfig = {
       type: 'number',
       defaultValue: 0,
       label: 'Баллы',
+      // Пересчитывается хуками из транзакций; иначе студент выставлял себе баллы через REST
+      access: {
+        create: ({ req: { user } }) => Boolean(user?.role === 'admin'),
+        update: ({ req: { user } }) => Boolean(user?.role === 'admin'),
+      },
       admin: {
         readOnly: true,
         position: 'sidebar',
@@ -105,6 +110,11 @@ export const Users: CollectionConfig = {
       type: 'checkbox',
       defaultValue: true,
       label: 'Активен',
+      // Скрывает студента из лидерборда - решение админа, не самого студента
+      access: {
+        create: ({ req: { user } }) => Boolean(user?.role === 'admin'),
+        update: ({ req: { user } }) => Boolean(user?.role === 'admin'),
+      },
       admin: {
         position: 'sidebar',
       },

@@ -259,8 +259,9 @@ async function safeCreateTransaction(
     if (existing.totalDocs > 0) return false
 
     try {
+      // Без skipHooks: хуки транзакции выдают сертификат, уведомление и письмо о завершении
       await req.payload.create({
-        req: skipHooksReq(req),
+        req,
         collection: 'points-transactions',
         data: {
           user: userId,

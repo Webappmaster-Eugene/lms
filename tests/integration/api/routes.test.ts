@@ -268,14 +268,16 @@ describe('GET /api/trainer/solution', () => {
     expect((await get(await login(payload, admin))).status).toBe(200)
   })
 
-  it.fails('БАГ: студент не должен открыть эталон, выставив себе failedAttempts=5 через REST', async () => {
+  it('студент не может открыть эталон, выставив себе failedAttempts=5 через REST', async () => {
     const { user, token } = await newStudent()
-    await payload.create({
-      collection: 'user-trainer-progress',
-      data: { task: task.id, failedAttempts: 5 } as never,
-      user,
-      overrideAccess: false,
-    })
+    await expect(
+      payload.create({
+        collection: 'user-trainer-progress',
+        data: { task: task.id, failedAttempts: 5 } as never,
+        user,
+        overrideAccess: false,
+      }),
+    ).rejects.toThrow()
     expect((await get(token)).status).toBe(403)
   })
 })

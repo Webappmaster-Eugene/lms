@@ -86,7 +86,7 @@ describe('уведомление о завершении', () => {
     await run(transaction())
 
     expect(store.notifications[0]).toMatchObject({
-      user: '3',
+      user: 3,
       title: 'Курс завершён!',
       type: 'course_completed',
       link: '/profile',
@@ -146,8 +146,11 @@ describe('уведомление о завершении', () => {
   it('уведомление не запускает хуки повторно', async () => {
     await run(transaction())
 
+    // skipHooks - на наследнике req, а не через context операции: тот Payload вмерживает в общий req
     const [args] = payload.create.mock.calls[0]
-    expect(args.context?.skipHooks).toBe(true)
+    expect(args.req?.context?.skipHooks).toBe(true)
+    expect(args.context).toBeUndefined()
+    expect(req.context?.skipHooks).toBeUndefined()
   })
 
   it('отказ записи не роняет начисление баллов', async () => {

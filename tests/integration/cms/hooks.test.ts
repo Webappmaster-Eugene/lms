@@ -89,8 +89,7 @@ describe('прохождение урока → баллы, серия, дост
     const unlocked = await payload.find({ collection: 'user-achievements', where: { user: { equals: student.id } }, depth: 1 })
     expect(unlocked.docs.map((u) => (u.achievement as Achievement).title)).toEqual(['Первый шаг (hooks)'])
 
-    // checkAchievements пишет user-achievements с skipHooks: письма о достижении здесь нет.
-    expect(emails.sent.filter((e) => e.to === student.email)).toEqual([])
+    expect(emails.sent.filter((e) => e.to === student.email).map((e) => e.subject)).toEqual(['Новое достижение: Первый шаг (hooks)'])
   })
 
   it('последний урок курса: бонусы за курс и роадмап, totalPoints = сумма транзакций', async () => {
@@ -109,7 +108,7 @@ describe('прохождение урока → баллы, серия, дост
     expect(await total(student.id)).toBe(txs.reduce((acc, t) => acc + t.amount, 0))
   })
 
-  it.fails('БАГ: завершение курса и роадмапа шлёт письма (awardPoints пишет транзакции с skipHooks — хуки транзакций молчат)', async () => {
+  it('завершение курса и роадмапа шлёт письма', async () => {
     const student = await createStudent(payload)
     const tree = await createCourseTree(payload, { lessons: 1 })
     await completeLesson(student, tree.lessons[0].id)
@@ -119,7 +118,7 @@ describe('прохождение урока → баллы, серия, дост
     )
   })
 
-  it.fails('БАГ: завершение курса и роадмапа выдаёт сертификаты (skipHooks в awardPoints + user строкой в createCertificate)', async () => {
+  it('завершение курса и роадмапа выдаёт сертификаты', async () => {
     const student = await createStudent(payload)
     const tree = await createCourseTree(payload, { lessons: 1 })
     await completeLesson(student, tree.lessons[0].id)
@@ -131,7 +130,7 @@ describe('прохождение урока → баллы, серия, дост
     for (const c of certificates.docs) expect(c.certificateNumber).toMatch(/^MC-[CR]-[0-9A-Z]+-[0-9A-F]{6}$/)
   })
 
-  it.fails('БАГ: завершение курса создаёт уведомления «Курс завершён!» и «Роадмап завершён!» (skipHooks + user строкой)', async () => {
+  it('завершение курса создаёт уведомления «Курс завершён!» и «Роадмап завершён!»', async () => {
     const student = await createStudent(payload)
     const tree = await createCourseTree(payload, { lessons: 1 })
     await completeLesson(student, tree.lessons[0].id)
@@ -139,7 +138,7 @@ describe('прохождение урока → баллы, серия, дост
     expect(titles).toEqual(expect.arrayContaining(['Курс завершён!', 'Роадмап завершён!']))
   })
 
-  it.fails('БАГ: полученное достижение создаёт уведомление в колокольчике (checkAchievements пишет с skipHooks)', async () => {
+  it('полученное достижение создаёт уведомление в колокольчике', async () => {
     const student = await createStudent(payload)
     const tree = await createCourseTree(payload, { lessons: 2 })
     await completeLesson(student, tree.lessons[0].id)
@@ -270,21 +269,23 @@ describe('тренажёр (awardTrainerPoints)', () => {
     expect((await transactions(student.id))[0]).toMatchObject({ reason: 'trainer_task_completed', amount: 10 })
   })
 
-  it.fails('БАГ: студент не должен получить баллы, записав себе «решено» напрямую через API', async () => {
+  it('студент не может записать себе «решено» напрямую через API и получить баллы', async () => {
     const student = await createStudent(payload)
     const task = await createSumTask(payload)
-    await payload.create({
-      collection: 'user-trainer-progress',
-      data: { task: task.id, isCompleted: true, verifiedBy: 'server' } as never,
-      user: student,
-      overrideAccess: false,
-    })
+    await expect(
+      payload.create({
+        collection: 'user-trainer-progress',
+        data: { task: task.id, isCompleted: true, verifiedBy: 'server' } as never,
+        user: student,
+        overrideAccess: false,
+      }),
+    ).rejects.toThrow()
     expect(await transactions(student.id)).toEqual([])
   })
 })
 
 describe('сертификаты и уведомления по транзакциям', () => {
-  it.fails('БАГ: транзакция за курс выдаёт ровно один сертификат, повторная — не дублирует (сейчас ни одного)', async () => {
+  it('транзакция за курс выдаёт ровно один сертификат, повторная — не дублирует', async () => {
     const student = await createStudent(payload)
     const tree = await createCourseTree(payload, { lessons: 1 })
     for (let i = 0; i < 2; i += 1) {
@@ -314,7 +315,7 @@ describe('сертификаты и уведомления по транзакц
     expect(emails.sent.map((e) => [e.to, e.subject])).toEqual([[student.email, 'Новое достижение: Первый шаг (hooks)']])
   })
 
-  it.fails('БАГ: выдача достижения админом создаёт уведомление (user строкой)', async () => {
+  it('выдача достижения админом создаёт уведомление', async () => {
     const student = await createStudent(payload)
     await payload.create({
       collection: 'user-achievements',

@@ -126,7 +126,7 @@ describe('выдача сертификата', () => {
 
       expect(store.certificates).toHaveLength(1)
       expect(store.certificates[0]).toMatchObject({
-        user: '3',
+        user: 3,
         type: 'course',
         title: 'Глубокий React',
         relatedEntity: '51',
@@ -159,8 +159,11 @@ describe('выдача сертификата', () => {
     it('запись сертификата не запускает хуки заново', async () => {
       await run(transaction())
 
-      const [args] = payload.create.mock.calls[0] as [{ context?: { skipHooks?: boolean } }]
-      expect(args.context?.skipHooks).toBe(true)
+      // skipHooks - на наследнике req, а не через context операции: тот Payload вмерживает в общий req
+      const [args] = payload.create.mock.calls[0] as [{ req?: PayloadRequest; context?: unknown }]
+      expect(args.req?.context?.skipHooks).toBe(true)
+      expect(args.context).toBeUndefined()
+      expect(req.context?.skipHooks).toBeUndefined()
     })
   })
 

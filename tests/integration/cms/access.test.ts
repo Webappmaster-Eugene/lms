@@ -37,7 +37,8 @@ const MATRIX: Record<string, Matrix> = {
   notifications: { create: 'admin', read: 'own', update: 'own', delete: 'admin' },
   certificates: { create: 'admin', read: 'own', update: 'admin', delete: 'admin' },
   streaks: { create: 'admin', read: 'own', update: 'admin', delete: 'admin' },
-  'user-trainer-progress': { create: 'auth', read: 'own', update: 'own', delete: 'admin' },
+  // Пишет только сервер после проверки в песочнице (/api/trainer/submit)
+  'user-trainer-progress': { create: 'admin', read: 'own', update: 'admin', delete: 'admin' },
   'yandex-disk-imports': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
 }
 
@@ -267,15 +268,18 @@ describe('попытки эскалации прав', () => {
     expect((doc as { user: number | { id: number } }).user).toEqual(expect.objectContaining({ id: owner.id }))
   })
 
-  it('user-trainer-progress: студент не может записать прогресс на чужое имя', async () => {
+  it('user-trainer-progress: студент не может записать прогресс ни на чужое, ни на своё имя', async () => {
     const task = await createSumTask(payload)
-    const doc = await payload.create({
-      collection: 'user-trainer-progress',
-      data: { user: other.id, task: task.id },
-      user: owner,
-      overrideAccess: false,
-    })
-    expect(doc.user).toEqual(expect.objectContaining({ id: owner.id }))
+    for (const user of [other.id, owner.id]) {
+      await expect(
+        payload.create({
+          collection: 'user-trainer-progress',
+          data: { user, task: task.id },
+          user: owner,
+          overrideAccess: false,
+        }),
+      ).rejects.toThrow()
+    }
   })
 
   it('студент не видит скрытые поля задачи: эталон, разбор и ожидаемый вывод', async () => {
@@ -303,14 +307,14 @@ describe('попытки эскалации прав', () => {
   // ↓ Найденные дефекты: тест описывает ожидаемое поведение и помечен it.fails,
   //   пока продукт не исправлен. После исправления снять .fails.
 
-  it.fails('БАГ: студент не должен менять себе totalPoints (поле без field-level access)', async () => {
+  it('студент не должен менять себе totalPoints', async () => {
     const student = await createStudent(payload)
     await payload.update({ collection: 'users', id: student.id, data: { totalPoints: 100500 }, user: student, overrideAccess: false })
     const fresh = await payload.findByID({ collection: 'users', id: student.id })
     expect(fresh.totalPoints).toBe(0)
   })
 
-  it.fails('БАГ: скрытый админом студент (isActive=false) не должен сам вернуть себя в лидерборд', async () => {
+  it('скрытый админом студент (isActive=false) не должен сам вернуть себя в лидерборд', async () => {
     const student = await createStudent(payload, { isActive: false })
     await payload.update({ collection: 'users', id: student.id, data: { isActive: true }, user: student, overrideAccess: false })
     const fresh = await payload.findByID({ collection: 'users', id: student.id })
