@@ -19,6 +19,9 @@ export async function markAnswersRead(linkPart: string): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ isRead: true }),
+      // Ученик прочитал ответ и сразу ушёл со страницы — без keepalive браузер
+      // обрывает запрос, и уведомление остаётся висеть.
+      keepalive: true,
     })
     if (!res.ok) throw new Error(`PATCH /api/notifications → ${res.status}`)
   } catch (error) {

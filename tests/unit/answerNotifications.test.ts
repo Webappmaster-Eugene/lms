@@ -16,6 +16,7 @@ describe('отметка ответов прочитанными', () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(init.method).toBe('PATCH')
     expect(JSON.parse(String(init.body))).toEqual({ isRead: true })
+    expect(init.keepalive, 'запрос должен пережить уход со страницы').toBe(true)
     expect(url).toContain('where[type][equals]=comment')
     expect(url).toContain('where[isRead][equals]=false')
     expect(url).toContain(`where[link][like]=${encodeURIComponent('/lessons/hooks#comment-')}`)

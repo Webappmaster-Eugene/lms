@@ -41,9 +41,13 @@ test('вопрос ученика, ответ ментора, уведомлен
   await page.goto('/')
   const answers = page.getByRole('region', { name: /Ментор ответил/ })
   await expect(answers).toContainText(answer)
+  const markedRead = page.waitForResponse(
+    (r) => r.request().method() === 'PATCH' && r.url().includes('/api/notifications?'),
+  )
   await answers.getByRole('link', { name: /Ответ на ваш вопрос/ }).first().click()
   await expect(page).toHaveURL(new RegExp(`#comment-${questionId}$`))
   await expect(thread.getByText(answer)).toBeVisible()
+  expect((await markedRead).ok()).toBe(true)
   await expect(async () => {
     await page.goto('/')
     await expect(page.getByRole('region', { name: /Ментор ответил/ })).toHaveCount(0)
