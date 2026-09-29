@@ -31,6 +31,9 @@ export default defineConfig({
   },
   projects: [
     { name: 'prod-setup', testMatch: /auth\.setup\.ts/ },
-    { name: 'prod', testMatch: /.*\.spec\.ts/, dependencies: ['prod-setup'] },
+    { name: 'prod', testMatch: /(public|questions|student)\.spec\.ts/, dependencies: ['prod-setup'] },
+    // Углублённые сценарии меняют прогресс ученика (сертификат, решённая задача),
+    // а базовые ждут новичка — поэтому они идут после, отдельным проектом.
+    { name: 'prod-deep', testMatch: /deep\/.*\.spec\.ts/, dependencies: ['prod'] },
   ],
 })

@@ -96,7 +96,7 @@ export function CourseCatalog({ courses }: { courses: CatalogCourse[] }) {
         <div className="flex flex-wrap gap-2" role="group" aria-label="Статус курса">
           {(Object.keys(STATUS_LABELS) as Status[]).map((s) => (
             <Chip key={s} active={status === s} onClick={() => setStatus(s)}>
-              {STATUS_LABELS[s]} <span className="opacity-70">{counts[s]}</span>
+              {STATUS_LABELS[s]} <span className="tabular-nums">{counts[s]}</span>
             </Chip>
           ))}
         </div>

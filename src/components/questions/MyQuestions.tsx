@@ -64,7 +64,7 @@ export function MyQuestions({ threads }: { threads: QuestionThread[] }) {
                 : 'border-border text-muted-foreground hover:text-foreground',
             )}
           >
-            {FILTER_LABELS[f]} <span className="opacity-70">{counts[f]}</span>
+            {FILTER_LABELS[f]} <span className="tabular-nums">{counts[f]}</span>
           </button>
         ))}
       </div>
