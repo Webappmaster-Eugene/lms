@@ -48,6 +48,16 @@ function getProxyUrl(videoUrl: string): string {
   return `/api/yandex-disk/proxy?url=${encodeURIComponent(videoUrl)}`
 }
 
+/** Файлы медиатеки воспроизводятся непосредственно, без iframe стороннего сервиса. */
+function isMediaFile(videoUrl: string): boolean {
+  try {
+    const url = new URL(videoUrl, 'https://local.invalid')
+    return ['https:', 'http:'].includes(url.protocol) && url.pathname.startsWith('/api/media/file/')
+  } catch {
+    return false
+  }
+}
+
 /**
  * Записи в контейнере MPEG-TS браузер нативно не проигрывает — их разбирает
  * отдельный плеер. Расширение .ts у видео библиотеки означает именно поток,
@@ -122,6 +132,19 @@ export function VideoPlayer({ title, videoUrl, displayMode, description, duratio
     )
   }
 
+  if (isMediaFile(videoUrl)) {
+    if (mode === 'link') {
+      return <VideoLinkCard title={title} videoUrl={videoUrl} description={description} durationMinutes={durationMinutes} />
+    }
+
+    return (
+      <div className="space-y-3">
+        <VideoHeading title={title} description={description} durationMinutes={durationMinutes} />
+        <NativeVideo key={videoUrl} videoUrl={videoUrl} direct onFailure={handleStreamFailure} />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-3">
       <VideoHeading title={title} description={description} durationMinutes={durationMinutes} />
@@ -139,7 +162,7 @@ export function VideoPlayer({ title, videoUrl, displayMode, description, duratio
   )
 }
 
-function NativeVideo({ videoUrl, onFailure }: { videoUrl: string; onFailure: () => void }) {
+function NativeVideo({ videoUrl, direct = false, onFailure }: { videoUrl: string; direct?: boolean; onFailure: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const memory = useVideoMemory(videoRef, videoUrl)
 
@@ -148,7 +171,7 @@ function NativeVideo({ videoUrl, onFailure }: { videoUrl: string; onFailure: () 
       <div className="overflow-hidden rounded-xl border border-border bg-black">
         <video
           ref={videoRef}
-          src={getStreamUrl(videoUrl)}
+          src={direct ? videoUrl : getStreamUrl(videoUrl)}
           className="aspect-video w-full"
           controls
           preload="metadata"
