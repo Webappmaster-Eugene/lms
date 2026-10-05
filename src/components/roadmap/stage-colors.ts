@@ -40,43 +40,43 @@ export const STAGE_DEFAULT_COLOR: Record<NodeStage, NodeColor> = {
 /** Tailwind-классы фона/рамки/текста карточки. Работают в dark и light. */
 export const COLOR_CLASSES: Record<NodeColor, { bg: string; border: string; text: string; accent: string }> = {
   yellow: {
-    bg: 'bg-amber-400/15 dark:bg-amber-400/20',
+    bg: 'bg-amber-50 dark:bg-neutral-900',
     border: 'border-amber-500/60 dark:border-amber-400/60',
     text: 'text-amber-950 dark:text-amber-50',
     accent: 'text-amber-700 dark:text-amber-300',
   },
   lime: {
-    bg: 'bg-lime-400/15 dark:bg-lime-400/20',
+    bg: 'bg-lime-50 dark:bg-neutral-900',
     border: 'border-lime-500/60 dark:border-lime-400/60',
     text: 'text-lime-950 dark:text-lime-50',
     accent: 'text-lime-700 dark:text-lime-300',
   },
   white: {
-    bg: 'bg-neutral-50 dark:bg-neutral-800/60',
+    bg: 'bg-neutral-50 dark:bg-neutral-900',
     border: 'border-neutral-300 dark:border-neutral-600',
     text: 'text-neutral-900 dark:text-neutral-50',
     accent: 'text-neutral-600 dark:text-neutral-300',
   },
   gray: {
-    bg: 'bg-neutral-200/60 dark:bg-neutral-700/40',
+    bg: 'bg-neutral-100 dark:bg-neutral-900',
     border: 'border-neutral-400 dark:border-neutral-500',
     text: 'text-neutral-900 dark:text-neutral-100',
     accent: 'text-neutral-600 dark:text-neutral-400',
   },
   pink: {
-    bg: 'bg-pink-500/15 dark:bg-pink-500/25',
+    bg: 'bg-pink-50 dark:bg-neutral-900',
     border: 'border-pink-500/70 dark:border-pink-400/70',
     text: 'text-pink-950 dark:text-pink-50',
     accent: 'text-pink-700 dark:text-pink-300',
   },
   blue: {
-    bg: 'bg-sky-400/15 dark:bg-sky-400/20',
+    bg: 'bg-sky-50 dark:bg-neutral-900',
     border: 'border-sky-500/60 dark:border-sky-400/60',
     text: 'text-sky-950 dark:text-sky-50',
     accent: 'text-sky-700 dark:text-sky-300',
   },
   red: {
-    bg: 'bg-red-500/15 dark:bg-red-500/25',
+    bg: 'bg-red-50 dark:bg-neutral-900',
     border: 'border-red-500/60 dark:border-red-400/60',
     text: 'text-red-950 dark:text-red-50',
     accent: 'text-red-700 dark:text-red-300',
@@ -85,7 +85,7 @@ export const COLOR_CLASSES: Record<NodeColor, { bg: string; border: string; text
 
 /** Оверлей-статус (locked/in-progress/completed) поверх цвета стадии. */
 export const STATUS_RING: Record<NodeStatus, string> = {
-  locked: 'opacity-60 ring-0',
+  locked: 'ring-0',
   available: 'ring-0',
   'in-progress': 'ring-2 ring-info ring-offset-2 ring-offset-background',
   completed: 'ring-2 ring-success ring-offset-2 ring-offset-background',

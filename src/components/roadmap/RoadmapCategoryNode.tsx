@@ -4,11 +4,7 @@ import { RoadmapIcon } from './RoadmapIcon'
 import { getNodeClasses } from './stage-colors'
 import { cn } from '@/lib/utils'
 
-/**
- * Узел-категория (заголовок стадии). На Miro-доске соответствует розовым
- * плашкам «Начало», «Стажёр», «Junior», «Middle», «Senior» и их пояснениям.
- * Рисуется шире и заметнее, чем topic-узлы.
- */
+/** Заголовок этапа: заметнее темы, с ограниченной шириной и свободным переносом текста. */
 export function RoadmapCategoryNode({ data }: NodeProps) {
   const nodeData = data as RoadmapNodeData
   const classes = getNodeClasses(nodeData.color, nodeData.stage, nodeData.status)
@@ -17,28 +13,22 @@ export function RoadmapCategoryNode({ data }: NodeProps) {
     <div
       title={nodeData.description ?? undefined}
       className={cn(
-        'min-w-[280px] rounded-xl border-2 px-5 py-3 shadow-lg',
+        'w-[320px] rounded-xl border px-5 py-4 shadow-sm',
         classes.bg,
         classes.border,
         classes.text,
       )}
     >
-      <div className="flex items-center gap-3">
-        <div
-          className={cn(
-            'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border',
-            classes.border,
-            classes.accent,
-          )}
-        >
+      <div className="flex items-start gap-3">
+        <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', classes.accent)}>
           <RoadmapIcon name={nodeData.icon} className="h-5 w-5" />
         </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-bold uppercase tracking-wide leading-tight">
+        <div className="min-w-0 flex-1">
+          <span className="block break-words pt-1 text-[15px] font-semibold leading-5">
             {nodeData.label}
           </span>
           {nodeData.description && (
-            <span className={cn('mt-0.5 text-[11px] leading-tight', classes.accent)}>
+            <span className={cn('mt-2 block break-words text-xs leading-[18px]', classes.accent)}>
               {nodeData.description}
             </span>
           )}

@@ -51,3 +51,14 @@
 .react-flow__handle:hover {
   opacity: 0.8;
 }
+
+.roadmap-canvas[data-layout-ready='false'] .react-flow__nodes,
+.roadmap-canvas[data-layout-ready='false'] .react-flow__edges {
+  opacity: 0;
+}
+
+.roadmap-canvas:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+}

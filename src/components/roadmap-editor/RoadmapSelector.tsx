@@ -61,12 +61,13 @@ export function RoadmapSelector() {
     <div style={S.page}>
       <a href="/admin" style={S.backLink}>
         <ArrowLeft style={{ width: 16, height: 16 }} />
-        Панель управления
+        CMS и настройки
       </a>
 
       <div>
         <h1 style={S.title}>Визуальный редактор роадмапов</h1>
-        <p style={S.subtitle}>Выберите роадмап для визуального редактирования узлов и связей</p>
+        <p style={S.subtitle}>Выберите карту, измените темы и связи, затем нажмите «Сохранить». Кнопка «Открыть на платформе» покажет результат.</p>
+        <a href="/admin/collections/roadmaps/create" style={{ ...S.emptyLink, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>Создать роадмап</a>
       </div>
 
       {isLoading && (

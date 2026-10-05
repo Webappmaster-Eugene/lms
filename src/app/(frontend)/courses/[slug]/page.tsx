@@ -9,6 +9,7 @@ import { relationKey } from '@/lib/course-lessons'
 import { pluralize } from '@/lib/utils'
 import { remainingTime } from '@/lib/course-time'
 import { nextLesson, orderCourseLessons } from '@/lib/roadmap-next-step'
+import { RichText } from '@payloadcms/richtext-lexical/react'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -186,6 +187,16 @@ export default async function CourseDetailPage({ params }: Props) {
           </div>
         </div>
       </div>
+
+      {user?.role === 'admin' && (
+        <Link href={`/manage/courses/${course.id}`} className="inline-flex min-h-[44px] items-center rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">Редактировать программу</Link>
+      )}
+
+      {course.description && (
+        <section aria-label="Описание курса" className="prose prose-sm dark:prose-invert max-w-none break-words">
+          <RichText data={course.description} />
+        </section>
+      )}
 
       {next ? (
         <Link

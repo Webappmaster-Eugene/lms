@@ -126,3 +126,17 @@ Google Chrome (`channel: 'chrome'`), в CI и контейнере — штат�
 `.github/workflows/ci.yml`: `quality` (lint, typecheck, unit), `integration`
 (service container PostgreSQL), `e2e` и `visual` (в контейнере Playwright).
 Отчёт Playwright и трассы прикладываются артефактами при падении.
+
+## Полный браузерный прогон в Docker
+
+Для e2e, HTTP API и контентных проверок в штатном Linux-браузере:
+
+```sh
+node scripts/visual-docker.mjs --project=e2e --project=api --project=content --retries=0 tests/e2e/specs tests/e2e/api tests/e2e/content
+```
+
+Фильтры каталогов выбирают эти сценарии. Серверы поднимаются на хосте,
+браузер — в контейнере. Обёртка передаёт браузерным SQL-проверкам
+`TEST_PG_URL` с адресом `host.docker.internal`; приложение использует
+исходный адрес PostgreSQL. Это требуется сценарию приглашения и установки
+пароля, который читает одноразовый токен из тестовой БД.

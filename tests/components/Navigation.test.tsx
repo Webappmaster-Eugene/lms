@@ -20,6 +20,7 @@ vi.mock('@/components/layout/SidebarContext', () => ({
 const { Sidebar } = await import('@/components/layout/Sidebar')
 const { CourseSidebar } = await import('@/components/course/CourseSidebar')
 const { RoadmapGraph } = await import('@/components/roadmap/RoadmapGraph')
+const { RoadmapEditorNavLink } = await import('@/components/roadmap-editor/NavLink')
 
 /** Навигация: боковое меню платформы, оглавление курса и карта навыков. */
 
@@ -57,32 +58,87 @@ describe('боковое меню', () => {
     expect(dashboard.className).not.toBe(courses.className)
   })
 
-  it('обычному ученику админских пунктов не видно', async () => {
-    render(<Sidebar />)
+  it('обычному ученику админских пунктов не видно', () => {
+    render(<Sidebar isAdmin={false} />)
 
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled())
-    expect(screen.queryByRole('link', { name: /Импорт из YD/ })).not.toBeInTheDocument()
+    expect(screen.queryByText('Управление')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Редактор роадмапов' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Учебный контент')).not.toBeInTheDocument()
   })
 
-  it('администратору показываются служебные пункты', async () => {
-    global.fetch = vi.fn(async () => Response.json({ user: { role: 'admin' } })) as unknown as typeof fetch
+  it('администратор сразу видит вход в панель, редактор и управление учениками', () => {
+    render(<Sidebar isAdmin />)
 
-    render(<Sidebar />)
-
-    await waitFor(() =>
-      expect(within(desktop()).getByRole('link', { name: /Импорт из YD/ })).toBeInTheDocument(),
-    )
+    const menu = within(desktop())
+    expect(menu.getByRole('link', { name: 'CMS и настройки' })).toHaveAttribute('href', '/admin')
+    expect(menu.getByRole('link', { name: 'Учебный контент' })).toHaveAttribute('href', '/manage')
+    expect(menu.getByRole('link', { name: 'Редактор роадмапов' })).toHaveAttribute('href', '/admin/roadmap-editor')
+    expect(menu.getByRole('link', { name: 'Ученики и администраторы' })).toHaveAttribute('href', '/admin/collections/users')
+    expect(menu.getByRole('link', { name: 'Вопросы учеников' })).toHaveAttribute('href', '/admin/questions')
+    expect(global.fetch).not.toHaveBeenCalled()
   })
 
-  it('сбой проверки роли не добавляет админских пунктов', async () => {
-    global.fetch = vi.fn(async () => {
-      throw new Error('сеть недоступна')
-    }) as unknown as typeof fetch
-
+  it('без подтверждённой роли не добавляет админские пункты', () => {
     render(<Sidebar />)
 
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled())
-    expect(screen.queryByRole('link', { name: /Импорт из YD/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Редактор роадмапов' })).not.toBeInTheDocument()
+  })
+
+  it('группы меню дают доступ к контенту, тренажёру, прогрессу и настройкам', async () => {
+    const user = userEvent.setup()
+    render(<Sidebar isAdmin />)
+    const menu = within(desktop())
+
+    for (const label of ['Настройки контента в CMS', 'Управление тренажёром', 'Прогресс и награды', 'Общение и настройки']) {
+      await user.click(menu.getByText(label))
+    }
+
+    for (const [label, href] of [
+      ['Курсы', '/admin/collections/courses'],
+      ['Уроки', '/admin/collections/lessons'],
+      ['Импорт из Яндекс.Диска', '/admin/import-yandex'],
+      ['Задачи тренажёра', '/admin/collections/trainer-tasks'],
+      ['Прогресс по урокам', '/admin/collections/user-progress'],
+      ['Настройки платформы', '/admin/globals/site-settings'],
+    ]) {
+      expect(menu.getAllByRole('link', { name: label }).some((link) => link.getAttribute('href') === href)).toBe(true)
+    }
+  })
+
+  it('выделяет редактор выбранной карты, а не всю панель управления', () => {
+    pathname.current = '/admin/roadmap-editor/7'
+    render(<Sidebar isAdmin />)
+
+    const menu = within(desktop())
+    expect(menu.getByRole('link', { name: 'Редактор роадмапов' })).toHaveAttribute('aria-current', 'page')
+    expect(menu.getByRole('link', { name: 'CMS и настройки' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('закрывает мобильное меню после выбора редактора', async () => {
+    const user = userEvent.setup()
+    render(<Sidebar isAdmin />)
+
+    await user.click(screen.getAllByRole('link', { name: 'Редактор роадмапов' })[0])
+
+    expect(setMobileOpen).toHaveBeenCalledWith(false)
+  })
+
+  it('автоматически раскрывает группу текущего административного раздела', () => {
+    pathname.current = '/admin/collections/lessons/12'
+    render(<Sidebar isAdmin />)
+
+    expect(within(desktop()).getByText('Настройки контента в CMS').closest('details')).toHaveAttribute('open')
+    expect(within(desktop()).getByRole('link', { name: 'Уроки' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('в админке доступны рабочие разделы и возврат на платформу', () => {
+    pathname.current = '/admin/roadmap-editor/7'
+    render(<RoadmapEditorNavLink />)
+
+    expect(screen.getByRole('link', { name: 'Редактор роадмапов' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Вопросы учеников' })).toHaveAttribute('href', '/admin/questions')
+    expect(screen.getByRole('link', { name: 'Импорт из Яндекс.Диска' })).toHaveAttribute('href', '/admin/import-yandex')
+    expect(screen.getByRole('link', { name: 'Открыть платформу' })).toHaveAttribute('href', '/')
   })
 
   it('выход завершает сессию на сервере', async () => {

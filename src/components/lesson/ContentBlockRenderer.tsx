@@ -189,6 +189,7 @@ type LexicalNode = {
   children?: LexicalNode[]
   listType?: string
   url?: string
+  fields?: { url?: string; newTab?: boolean }
   language?: string
   [key: string]: unknown
 }
@@ -232,11 +233,12 @@ function LexicalNode({ node }: { node: LexicalNode }) {
     case 'listitem':
       return <li>{children}</li>
     case 'link': {
-      const url = String(node.url ?? '').trim()
-      const isSafeUrl = /^(https?:|\/|mailto:)/.test(url)
+      const url = String(node.fields?.url ?? node.url ?? '').trim()
+      const isSafeUrl = /^(https?:|\/|mailto:)/i.test(url)
       if (!isSafeUrl) return <>{children}</>
+      const newTab = node.fields ? node.fields.newTab === true : true
       return (
-        <a href={url} target="_blank" rel="noopener noreferrer">
+        <a href={url} target={newTab ? '_blank' : undefined} rel={newTab ? 'noopener noreferrer' : undefined}>
           {children}
         </a>
       )

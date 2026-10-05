@@ -4,6 +4,7 @@ import { NodeCourseList } from './NodeCourseList'
 import { STAGE_ORDER, STAGE_TITLES } from './stage-colors'
 import type { GraphNode, NodeCourse, NodeStatus, RoadmapNodeData } from './types'
 import type { NodeStage } from './stage-colors'
+import Link from 'next/link'
 
 const STATUS_ICON: Record<NodeStatus, typeof Circle> = {
   locked: Lock,
@@ -41,7 +42,7 @@ export function groupTopicsByStage(nodes: GraphNode[]): StageGroup[] {
   return groups
 }
 
-function TopicRow({ data }: { data: RoadmapNodeData }) {
+function TopicRow({ data, nodeId, managementRoadmapId }: { data: RoadmapNodeData; nodeId?: number; managementRoadmapId?: number }) {
   const Icon = STATUS_ICON[data.status]
 
   return (
@@ -64,6 +65,12 @@ function TopicRow({ data }: { data: RoadmapNodeData }) {
       </summary>
       <div className="border-t border-border p-3">
         {data.description && <p className="mb-3 text-sm text-muted-foreground">{data.description}</p>}
+        {managementRoadmapId && nodeId && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            <Link href={`/manage/courses/new?roadmap=${managementRoadmapId}&node=${nodeId}`} className="inline-flex min-h-[44px] items-center rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground focus-visible:outline-2 focus-visible:outline-ring">Добавить курс в тему</Link>
+            <Link href={`/manage/roadmaps/${managementRoadmapId}?node=${nodeId}`} className="inline-flex min-h-[44px] items-center rounded-lg border border-border px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring">Управлять курсами темы</Link>
+          </div>
+        )}
         {data.courses.length > 0 ? (
           <NodeCourseList courses={data.courses} />
         ) : (
@@ -78,7 +85,7 @@ function TopicRow({ data }: { data: RoadmapNodeData }) {
  * Карта в виде списка: читается на телефоне, проходится с клавиатуры и
  * скринридером. Карта остаётся основным видом на широком экране.
  */
-export function RoadmapTopicList({ nodes, looseCourses }: { nodes: GraphNode[]; looseCourses: NodeCourse[] }) {
+export function RoadmapTopicList({ nodes, looseCourses, managementRoadmapId }: { nodes: GraphNode[]; looseCourses: NodeCourse[]; managementRoadmapId?: number }) {
   const groups = groupTopicsByStage(nodes)
 
   return (
@@ -88,7 +95,7 @@ export function RoadmapTopicList({ nodes, looseCourses }: { nodes: GraphNode[]; 
           <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{group.title}</h3>
           <div className="space-y-2">
             {group.nodes.map((node) => (
-              <TopicRow key={node.id} data={node.data} />
+              <TopicRow key={node.id} data={node.data} nodeId={node.data.managementNodeId} managementRoadmapId={managementRoadmapId} />
             ))}
           </div>
         </section>

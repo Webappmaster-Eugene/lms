@@ -65,10 +65,14 @@ export function xyflowMock() {
     Panel: ({ children }: { children: ReactNode }) => <div>{children}</div>,
     useReactFlow: () => ({
       fitView: vi.fn(),
+      getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+      setViewport: vi.fn(async () => true),
       screenToFlowPosition: (p: unknown) => p,
       getNode: (id: string) => renderedFlowNodes.current.find((n) => n.id === id),
       setCenter: flowSetCenter,
     }),
+    useStore: (selector: (state: { nodeLookup: Map<string, { measured?: { width: number; height: number } }> }) => unknown) => selector({ nodeLookup: new Map(renderedFlowNodes.current.map((node) => [node.id, { measured: { width: 280, height: 200 } }])) }),
+    BaseEdge: () => <path />,
     // Состояние графа реализовано по-настоящему: редактор роадмапа строит на
     // нём всю логику, и заглушка-пустышка сделала бы его тесты бессмысленными.
     useNodesState: useElementsState,

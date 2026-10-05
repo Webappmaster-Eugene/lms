@@ -5,7 +5,7 @@ import { createElement, type FunctionComponent } from 'react'
 vi.mock('@xyflow/react', async () => (await import('../helpers/component-mocks')).xyflowMock())
 
 const params = vi.fn(() => ({ segments: ['collections', 'roadmaps', '5'] }) as Record<string, unknown>)
-vi.mock('next/navigation', () => ({ useParams: () => params() }))
+vi.mock('next/navigation', () => ({ useParams: () => params(), usePathname: () => '/admin' }))
 
 const { EditorTopicNode } = await import('@/components/roadmap-editor/EditorTopicNode')
 const { EditorCategoryNode } = await import('@/components/roadmap-editor/EditorCategoryNode')
@@ -142,13 +142,13 @@ describe('ссылка на редактор в админке', () => {
   it('ведёт на страницу редактора', () => {
     render(<RoadmapEditorNavLink />)
 
-    expect(screen.getByRole('link')).toHaveAttribute('href', '/admin/roadmap-editor')
+    expect(screen.getByRole('link', { name: 'Редактор роадмапов' })).toHaveAttribute('href', '/admin/roadmap-editor')
   })
 
   it('подписана понятно', () => {
     render(<RoadmapEditorNavLink />)
 
-    expect(screen.getByRole('link')).toHaveTextContent('Редактор роадмапов')
+    expect(screen.getByRole('link', { name: 'Редактор роадмапов' })).toBeInTheDocument()
   })
 })
 

@@ -1,14 +1,10 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { CheckCircle2, Lock } from 'lucide-react'
+import { CheckCircle2, Lock, Play } from 'lucide-react'
 import type { RoadmapNodeData } from './types'
 import { getNodeClasses } from './stage-colors'
 import { cn } from '@/lib/utils'
 
-/**
- * Мини-узел для дополнительных блоков «роста» (нагрузочное тестирование,
- * мониторинг, стратегия проектов). На Miro-доске — это небольшие плашки
- * серого цвета, без внутренних списков.
- */
+/** Дополнительная тема остаётся компактной, но выравнивается с основными карточками. */
 export function RoadmapSubtopicNode({ data }: NodeProps) {
   const nodeData = data as RoadmapNodeData
   const isLocked = nodeData.status === 'locked'
@@ -20,27 +16,32 @@ export function RoadmapSubtopicNode({ data }: NodeProps) {
     <div
       title={nodeData.description ?? undefined}
       className={cn(
-        'flex min-w-[140px] items-center gap-2 rounded-md border-2 px-3 py-2 shadow-sm transition-all',
+        'relative flex min-h-[72px] w-[280px] items-center gap-2.5 rounded-xl border px-4 py-4 shadow-sm transition-shadow',
         classes.bg,
         classes.border,
         classes.text,
         classes.ring,
-        nodeData.comingSoon && 'opacity-60',
-        isClickable && 'cursor-pointer hover:scale-[1.03] hover:shadow-md',
-        nodeData.isNextStep && 'ring-4 ring-primary ring-offset-2 ring-offset-background',
+        isClickable && 'cursor-pointer hover:shadow-md',
+        nodeData.isNextStep && 'ring-2 ring-primary ring-offset-4 ring-offset-background',
       )}
     >
+      {nodeData.isNextStep && (
+        <div className="absolute -top-3 right-3 flex items-center gap-1.5 rounded-full bg-primary px-2.5 py-1 text-xs font-medium leading-none text-primary-foreground">
+          <Play className="h-3 w-3" aria-hidden="true" />
+          Ваш шаг
+        </div>
+      )}
       {isLocked && (
         <Lock
-          className={cn('h-3 w-3 flex-shrink-0', classes.accent)}
+          className={cn('h-4 w-4 shrink-0', classes.accent)}
           aria-label={nodeData.comingSoon ? 'Материалы готовятся' : 'Пройдите предыдущие курсы'}
         />
       )}
-      {isCompleted && <CheckCircle2 className="h-3 w-3 flex-shrink-0 text-success" />}
-      <span className="text-[11px] font-semibold leading-tight">{nodeData.label}</span>
+      {isCompleted && <CheckCircle2 className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />}
+      <span className="min-w-0 break-words text-[15px] font-semibold leading-5">{nodeData.label}</span>
 
-      <Handle type="source" position={Position.Bottom} className="!h-1.5 !w-1.5 !bg-border !border-0" />
-      <Handle type="target" position={Position.Top} className="!h-1.5 !w-1.5 !bg-border !border-0" />
+      <Handle type="source" position={Position.Bottom} className="!h-2 !w-2 !bg-border !border-0" />
+      <Handle type="target" position={Position.Top} className="!h-2 !w-2 !bg-border !border-0" />
     </div>
   )
 }

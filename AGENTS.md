@@ -26,12 +26,17 @@ Push в `main` запускает выкат Dokploy: до push обязател
 ## Скиллы и инструменты
 
 Проектные скиллы находятся в `.agents/skills/`: `self-review`, `deploy-check`,
-`prod-check`, `frontend-design`, `project-harness`. Вызывай их как `$self-review`.
+`prod-check`, `frontend-design`, `project-harness`, `lms-content`. Вызывай их как `$self-review`.
 Скиллы-адаптеры читают оригиналы в `.claude/skills/`: это единый источник
 методологии. `$ARGUMENTS` в оригиналах означает текущий запрос или переданные
 пути, не переменную shell. Недоступный инструмент не означает выполненную
 проверку: назови точное ограничение. MCP из `.mcp.json` подключаются локальным
 адаптером без переноса секретов в Git.
+
+Для управления данными платформы используй `$lms-content`: курсы, уроки,
+роадмапы, задачи, FAQ, настройки и аккаунты. Источник скилла общий с Claude —
+`.claude/skills/lms-content/`. Проверка операций проводится в одноразовой БД
+через `pnpm test:integration tests/integration/cms/contentWorkflows.test.ts`.
 
 Роли `.codex/agents/` собраны из `../expert_info/lms/agents` с копией в
 `.codex/context/lms/agents`. Делегируй только когда задача независима и это

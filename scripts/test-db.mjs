@@ -29,6 +29,15 @@ export function databaseUrl(db) {
   return `${serverUrl()}/${db}`
 }
 
+/** Браузерные тесты в Docker обращаются к тому же Postgres через хост. */
+export function browserServerUrl(url = serverUrl()) {
+  const parsed = new URL(url)
+  if (['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)) {
+    parsed.hostname = 'host.docker.internal'
+  }
+  return parsed.toString().replace(/\/+$/, '')
+}
+
 function docker(args, opts = {}) {
   return execFileSync('docker', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim()
 }

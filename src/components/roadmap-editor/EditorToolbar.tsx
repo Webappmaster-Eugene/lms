@@ -12,6 +12,7 @@ import {
   LayoutGrid,
   BookOpen,
   Tag,
+  Settings,
 } from 'lucide-react'
 import type { RoadmapInfo } from './types'
 
@@ -79,11 +80,11 @@ export function EditorToolbar({
     >
       {/* Back */}
       <a
-        href="/admin/collections/roadmaps"
+        href="/admin/roadmap-editor"
         style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#888', textDecoration: 'none' }}
       >
         <ArrowLeft style={ico} />
-        Назад
+        Все роадмапы
       </a>
 
       {/* Separator */}
@@ -196,6 +197,13 @@ export function EditorToolbar({
         {isSaving ? 'Сохранение...' : 'Сохранить'}
       </button>
 
+      {roadmapInfo && (
+        <a href={`/admin/collections/roadmaps/${roadmapInfo.id}`} style={{ ...btn(true), textDecoration: 'none' }}>
+          <Settings style={ico} />
+          Настройки роадмапа
+        </a>
+      )}
+
       {/* Preview */}
       {roadmapInfo?.slug && (
         <a
@@ -205,7 +213,7 @@ export function EditorToolbar({
           style={{ display: 'flex', alignItems: 'center', gap: 6, ...btn(true), textDecoration: 'none' }}
         >
           <ExternalLink style={ico} />
-          Preview
+          Открыть на платформе
         </a>
       )}
     </div>

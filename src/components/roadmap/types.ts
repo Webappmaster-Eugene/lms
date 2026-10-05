@@ -17,6 +17,8 @@ export type NodeCourse = {
 }
 
 export type RoadmapNodeData = {
+  /** ID записи темы для управления; отличается от nodeId визуального графа. */
+  managementNodeId?: number
   label: string
   nodeType: 'category' | 'topic' | 'subtopic'
   /** Курс, который открывается по клику по узлу. */
@@ -56,4 +58,5 @@ export type RoadmapGraphProps = {
   edges: GraphEdge[]
   /** Тема со следующим шагом ученика — к ней ведёт кнопка «К моему шагу». */
   nextStepNodeId?: string | null
+  managementRoadmapId?: number
 }

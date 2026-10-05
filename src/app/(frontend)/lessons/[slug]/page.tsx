@@ -242,6 +242,7 @@ export default async function LessonPage({ params }: Props) {
         <div className="space-y-2">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <h1 className="text-xl font-bold text-foreground sm:text-2xl">{lesson.title}</h1>
+            {user?.role === 'admin' && <Link href={`/manage/lessons/${lesson.id}`} className="inline-flex min-h-[44px] items-center rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">Редактировать урок</Link>}
             {user && <BookmarkButton target={{ lesson: lesson.id }} initialId={bookmarkId} />}
           </div>
           {lesson.description && (

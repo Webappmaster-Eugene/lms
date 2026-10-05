@@ -90,7 +90,7 @@ function RoadmapEditorInner({ roadmapId }: { roadmapId: number }) {
       </div>
 
       {/* Canvas + Side Panel — inline styles because Tailwind classes don't apply in Payload admin context */}
-      <div style={{ display: 'flex', height: 'calc(100vh - 160px)', overflow: 'hidden', borderRadius: '12px' }}>
+      <div style={{ display: 'flex', flex: '1 1 0%', minHeight: 0, overflow: 'hidden', borderRadius: '12px' }}>
         <div style={{ flex: '1 1 0%', minWidth: 0, height: '100%' }}>
           <RoadmapEditorCanvas
             nodes={editor.nodes}

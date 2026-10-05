@@ -62,6 +62,19 @@ beforeEach(() => {
 })
 
 describe('панель темы', () => {
+  it('добавляет курс по ID документа темы, а не по строковому ID графа', async () => {
+    render(<RoadmapTopicList nodes={[node('semantic-react-node', { managementNodeId: 91 })]} looseCourses={[]} managementRoadmapId={7} />)
+    await userEvent.click(screen.getByText('React').closest('summary') as HTMLElement)
+    expect(screen.getByRole('link', { name: 'Добавить курс в тему' })).toHaveAttribute('href', '/manage/courses/new?roadmap=7&node=91')
+    expect(screen.getByRole('link', { name: 'Управлять курсами темы' })).toHaveAttribute('href', '/manage/roadmaps/7?node=91')
+  })
+
+  it('не показывает управление темой ученику', async () => {
+    render(<RoadmapTopicList nodes={[node('semantic-react-node', { managementNodeId: 91 })]} looseCourses={[]} />)
+    await userEvent.click(screen.getByText('React').closest('summary') as HTMLElement)
+    expect(screen.queryByRole('link', { name: 'Добавить курс в тему' })).not.toBeInTheDocument()
+  })
+
   it('ведёт в следующий урок, а не просто в курс', () => {
     render(<RoadmapNodePanel data={data()} onClose={vi.fn()} />)
 

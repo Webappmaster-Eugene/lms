@@ -23,7 +23,7 @@ function AnnotationNodeInner({ data }: NodeProps<AnnotationGraphNode>) {
 
   // leftLabel
   return (
-    <div className="max-w-[140px] whitespace-pre-line text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
+      <div className="w-[160px] whitespace-pre-line text-right text-xs font-medium leading-relaxed text-muted-foreground">
       {text}
     </div>
   )

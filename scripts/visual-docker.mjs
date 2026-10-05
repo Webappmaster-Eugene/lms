@@ -13,6 +13,7 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { browserServerUrl } from './test-db.mjs'
 
 const APP_DIR = fileURLToPath(new URL('../', import.meta.url))
 const APP_PORT = process.env.VISUAL_APP_PORT ?? '3102'
@@ -64,12 +65,13 @@ try {
       '--add-host=host.docker.internal:host-gateway',
       '-v', `${APP_DIR}:/work`, '-w', '/work',
       '-e', 'CI=1', '-e', 'PW_NO_WEBSERVER=1',
+      '-e', 'TEST_PG_URL',
       '-e', `E2E_BASE_URL=http://host.docker.internal:${APP_PORT}`,
       '-e', `E2E_LANDING_URL=http://host.docker.internal:${LANDING_PORT}`,
       IMAGE,
       'node', 'node_modules/@playwright/test/cli.js', 'test', '--project=visual', ...process.argv.slice(2),
     ],
-    { stdio: 'inherit' },
+    { stdio: 'inherit', env: { ...process.env, TEST_PG_URL: browserServerUrl() } },
   )
   code = result.status ?? 1
 } catch (error) {

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
+import Link from 'next/link'
 
 import { NodeCourseList } from './NodeCourseList'
 import { STAGE_TITLES } from './stage-colors'
@@ -18,7 +19,7 @@ const STATUS_TEXT: Record<RoadmapNodeData['status'], string> = {
  * Панель темы поверх карты. Раньше клик по теме сразу уводил в первый курс,
  * и остальные курсы темы, прогресс и причина блокировки были не видны.
  */
-export function RoadmapNodePanel({ data, onClose }: { data: RoadmapNodeData; onClose: () => void }) {
+export function RoadmapNodePanel({ data, onClose, managementRoadmapId, nodeId }: { data: RoadmapNodeData; onClose: () => void; managementRoadmapId?: number; nodeId?: number }) {
   const headingRef = useRef<HTMLHeadingElement>(null)
 
   // Фокус в панель: с клавиатуры и скринридером иначе не понять, что она открылась.
@@ -60,6 +61,13 @@ export function RoadmapNodePanel({ data, onClose }: { data: RoadmapNodeData; onC
       </div>
 
       {data.description && <p className="mt-3 text-sm text-muted-foreground">{data.description}</p>}
+
+      {managementRoadmapId && nodeId && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link href={`/manage/courses/new?roadmap=${managementRoadmapId}&node=${nodeId}`} className="inline-flex min-h-[44px] items-center rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground focus-visible:outline-2 focus-visible:outline-ring">Добавить курс в тему</Link>
+          <Link href={`/manage/roadmaps/${managementRoadmapId}?node=${nodeId}`} className="inline-flex min-h-[44px] items-center rounded-lg border border-border px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring">Управлять курсами темы</Link>
+        </div>
+      )}
 
       {data.totalLessons > 0 && (
         <p className="mt-3 text-sm text-foreground">

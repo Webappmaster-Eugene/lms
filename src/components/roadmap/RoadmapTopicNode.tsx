@@ -5,105 +5,107 @@ import { RoadmapIcon } from './RoadmapIcon'
 import { getNodeClasses } from './stage-colors'
 import { cn } from '@/lib/utils'
 
-/**
- * Карточка темы в стиле Miro-доски: заголовок с иконкой + маркированный
- * список под-тем + футер с прогрессом (если узел связан с курсом).
- *
- * Цвет карточки определяется связкой `data.color` → `data.stage` → default.
- * Статус (locked/in-progress/completed) накладывается поверх через ring.
- */
+/** Краткое содержание темы; полная программа открывается в панели по клику. */
 export function RoadmapTopicNode({ data }: NodeProps) {
   const nodeData = data as RoadmapNodeData
   const comingSoon = nodeData.comingSoon
   const isLocked = nodeData.status === 'locked'
   const isCompleted = nodeData.status === 'completed'
   const hasProgress = nodeData.totalLessons > 0
-  // Клик открывает панель темы, в том числе у закрытой: там сказано, что её открывает.
   const isClickable = !comingSoon
-  const firstBlocker = nodeData.courses.find((c) => c.blockedBy.length > 0)?.blockedBy[0]
-
+  const firstBlocker = nodeData.courses.find((course) => course.blockedBy.length > 0)?.blockedBy[0]
   const classes = getNodeClasses(nodeData.color, nodeData.stage, nodeData.status)
+  const showCourses = nodeData.courses.length > 1
+  const visibleCourses = nodeData.courses.slice(0, 3)
+  const visibleBullets = nodeData.bullets.slice(0, 4)
 
   return (
     <div
       title={nodeData.description ?? undefined}
       className={cn(
-        'w-[240px] rounded-lg border-2 shadow-md transition-all',
+        'relative flex min-h-[180px] w-[280px] flex-col rounded-xl border shadow-sm transition-shadow',
         classes.bg,
         classes.border,
         classes.text,
         classes.ring,
-        comingSoon && 'opacity-60',
-        isClickable && 'cursor-pointer hover:scale-[1.02] hover:shadow-lg',
-        nodeData.isNextStep && 'ring-4 ring-primary ring-offset-2 ring-offset-background',
+        isClickable && 'cursor-pointer hover:shadow-md',
+        nodeData.isNextStep && 'ring-2 ring-primary ring-offset-4 ring-offset-background',
       )}
     >
       {nodeData.isNextStep && (
-        <div className="flex items-center gap-1.5 rounded-t-md bg-primary px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
+        <div className="absolute -top-3 right-3 flex items-center gap-1.5 rounded-full bg-primary px-2.5 py-1 text-xs font-medium leading-none text-primary-foreground">
           <Play className="h-3 w-3" aria-hidden="true" />
-          Ваш следующий шаг
+          Ваш шаг
         </div>
       )}
-      {/* Header */}
-      <div className={cn('flex items-center gap-2 border-b px-3 py-2', classes.border)}>
-        <div className={cn('flex h-6 w-6 flex-shrink-0 items-center justify-center rounded', classes.accent)}>
+      <div className="flex items-start gap-2.5 px-4 pb-3 pt-4">
+        <div className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md', classes.accent)}>
           {isLocked ? (
-            <Lock className="h-3.5 w-3.5" />
+            <Lock className="h-4 w-4" aria-hidden="true" />
           ) : isCompleted ? (
-            <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+            <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
           ) : (
-            <RoadmapIcon name={nodeData.icon} className="h-3.5 w-3.5" />
+            <RoadmapIcon name={nodeData.icon} className="h-4 w-4" />
           )}
         </div>
-        <span className="text-xs font-bold uppercase tracking-wide leading-tight line-clamp-2">
+        <span className="min-w-0 break-words pt-0.5 text-[15px] font-semibold leading-5">
           {nodeData.label}
         </span>
       </div>
 
-      {/* Курсы темы: по одной теме их может быть несколько */}
-      {nodeData.courses.length > 1 && (
-        <ul className={cn('space-y-0.5 border-b px-3 py-2 text-[10px] leading-snug', classes.border)}>
-          {nodeData.courses.slice(0, 6).map((course) => (
-            <li key={course.slug} className="flex items-baseline gap-1.5">
-              <span className={cn('flex-shrink-0', classes.accent)}>•</span>
-              <span className="line-clamp-1 flex-1">{course.title}</span>
-              <span className="flex-shrink-0 opacity-70">{course.totalLessons}</span>
+      {showCourses && (
+        <ul className="space-y-2 px-4 pb-4 text-xs leading-[18px]">
+          {visibleCourses.map((course) => (
+            <li key={course.slug} className="flex items-start gap-2">
+              <span className={cn('shrink-0', classes.accent)} aria-hidden="true">•</span>
+              <span className="line-clamp-2 min-w-0 flex-1 break-words">{course.title}</span>
+              <span className={cn('shrink-0 tabular-nums', classes.accent)} title="Количество уроков">
+                {course.totalLessons}
+              </span>
             </li>
           ))}
-          {nodeData.courses.length > 6 && (
-            <li className="pl-3 opacity-70">и ещё {nodeData.courses.length - 6}</li>
+          {nodeData.courses.length > visibleCourses.length && (
+            <li className={cn('pl-3.5', classes.accent)}>
+              Ещё {nodeData.courses.length - visibleCourses.length} — в программе темы
+            </li>
           )}
         </ul>
       )}
 
-      {/* Bullet list */}
-      {nodeData.bullets.length > 0 && nodeData.courses.length <= 1 && (
-        <ul className="space-y-0.5 px-3 py-2 text-[10px] leading-snug">
-          {nodeData.bullets.slice(0, 14).map((bullet, i) => (
-            <li key={i} className="flex gap-1.5">
-              <span className={cn('flex-shrink-0', classes.accent)}>•</span>
-              <span className="line-clamp-2">{bullet}</span>
+      {nodeData.bullets.length > 0 && !showCourses && (
+        <ul className="space-y-1.5 px-4 pb-4 text-xs leading-[18px]">
+          {visibleBullets.map((bullet, index) => (
+            <li key={index} className="flex items-start gap-2">
+              <span className={cn('shrink-0', classes.accent)} aria-hidden="true">•</span>
+              <span className="line-clamp-2 min-w-0 break-words">{bullet}</span>
             </li>
           ))}
+          {nodeData.bullets.length > visibleBullets.length && (
+            <li className={cn('pl-3.5', classes.accent)}>
+              Ещё {nodeData.bullets.length - visibleBullets.length} — в описании темы
+            </li>
+          )}
         </ul>
       )}
 
-      {/* Progress footer */}
       {hasProgress && !isLocked && (
-        <div className={cn('border-t px-3 py-1.5', classes.border)}>
-          <div className="flex items-center justify-between text-[10px]">
+        <div className={cn('mt-auto border-t px-4 py-3', classes.border)}>
+          <div className="flex items-center justify-between gap-2 text-xs leading-4">
             <span className={classes.accent}>
-              {nodeData.courses.length > 1 && `${nodeData.courses.length} курса · `}
               {nodeData.completedLessons}/{nodeData.totalLessons} уроков
             </span>
-            <span className="font-semibold">{nodeData.progressPercent}%</span>
+            <span className="font-medium tabular-nums">{nodeData.progressPercent}%</span>
           </div>
-          <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+          <div
+            role="progressbar"
+            aria-label={`Прогресс темы «${nodeData.label}»`}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={nodeData.progressPercent}
+            className="mt-2 h-1 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10"
+          >
             <div
-              className={cn(
-                'h-full rounded-full transition-all duration-500',
-                isCompleted ? 'bg-success' : 'bg-info',
-              )}
+              className={cn('h-full rounded-full', isCompleted ? 'bg-success' : 'bg-info')}
               style={{ width: `${nodeData.progressPercent}%` }}
             />
           </div>
@@ -111,7 +113,7 @@ export function RoadmapTopicNode({ data }: NodeProps) {
       )}
 
       {isLocked && (
-        <div className={cn('border-t px-3 py-1.5 text-[10px]', classes.border, classes.accent)}>
+        <div className={cn('mt-auto border-t px-4 py-3 text-xs leading-[18px]', classes.border, classes.accent)}>
           {comingSoon
             ? 'Материалы готовятся'
             : firstBlocker

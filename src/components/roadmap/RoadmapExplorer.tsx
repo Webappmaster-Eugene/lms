@@ -42,13 +42,14 @@ type Props = {
   edges: GraphEdge[]
   looseCourses: NodeCourse[]
   nextStepNodeId: string | null
+  managementRoadmapId?: number
 }
 
 /**
  * Роадмап двумя видами: карта для обзора и список по этапам для телефона и
  * клавиатуры. Выбор запоминается; без выбора на узком экране открыт список.
  */
-export function RoadmapExplorer({ nodes, edges, looseCourses, nextStepNodeId }: Props) {
+export function RoadmapExplorer({ nodes, edges, looseCourses, nextStepNodeId, managementRoadmapId }: Props) {
   const hydrated = useHydrated()
   const [chosen, setChosen] = useState<View | null>(null)
   const hasMap = nodes.some(isTopicNode)
@@ -59,14 +60,14 @@ export function RoadmapExplorer({ nodes, edges, looseCourses, nextStepNodeId }: 
     saveView(next)
   }
 
-  if (!hasMap) return <RoadmapTopicList nodes={topicNodes} looseCourses={looseCourses} />
+  if (!hasMap) return <RoadmapTopicList nodes={topicNodes} looseCourses={looseCourses} managementRoadmapId={managementRoadmapId} />
 
   // До гидратации ширина экрана неизвестна: список на узком экране, место под карту на широком.
   if (!hydrated) {
     return (
       <div>
         <div className="sm:hidden">
-          <RoadmapTopicList nodes={topicNodes} looseCourses={looseCourses} />
+          <RoadmapTopicList nodes={topicNodes} looseCourses={looseCourses} managementRoadmapId={managementRoadmapId} />
         </div>
         <div className="hidden h-[800px] animate-pulse rounded-xl border border-border bg-muted/40 sm:block" />
       </div>
@@ -97,9 +98,9 @@ export function RoadmapExplorer({ nodes, edges, looseCourses, nextStepNodeId }: 
         {tab('list', 'Список по этапам', List)}
       </div>
       {view === 'map' ? (
-        <RoadmapGraph nodes={nodes} edges={edges} nextStepNodeId={nextStepNodeId} />
+        <RoadmapGraph nodes={nodes} edges={edges} nextStepNodeId={nextStepNodeId} managementRoadmapId={managementRoadmapId} />
       ) : (
-        <RoadmapTopicList nodes={topicNodes} looseCourses={looseCourses} />
+        <RoadmapTopicList nodes={topicNodes} looseCourses={looseCourses} managementRoadmapId={managementRoadmapId} />
       )}
     </div>
   )

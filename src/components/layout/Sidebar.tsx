@@ -16,16 +16,19 @@ import {
   MessagesSquare,
   StickyNote,
   Trophy,
-  Upload,
+  ChevronDown,
+  Shield,
+  Users,
   User,
   LogOut,
   X,
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { ThemeToggle } from './ThemeToggle'
 import { SHORTCUTS_OPEN_EVENT } from './KeyboardShortcuts'
 import { cn } from '@/lib/utils'
 import { useSidebar } from './SidebarContext'
+import { ADMIN_NAV_GROUPS, ADMIN_SHORTCUTS, isAdminPathActive } from '@/lib/admin-navigation'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Дашборд', icon: LayoutDashboard },
@@ -42,24 +45,17 @@ const NAV_ITEMS = [
   { href: '/help', label: 'Помощь', icon: HelpCircle },
 ] as const
 
-const ADMIN_NAV_ITEMS = [
-  { href: '/admin/questions', label: 'Вопросы учеников', icon: MessagesSquare },
-  { href: '/admin/import-yandex', label: 'Импорт из YD', icon: Upload },
-] as const
+const ADMIN_ICONS = {
+  '/manage': GraduationCap,
+  '/admin': Shield,
+  '/admin/roadmap-editor': Map,
+  '/admin/collections/users': Users,
+  '/admin/questions': MessagesSquare,
+} as const
 
-export function Sidebar() {
+export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname()
   const { mobileOpen, setMobileOpen } = useSidebar()
-  const [isAdmin, setIsAdmin] = useState(false)
-
-  useEffect(() => {
-    fetch('/api/users/me', { credentials: 'include' })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.user?.role === 'admin') setIsAdmin(true)
-      })
-      .catch(() => {})
-  }, [])
 
   // Lock body scroll when mobile sidebar is open
   useEffect(() => {
@@ -89,13 +85,69 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+      <nav aria-label="Меню платформы" className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        {/* Admin-only links */}
+        {isAdmin && (
+          <>
+            <p className="px-3 py-2 text-sm font-semibold text-foreground">Управление</p>
+            {ADMIN_SHORTCUTS.map(({ href, label }) => {
+              const Icon = ADMIN_ICONS[href]
+              const isActive = isAdminPathActive(pathname, href)
+              return (
+                <a
+                  key={href}
+                  href={href}
+                  aria-current={isActive ? 'page' : undefined}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    'flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring',
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                  )}
+                >
+                  <Icon className="h-5 w-5 flex-shrink-0" />
+                  {label}
+                </a>
+              )
+            })}
+            {ADMIN_NAV_GROUPS.map(({ label, items }) => (
+              <details key={label} open={items.some(({ href }) => isAdminPathActive(pathname, href))} className="group">
+                <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
+                  {label}
+                  <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="ml-3 space-y-1 border-l border-border pl-2">
+                  {items.map(({ href, label: itemLabel }) => {
+                    const isActive = isAdminPathActive(pathname, href)
+                    return (
+                      <a
+                        key={href}
+                        href={href}
+                        aria-current={isActive ? 'page' : undefined}
+                        onClick={() => setMobileOpen(false)}
+                        className={cn(
+                          'flex min-h-[44px] items-center rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-ring',
+                          isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                        )}
+                      >
+                        {itemLabel}
+                      </a>
+                    )
+                  })}
+                </div>
+              </details>
+            ))}
+          </>
+        )}
+        {isAdmin && <p className="mt-4 border-t border-border px-3 pt-4 pb-2 text-sm font-semibold text-foreground">Обучение</p>}
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href)
           return (
             <Link
               key={href}
               href={href}
+              aria-current={isActive ? 'page' : undefined}
               onClick={() => setMobileOpen(false)}
               className={cn(
                 'flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
@@ -109,32 +161,6 @@ export function Sidebar() {
             </Link>
           )
         })}
-
-        {/* Admin-only links */}
-        {isAdmin && (
-          <>
-            <div className="my-2 border-t border-border" />
-            {ADMIN_NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-              const isActive = pathname.startsWith(href)
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={() => setMobileOpen(false)}
-                  className={cn(
-                    'flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-                  )}
-                >
-                  <Icon className="h-5 w-5 flex-shrink-0" />
-                  {label}
-                </Link>
-              )
-            })}
-          </>
-        )}
       </nav>
 
       {/* Footer */}
@@ -176,6 +202,8 @@ export function Sidebar() {
 
       {/* Mobile sidebar */}
       <aside
+        aria-hidden={!mobileOpen}
+        inert={!mobileOpen}
         className={cn(
           'fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-border bg-card transition-transform duration-300 ease-in-out lg:hidden',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',

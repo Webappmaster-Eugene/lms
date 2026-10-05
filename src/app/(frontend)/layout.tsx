@@ -11,6 +11,8 @@ import { ToastProvider } from '@/components/ui/Toast'
 import { NavigationProgress } from '@/components/layout/NavigationProgress'
 import { KeyboardShortcuts } from '@/components/layout/KeyboardShortcuts'
 import { Suspense } from 'react'
+import { headers } from 'next/headers'
+import { getPayload } from '@/lib/payload'
 
 const inter = Inter({
   subsets: ['cyrillic', 'latin'],
@@ -26,7 +28,16 @@ export const metadata: Metadata = {
   description: 'Платформа обучения MentorCareer — курсы Frontend и Backend с тренажёром кода, геймификацией и сертификатами',
 }
 
-export default function FrontendLayout({ children }: { children: React.ReactNode }) {
+export default async function FrontendLayout({ children }: { children: React.ReactNode }) {
+  let isAdmin = false
+  try {
+    const payload = await getPayload()
+    const { user } = await payload.auth({ headers: await headers() })
+    isAdmin = user?.role === 'admin'
+  } catch (error) {
+    console.error('Меню: не удалось определить права пользователя', error)
+  }
+
   return (
     <html lang="ru" className={inter.variable} suppressHydrationWarning>
       <body>
@@ -39,7 +50,7 @@ export default function FrontendLayout({ children }: { children: React.ReactNode
             <SidebarProvider>
               <div className="flex min-h-screen overflow-x-hidden">
                 <div className="contents print:hidden">
-                  <Sidebar />
+                  <Sidebar isAdmin={isAdmin} />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col lg:ml-64 print:ml-0">
                   <div className="contents print:hidden">

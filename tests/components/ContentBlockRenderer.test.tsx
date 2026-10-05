@@ -46,6 +46,20 @@ describe('содержимое урока', () => {
   })
 
   describe('виды блоков', () => {
+    it('показывает Payload-ссылку из редактора LMS и сохраняет режим вкладки', () => {
+      renderBlocks([{ blockType: 'text', content: { root: { children: [{ type: 'paragraph', children: [{ type: 'link', version: 3, fields: { linkType: 'custom', url: 'https://nodejs.org', newTab: false }, children: [{ type: 'text', text: 'Документация Node.js', format: 1 }] }] }] } } }])
+      const link = screen.getByRole('link', { name: 'Документация Node.js' })
+      expect(link).toHaveAttribute('href', 'https://nodejs.org')
+      expect(link).not.toHaveAttribute('target')
+      expect(link.querySelector('strong')).toHaveTextContent('Документация Node.js')
+    })
+
+    it('не делает исполняемую ссылку из неподходящего Payload URL', () => {
+      renderBlocks([{ blockType: 'text', content: { root: { children: [{ type: 'paragraph', children: [{ type: 'link', fields: { url: 'javascript:alert(1)', newTab: true }, children: [{ type: 'text', text: 'Небезопасная ссылка' }] }] }] } } }])
+      expect(screen.queryByRole('link')).not.toBeInTheDocument()
+      expect(screen.getByText('Небезопасная ссылка')).toBeVisible()
+    })
+
     it('текст выводится', () => {
       renderBlocks([{ blockType: 'text', content: lexical('Теория урока') }])
 

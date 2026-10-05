@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import { createElement, type FunctionComponent } from 'react'
+import { createElement, type FunctionComponent, type ReactNode } from 'react'
 import userEvent from '@testing-library/user-event'
 
 vi.mock('@xyflow/react', async () => (await import('../helpers/component-mocks')).xyflowMock())
+vi.mock('@payloadcms/next/templates', () => ({
+  DefaultTemplate: ({ children }: { children: ReactNode }) => <div data-testid="admin-template">{children}</div>,
+}))
+vi.mock('next/navigation', () => ({ redirect: () => { throw new Error('redirect') } }))
 
 const { EditorToolbar } = await import('@/components/roadmap-editor/EditorToolbar')
 const { RoadmapSelector } = await import('@/components/roadmap-editor/RoadmapSelector')
@@ -29,6 +33,12 @@ const toolbarProps = {
   onSave: vi.fn(),
 }
 
+const initPageResult = {
+  req: { user: { role: 'admin' }, i18n: {}, payload: {} },
+  permissions: {},
+  visibleEntities: { collections: [], globals: [] },
+}
+
 describe('панель действий редактора', () => {
   beforeEach(() => vi.clearAllMocks())
 
@@ -36,6 +46,15 @@ describe('панель действий редактора', () => {
     render(<EditorToolbar {...toolbarProps} />)
 
     expect(screen.getByText(/Frontend React/)).toBeInTheDocument()
+  })
+
+  it('позволяет выбрать другую карту, открыть настройки и проверить результат', () => {
+    render(<EditorToolbar {...toolbarProps} />)
+
+    expect(screen.getByRole('link', { name: 'Все роадмапы' })).toHaveAttribute('href', '/admin/roadmap-editor')
+    expect(screen.getByRole('link', { name: 'Настройки роадмапа' })).toHaveAttribute('href', '/admin/collections/roadmaps/7')
+    expect(screen.getByRole('link', { name: 'Открыть на платформе' })).toHaveAttribute('href', '/roadmaps/frontend-react')
+    expect(screen.getByRole('link', { name: 'Открыть на платформе' })).toHaveAttribute('target', '_blank')
   })
 
   it('без несохранённых правок сохранять нечего', () => {
@@ -121,6 +140,7 @@ describe('выбор роадмапа для правки', () => {
 
     const link = await screen.findByRole('link', { name: /Frontend React/ })
     expect(link).toHaveAttribute('href', expect.stringContaining('/admin/roadmap-editor/7'))
+    expect(screen.getByRole('link', { name: 'Создать роадмап' })).toHaveAttribute('href', '/admin/collections/roadmaps/create')
   })
 
   it('пустой список объясняет, что роадмапов нет', async () => {
@@ -142,7 +162,7 @@ describe('выбор роадмапа для правки', () => {
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalled())
     expect(screen.queryByRole('link', { name: /Frontend React/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Панель управления/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /CMS и настройки/ })).toBeInTheDocument()
   })
 })
 
@@ -156,27 +176,39 @@ describe('точка входа редактора', () => {
     render(<RoadmapEditorClient roadmapId={null} />)
 
     expect(screen.queryByTestId('react-flow')).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Панель управления/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /CMS и настройки/ })).toBeInTheDocument()
   })
 
   it('серверная обёртка достаёт id из адреса', () => {
     render(
       createElement(RoadmapEditorView as FunctionComponent<Record<string, unknown>>, {
         params: { segments: ['roadmap-editor', '7'] },
+        initPageResult,
       }),
     )
 
-    expect(screen.queryByText(/ошибка/i)).not.toBeInTheDocument()
+    expect(screen.getByTestId('admin-template')).toBeInTheDocument()
   })
 
   it('адрес без id ведёт к выбору роадмапа', () => {
     render(
       createElement(RoadmapEditorView as FunctionComponent<Record<string, unknown>>, {
         params: { segments: ['roadmap-editor'] },
+        initPageResult,
       }),
     )
 
     expect(screen.queryByTestId('react-flow')).not.toBeInTheDocument()
+  })
+
+  it('ученик не может открыть серверную страницу редактора', () => {
+    const props = { initPageResult: { ...initPageResult, req: { ...initPageResult.req, user: { role: 'student' } } } }
+    expect(() => (RoadmapEditorView as FunctionComponent<Record<string, unknown>>)(props)).toThrow('redirect')
+  })
+
+  it('без сессии серверная страница редактора недоступна', () => {
+    const props = { initPageResult: { ...initPageResult, req: { ...initPageResult.req, user: null } } }
+    expect(() => (RoadmapEditorView as FunctionComponent<Record<string, unknown>>)(props)).toThrow('redirect')
   })
 })
 

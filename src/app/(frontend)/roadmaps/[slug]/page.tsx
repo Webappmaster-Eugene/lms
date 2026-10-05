@@ -14,11 +14,10 @@ import {
 import { collectAllPages } from '@/lib/paginate'
 import { pluralize } from '@/lib/utils'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, PartyPopper } from 'lucide-react'
+import { ArrowLeft, ArrowRight, PartyPopper, Pencil, Settings } from 'lucide-react'
 import { MiroEmbed } from '@/components/lesson/MiroEmbed'
 import { RoadmapExplorer } from '@/components/roadmap/RoadmapExplorer'
-import type { GraphEdge, AnnotationGraphNode, AnyRoadmapNode, NodeCourse } from '@/components/roadmap/types'
-import { STAGE_ANNOTATIONS, STAGE_LEVELS, STAGE_ORDER } from '@/components/roadmap/stage-colors'
+import type { GraphEdge, AnyRoadmapNode, NodeCourse } from '@/components/roadmap/types'
 import type {
   RoadmapNode as PayloadRoadmapNode,
   RoadmapEdge as PayloadRoadmapEdge,
@@ -246,6 +245,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
     edgeDocs,
     coursesWithProgress,
     nextStep?.id ?? null,
+    user?.role === 'admin',
   )
   const nextStepNodeId =
     graphNodes.find((n) => n.type !== 'annotation' && (n.data as { isNextStep?: boolean }).isNextStep)?.id ?? null
@@ -262,7 +262,27 @@ export default async function RoadmapDetailPage({ params }: Props) {
       </Link>
 
       <div>
-        <h1 className="text-2xl font-bold text-foreground">{roadmap.title}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold text-foreground">{roadmap.title}</h1>
+          {user?.role === 'admin' && (
+            <div className="flex flex-wrap gap-2">
+              <Link href={`/manage/roadmaps/${roadmap.id}`} className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground focus-visible:outline-2 focus-visible:outline-ring">
+                Курсы и уроки
+              </Link>
+              <Link href={`/manage/courses/new?roadmap=${roadmap.id}`} className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">
+                Добавить курс
+              </Link>
+              <a href={`/admin/roadmap-editor/${roadmap.id}`} className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground focus-visible:outline-2 focus-visible:outline-ring">
+                <Pencil className="h-4 w-4" aria-hidden="true" />
+                Редактировать карту
+              </a>
+              <a href={`/admin/collections/roadmaps/${roadmap.id}`} className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">
+                <Settings className="h-4 w-4" aria-hidden="true" />
+                Настройки роадмапа
+              </a>
+            </div>
+          )}
+        </div>
         <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
           <span>{pluralize(coursesWithProgress.length, 'курс', 'курса', 'курсов')}</span>
           <span>{pluralize(totalLessons, 'урок', 'урока', 'уроков')}</span>
@@ -301,6 +321,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
           edges={graphEdges}
           looseCourses={looseCourses}
           nextStepNodeId={nextStepNodeId}
+          managementRoadmapId={user?.role === 'admin' ? roadmap.id : undefined}
         />
       </section>
 
@@ -428,6 +449,7 @@ function buildGraphData(
   rawEdges: PayloadRoadmapEdge[],
   coursesWithProgress: CourseWithProgress[],
   nextStepCourseId: string | null,
+  canManage = false,
 ): { graphNodes: AnyRoadmapNode[]; graphEdges: GraphEdge[]; placedCourseIds: Set<string> } {
   const courseMap = new Map(coursesWithProgress.map((c) => [c.id, c]))
   const byNode = groupCoursesByNode(coursesWithProgress)
@@ -461,6 +483,7 @@ function buildGraphData(
       type: n.nodeType,
       position: { x: n.positionX, y: n.positionY },
       data: {
+        ...(canManage ? { managementNodeId: n.id } : {}),
         label: n.label,
         nodeType: n.nodeType,
         courseSlug: comingSoon ? null : (linkedCourse ?? nodeCourses[0])?.slug ?? null,
@@ -481,9 +504,6 @@ function buildGraphData(
     }
   })
 
-  // Добавляем annotation-узлы (привязаны к координатам графа, двигаются при пан/зум)
-  graphNodes.push(...buildAnnotationNodes(rawNodes))
-
   const graphEdges: GraphEdge[] = rawEdges
     .map((e) => ({
       id: e.edgeId,
@@ -503,99 +523,4 @@ function buildGraphData(
     })
 
   return { graphNodes, graphEdges, placedCourseIds }
-}
-
-type StageRange = { minY: number; maxY: number; minX: number; maxX: number }
-
-/**
- * Создаёт annotation-узлы на основе реальных позиций roadmap-узлов.
- * Координаты вычисляются динамически — работает с любым роадмапом.
- */
-function buildAnnotationNodes(rawNodes: PayloadRoadmapNode[]): AnnotationGraphNode[] {
-  // Группируем узлы по stage для вычисления координат
-  const stageRanges = new Map<string, StageRange>()
-  for (const n of rawNodes) {
-    if (!n.stage) continue
-    const range = stageRanges.get(n.stage)
-    if (range) {
-      range.minY = Math.min(range.minY, n.positionY)
-      range.maxY = Math.max(range.maxY, n.positionY)
-      range.minX = Math.min(range.minX, n.positionX)
-      range.maxX = Math.max(range.maxX, n.positionX)
-    } else {
-      stageRanges.set(n.stage, {
-        minY: n.positionY,
-        maxY: n.positionY,
-        minX: n.positionX,
-        maxX: n.positionX,
-      })
-    }
-  }
-
-  if (stageRanges.size === 0) return []
-
-  const annotations: AnnotationGraphNode[] = []
-  let counter = 0
-
-  // Определяем горизонтальные границы всех узлов
-  let globalMinX = Infinity
-  let globalMaxX = -Infinity
-  for (const range of stageRanges.values()) {
-    globalMinX = Math.min(globalMinX, range.minX)
-    globalMaxX = Math.max(globalMaxX, range.maxX)
-  }
-  const centerX = Math.round((globalMinX + globalMaxX) / 2)
-
-  for (const ann of STAGE_ANNOTATIONS) {
-    const range = stageRanges.get(ann.stage)
-    if (!range) continue
-
-    const midY = Math.round((range.minY + range.maxY) / 2)
-
-    // Left label
-    if (ann.leftLabel) {
-      annotations.push({
-        id: `ann-left-${counter++}`,
-        type: 'annotation',
-        position: { x: globalMinX - 200, y: midY },
-        data: { annotationType: 'leftLabel', text: ann.leftLabel },
-        selectable: false,
-        draggable: false,
-      })
-    }
-
-    // Right label
-    if (ann.rightLabel) {
-      annotations.push({
-        id: `ann-right-${counter++}`,
-        type: 'annotation',
-        position: { x: globalMaxX + 280, y: midY },
-        data: { annotationType: 'rightLabel', text: ann.rightLabel },
-        selectable: false,
-        draggable: false,
-      })
-    }
-
-    // Level badge — между текущей и предыдущей стадией
-    const level = STAGE_LEVELS[ann.stage as keyof typeof STAGE_LEVELS]
-    if (level) {
-      const stageIdx = STAGE_ORDER.indexOf(ann.stage)
-      const prevStage = stageIdx > 0 ? STAGE_ORDER[stageIdx - 1] : null
-      const prevRange = prevStage ? stageRanges.get(prevStage) : null
-      const badgeY = prevRange
-        ? Math.round((prevRange.maxY + range.minY) / 2)
-        : range.minY - 60
-
-      annotations.push({
-        id: `ann-badge-${counter++}`,
-        type: 'annotation',
-        position: { x: centerX, y: badgeY },
-        data: { annotationType: 'levelBadge', text: level },
-        selectable: false,
-        draggable: false,
-      })
-    }
-  }
-
-  return annotations
 }
