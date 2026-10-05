@@ -79,10 +79,138 @@ async function openEditor(options: Parameters<typeof mockApi>[0] = {}) {
   return view
 }
 
+async function measureEditor(view: Pick<Awaited<ReturnType<typeof openEditor>>, 'result'>) {
+  act(() => view.result.current.setNodes((nodes) => nodes.map((node, index) => ({
+    ...node, measured: { width: 240 + index * 20, height: 180 + index * 80 },
+  }))))
+  await waitFor(() => expect(view.result.current.layoutReady).toBe(true))
+}
+
 describe('редактор роадмапа', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockApi()
+  })
+
+  describe('начальная раскладка и явное выравнивание', () => {
+    it('ждёт измерения всех карточек и убирает пересечения без dirty и запросов записи', async () => {
+      const view = await openEditor()
+      expect(view.result.current.layoutReady).toBe(false)
+      act(() => view.result.current.setNodes((nodes) => nodes.map((node, index) => index === 0
+        ? { ...node, measured: { width: 240, height: 240 } } : node)))
+      expect(view.result.current.layoutReady).toBe(false)
+      expect(view.result.current.nodes[0].position).toEqual({ x: 100, y: 200 })
+      await measureEditor(view)
+      const [left, right] = view.result.current.nodes
+      expect(left.position.x + (left.measured?.width ?? 0)).toBeLessThan(right.position.x)
+      expect(view.result.current.layoutRoutes.e1).toBeDefined()
+      expect(view.result.current.isDirty).toBe(false)
+      expect(view.result.current.canUndoAlignment).toBe(false)
+      expect(vi.mocked(fetch).mock.calls.every(([, init]) => !init?.method)).toBe(true)
+      expect(left.width).toBeUndefined()
+      expect(left.height).toBeUndefined()
+    })
+
+    it('сохранение подписи оставляет хранимые координаты до явного выравнивания', async () => {
+      const view = await openEditor()
+      await measureEditor(view)
+      expect(view.result.current.nodes[0].position).not.toEqual({ x: 100, y: 200 })
+      act(() => view.result.current.updateNodeData('n1', { label: 'Новая подпись' }))
+      await act(async () => view.result.current.saveAll())
+      const patch = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === 'PATCH')
+      expect(JSON.parse(String(patch?.[1]?.body))).toMatchObject({ label: 'Новая подпись', positionX: 100, positionY: 200 })
+      expect(view.result.current.isDirty).toBe(false)
+    })
+
+    it('позднее измерение не отменяет перемещение и очищает устаревшие маршруты', async () => {
+      const view = await openEditor()
+      await measureEditor(view)
+      act(() => view.result.current.onNodesChange([{ type: 'position', id: 'n1', position: { x: 900, y: 750 } }]))
+      act(() => view.result.current.setNodes((nodes) => nodes.map((node) => ({ ...node, measured: { width: 290, height: 350 } }))))
+      expect(view.result.current.nodes[0].position).toEqual({ x: 900, y: 750 })
+      expect(view.result.current.layoutRoutes).toEqual({})
+      expect(view.result.current.isDirty).toBe(true)
+      await act(async () => view.result.current.saveAll())
+      const patch = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === 'PATCH')
+      expect(JSON.parse(String(patch?.[1]?.body))).toMatchObject({ positionX: 900, positionY: 750 })
+    })
+
+    it('ручная правка до измерений предотвращает последующий сброс позиции', async () => {
+      const view = await openEditor()
+      act(() => view.result.current.onNodesChange([{ type: 'position', id: 'n1', position: { x: 450, y: 600 } }]))
+      await measureEditor(view)
+      expect(view.result.current.nodes[0].position).toEqual({ x: 450, y: 600 })
+      expect(view.result.current.layoutRoutes).toEqual({})
+    })
+
+    it('явное выравнивание становится pending для всех изменённых позиций, до сохранения запросов нет', async () => {
+      const view = await openEditor()
+      await measureEditor(view)
+      act(() => view.result.current.alignNodes())
+      expect(view.result.current.isDirty).toBe(true)
+      expect(view.result.current.canUndoAlignment).toBe(true)
+      expect(vi.mocked(fetch).mock.calls.every(([, init]) => !init?.method)).toBe(true)
+      const aligned = structuredClone(view.result.current.nodes.map((node) => ({ id: node.data.payloadId, position: node.position })))
+      await act(async () => view.result.current.saveAll())
+      const patches = vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'PATCH')
+      expect(patches).toHaveLength(2)
+      for (const node of aligned) {
+        const patch = patches.find(([url]) => url === `/api/roadmap-nodes/${node.id}`)
+        expect(JSON.parse(String(patch?.[1]?.body))).toMatchObject({ positionX: Math.round(node.position.x), positionY: Math.round(node.position.y) })
+      }
+      expect(view.result.current.canUndoAlignment).toBe(false)
+    })
+
+    it('отмена выравнивания восстанавливает предыдущие dirty, позиции и очередь сохранения', async () => {
+      const view = await openEditor()
+      await measureEditor(view)
+      act(() => view.result.current.updateNodeData('n2', { label: 'Сохранить эту подпись' }))
+      act(() => view.result.current.onNodesChange([{ type: 'position', id: 'n1', position: { x: 700, y: 800 } }]))
+      const previous = view.result.current.nodes.map((node) => node.position)
+      act(() => view.result.current.alignNodes())
+      expect(view.result.current.nodes.map((node) => node.position)).not.toEqual(previous)
+      act(() => view.result.current.undoAlignment())
+      expect(view.result.current.nodes.map((node) => node.position)).toEqual(previous)
+      expect(view.result.current.isDirty).toBe(true)
+      expect(view.result.current.nodes[1].data.label).toBe('Сохранить эту подпись')
+      await act(async () => view.result.current.saveAll())
+      const patches = vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'PATCH')
+      expect(JSON.parse(String(patches.find(([url]) => url === '/api/roadmap-nodes/1')?.[1]?.body))).toMatchObject({ positionX: 700, positionY: 800 })
+      expect(JSON.parse(String(patches.find(([url]) => url === '/api/roadmap-nodes/2')?.[1]?.body))).toMatchObject({ label: 'Сохранить эту подпись', positionX: 100, positionY: 200 })
+    })
+
+    it('отмена выравнивания чистой карты возвращает clean и не оставляет ненужных PATCH', async () => {
+      const view = await openEditor()
+      await measureEditor(view)
+      act(() => view.result.current.alignNodes())
+      act(() => view.result.current.undoAlignment())
+      expect(view.result.current.isDirty).toBe(false)
+      await act(async () => view.result.current.saveAll())
+      expect(vi.mocked(fetch).mock.calls.every(([, init]) => !init?.method)).toBe(true)
+    })
+
+    it('новая ручная правка закрывает отмену предыдущего выравнивания, не затирая последнюю правку', async () => {
+      const view = await openEditor()
+      await measureEditor(view)
+      act(() => view.result.current.alignNodes())
+      act(() => view.result.current.updateNodeData('n1', { label: 'Последняя правка' }))
+      expect(view.result.current.canUndoAlignment).toBe(false)
+      act(() => view.result.current.undoAlignment())
+      expect(view.result.current.nodes[0].data.label).toBe('Последняя правка')
+      expect(view.result.current.isDirty).toBe(true)
+    })
+
+    it('поздняя смена размеров не возвращает устаревшие маршруты при отмене выравнивания', async () => {
+      const view = await openEditor()
+      await measureEditor(view)
+      const previous = view.result.current.nodes.map((node) => node.position)
+      act(() => view.result.current.alignNodes())
+      act(() => view.result.current.setNodes((nodes) => nodes.map((node) => ({ ...node, measured: { width: 310, height: 360 } }))))
+      act(() => view.result.current.undoAlignment())
+      expect(view.result.current.nodes.map((node) => node.position)).toEqual(previous)
+      expect(view.result.current.layoutRoutes).toEqual({})
+      expect(view.result.current.isDirty).toBe(false)
+    })
   })
 
   describe('загрузка', () => {
@@ -139,6 +267,29 @@ describe('редактор роадмапа', () => {
 
       await waitFor(() => expect(result.current.error).toBe('Роадмап не найден'))
       expect(result.current.isLoading).toBe(false)
+      expect(result.current.layoutReady).toBe(true)
+    })
+
+    it('ошибка перехода к другой карте не оставляет dirty и очередь записи предыдущей карты', async () => {
+      mockApi()
+      const view = renderHook(({ roadmapId }) => useRoadmapEditor(roadmapId), { initialProps: { roadmapId: ROADMAP_ID } })
+      await waitFor(() => expect(view.result.current.isLoading).toBe(false))
+      await measureEditor(view)
+      act(() => view.result.current.alignNodes())
+      act(() => view.result.current.updateNodeData('n1', { label: 'Правка первой карты' }))
+      expect(view.result.current.isDirty).toBe(true)
+      mockApi({ roadmapOk: false })
+      view.rerender({ roadmapId: ROADMAP_ID + 1 })
+      await waitFor(() => expect(view.result.current.error).toBe('Роадмап не найден'))
+      expect(view.result.current.isLoading).toBe(false)
+      expect(view.result.current.isDirty).toBe(false)
+      expect(view.result.current.canUndoAlignment).toBe(false)
+      expect(view.result.current.canAlign).toBe(false)
+      expect(view.result.current.roadmapInfo).toBeNull()
+      expect(view.result.current.nodes).toEqual([])
+      expect(view.result.current.edges).toEqual([])
+      await act(async () => view.result.current.saveAll())
+      expect(vi.mocked(fetch).mock.calls.every(([, init]) => !init?.method)).toBe(true)
     })
   })
 

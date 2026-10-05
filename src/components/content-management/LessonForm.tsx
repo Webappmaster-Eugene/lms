@@ -74,8 +74,7 @@ export function LessonForm({ lesson, course, sections, defaultSection }: Props) 
       </div>
     </fieldset>
     <fieldset disabled={saving} className={panelClass}>
-      <legend className="px-1 text-lg font-semibold">Материалы урока</legend>
-      <p className="text-sm text-muted-foreground">Добавьте текст, видео и материалы в том порядке, в котором их должен увидеть ученик.</p>
+      <legend className="sr-only">Материалы урока</legend>
       <LessonBlocks value={draft.content} onChange={(value) => change('content', value)} disabled={saving} />
     </fieldset>
     <fieldset disabled={saving} className={panelClass}>

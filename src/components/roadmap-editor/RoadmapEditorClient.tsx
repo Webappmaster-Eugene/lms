@@ -86,6 +86,10 @@ function RoadmapEditorInner({ roadmapId }: { roadmapId: number }) {
           onAddNode={handleAddNode}
           onDeleteSelected={editor.deleteSelected}
           onSave={editor.saveAll}
+          canAlign={editor.canAlign}
+          canUndoAlignment={editor.canUndoAlignment}
+          onAlign={editor.alignNodes}
+          onUndoAlignment={editor.undoAlignment}
         />
       </div>
 
@@ -100,6 +104,9 @@ function RoadmapEditorInner({ roadmapId }: { roadmapId: number }) {
             onConnect={editor.onConnect}
             onNodeClick={editor.selectNode}
             onPaneClick={editor.deselectNode}
+            layoutReady={editor.layoutReady}
+            layoutRevision={editor.layoutRevision}
+            layoutRoutes={editor.layoutRoutes}
           />
         </div>
 

@@ -31,6 +31,10 @@ const toolbarProps = {
   onAddNode: vi.fn(),
   onDeleteSelected: vi.fn(),
   onSave: vi.fn(),
+  canAlign: true,
+  canUndoAlignment: false,
+  onAlign: vi.fn(),
+  onUndoAlignment: vi.fn(),
 }
 
 const initPageResult = {
@@ -103,6 +107,30 @@ describe('панель действий редактора', () => {
     await user.click(screen.getByRole('button', { name: 'Сохранить' }))
 
     expect(toolbarProps.onSave).toHaveBeenCalled()
+  })
+
+  it('выравнивание объясняет отдельное сохранение и вызывается явным действием', async () => {
+    const user = userEvent.setup()
+    render(<EditorToolbar {...toolbarProps} />)
+    const button = screen.getByRole('button', { name: 'Выровнять карту' })
+    expect(button).toHaveAttribute('title', expect.stringContaining('нажмите «Сохранить»'))
+    await user.click(button)
+    expect(toolbarProps.onAlign).toHaveBeenCalledOnce()
+    expect(toolbarProps.onSave).not.toHaveBeenCalled()
+  })
+
+  it('не разрешает выравнивание до измерений или во время сохранения', () => {
+    const view = render(<EditorToolbar {...toolbarProps} canAlign={false} />)
+    expect(screen.getByRole('button', { name: 'Выровнять карту' })).toBeDisabled()
+    view.rerender(<EditorToolbar {...toolbarProps} isSaving />)
+    expect(screen.getByRole('button', { name: 'Выровнять карту' })).toBeDisabled()
+  })
+
+  it('предлагает отменить выравнивание, когда доступна предыдущая раскладка', async () => {
+    const user = userEvent.setup()
+    render(<EditorToolbar {...toolbarProps} canUndoAlignment />)
+    await user.click(screen.getByRole('button', { name: 'Отменить выравнивание' }))
+    expect(toolbarProps.onUndoAlignment).toHaveBeenCalledOnce()
   })
 
   describe('добавление узла', () => {
@@ -253,5 +281,14 @@ describe('канва редактора', () => {
     render(createElement(RoadmapEditorCanvas as FunctionComponent<Record<string, unknown>>, canvasProps))
 
     expect(screen.getByTestId('flow-node')).toHaveAttribute('data-node-type', 'topic')
+  })
+
+  it('показывает стабильный статус начальной раскладки', () => {
+    const view = render(createElement(RoadmapEditorCanvas as FunctionComponent<Record<string, unknown>>, { ...canvasProps, layoutReady: false }))
+    expect(view.container.querySelector('.roadmap-editor')).toHaveAttribute('data-layout-ready', 'false')
+    expect(screen.getByRole('status')).toHaveTextContent('Выравниваем карту')
+    view.rerender(createElement(RoadmapEditorCanvas as FunctionComponent<Record<string, unknown>>, { ...canvasProps, layoutReady: true }))
+    expect(view.container.querySelector('.roadmap-editor')).toHaveAttribute('data-layout-ready', 'true')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 })

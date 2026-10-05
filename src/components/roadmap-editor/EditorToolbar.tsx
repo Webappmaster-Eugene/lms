@@ -13,6 +13,8 @@ import {
   BookOpen,
   Tag,
   Settings,
+  Network,
+  Undo2,
 } from 'lucide-react'
 import type { RoadmapInfo } from './types'
 
@@ -24,6 +26,10 @@ type Props = {
   onAddNode: (type: 'category' | 'topic' | 'subtopic') => void
   onDeleteSelected: () => void
   onSave: () => void
+  canAlign?: boolean
+  canUndoAlignment?: boolean
+  onAlign?: () => void
+  onUndoAlignment?: () => void
 }
 
 const ico = { width: 16, height: 16 }
@@ -52,6 +58,10 @@ export function EditorToolbar({
   onAddNode,
   onDeleteSelected,
   onSave,
+  canAlign = false,
+  canUndoAlignment = false,
+  onAlign,
+  onUndoAlignment,
 }: Props) {
   const [addMenuOpen, setAddMenuOpen] = useState(false)
 
@@ -168,6 +178,19 @@ export function EditorToolbar({
           </>
         )}
       </div>
+
+      <button type="button" disabled={!canAlign || isSaving} onClick={onAlign}
+        title="Убрать перекрытия карточек и связей. Чтобы записать новые позиции, нажмите «Сохранить»."
+        style={btn(canAlign && !isSaving)}>
+        <Network style={ico} />
+        Выровнять карту
+      </button>
+      {canUndoAlignment && <button type="button" disabled={isSaving} onClick={onUndoAlignment}
+        title="Вернуть позиции до последнего выравнивания"
+        style={btn(!isSaving)}>
+        <Undo2 style={ico} />
+        Отменить выравнивание
+      </button>}
 
       {/* Delete selected */}
       <button
