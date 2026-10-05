@@ -240,6 +240,10 @@ export default async function TaskPage({ params }: Props) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          <Link href={`/trainer/interview/new?taskId=${clientTask.id}`}
+            className="inline-flex min-h-[38px] items-center rounded-lg border border-border px-3 text-sm font-medium transition-colors hover:bg-accent">
+            На собеседовании
+          </Link>
           {user && <BookmarkButton target={{ task: task.id }} initialId={bookmarkId} />}
           {previous && (
             <Link

@@ -436,6 +436,9 @@ deepEqual(NaN, NaN)                                   // true
         { name: 'разные даты', args: [new Date(1000), new Date(2000)], expected: false, hidden: true },
         { name: 'пустые объекты', args: [{}, {}], expected: true },
         { name: 'примитивы', args: [1, '1'], expected: false },
+        { name: 'разные собственные ключи с undefined', args: [{ a: undefined }, { b: undefined }], expected: false, hidden: true },
+        { name: 'вложенный NaN', args: [{ items: [NaN] }, { items: [NaN] }], expected: true, hidden: true },
+        { name: 'пустой массив и пустой объект', args: [[], {}], expected: false, hidden: true },
       ],
     },
 
@@ -514,6 +517,9 @@ flattenObject({ list: [1, 2] })
         { name: 'пустой объект', args: [{}], expected: {} },
         { name: 'пустой объект как значение', args: [{ a: {} }], expected: { a: {} }, hidden: true },
         { name: 'null как значение', args: [{ a: null }], expected: { a: null }, hidden: true },
+        { name: 'пустой массив как лист', args: [{ filters: { tags: [] } }], expected: { 'filters.tags': [] }, hidden: true },
+        { name: 'массив объектов с ложными значениями', args: [{ rows: [{ active: false }, { count: 0, name: '' }] }], expected: { 'rows.0.active': false, 'rows.1.count': 0, 'rows.1.name': '' }, hidden: true },
+        { name: 'undefined как значение', args: [{ a: { b: undefined } }], expected: { 'a.b': undefined }, hidden: true },
         {
           name: 'смешанная структура',
           args: [{ user: { name: 'Аня', tags: ['a', 'b'] } }],
@@ -594,6 +600,9 @@ get({ list: [{ name: 'Аня' }] }, 'list[0].name') // 'Аня'
         { name: 'null — это значение', args: [{ a: null }, 'a', 'по умолчанию'], expected: null, hidden: true },
         { name: 'пустая строка — значение', args: [{ a: '' }, 'a', 'по умолчанию'], expected: '', hidden: true },
         { name: 'нет значения по умолчанию', args: [{}, 'a.b'], expected: undefined, hidden: true },
+        { name: 'false не заменяется default', args: [{ settings: { enabled: false } }, 'settings.enabled', true], expected: false, hidden: true },
+        { name: 'null посередине пути', args: [{ settings: null }, 'settings.enabled', 'fallback'], expected: 'fallback', hidden: true },
+        { name: 'вложенные индексы', args: [{ grid: [[{ id: 7 }]] }, 'grid[0][0].id', 0], expected: 7, hidden: true },
       ],
     },
 
@@ -676,6 +685,9 @@ function deepMerge(target, ...sources) {
         { name: 'undefined не затирает', args: [{ a: 1 }, { a: undefined }], expected: { a: 1 } },
         { name: 'несколько источников', args: [{ a: 1 }, { b: 2 }, { c: 3 }], expected: { a: 1, b: 2, c: 3 } },
         { name: 'null затирает', args: [{ a: 1 }, { a: null }], expected: { a: null }, hidden: true },
+        { name: 'undefined во вложенном объекте', args: [{ config: { enabled: true, count: 1 } }, { config: { enabled: undefined, count: 0 } }], expected: { config: { enabled: true, count: 0 } }, hidden: true },
+        { name: 'последний источник выигрывает', args: [{ x: { a: 1 } }, { x: { b: 2 } }, { x: { a: 3 } }], expected: { x: { a: 3, b: 2 } }, hidden: true },
+        { name: 'пустой массив заменяет прежний', args: [{ items: [1, 2] }, { items: [] }], expected: { items: [] }, hidden: true },
       ],
       testCode: `test('исходные объекты не мутируются', function () {
   const target = { nested: { x: 1 } }
@@ -750,6 +762,9 @@ chunk([1, 2, 3], 5)       // [[1, 2, 3]]
         { name: 'пустой массив', args: [[], 2], expected: [] },
         { name: 'size = 1', args: [[1, 2], 1], expected: [[1], [2]] },
         { name: 'size = 0', args: [[1, 2], 0], expected: [], hidden: true },
+        { name: 'отрицательный size', args: [[1, 2], -2], expected: [], hidden: true },
+        { name: 'объекты и null сохраняются', args: [[{ id: 1 }, null, false, 0], 3], expected: [[{ id: 1 }, null, false], [0]], hidden: true },
+        { name: 'одиночный остаток после нескольких частей', args: [[1, 2, 3, 4, 5, 6, 7], 3], expected: [[1, 2, 3], [4, 5, 6], [7]], hidden: true },
       ],
     },
 
@@ -814,6 +829,9 @@ uniqBy([1.2, 1.8, 2.1], Math.floor)                      // [1.2, 2.1]
         { name: 'пустой массив', args: [[]], expected: [] },
         { name: 'без дубликатов', args: [['a', 'b']], expected: ['a', 'b'] },
         { name: 'NaN считается дубликатом', args: [[NaN, NaN, 1]], expected: [NaN, 1], hidden: true },
+        { name: 'строка и число — разные ключи', args: [[1, '1', 1, '1']], expected: [1, '1'], hidden: true },
+        { name: 'отсутствующие ключи группируются вместе', args: [[{ name: 'first' }, { name: 'second' }, { id: 0 }], 'id'], expected: [{ name: 'first' }, { id: 0 }], hidden: true },
+        { name: 'не сортирует значения', args: [[3, 1, 3, 2, 1]], expected: [3, 1, 2], hidden: true },
       ],
       testCode: `test('ключ-функция', function () {
   expect(uniqBy([1.2, 1.8, 2.1], Math.floor)).toEqual([1.2, 2.1])

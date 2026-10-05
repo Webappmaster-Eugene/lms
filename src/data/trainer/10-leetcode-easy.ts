@@ -102,6 +102,9 @@ twoSum([3, 3], 6)         // [0, 1]
         { name: 'одинаковые числа', args: [[3, 3], 6], expected: [0, 1] },
         { name: 'отрицательные числа', args: [[-1, -2, -3, -4], -6], expected: [1, 3], hidden: true },
         { name: 'ноль в сумме', args: [[0, 4, 3, 0], 0], expected: [0, 3], hidden: true },
+        { name: 'пара с первым индексом ноль', args: [[-8, 13, 4, 7], -1], expected: [0, 3], hidden: true },
+        { name: 'единственный ноль нельзя повторить', args: [[0, -2, 5, 2], 0], expected: [1, 3], hidden: true },
+        { name: 'числа за пределами int32', args: [[4294967296, 3, 4294967297], 8589934593], expected: [0, 2], hidden: true },
       ],
       testCode: `test('большой массив обрабатывается за линейное время', function () {
   const big = Array.from({ length: 100000 }, function (_unused, i) { return i })
@@ -202,6 +205,9 @@ isValid('')        // true
         { name: 'пустая строка', args: [''], expected: true },
         { name: 'вложенные', args: ['{[()]}'], expected: true, hidden: true },
         { name: 'много незакрытых', args: ['((('], expected: false, hidden: true },
+        { name: 'после правильной группы остался хвост', args: ['()[]{}('], expected: false, hidden: true },
+        { name: 'правильная группа не скрывает лишнее закрытие', args: ['(()))('], expected: false, hidden: true },
+        { name: 'смешанная глубокая вложенность', args: ['[{({[]})}()]'], expected: true, hidden: true },
       ],
     },
 
@@ -355,6 +361,9 @@ containsDuplicate([])           // false
         { name: 'один элемент', args: [[1]], expected: false },
         { name: 'все одинаковые', args: [[7, 7, 7]], expected: true, hidden: true },
         { name: 'NaN считается дубликатом', args: [[NaN, NaN]], expected: true, hidden: true },
+        { name: 'плюс и минус ноль', args: [[0, -0]], expected: true, hidden: true },
+        { name: 'дубликат в конце длинного префикса', args: [[5, -1, 2, 0, 9, -1]], expected: true, hidden: true },
+        { name: 'NaN встречается один раз', args: [[NaN, 1, 2]], expected: false, hidden: true },
       ],
     },
 
@@ -438,6 +447,9 @@ maxProfit([7, 6, 4, 3, 1])    // 0 — цена только падает
         { name: 'пустой массив', args: [[]], expected: 0 },
         { name: 'рост в конце', args: [[3, 2, 6, 5, 0, 3]], expected: 4, hidden: true },
         { name: 'одинаковые цены', args: [[2, 2, 2]], expected: 0, hidden: true },
+        { name: 'максимум раньше минимума', args: [[10, 8, 9, 1, 2]], expected: 1, hidden: true },
+        { name: 'поздний минимум не сбрасывает лучшую прибыль', args: [[1, 10, 0, 2]], expected: 9, hidden: true },
+        { name: 'несколько локальных ростов', args: [[3, 5, 1, 4, 2, 8]], expected: 7, hidden: true },
       ],
     },
 

@@ -145,7 +145,7 @@ export function useCodeRunner(): CodeRunner {
           if (event.source !== iframe.contentWindow) return
           const data = event.data as RunnerMessage
           if (data?.type !== 'trainer-result') return
-          settle(normalizeRunResult(data.payload))
+          settle(normalizeRunResult(data.payload, { allowNoTests: spec.allowNoTests }))
         }
 
         listenerRef.current = onMessage

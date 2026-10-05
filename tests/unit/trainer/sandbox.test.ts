@@ -43,6 +43,7 @@ async function execute(userCode: string, overrides: Partial<TrainerExecSpec> = {
     'execute',
     {
       source: composed.source,
+      validationSource: composed.validationSource,
       timeLimitMs: execSpec.timeLimitMs,
       userStartLine: composed.userStartLine,
       userEndLine: composed.userEndLine,
@@ -95,6 +96,47 @@ describe('серверная песочница: исполнение', () => {
 })
 
 describe('серверная песочница: изоляция', () => {
+  it('значение return верхнего уровня не заменяет результат проверок', async () => {
+    const result = await execute('function solve() { return 2 }\nreturn 123', { testCode: PASSING_TEST })
+    expect(result.status).toBe('failed')
+    expect(result.totalCount).toBe(1)
+    expect(result.tests[0]).toMatchObject({ name: 'кейс', actual: '2', expected: '1' })
+  })
+
+  it('служебный запуск отсутствует в публичном API, базовые методы защищены', async () => {
+    const result = await execute(`function solve() {
+      return [typeof __tr.run, typeof __tr.abort, typeof __clock.takeErrors,
+        Object.getOwnPropertyDescriptor(Object, 'is').writable,
+        Object.isExtensible(Array.prototype), Object.isExtensible(Object.prototype)]
+    }`, { testCode: `test('границы API', function () { expect(solve()).toEqual(['undefined', 'undefined', 'undefined', false, true, false]) })` })
+    expect(result.status).toBe('passed')
+  })
+
+  it('проверочные замыкания видят class и const после инициализации решения', async () => {
+    const result = await execute('const value = 1; class Solution { get() { return value } }', {
+      testCode: `const instance = new Solution(); test('инициализация', function () { expect(instance.get()).toBe(1) })`,
+    })
+    expect(result.status).toBe('passed')
+  })
+
+  it('локальные имена решения не подменяют служебные зависимости проверок', async () => {
+    const result = await execute('function __trainerApi() {}\nfunction solve() { return 1 }', { testCode: PASSING_TEST })
+    expect(result.status).toBe('passed')
+    expect(result.tests[0].name).toBe('кейс')
+  })
+
+  it('синтаксическая ошибка показывает строку решения после отдельной компиляции', async () => {
+    const result = await execute('function solve() {\n const value = ;\n}', { testCode: PASSING_TEST })
+    expect(result.status).toBe('compile_error')
+    expect(result.errorLine).toBe(2)
+  })
+
+  it('ошибка выполнения указывает строку внутри отдельно скомпилированного решения', async () => {
+    const result = await execute('function solve() {\n throw new Error("обычная ошибка");\n}', { testCode: PASSING_TEST })
+    expect(result.status).toBe('failed')
+    expect(result.tests[0].line).toBe(2)
+  })
+
   it('в контексте нет ни require, ни process, ни fetch', async () => {
     const result = await execute(
       `function solve() {

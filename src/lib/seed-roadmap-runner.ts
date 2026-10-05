@@ -284,7 +284,6 @@ export async function seedRoadmapNodes(payload: Payload): Promise<void> {
     title: 'Frontend React',
     slug: 'frontend-react',
     order: 1,
-    miroEmbedUrl: 'https://miro.com/app/live-embed/uXjVJaQFRcw=/?embedMode=view_only_without_ui',
   })
   console.log(`Frontend roadmap: id=${frontendRoadmap.id}`)
 
@@ -292,7 +291,6 @@ export async function seedRoadmapNodes(payload: Payload): Promise<void> {
     title: 'Backend Node.js',
     slug: 'backend-nodejs',
     order: 2,
-    miroEmbedUrl: 'https://miro.com/app/live-embed/uXjVJaQFRcw=/?embedMode=view_only_without_ui',
   })
   console.log(`Backend roadmap: id=${backendRoadmap.id}`)
 

@@ -15,7 +15,6 @@ import { collectAllPages } from '@/lib/paginate'
 import { pluralize } from '@/lib/utils'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, PartyPopper, Pencil, Settings } from 'lucide-react'
-import { MiroEmbed } from '@/components/lesson/MiroEmbed'
 import { RoadmapExplorer } from '@/components/roadmap/RoadmapExplorer'
 import type { GraphEdge, AnyRoadmapNode, NodeCourse } from '@/components/roadmap/types'
 import type {
@@ -324,22 +323,6 @@ export default async function RoadmapDetailPage({ params }: Props) {
           managementRoadmapId={user?.role === 'admin' ? roadmap.id : undefined}
         />
       </section>
-
-      {/* Miro embed — вторичный вид, сырая доска */}
-      {roadmap.miroEmbedUrl && typeof roadmap.miroEmbedUrl === 'string' && (
-        <details className="rounded-xl border border-border bg-card p-4">
-          <summary className="cursor-pointer text-lg font-semibold text-foreground">
-            Оригинальная Miro-доска
-          </summary>
-          <div className="mt-3">
-            <MiroEmbed
-              title={`${roadmap.title} — Miro`}
-              embedUrl={roadmap.miroEmbedUrl}
-              height={600}
-            />
-          </div>
-        </details>
-      )}
 
     </div>
   )

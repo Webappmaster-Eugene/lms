@@ -27,6 +27,8 @@ export default tseslint.config(
       // Отчёты и артефакты Playwright
       'playwright-report/**',
       'test-results/**',
+      // Одноразовые аудиты, выгрузки и фрагменты browser_run_code; не исходники приложения.
+      '.codex/state/**',
     ],
   },
 

@@ -95,6 +95,32 @@ export const SiteSettings: GlobalConfig = {
           type: 'text',
           label: 'Email для связи',
         },
+        {
+          name: 'links',
+          type: 'array',
+          label: 'Дополнительные каналы и контакты',
+          fields: [
+            { name: 'title', type: 'text', required: true, label: 'Название' },
+            { name: 'description', type: 'textarea', label: 'Описание' },
+            {
+              name: 'url',
+              type: 'text',
+              required: true,
+              label: 'Ссылка',
+              validate: (value: unknown) => {
+                if (typeof value !== 'string') return 'Введите ссылку'
+                try {
+                  const url = new URL(value)
+                  return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password
+                    ? true
+                    : 'Используйте ссылку http или https без пароля'
+                } catch {
+                  return 'Введите корректную ссылку'
+                }
+              },
+            },
+          ],
+        },
       ],
     },
   ],

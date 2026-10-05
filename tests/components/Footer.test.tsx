@@ -55,6 +55,16 @@ describe('подвал платформы', () => {
     )
   })
 
+  it('показывает дополнительный канал и не повторяет одну ссылку в списке контактов', async () => {
+    findGlobal.mockResolvedValue({ contacts: { ...CONTACTS, links: [
+      { title: 'Разборы задач', url: 'https://t.me/eugene_vibecode' },
+      { title: 'Повтор канала', url: CONTACTS.telegramChannel },
+    ] } })
+    render(await Footer())
+    expect(screen.getByRole('link', { name: 'Разборы задач' })).toHaveAttribute('href', 'https://t.me/eugene_vibecode')
+    expect(screen.queryByRole('link', { name: 'Повтор канала' })).not.toBeInTheDocument()
+  })
+
   it('внешние ссылки открываются в новой вкладке, почта — нет', async () => {
     render(await Footer())
 

@@ -26,6 +26,7 @@ export const ADMIN_NAV_GROUPS = [
     items: [
       { href: '/admin/collections/trainer-topics', label: 'Темы тренажёра' },
       { href: '/admin/collections/trainer-tasks', label: 'Задачи тренажёра' },
+      { href: '/admin/collections/interview-rooms', label: 'Мои собеседования' },
       { href: '/admin/collections/user-trainer-progress', label: 'Результаты тренажёра' },
     ],
   },

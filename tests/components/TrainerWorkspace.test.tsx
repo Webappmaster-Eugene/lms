@@ -69,8 +69,32 @@ const passed = {
 }
 
 describe('рабочее место тренажёра', () => {
+  it('добавляет свои тесты только в локальный запуск, сохраняя серверную проверку', async () => {
+    const user = userEvent.setup()
+    render(<TrainerWorkspace task={task} progress={progress} />)
+    await user.click(screen.getByText('Свои тесты'))
+    await user.click(screen.getByRole('button', { name: 'Добавить свой тест' }))
+    await user.type(screen.getByLabelText('Аргументы теста 1'), '10')
+    await user.clear(screen.getByLabelText('Ожидаемый результат теста 1'))
+    await user.type(screen.getByLabelText('Ожидаемый результат теста 1'), '11')
+    await user.click(screen.getByRole('button', { name: 'Запустить' }))
+    await waitFor(() => expect(run).toHaveBeenCalled())
+    expect(run.mock.calls.at(-1)?.[0].cases).toEqual([
+      { name: 'Свой тест 1', argsCode: '10', expectedCode: '11', compare: 'deep', hidden: false },
+    ])
+    await user.click(screen.getByRole('button', { name: 'Отправить' }))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled())
+    const body = JSON.parse((vi.mocked(global.fetch).mock.calls.at(-1)?.[1] as RequestInit).body as string)
+    expect(Object.keys(body).sort()).toEqual(['code', 'language', 'taskId'])
+    await user.click(screen.getByRole('button', { name: 'Удалить свой тест 1' }))
+    await user.click(screen.getByRole('button', { name: 'Запустить' }))
+    await waitFor(() => expect(run.mock.calls.at(-1)?.[0].cases).toEqual([]))
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
+    window.localStorage.clear()
+    monacoCommands.clear()
     run.mockResolvedValue(passed)
     global.fetch = vi.fn(async () =>
       Response.json({ result: passed, solved: true, awardedPoints: 10 }),
@@ -78,13 +102,13 @@ describe('рабочее место тренажёра', () => {
   })
 
   describe('стартовое состояние', () => {
-    it('в редактор подставляется заготовка задачи', () => {
+    it('в редактор подставляется заготовка задачи', async () => {
       render(<TrainerWorkspace task={task} progress={progress} />)
 
-      expect(screen.getByTestId('monaco')).toHaveValue('function createCounter() {}')
+      expect(await screen.findByTestId('monaco')).toHaveValue('function createCounter() {}')
     })
 
-    it('сохранённое решение важнее заготовки', () => {
+    it('сохранённое решение важнее заготовки', async () => {
       render(
         <TrainerWorkspace
           task={task}
@@ -92,7 +116,7 @@ describe('рабочее место тренажёра', () => {
         />,
       )
 
-      expect(screen.getByTestId('monaco')).toHaveValue('моё решение')
+      expect(await screen.findByTestId('monaco')).toHaveValue('моё решение')
     })
 
     it('решённая задача помечена', () => {
@@ -116,7 +140,7 @@ describe('рабочее место тренажёра', () => {
 
       await user.click(screen.getByRole('button', { name: 'TypeScript' }))
 
-      expect(screen.getByTestId('monaco')).toHaveValue('function createCounter(): void {}')
+      expect(await screen.findByTestId('monaco')).toHaveValue('function createCounter(): void {}')
     })
   })
 
@@ -214,6 +238,7 @@ describe('рабочее место тренажёра', () => {
     it('Ctrl+Enter запускает в браузере, Ctrl+Shift+Enter отправляет на сервер', async () => {
       render(<TrainerWorkspace task={task} progress={progress} />)
 
+      await waitFor(() => expect(monacoCommands.has(MONACO_KEYS.CtrlCmd | MONACO_KEYS.Enter)).toBe(true))
       monacoCommands.get(MONACO_KEYS.CtrlCmd | MONACO_KEYS.Enter)?.()
       await waitFor(() => expect(run).toHaveBeenCalled())
       expect(global.fetch).not.toHaveBeenCalled()
@@ -236,7 +261,7 @@ describe('рабочее место тренажёра', () => {
 
       await user.click(screen.getByRole('button', { name: /Сбросить/ }))
 
-      expect(screen.getByTestId('monaco')).toHaveValue('function createCounter() {}')
+      expect(await screen.findByTestId('monaco')).toHaveValue('function createCounter() {}')
     })
   })
 })

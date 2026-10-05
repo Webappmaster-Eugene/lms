@@ -104,6 +104,20 @@ export default async function TrainerPage() {
         за каждую решённую задачу начисляются баллы.
       </p>
 
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card p-4">
+        <div className="max-w-xl">
+          <h2 className="font-semibold text-foreground">Режим собеседования</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Пригласите интервьюера по ссылке: общий редактор, запуск кода и консоль.
+            Для комнаты с условием выберите «На собеседовании» на странице задачи.
+          </p>
+        </div>
+        <Link href="/trainer/interview/new"
+          className="inline-flex min-h-[38px] items-center rounded-lg border border-border px-3 text-sm font-medium hover:bg-accent">
+          Создать комнату
+        </Link>
+      </section>
+
       {topicsWithStats.length === 0 ? (
         <p className="text-center text-muted-foreground py-12">
           Задачи скоро появятся

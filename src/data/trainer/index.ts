@@ -25,8 +25,9 @@ import { patterns } from './14-patterns'
 import { typescriptTypes } from './15-typescript-types'
 import { typescriptApplied } from './16-typescript-applied'
 import { webApi } from './17-web-api'
+import { practical } from './18-practical'
 
-export const TRAINER_CATALOG: readonly TrainerTopicSeed[] = [jsCore, hof, asyncTopic, collections, arrayPolyfills, functionPolyfills, strings, dataStructures, algorithms, leetcodeEasy, leetcodeMedium, leetcodeHard, companies, patterns, typescriptTypes, typescriptApplied, webApi]
+export const TRAINER_CATALOG: readonly TrainerTopicSeed[] = [jsCore, hof, asyncTopic, collections, arrayPolyfills, functionPolyfills, strings, dataStructures, algorithms, leetcodeEasy, leetcodeMedium, leetcodeHard, companies, patterns, typescriptTypes, typescriptApplied, webApi, practical]
 
 export { flattenCatalog } from './types'
 export type { TrainerTaskSeed, TrainerTopicSeed } from './types'

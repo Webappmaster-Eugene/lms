@@ -27,7 +27,7 @@ export default async function ContactsPage() {
     {
       icon: Globe,
       title: 'Веб-сайт',
-      description: 'Основной сайт с информацией о курсах',
+      description: 'Сайт Евгения Надточеева: проекты, публикации и менторство',
       link: contacts.website,
       linkText: 'Перейти',
     },
@@ -38,6 +38,13 @@ export default async function ContactsPage() {
       link: contacts.email ? `mailto:${contacts.email}` : undefined,
       linkText: contacts.email ?? 'Не указан',
     },
+    ...(contacts.links ?? []).map((contact) => ({
+      icon: contact.url.startsWith('https://t.me/') ? MessageCircle : Globe,
+      title: contact.title,
+      description: contact.description ?? '',
+      link: contact.url,
+      linkText: contact.url.startsWith('https://t.me/') ? 'Открыть в Telegram' : 'Перейти',
+    })),
   ]
 
   return (
@@ -63,6 +70,7 @@ export default async function ContactsPage() {
             {link ? (
               <a
                 href={link}
+                aria-label={`${linkText}: ${title}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-auto inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors"

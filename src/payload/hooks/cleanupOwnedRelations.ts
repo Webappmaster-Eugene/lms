@@ -37,6 +37,7 @@ export const cleanupUserRelations = cleanupDependents('пользователь'
   { collection: 'notes', field: 'user' },
   { collection: 'bookmarks', field: 'user' },
   { collection: 'comments', field: 'user' },
+  { collection: 'interview-rooms', field: 'owner' },
 ])
 
 /** Выданные экземпляры достижения; начисленные за него баллы остаются в истории */

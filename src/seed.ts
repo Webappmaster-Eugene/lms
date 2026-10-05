@@ -87,7 +87,6 @@ export const seed = async (payload: Payload) => {
     title: 'Frontend React',
     slug: 'frontend-react',
     order: 1,
-    miroEmbedUrl: 'https://miro.com/app/live-embed/uXjVJaQFRcw=/?embedMode=view_only_without_ui',
   })
 
   // Курсы React с секциями (idempotent)
@@ -152,7 +151,6 @@ export const seed = async (payload: Payload) => {
     title: 'Backend Node.js',
     slug: 'backend-nodejs',
     order: 2,
-    miroEmbedUrl: 'https://miro.com/app/live-embed/uXjVJaQFRcw=/?embedMode=view_only_without_ui',
   })
 
   const nodeBasics = await findOrCreateCourse(payload, {

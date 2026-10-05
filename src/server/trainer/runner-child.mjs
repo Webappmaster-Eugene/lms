@@ -61,6 +61,18 @@ async function execute(payload) {
     // код не разобрался. Всё, что случится дальше, — уже ошибки выполнения.
     let script
     try {
+      if (typeof payload.validationSource === 'string') {
+        try {
+          await isolate.compileScript(`(function(){\n${payload.validationSource}\n})()`, {
+            filename: 'trainer-solution.js',
+          })
+        } catch (error) {
+          const lines = payload.validationSource.split('\n').length
+          return failure('compile_error', describeError(error), {
+            errorLine: extractLine(error, 2, lines, 'trainer-solution'),
+          })
+        }
+      }
       // Обёртка в функцию: собранный скрипт — это ТЕЛО функции, оно завершается
       // через return, а не выражением.
       script = await isolate.compileScript(`(function(){\n${payload.source}\n})()`, {
@@ -160,9 +172,9 @@ function describeError(error) {
  * создан — скрипт не скомпилировался, — поэтому пересчёт делается здесь.
  * Обёртка добавляет одну строку сверху, её и вычитаем.
  */
-function extractLine(error, userStartLine, userEndLine) {
+function extractLine(error, userStartLine, userEndLine, filename = 'trainer-sandbox') {
   const stack = typeof error?.stack === 'string' ? error.stack : ''
-  const match = /trainer-sandbox\.js:(\d+)/.exec(stack)
+  const match = new RegExp(`${filename}\\.js:(\\d+)`).exec(stack)
   if (!match) return undefined
   const absolute = Number(match[1]) - 1
   if (

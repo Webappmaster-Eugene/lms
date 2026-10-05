@@ -81,7 +81,7 @@ function normalizeDiagnostic(input: unknown): TrainerDiagnostic | null {
   }
 }
 
-export function normalizeRunResult(input: unknown): TrainerRunResult {
+export function normalizeRunResult(input: unknown, options: { allowNoTests?: boolean } = {}): TrainerRunResult {
   const raw = (input ?? {}) as Record<string, unknown>
 
   const status: TrainerRunStatus = STATUSES.includes(raw.status as TrainerRunStatus)
@@ -109,7 +109,7 @@ export function normalizeRunResult(input: unknown): TrainerRunResult {
 
   const result: TrainerRunResult = {
     // Статус не берём на веру: он должен сходиться с самими тестами.
-    status: reconcileStatus(status, tests.length, passedCount),
+    status: reconcileStatus(status, tests.length, passedCount, options.allowNoTests === true),
     tests,
     passedCount,
     totalCount: tests.length,
@@ -129,17 +129,19 @@ export function normalizeRunResult(input: unknown): TrainerRunResult {
 }
 
 /**
- * Статус «passed» имеет право существовать только когда тесты действительно есть
- * и все они зелёные. Статусы аварий (timeout / compile_error / error) сохраняем
+ * Обычный прогон требует настоящих тестов. Консоль собеседования разрешает
+ * отсутствие тестов опцией хоста, которая не принимается из результата.
+ * Статусы аварий (timeout / compile_error / error) сохраняем
  * как есть — они описывают то, что случилось до или вместо тестов.
  */
 function reconcileStatus(
   status: TrainerRunStatus,
   totalCount: number,
   passedCount: number,
+  allowNoTests: boolean,
 ): TrainerRunStatus {
-  if (status === 'timeout' || status === 'compile_error') return status
-  if (totalCount === 0) return status === 'passed' ? 'error' : status
+  if (status === 'timeout' || status === 'compile_error' || status === 'error') return status
+  if (totalCount === 0) return status === 'passed' && !allowNoTests ? 'error' : status
   return passedCount === totalCount ? 'passed' : 'failed'
 }
 

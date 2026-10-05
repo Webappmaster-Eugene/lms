@@ -219,12 +219,12 @@ describe('фильтры каталога задач', () => {
 })
 
 describe('редактор кода', () => {
-  it('показывает текущий код', () => {
+  it('показывает текущий код', async () => {
     render(
       <CodeEditor value="function solve() {}" onChange={vi.fn()} language="js" />,
     )
 
-    expect(screen.getByTestId('monaco')).toHaveValue('function solve() {}')
+    expect(await screen.findByTestId('monaco')).toHaveValue('function solve() {}')
   })
 
   it('правка уходит наружу', async () => {
@@ -232,7 +232,7 @@ describe('редактор кода', () => {
     const user = userEvent.setup()
     render(<CodeEditor value="" onChange={onChange} language="js" />)
 
-    await user.type(screen.getByTestId('monaco'), 'x')
+    await user.type(await screen.findByTestId('monaco'), 'x')
 
     expect(onChange).toHaveBeenCalled()
   })
@@ -240,9 +240,9 @@ describe('редактор кода', () => {
   it.each([
     ['js', 'javascript'],
     ['ts', 'typescript'],
-  ] as const)('язык %s включает свою подсветку', (language, monacoLanguage) => {
+  ] as const)('язык %s включает свою подсветку', async (language, monacoLanguage) => {
     render(<CodeEditor value="" onChange={vi.fn()} language={language} />)
 
-    expect(screen.getByTestId('monaco')).toHaveAttribute('data-language', monacoLanguage)
+    expect(await screen.findByTestId('monaco')).toHaveAttribute('data-language', monacoLanguage)
   })
 })

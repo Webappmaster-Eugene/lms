@@ -21,13 +21,17 @@ type SandboxApi = {
 
 function createSandbox(): { api: SandboxApi; run: (code: string) => unknown } {
   const context = vm.createContext(Object.create(null))
-  vm.runInContext(HARNESS_SOURCE, context)
+  const runtime = vm.runInContext(HARNESS_SOURCE, context) as SandboxApi
 
   const api = (context as { __tr: SandboxApi }).__tr
 
   return {
     api,
-    run: (code: string) => vm.runInContext(`(function(){\n${code}\n})()`, context),
+    run: (code: string) => {
+      const body = code.replaceAll('var __tr = globalThis.__tr', '')
+      const execute = vm.runInContext(`(function(__tr){\n${body}\n})`, context) as (api: SandboxApi) => unknown
+      return execute(runtime)
+    },
   }
 }
 

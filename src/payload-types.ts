@@ -88,6 +88,7 @@ export interface Config {
     'trainer-topics': TrainerTopic;
     'trainer-tasks': TrainerTask;
     'user-trainer-progress': UserTrainerProgress;
+    'interview-rooms': InterviewRoom;
     'faq-items': FaqItem;
     'yandex-disk-imports': YandexDiskImport;
     'payload-kv': PayloadKv;
@@ -118,6 +119,7 @@ export interface Config {
     'trainer-topics': TrainerTopicsSelect<false> | TrainerTopicsSelect<true>;
     'trainer-tasks': TrainerTasksSelect<false> | TrainerTasksSelect<true>;
     'user-trainer-progress': UserTrainerProgressSelect<false> | UserTrainerProgressSelect<true>;
+    'interview-rooms': InterviewRoomsSelect<false> | InterviewRoomsSelect<true>;
     'faq-items': FaqItemsSelect<false> | FaqItemsSelect<true>;
     'yandex-disk-imports': YandexDiskImportsSelect<false> | YandexDiskImportsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -879,6 +881,35 @@ export interface UserTrainerProgress {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "interview-rooms".
+ */
+export interface InterviewRoom {
+  id: number;
+  token: string;
+  owner: number | User;
+  members: (number | User)[];
+  presence?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  title: string;
+  descriptionMd?: string | null;
+  setupCode?: string | null;
+  setupTypes?: string | null;
+  code?: string | null;
+  language: 'js' | 'ts';
+  version: number;
+  endedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "faq-items".
  */
 export interface FaqItem {
@@ -1027,6 +1058,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'user-trainer-progress';
         value: number | UserTrainerProgress;
+      } | null)
+    | ({
+        relationTo: 'interview-rooms';
+        value: number | InterviewRoom;
       } | null)
     | ({
         relationTo: 'faq-items';
@@ -1544,6 +1579,26 @@ export interface UserTrainerProgressSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "interview-rooms_select".
+ */
+export interface InterviewRoomsSelect<T extends boolean = true> {
+  token?: T;
+  owner?: T;
+  members?: T;
+  presence?: T;
+  title?: T;
+  descriptionMd?: T;
+  setupCode?: T;
+  setupTypes?: T;
+  code?: T;
+  language?: T;
+  version?: T;
+  endedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "faq-items_select".
  */
 export interface FaqItemsSelect<T extends boolean = true> {
@@ -1635,6 +1690,14 @@ export interface SiteSetting {
     telegramGroup?: string | null;
     website?: string | null;
     email?: string | null;
+    links?:
+      | {
+          title: string;
+          description?: string | null;
+          url: string;
+          id?: string | null;
+        }[]
+      | null;
   };
   updatedAt?: string | null;
   createdAt?: string | null;
@@ -1662,6 +1725,14 @@ export interface SiteSettingsSelect<T extends boolean = true> {
         telegramGroup?: T;
         website?: T;
         email?: T;
+        links?:
+          | T
+          | {
+              title?: T;
+              description?: T;
+              url?: T;
+              id?: T;
+            };
       };
   updatedAt?: T;
   createdAt?: T;

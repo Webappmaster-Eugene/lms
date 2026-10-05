@@ -15,7 +15,7 @@
  *      вердикт браузера и вердикт сервера совпадают.
  *   3. Всё общение с внешним миром — через globalThis.__tr.
  */
-;(function (global) {
+(function (global) {
   'use strict'
 
   var MAX_CONSOLE_LINES = 200
@@ -30,6 +30,56 @@
 
   var RealDate = global.Date
   var realNow = RealDate.now.bind(RealDate)
+  var applyFunction = Function.prototype.call.bind(Function.prototype.apply)
+
+  var intrinsicNames = [
+    'Object', 'Function', 'Array', 'Number', 'String', 'Boolean', 'Symbol', 'BigInt',
+    'Promise', 'RegExp', 'Map', 'Set', 'WeakMap', 'WeakSet', 'Error', 'TypeError',
+    'RangeError', 'SyntaxError', 'Reflect', 'Math', 'JSON', 'ArrayBuffer', 'DataView',
+    'Int8Array', 'Uint8Array', 'Uint8ClampedArray', 'Int16Array', 'Uint16Array',
+    'Int32Array', 'Uint32Array', 'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array',
+  ]
+  var intrinsics = Object.create(null)
+  var errorPrototypes = [Error.prototype, TypeError.prototype, RangeError.prototype, SyntaxError.prototype]
+  for (var intrinsicIndex = 0; intrinsicIndex < intrinsicNames.length; intrinsicIndex++) {
+    var intrinsicName = intrinsicNames[intrinsicIndex]
+    if (global[intrinsicName] !== undefined) intrinsics[intrinsicName] = global[intrinsicName]
+  }
+
+  // Keep prototypes extensible for polyfills, but protect the methods used by the judge.
+  function protectExistingProperties(target) {
+    if (!target || (typeof target !== 'object' && typeof target !== 'function')) return
+    var keys = Object.getOwnPropertyNames(target).concat(Object.getOwnPropertySymbols(target))
+    for (var i = 0; i < keys.length; i++) {
+      // Error instances commonly assign their own name; keep that normal operation valid.
+      if (errorPrototypes.indexOf(target) !== -1 && (keys[i] === 'name' || keys[i] === 'message')) continue
+      var descriptor = Object.getOwnPropertyDescriptor(target, keys[i])
+      if ('value' in descriptor) descriptor.writable = false
+      descriptor.configurable = false
+      Object.defineProperty(target, keys[i], descriptor)
+    }
+  }
+
+  function protectIntrinsics() {
+    intrinsics.Date = global.Date
+    for (var timerName of ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'console', 'AbortController']) {
+      intrinsics[timerName] = global[timerName]
+    }
+    var keys = Object.keys(intrinsics)
+    for (var i = 0; i < keys.length; i++) {
+      var name = keys[i]
+      var value = intrinsics[name]
+      protectExistingProperties(value)
+      protectExistingProperties(value.prototype)
+      Object.preventExtensions(value)
+      Object.defineProperty(global, name, { value: value, writable: false, configurable: false })
+    }
+    protectExistingProperties(RealDate)
+    protectExistingProperties(RealDate.prototype)
+    // Plain private outcomes must retain their original prototype semantics.
+    Object.preventExtensions(Object.prototype)
+    Object.freeze(intrinsics)
+  }
 
   // ──────────────────────────────────────────────────────────────
   // Сериализация значений для отчёта
@@ -817,11 +867,14 @@
   // ──────────────────────────────────────────────────────────────
 
   var tests = []
+  var suiteFactory = null
+  var acceptingTests = true
   var lineBias = 0
   var userStart = 1
   var userEnd = Number.MAX_SAFE_INTEGER
 
   function register(meta, fn) {
+    if (!acceptingTests) throw new Error('Нельзя регистрировать проверки во время прогона')
     if (typeof fn !== 'function') {
       throw new TypeError('Тест «' + meta.name + '» должен получать функцию')
     }
@@ -836,6 +889,13 @@
 
   function test(name, fn) {
     register({ name: name }, fn)
+  }
+
+  function registerSuite(factory) {
+    if (suiteFactory !== null || typeof factory !== 'function') {
+      throw new Error('Набор проверок уже зарегистрирован')
+    }
+    suiteFactory = factory
   }
 
   function rawLine(error) {
@@ -902,9 +962,20 @@
       })
   }
 
-  function run() {
+  function run(allowNoTests) {
     var startedAt = realNow()
     var outcomes = []
+    // Only the trusted suite contributes to grading; console rooms keep their own tests.
+    if (allowNoTests !== true && suiteFactory !== null) tests = []
+    if (suiteFactory !== null) {
+      try {
+        suiteFactory()
+      } catch (error) {
+        acceptingTests = false
+        return Promise.resolve(abort('error', error))
+      }
+    }
+    acceptingTests = false
 
     function step(index) {
       if (index >= tests.length) return Promise.resolve()
@@ -919,12 +990,12 @@
         return o.passed
       }).length
       return {
-        status: tests.length === 0 ? 'error' : passedCount === tests.length ? 'passed' : 'failed',
+        status: tests.length === 0 && allowNoTests !== true ? 'error' : passedCount === tests.length ? 'passed' : 'failed',
         tests: outcomes,
         passedCount: passedCount,
         totalCount: outcomes.length,
         consoleOutput: consoleLines.slice(),
-        error: tests.length === 0 ? 'У задачи нет ни одного теста' : undefined,
+        error: tests.length === 0 && allowNoTests !== true ? 'У задачи нет ни одного теста' : undefined,
         totalMs: realNow() - startedAt,
       }
     })
@@ -992,7 +1063,7 @@
             true,
           )
         }
-        return Promise.resolve(entry.apply(undefined, meta.args)).then(function (result) {
+        return Promise.resolve(applyFunction(entry, undefined, meta.args)).then(function (result) {
           if (!compareValues(result, meta.expectedValue, meta.compare)) {
             fail('Результат не совпадает с ожидаемым', meta.expectedValue, result)
           }
@@ -1005,7 +1076,7 @@
   installAbortController()
   var clock = createClock()
 
-  global.__tr = {
+  var runtime = {
     expect: expect,
     test: test,
     it: test,
@@ -1030,9 +1101,20 @@
       userEnd = end
     },
   }
-
-  global.expect = expect
-  global.test = test
-  global.it = test
-  global.__clock = clock
+  protectIntrinsics()
+  var publicClock = Object.freeze({ tick: clock.tick, runAll: clock.runAll, flush: clock.flush, pending: clock.pending })
+  var publicApi = Object.freeze({
+    expect: expect, test: test, it: test, clock: publicClock,
+    register: register,
+    registerCase: registerCase, registerSuite: registerSuite, expectStdout: expectStdout,
+    deepEqual: deepEqual, compareValues: compareValues, serialize: serialize,
+    normalizeOutput: normalizeOutput, formatCall: formatCall, intrinsics: intrinsics,
+  })
+  runtime.publicApi = publicApi
+  Object.defineProperty(global, '__tr', { value: publicApi, writable: false, configurable: false })
+  Object.defineProperty(global, 'expect', { value: expect, writable: false, configurable: false })
+  Object.defineProperty(global, 'test', { value: test, writable: false, configurable: false })
+  Object.defineProperty(global, 'it', { value: test, writable: false, configurable: false })
+  Object.defineProperty(global, '__clock', { value: publicClock, writable: false, configurable: false })
+  return runtime
 })(typeof globalThis !== 'undefined' ? globalThis : this)

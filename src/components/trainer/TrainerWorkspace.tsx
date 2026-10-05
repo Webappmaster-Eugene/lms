@@ -8,13 +8,14 @@ import { ArrowRight, Play, RotateCcw, Send, Trophy } from 'lucide-react'
 import { CodeEditor } from './CodeEditor'
 import { TestResultsPanel } from './TestResultsPanel'
 import { useCodeRunner } from './useCodeRunner'
+import { CustomTestCases } from './CustomTestCases'
 import { LANGUAGE_LABELS, TRAINER_LIMITS } from '@/lib/trainer/constants'
 import { failureResult } from '@/lib/trainer/result'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/components/ui/Toast'
 import { useHydrated } from '@/hooks/use-hydrated'
 import type { ClientProgress, ClientTaskSpec, SubmitResponse } from '@/lib/trainer/api'
-import type { TrainerDiagnostic, TrainerLanguage, TrainerRunResult } from '@/lib/trainer/types'
+import type { TrainerCaseSpec, TrainerDiagnostic, TrainerLanguage, TrainerRunResult } from '@/lib/trainer/types'
 
 /**
  * Рабочая область решения задачи.
@@ -89,6 +90,11 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [completed, setCompleted] = useState(progress.isCompleted)
   const [attempts, setAttempts] = useState(progress.attempts)
+  const [customTests, setCustomTests] = useState<{ taskId: string; cases: TrainerCaseSpec[] }>({ taskId: task.id, cases: [] })
+  const customCases = useMemo(
+    () => customTests.taskId === task.id ? customTests.cases : [],
+    [customTests, task.id],
+  )
 
   const [focusLine, setFocusLine] = useState<number | undefined>(undefined)
 
@@ -213,7 +219,7 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
         setupCode: task.setupCode,
         userCode: compiled.js,
         testCode: task.checkMode === 'unit' ? task.testCode : PREVIEW_TEST,
-        cases: task.checkMode === 'unit' ? task.publicCases : [],
+        cases: task.checkMode === 'unit' ? [...task.publicCases, ...customCases] : [],
         entryName: task.entryName,
         expectedOutput: undefined,
         timeLimitMs: task.timeLimitMs,
@@ -228,7 +234,7 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
     } finally {
       setIsRunning(false)
     }
-  }, [busy, code, language, prepareJavaScript, runner, task])
+  }, [busy, code, customCases, language, prepareJavaScript, runner, task])
 
   const handleSubmit = useCallback(async () => {
     if (busy || code.trim().length === 0) return
@@ -394,6 +400,11 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
       />
 
       {hiddenNote && <p className="text-xs text-muted-foreground">{hiddenNote}</p>}
+
+      {task.checkMode === 'unit' && task.entryName && (
+        <CustomTestCases cases={customCases} disabled={busy} entryName={task.entryName}
+          onChange={(cases) => setCustomTests({ taskId: task.id, cases })} />
+      )}
 
       {/* Решено — следующий шаг сразу под результатом, а не кнопкой «Далее» в шапке. */}
       {completed && !busy && (nextTask || topicHref) && (

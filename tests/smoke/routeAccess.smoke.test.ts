@@ -33,6 +33,7 @@ const SEGMENT_SAMPLES: Record<string, readonly string[]> = {
   slug: ['deep-react', 'next.js'],
   topicSlug: ['js-core', 'node.js'],
   taskSlug: ['create-counter', 'array.map'],
+  token: ['12345678-1234-4123-8123-123456789abc'],
   id: ['42'],
 }
 

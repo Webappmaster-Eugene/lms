@@ -6,6 +6,7 @@ export type SiteContacts = {
   telegramGroup?: string
   website?: string
   email?: string
+  links?: Array<{ title: string; description?: string | null; url: string; id?: string | null }> | null
 }
 
 /**

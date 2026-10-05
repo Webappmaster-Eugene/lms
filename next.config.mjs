@@ -30,6 +30,10 @@ const nextConfig = {
   async headers() {
     return [
       {
+        source: '/monaco/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=3600, must-revalidate' }],
+      },
+      {
         // Админке общий CSP не подходит (свои скрипты и стили Payload), но встраивать её
         // во фрейм нельзя: иначе кликджекинг действий администратора
         source: '/admin/:path*',

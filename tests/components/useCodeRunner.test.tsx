@@ -102,6 +102,24 @@ describe('браузерный прогон решения', () => {
   })
 
   describe('приём результата', () => {
+    it('пустая консоль разрешается только доверенной спецификацией комнаты', async () => {
+      const { result } = renderHook(() => useCodeRunner())
+      await act(async () => {
+        const pending = result.current.run({ ...SPEC, allowNoTests: true, testCode: '' })
+        replyFrom(frames()[0], { status: 'passed', tests: [], consoleOutput: ['42'] })
+        expect(await pending).toMatchObject({ status: 'passed', totalCount: 0, passedCount: 0, consoleOutput: ['42'] })
+      })
+    })
+
+    it('флаг пустой консоли из сообщения iframe не ослабляет обычный прогон', async () => {
+      const { result } = renderHook(() => useCodeRunner())
+      await act(async () => {
+        const pending = result.current.run(SPEC)
+        replyFrom(frames()[0], { status: 'passed', allowNoTests: true, tests: [], consoleOutput: ['42'] })
+        expect(await pending).toMatchObject({ status: 'error', totalCount: 0 })
+      })
+    })
+
     it('ответ своего фрейма становится результатом', async () => {
       const { result } = renderHook(() => useCodeRunner())
 

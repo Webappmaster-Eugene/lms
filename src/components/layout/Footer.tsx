@@ -20,13 +20,14 @@ export async function Footer() {
   const external = [
     { href: contacts.telegramChannel, label: 'Telegram-канал', blank: true },
     { href: contacts.telegramGroup, label: 'Чат учеников', blank: true },
-    { href: contacts.website || PROMO_URL, label: 'О платформе', blank: true },
-    { href: AUTHOR_URL, label: 'Сайт автора', blank: true },
+    { href: PROMO_URL, label: 'О платформе', blank: true },
+    { href: contacts.website || AUTHOR_URL, label: 'Сайт автора', blank: true },
+    ...(contacts.links ?? []).map((contact) => ({ href: contact.url, label: contact.title, blank: true })),
     // Почтовый клиент открывается на месте, новая вкладка останется пустой.
     { href: contacts.email ? `mailto:${contacts.email}` : undefined, label: contacts.email, blank: false },
   ].filter((item): item is { href: string; label: string; blank: boolean } =>
     Boolean(item.href && item.label),
-  )
+  ).filter((item, index, links) => links.findIndex((link) => link.href === item.href) === index)
 
   return (
     <footer className="border-t border-border bg-card/40 px-4 pb-24 pt-8 text-sm lg:px-8 lg:pb-8">

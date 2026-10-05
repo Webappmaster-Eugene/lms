@@ -29,6 +29,7 @@ import { Streaks } from '@/payload/collections/Streaks'
 import { TrainerTopics } from '@/payload/collections/TrainerTopics'
 import { TrainerTasks } from '@/payload/collections/TrainerTasks'
 import { UserTrainerProgress } from '@/payload/collections/UserTrainerProgress'
+import { InterviewRooms } from '@/payload/collections/InterviewRooms'
 import { FaqItems } from '@/payload/collections/FaqItems'
 import { YandexDiskImports } from '@/payload/collections/YandexDiskImports'
 import { SiteSettings } from '@/payload/globals/SiteSettings'
@@ -79,6 +80,7 @@ export default buildConfig({
     TrainerTopics,
     TrainerTasks,
     UserTrainerProgress,
+    InterviewRooms,
     FaqItems,
     YandexDiskImports,
   ],

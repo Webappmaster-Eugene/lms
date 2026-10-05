@@ -125,6 +125,8 @@ export type TrainerRunResult = {
  * задачи, чтобы ни один хост не зависел от схемы Payload.
  */
 export type TrainerExecSpec = {
+  /** Console-only interview runs may have no checks. Task specs never enable this. */
+  allowNoTests?: boolean
   checkMode: TrainerCheckMode
   language: TrainerLanguage
   /** Преамбула: фикстуры и хелперы, доступные и коду пользователя, и тестам. */

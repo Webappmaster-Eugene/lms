@@ -6,10 +6,8 @@
  *   - isolated-vm:  (function(){ body })()  внутри изолята
  *   - node:vm:      то же самое в тестах
  *
- * Порядок частей важен: код пользователя и тесты обязаны оказаться в ОДНОЙ
- * области видимости. Объявил `function debounce(){}` — тесты его видят, ровно
- * как на живом собеседовании. Поэтому никаких модулей и никаких отдельных
- * замыканий между ними.
+ * Тестовые замыкания видят объявления решения. Служебный запуск и итоговый
+ * результат остаются снаружи отдельно скомпилированной функции решения.
  */
 
 import { HARNESS_SOURCE } from './harness-source.generated'
@@ -18,14 +16,13 @@ import type { TrainerCaseSpec, TrainerExecSpec } from './types'
 export type ComposedScript = {
   /** Тело функции для запуска в хосте. */
   source: string
+  /** Отдельная проверка синтаксиса без выполнения решения. */
+  validationSource: string
   /** Номер строки, с которой начинается код пользователя (1-based). */
   userStartLine: number
   /** Номер последней строки кода пользователя (1-based). */
   userEndLine: number
 }
-
-/** Имена, которые харнесс кладёт в глобальную область песочницы. */
-const RESERVED_GLOBALS = ['test', 'it', 'expect', '__clock', '__tr'] as const
 
 /**
  * Генерирует код регистрации табличного кейса.
@@ -63,68 +60,53 @@ function splitLines(text: string): string[] {
   return text.replace(/\r\n/g, '\n').split('\n')
 }
 
-/**
- * Собирает скрипт. Вызывается дважды: первый проход нужен, чтобы узнать
- * номера строк кода пользователя, второй — чтобы вшить их в `setUserRange`
- * ДО этого кода. Обе сборки дают одинаковое число строк, поэтому смещения,
- * посчитанные на первом проходе, верны и на втором.
- */
-function build(spec: TrainerExecSpec, range: { start: number; end: number }): ComposedScript {
-  const harnessLines = splitLines(HARNESS_SOURCE)
-  const setupLines = splitLines(spec.setupCode)
-  const userLines = splitLines(spec.userCode)
-
-  const testSource =
-    spec.checkMode === 'stdout'
-      ? renderStdoutCase(spec.expectedOutput ?? '')
-      : [
-          ...spec.cases.map((testCase, index) => renderCase(testCase, spec.entryName, index)),
-          spec.testCode,
-        ]
-          .filter((part) => part.trim().length > 0)
-          .join('\n')
-
-  const lines: string[] = []
-
-  lines.push(...harnessLines)
-
-  // Калибровка смещения строк. Хост может обернуть тело (new Function добавляет
-  // две строки сверху), поэтому bias измеряется изнутри: бросаем ошибку на
-  // заведомо известной строке и сравниваем с тем, что сказал стек.
-  const calibrationLine = lines.length + 1
-  lines.push(
-    `;(function(){ try { throw new Error('calibrate') } catch (e) { ` +
-      `var raw = globalThis.__tr.rawLine(e); ` +
-      `globalThis.__tr.setLineBias(raw === null ? 0 : raw - ${calibrationLine}) } })();`,
-  )
-
-  lines.push(`;globalThis.__tr.setUserRange(${range.start}, ${range.end});`)
-  lines.push('var __tr = globalThis.__tr;')
-  lines.push('return (function () { try { return (function () {')
-
-  lines.push(...setupLines)
-
-  const userStartLine = lines.length + 1
-  lines.push(...userLines)
-  const userEndLine = lines.length
-
-  lines.push(
-    `if (typeof test !== 'function' || typeof expect !== 'function' || typeof __tr !== 'object') ` +
-      `{ return globalThis.__tr.abort('error', new Error(` +
-      `'Решение переопределяет служебные имена (${RESERVED_GLOBALS.join(', ')}) — тесты запустить нельзя')) }`,
-  )
-
-  lines.push(...splitLines(testSource))
-  lines.push('return __tr.run();')
-  lines.push('})(); } catch (e) { return globalThis.__tr.abort("error", e) } })();')
-
-  return { source: lines.join('\n'), userStartLine, userEndLine }
-}
-
-/** Собирает исполняемый скрипт для переданной спецификации задачи. */
+/** Решение и служебный результат исполняются в разных лексических областях. */
 export function composeScript(spec: TrainerExecSpec): ComposedScript {
-  const probe = build(spec, { start: 1, end: Number.MAX_SAFE_INTEGER })
-  return build(spec, { start: probe.userStartLine, end: probe.userEndLine })
+  const userLines = splitLines(spec.userCode)
+  const tests = spec.checkMode === 'stdout'
+    ? renderStdoutCase(spec.expectedOutput ?? '')
+    : [...spec.cases.map((item, index) => renderCase(item, spec.entryName, index)), spec.testCode]
+      .filter(part => part.trim()).join('\n')
+  const aliases = [
+    'Object', 'Function', 'Array', 'Number', 'String', 'Boolean', 'Symbol', 'BigInt',
+    'Promise', 'RegExp', 'Map', 'Set', 'WeakMap', 'WeakSet', 'Error', 'TypeError',
+    'RangeError', 'SyntaxError', 'Reflect', 'Math', 'JSON', 'Date', 'ArrayBuffer', 'DataView',
+    'Int8Array', 'Uint8Array', 'Uint8ClampedArray', 'Int16Array', 'Uint16Array',
+    'Int32Array', 'Uint32Array', 'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array',
+    'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'console', 'AbortController',
+  ]
+  const initializer = [
+    "'use strict';",
+    ...splitLines(spec.setupCode),
+    '{',
+    'const __tr = arguments[0];',
+    'const test = __tr.test, it = __tr.it, expect = __tr.expect, __clock = __tr.clock;',
+    ...aliases.map(name => `const ${name} = __tr.intrinsics.${name};`),
+    '__tr.registerSuite(function () {',
+    ...splitLines(tests),
+    '});',
+    '}',
+  ]
+  const userStartLine = initializer.length + 1
+  initializer.push(...userLines)
+  const userEndLine = initializer.length
+  const validationSource = "'use strict';\n" + spec.userCode
+  const source = [
+    "'use strict';",
+    `var __tr = ${HARNESS_SOURCE};`,
+    `__tr.setUserRange(${userStartLine}, ${userEndLine});`,
+    '__tr.setLineBias(2);',
+    'var initialize;',
+    'try {',
+    `new Function(${JSON.stringify(validationSource)});`,
+    `initialize = new Function(${JSON.stringify(initializer.join('\n'))});`,
+    '} catch (error) { return __tr.abort("compile_error", error); }',
+    'try {',
+    'initialize(__tr.publicApi);',
+    `return __tr.run(${spec.allowNoTests === true ? 'true' : ''});`,
+    '} catch (error) { return __tr.abort("error", error); }',
+  ].join('\n')
+  return { source, userStartLine, userEndLine, validationSource }
 }
 
 /**

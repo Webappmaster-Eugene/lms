@@ -160,6 +160,7 @@ export async function runSolution(
     'execute',
     {
       source: composed.source,
+      validationSource: composed.validationSource,
       timeLimitMs: spec.timeLimitMs,
       userStartLine: composed.userStartLine,
       userEndLine: composed.userEndLine,
