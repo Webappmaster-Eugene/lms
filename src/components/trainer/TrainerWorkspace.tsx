@@ -132,6 +132,7 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
   }, [code, language, task.id])
 
   const busy = isRunning || isSubmitting
+  const ready = hydrated && loadedSlot === draftSlot
 
   /**
    * Готовит исполняемый JavaScript. Для TypeScript это делает сервер: тащить в
@@ -164,7 +165,7 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
   )
 
   const handleRun = useCallback(async () => {
-    if (busy || code.trim().length === 0) return
+    if (!ready || busy || code.trim().length === 0) return
 
     setIsRunning(true)
     setResult(null)
@@ -234,10 +235,10 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
     } finally {
       setIsRunning(false)
     }
-  }, [busy, code, customCases, language, prepareJavaScript, runner, task])
+  }, [busy, code, customCases, language, prepareJavaScript, ready, runner, task])
 
   const handleSubmit = useCallback(async () => {
-    if (busy || code.trim().length === 0) return
+    if (!ready || busy || code.trim().length === 0) return
 
     setIsSubmitting(true)
     setResult(null)
@@ -290,7 +291,7 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
     } finally {
       setIsSubmitting(false)
     }
-  }, [busy, code, completed, language, router, showToast, task.id])
+  }, [busy, code, completed, language, ready, router, showToast, task.id])
 
   const handleReset = useCallback(() => {
     setCode(task.starters[language] ?? '')
@@ -314,7 +315,7 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
                 key={item}
                 type="button"
                 onClick={() => setLanguage(item)}
-                disabled={busy}
+                disabled={busy || !ready}
                 aria-pressed={language === item}
                 className={cn(
                   'rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50',
@@ -332,7 +333,7 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
         <button
           type="button"
           onClick={handleRun}
-          disabled={busy || code.trim().length === 0}
+          disabled={busy || !ready || code.trim().length === 0}
           title="Ctrl+Enter (⌘+Enter на Mac)"
           className="inline-flex min-h-[38px] items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
         >
@@ -343,7 +344,7 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={busy || code.trim().length === 0}
+          disabled={busy || !ready || code.trim().length === 0}
           title="Ctrl+Shift+Enter (⌘+Shift+Enter на Mac)"
           className="inline-flex min-h-[38px] items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
         >
@@ -354,7 +355,7 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
         <button
           type="button"
           onClick={handleReset}
-          disabled={busy}
+          disabled={busy || !ready}
           className="inline-flex min-h-[38px] items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
         >
           <RotateCcw className="h-4 w-4" />
@@ -377,7 +378,7 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
           value={code}
           onChange={setCode}
           language={language}
-          readOnly={busy}
+          readOnly={busy || !ready}
           diagnostics={diagnostics}
           errorLine={focusLine}
           height="100%"
