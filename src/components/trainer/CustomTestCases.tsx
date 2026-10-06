@@ -37,12 +37,14 @@ export function CustomTestCases({ cases, onChange, disabled, entryName }: {
             <label className="block text-xs">
               Аргументы теста {index + 1}
               <textarea value={item.argsCode} maxLength={5000} rows={2}
+                aria-label={`Аргументы теста ${index + 1}`}
                 onChange={(event) => update(index, { argsCode: event.target.value })}
                 className="mt-1 block w-full rounded border border-input bg-background p-2 font-mono text-xs" />
             </label>
             <label className="block text-xs">
               Ожидаемый результат теста {index + 1}
               <textarea value={item.expectedCode} maxLength={5000} rows={2}
+                aria-label={`Ожидаемый результат теста ${index + 1}`}
                 onChange={(event) => update(index, { expectedCode: event.target.value })}
                 className="mt-1 block w-full rounded border border-input bg-background p-2 font-mono text-xs" />
             </label>
