@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 vi.mock('react-markdown', async () => (await import('../helpers/component-mocks')).markdownMock())
 vi.mock('remark-gfm', () => ({ default: () => {} }))
@@ -7,6 +7,7 @@ vi.mock('rehype-raw', () => ({ default: () => {} }))
 
 const createPlayer = vi.fn()
 const destroy = vi.fn()
+const load = vi.fn()
 vi.mock('mpegts.js', () => ({
   default: {
     Events: { ERROR: 'error', LOADING_COMPLETE: 'loading_complete' },
@@ -15,7 +16,7 @@ vi.mock('mpegts.js', () => ({
       createPlayer(...args)
       return {
         attachMediaElement: vi.fn(),
-        load: vi.fn(),
+        load,
         play: vi.fn(),
         destroy,
         on: vi.fn(),
@@ -158,6 +159,28 @@ describe('плеер потока MPEG-TS', () => {
     )
 
     expect(container.querySelector('video')).toBeInTheDocument()
+  })
+
+  it('обновление страницы урока сохраняет плеер и позицию защищённого TS-видео', async () => {
+    const props = { title: 'Урок', displayMode: 'embed' as const, videoUrl: '/api/yandex-disk/stream?lesson=42&block=ts&format=ts', durationMinutes: 10 }
+    const { container, rerender } = render(<VideoPlayer {...props} />)
+    await waitFor(() => expect(load).toHaveBeenCalledTimes(1))
+    const video = container.querySelector('video')
+    expect(video).not.toBeNull()
+    if (!video) throw new Error('Видео не отрисовалось')
+    video.currentTime = 31
+    fireEvent.timeUpdate(video)
+
+    await act(async () => {
+      rerender(<VideoPlayer {...props} description="Урок пройден" />)
+      await Promise.resolve()
+    })
+
+    expect(container.querySelector('video')).toBe(video)
+    expect(video.currentTime).toBe(31)
+    expect(destroy).not.toHaveBeenCalled()
+    expect(createPlayer).toHaveBeenCalledTimes(1)
+    expect(load).toHaveBeenCalledTimes(1)
   })
 })
 

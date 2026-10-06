@@ -33,7 +33,7 @@ function uniqueVideoUrl(): string {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  auth.mockResolvedValue({ user: { id: 1, role: 'student' } })
+  auth.mockResolvedValue({ user: { id: 1, role: 'admin' } })
   fetchPublicDownloadHref.mockResolvedValue(HREF)
 })
 
@@ -47,10 +47,17 @@ describe('доступ', () => {
     expect(fetchPublicDownloadHref).not.toHaveBeenCalled()
   })
 
-  it('обычному студенту видео отдаётся — права админа не нужны', async () => {
+  it('админская диагностика исходного URL остаётся доступна', async () => {
     const response = await GET(streamRequest(uniqueVideoUrl()))
 
     expect(response.status).toBe(302)
+  })
+
+  it('ученик не может получать произвольные публичные источники вместо урока', async () => {
+    auth.mockResolvedValue({ user: { id: 1, role: 'student' } })
+    const response = await GET(streamRequest(uniqueVideoUrl()))
+    expect(response.status).toBe(403)
+    expect(fetchPublicDownloadHref).not.toHaveBeenCalled()
   })
 })
 

@@ -4,6 +4,7 @@ import { isAdmin } from '@/payload/access/isAdmin'
 import { isPublishedOrAdmin } from '@/payload/access/isPublishedOrAdmin'
 import { cleanupLessonRelations } from '@/payload/hooks/cleanupLessonRelations'
 import { generateSlug } from '@/payload/hooks/generateSlug'
+import { protectLessonVideos } from '@/payload/hooks/protectLessonVideos'
 import { TextBlock } from '@/payload/blocks/TextBlock'
 import { VideoBlock } from '@/payload/blocks/VideoBlock'
 import { ImageBlock } from '@/payload/blocks/ImageBlock'
@@ -25,6 +26,7 @@ export const Lessons: CollectionConfig = {
     delete: isAdmin,
   },
   hooks: {
+    afterRead: [protectLessonVideos],
     beforeValidate: [generateSlug],
     beforeDelete: [cleanupLessonRelations],
   },

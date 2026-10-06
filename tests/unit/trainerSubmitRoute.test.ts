@@ -15,10 +15,16 @@ const find = vi.fn()
 const create = vi.fn()
 const update = vi.fn()
 const runSolution = vi.fn()
+const execute = vi.fn()
+const initTransaction = vi.fn(async () => true)
+const commitTransaction = vi.fn()
+const killTransaction = vi.fn()
 
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('payload', () => ({
-  getPayload: vi.fn(async () => ({ auth, find, create, update })),
+  getPayload: vi.fn(async () => ({ auth, find, create, update, db: { sessions: { test: { db: { execute } } } } })),
+  createLocalReq: vi.fn(async () => ({ transactionID: 'test' })),
+  initTransaction, commitTransaction, killTransaction,
 }))
 vi.mock('@/server/trainer/sandbox', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/server/trainer/sandbox')>()
@@ -74,6 +80,7 @@ function failed(): TrainerRunResult {
 function givenTaskWithoutProgress(): void {
   find.mockImplementation(async ({ collection }: { collection: string }) => {
     if (collection === 'trainer-tasks') return { docs: [TASK], totalDocs: 1 }
+    if (collection === 'points-transactions') return { docs: [{ amount: 20 }], totalDocs: 1 }
     return { docs: [], totalDocs: 0 }
   })
 }
@@ -103,6 +110,13 @@ describe('POST /api/trainer/submit: доступ и валидация', () => {
   it('невалидный JSON — 400', async () => {
     const response = await POST(request('не json'))
     expect(response.status).toBe(400)
+  })
+
+  it.each([null, [], 1, true])('JSON без объекта (%s) — 400 без запуска и записи', async input => {
+    const response = await POST(request(input))
+    expect(response.status).toBe(400)
+    expect(runSolution).not.toHaveBeenCalled()
+    expect(create).not.toHaveBeenCalled()
   })
 
   it('без обязательных полей — 400', async () => {
@@ -303,26 +317,31 @@ describe('POST /api/trainer/submit: отказы инфраструктуры', 
     expect(response.status).toBe(500)
   })
 
-  it('гонка двух отправок дописывается в уже созданную запись', async () => {
-    // Первая отправка успела создать запись между нашим find и create.
-    let progressExists = false
-    find.mockImplementation(async ({ collection }: { collection: string }) => {
-      if (collection === 'trainer-tasks') return { docs: [TASK], totalDocs: 1 }
-      return progressExists
-        ? { docs: [{ id: 9, isCompleted: false, attempts: 1, failedAttempts: 1 }], totalDocs: 1 }
-        : { docs: [], totalDocs: 0 }
-    })
-    create.mockImplementation(async () => {
-      progressExists = true
-      throw new Error('duplicate key value violates unique constraint')
-    })
-
+  it('успешная запись прогресса коммитится после блокировки пользователя', async () => {
     const response = await POST(request({ taskId: '42', language: 'js', code: 'решение' }))
-
     expect(response.status).toBe(200)
-    expect(update).toHaveBeenCalledOnce()
-    expect(update.mock.calls[0][0].id).toBe(9)
-    expect(update.mock.calls[0][0].data.isCompleted).toBe(true)
-    expect(update.mock.calls[0][0].data.attempts).toBe(2)
+    expect(initTransaction).toHaveBeenCalledOnce()
+    expect(execute).toHaveBeenCalledOnce()
+    expect(commitTransaction).toHaveBeenCalledOnce()
+    expect(killTransaction).not.toHaveBeenCalled()
+    expect(create.mock.calls[0][0].req.transactionID).toBe('test')
+  })
+
+  it('ошибка записи откатывает транзакцию вместе с начислением', async () => {
+    create.mockRejectedValueOnce(new Error('запись недоступна'))
+    const response = await POST(request({ taskId: '42', language: 'js', code: 'решение' }))
+    expect(response.status).toBe(500)
+    expect(killTransaction).toHaveBeenCalledOnce()
+    expect(commitTransaction).not.toHaveBeenCalled()
+  })
+
+  it('показывает фактически начисленную награду из транзакции', async () => {
+    find.mockImplementation(async ({ collection }: { collection: string }) => {
+      if (collection === 'trainer-tasks') return { docs: [{ ...TASK, pointsReward: null }], totalDocs: 1 }
+      if (collection === 'points-transactions') return { docs: [{ amount: 37 }], totalDocs: 1 }
+      return { docs: [], totalDocs: 0 }
+    })
+    const response = await POST(request({ taskId: '42', language: 'js', code: 'решение' }))
+    expect((await response.json()).awardedPoints).toBe(37)
   })
 })

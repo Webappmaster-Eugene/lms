@@ -79,6 +79,11 @@ describe('POST /api/trainer/compile', () => {
     expect((await POST(compileRequest('не json'))).status).toBe(400)
   })
 
+  it.each([null, [], 1, true])('JSON без объекта (%s) — 400 без компиляции', async input => {
+    expect((await POST(compileRequest(input))).status).toBe(400)
+    expect(compileTypeScript).not.toHaveBeenCalled()
+  })
+
   it('без обязательных полей — 400', async () => {
     expect((await POST(compileRequest({ code: 'x' }))).status).toBe(400)
   })

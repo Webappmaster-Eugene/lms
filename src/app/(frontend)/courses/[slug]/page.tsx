@@ -10,6 +10,7 @@ import { pluralize } from '@/lib/utils'
 import { remainingTime } from '@/lib/course-time'
 import { nextLesson, orderCourseLessons } from '@/lib/roadmap-next-step'
 import { RichText } from '@payloadcms/richtext-lexical/react'
+import { protectCourseSourceLinks, protectLessonVideoSources } from '@/lib/lesson-video-source'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -46,7 +47,7 @@ export default async function CourseDetailPage({ params }: Props) {
   const course = courseResult.docs[0]
   if (!course) return notFound()
 
-  const [sectionDocs, lessonDocs, progressDocs] = await Promise.all([
+  const [sectionDocs, loadedLessonDocs, progressDocs] = await Promise.all([
     collectAllPages(
       ({ page, limit }) =>
         payload.find({
@@ -94,6 +95,8 @@ export default async function CourseDetailPage({ params }: Props) {
         )
       : [],
   ])
+
+  const lessonDocs = user?.role === 'admin' ? loadedLessonDocs : loadedLessonDocs.map(protectLessonVideoSources)
 
   const completedLessonIds = new Set(
     progressDocs.map((p) => String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson)),
@@ -194,7 +197,7 @@ export default async function CourseDetailPage({ params }: Props) {
 
       {course.description && (
         <section aria-label="Описание курса" className="prose prose-sm dark:prose-invert max-w-none break-words">
-          <RichText data={course.description} />
+          <RichText data={user?.role === 'admin' ? course.description : protectCourseSourceLinks(course).description ?? course.description} />
         </section>
       )}
 

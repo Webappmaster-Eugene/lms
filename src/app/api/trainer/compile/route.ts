@@ -40,7 +40,11 @@ export async function POST(request: Request): Promise<Response> {
 
   let body: { taskId?: unknown; code?: unknown }
   try {
-    body = await request.json()
+    const input: unknown = await request.json()
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      return NextResponse.json({ error: 'Ожидается объект JSON' }, { status: 400 })
+    }
+    body = input
   } catch {
     return NextResponse.json({ error: 'Невалидный JSON' }, { status: 400 })
   }

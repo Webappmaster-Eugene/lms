@@ -3,6 +3,7 @@ import type { CollectionConfig } from 'payload'
 import { isAdmin } from '@/payload/access/isAdmin'
 import { isPublishedOrAdmin } from '@/payload/access/isPublishedOrAdmin'
 import { generateSlug } from '@/payload/hooks/generateSlug'
+import { protectCourseSources } from '@/payload/hooks/protectCourseSources'
 
 export const Courses: CollectionConfig = {
   slug: 'courses',
@@ -18,6 +19,7 @@ export const Courses: CollectionConfig = {
     delete: isAdmin,
   },
   hooks: {
+    afterRead: [protectCourseSources],
     beforeValidate: [generateSlug],
   },
   fields: [

@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { parsePublicResourceUrl, YandexDiskError } from '@/lib/yandex-disk'
+import { YandexDiskError } from '@/lib/yandex-disk'
 import { resolveHref } from '@/lib/yandex-disk-href'
 import { withSpan, logger } from '@/lib/telemetry'
+import { LessonVideoAccessError, resolveLessonVideoSource } from '@/server/lesson-video-access'
 
 /**
  * Отдаёт байты файла Диска через наш домен.
@@ -32,33 +33,35 @@ export async function GET(request: Request): Promise<Response> {
       return NextResponse.json({ error: 'Требуется авторизация' }, { status: 401 })
     }
 
-    const rawUrl = new URL(request.url).searchParams.get('url')
-    if (!rawUrl) {
-      return NextResponse.json({ error: 'Обязательный параметр: url' }, { status: 400 })
-    }
-
-    const ref = parsePublicResourceUrl(rawUrl)
-    if (!ref) {
-      return NextResponse.json(
-        { error: 'Ссылка не похожа на публичный ресурс Яндекс.Диска' },
-        { status: 400 },
-      )
-    }
-
     try {
+      const source = await resolveLessonVideoSource(payload, user, new URL(request.url).searchParams)
+      if (source.kind !== 'yandex') {
+        return NextResponse.json({ error: 'Видео медиатеки использует нативный плеер' }, { status: 400 })
+      }
+      const { ref } = source
       const href = await resolveHref(ref)
       const range = request.headers.get('range')
 
       const upstream = await fetch(href, {
         headers: range ? { Range: range } : {},
         cache: 'no-store',
+        signal: request.signal,
       })
+
+      if (upstream.status === 416) {
+        const headers = new Headers({ 'Cache-Control': 'private, no-store' })
+        const contentRange = upstream.headers.get('content-range')
+        if (contentRange) headers.set('Content-Range', contentRange)
+        await upstream.body?.cancel()
+        return new Response(null, { status: 416, headers })
+      }
 
       if (!upstream.ok && upstream.status !== 206) {
         logger.warn('YD proxy: источник ответил не 2xx', {
           'yd.path': ref.path ?? '',
           'http.status_code': upstream.status,
         })
+        await upstream.body?.cancel()
         return NextResponse.json({ error: 'Источник недоступен' }, { status: 502 })
       }
 
@@ -72,16 +75,21 @@ export async function GET(request: Request): Promise<Response> {
       // Ссылка персональная и временная: ни браузерного, ни общего кеша.
       headers.set('Cache-Control', 'private, no-store')
       headers.set('Accept-Ranges', headers.get('accept-ranges') ?? 'bytes')
+      headers.set('Content-Disposition', 'inline')
+      headers.set('X-Content-Type-Options', 'nosniff')
 
       return new Response(upstream.body, { status: upstream.status, headers })
     } catch (error) {
+      if (error instanceof LessonVideoAccessError) {
+        return NextResponse.json({ error: error.message }, { status: error.status, headers: { 'Cache-Control': 'private, no-store' } })
+      }
       const status = error instanceof YandexDiskError ? error.statusCode : 502
       const message =
-        error instanceof YandexDiskError ? error.message : 'Не удалось получить файл'
+        error instanceof YandexDiskError && user.role === 'admin' ? error.message : 'Не удалось получить файл'
 
-      logger.error(`YD proxy failed для ${ref.publicKey}${ref.path ?? ''}: ${message}`)
+      logger.error('Не удалось получить поток видео урока', { 'http.status_code': status, 'error.type': error instanceof Error ? error.name : 'unknown' })
 
-      return NextResponse.json({ error: message }, { status: status === 404 ? 404 : 502 })
+      return NextResponse.json({ error: message }, { status: status === 404 ? 404 : 502, headers: { 'Cache-Control': 'private, no-store' } })
     }
   })
 }

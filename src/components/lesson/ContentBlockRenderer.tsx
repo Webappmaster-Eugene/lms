@@ -5,6 +5,7 @@ import { MiroEmbed } from './MiroEmbed'
 import { ExternalLinkBlock } from './ExternalLink'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { FileDown } from 'lucide-react'
+import type { Lesson } from '@/payload-types'
 
 type ContentBlock = {
   id?: string | null
@@ -13,7 +14,7 @@ type ContentBlock = {
 }
 
 type Props = {
-  blocks: ContentBlock[]
+  blocks: Array<ContentBlock | NonNullable<Lesson['content']>[number]>
 }
 
 /**
@@ -31,7 +32,7 @@ export function ContentBlockRenderer({ blocks }: Props) {
     <div className="space-y-6">
       {blocks.map((block, index) => (
         <div key={block.id ?? index}>
-          {renderBlock(block)}
+          {renderBlock({ ...block })}
         </div>
       ))}
     </div>

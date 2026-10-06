@@ -15,6 +15,7 @@ import { findBookmarkId } from '@/lib/bookmarks'
 import { collectAllPages } from '@/lib/paginate'
 import { relationKey } from '@/lib/course-lessons'
 import { lessonPosition, orderCourseLessons, type LessonPosition } from '@/lib/roadmap-next-step'
+import { protectLessonVideoSources } from '@/lib/lesson-video-source'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -214,8 +215,7 @@ export default async function LessonPage({ params }: Props) {
 
   const bookmarkId = user ? await findBookmarkId(payload, user.id, { lesson: lesson.id }) : null
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const blocks = (lesson.content ?? []) as any[]
+  const blocks = (user?.role === 'admin' ? lesson : protectLessonVideoSources(lesson)).content ?? []
 
   const hasSidebar = sidebarSections.length > 0
   const totalLessons = allCourseLessons.length

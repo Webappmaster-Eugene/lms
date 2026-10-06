@@ -45,7 +45,12 @@ function getStreamUrl(videoUrl: string): string {
 
 /** Прокси нужен только там, где плеер читает файл из JS. */
 function getProxyUrl(videoUrl: string): string {
+  if (isLessonSource(videoUrl)) return videoUrl.replace('/stream?', '/proxy?')
   return `/api/yandex-disk/proxy?url=${encodeURIComponent(videoUrl)}`
+}
+
+function isLessonSource(videoUrl: string): boolean {
+  return videoUrl.startsWith('/api/yandex-disk/stream?')
 }
 
 /** Файлы медиатеки воспроизводятся непосредственно, без iframe стороннего сервиса. */
@@ -64,8 +69,9 @@ function isMediaFile(videoUrl: string): boolean {
  * исходники TypeScript в видео-блок не попадают.
  */
 function isTransportStream(videoUrl: string): boolean {
+  if (isLessonSource(videoUrl)) return new URL(videoUrl, 'https://local.invalid').searchParams.get('format') === 'ts'
   const path = parsePublicResourceUrl(videoUrl)?.path ?? videoUrl
-  return /\.ts$/i.test(decodeURIComponent(path))
+  return /\.ts$/i.test(path)
 }
 
 /**
@@ -87,6 +93,10 @@ export function VideoPlayer({ title, videoUrl, displayMode, description, duratio
   const handleStreamFailure = useCallback(() => setMode('link'), [])
 
   const isYandexDisk = parsePublicResourceUrl(videoUrl) !== null
+
+  if (isLessonSource(videoUrl)) {
+    return <LessonVideo key={videoUrl} title={title} videoUrl={videoUrl} description={description} durationMinutes={durationMinutes} />
+  }
 
   if (displayMode === 'link') {
     return (
@@ -162,6 +172,32 @@ export function VideoPlayer({ title, videoUrl, displayMode, description, duratio
   )
 }
 
+function LessonVideo({ title, videoUrl, description, durationMinutes }: Omit<Props, 'displayMode'>) {
+  const [mode, setMode] = useState<PlaybackMode>(() => isTransportStream(videoUrl) ? 'stream' : 'native')
+  const isMedia = new URL(videoUrl, 'https://local.invalid').searchParams.get('source') === 'media'
+  const handleStreamFailure = useCallback(() => setMode('link'), [])
+  const handleNativeFailure = useCallback(() => setMode(isMedia ? 'link' : 'stream'), [isMedia])
+  return (
+    <div className="space-y-3">
+      <VideoHeading title={title} description={description} durationMinutes={durationMinutes} />
+      {mode === 'link' ? (
+        <p role="alert" className="rounded-xl border border-border bg-card p-6 text-muted-foreground">
+          Видео не удалось загрузить. Обновите страницу или сообщите об этом в поддержку.
+        </p>
+      ) : mode === 'stream' ? (
+        <TransportStreamPlayer
+          src={getProxyUrl(videoUrl)}
+          memoryKey={videoUrl}
+          durationMinutes={durationMinutes}
+          onFailure={handleStreamFailure}
+        />
+      ) : (
+        <NativeVideo videoUrl={videoUrl} direct onFailure={handleNativeFailure} />
+      )}
+    </div>
+  )
+}
+
 function NativeVideo({ videoUrl, direct = false, onFailure }: { videoUrl: string; direct?: boolean; onFailure: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const memory = useVideoMemory(videoRef, videoUrl)
@@ -176,6 +212,9 @@ function NativeVideo({ videoUrl, direct = false, onFailure }: { videoUrl: string
           controls
           preload="metadata"
           controlsList="nodownload"
+          disableRemotePlayback
+          playsInline
+          onContextMenu={(event) => event.preventDefault()}
           onError={onFailure}
         />
       </div>

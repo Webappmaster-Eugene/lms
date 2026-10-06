@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createElement, type FunctionComponent } from 'react'
 import userEvent from '@testing-library/user-event'
 
@@ -141,6 +141,34 @@ describe('рабочее место тренажёра', () => {
       await user.click(screen.getByRole('button', { name: 'TypeScript' }))
 
       expect(await screen.findByTestId('monaco')).toHaveValue('function createCounter(): void {}')
+    })
+
+    it('быстрое переключение сохраняет новый и пустой черновики обоих языков', async () => {
+      const user = userEvent.setup()
+      render(<TrainerWorkspace task={task} progress={progress} />)
+      const editor = await screen.findByTestId('monaco')
+      fireEvent.change(editor, { target: { value: 'новый JS' } })
+      await user.click(screen.getByRole('button', { name: 'TypeScript' }))
+      fireEvent.change(editor, { target: { value: 'новый TS' } })
+      await user.click(screen.getByRole('button', { name: 'JavaScript' }))
+      expect(editor).toHaveValue('новый JS')
+      fireEvent.change(editor, { target: { value: '' } })
+      await user.click(screen.getByRole('button', { name: 'TypeScript' }))
+      expect(editor).toHaveValue('новый TS')
+      await user.click(screen.getByRole('button', { name: 'JavaScript' }))
+      expect(editor).toHaveValue('')
+    })
+
+    it('очистка редактора сохраняет пустой черновик и после перезагрузки', async () => {
+      window.localStorage.setItem('lms.trainer.draft.task-1.js', 'старый код')
+      const view = render(<TrainerWorkspace task={task} progress={progress} />)
+      const editor = await screen.findByTestId('monaco')
+      expect(editor).toHaveValue('старый код')
+      fireEvent.change(editor, { target: { value: '' } })
+      await waitFor(() => expect(window.localStorage.getItem('lms.trainer.draft.task-1.js')).toBe(''))
+      view.unmount()
+      render(<TrainerWorkspace task={task} progress={progress} />)
+      expect(await screen.findByTestId('monaco')).toHaveValue('')
     })
   })
 

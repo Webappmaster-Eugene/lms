@@ -6,6 +6,12 @@ import { isAdmin } from '@/payload/access/isAdmin'
 const AVATAR_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024
 
+/** Публичные обложки/аватары сохраняются; видео требуют сессию, в том числе Range. */
+const canReadMedia: Access = ({ req }) => {
+  if (req.user) return true
+  return { mimeType: { not_like: 'video/%' } }
+}
+
 /**
  * Админ загружает любые материалы курса; студент - только картинку для аватара в профиле
  * (/profile/edit). Раньше загрузка была только у админа, и смена аватара всегда падала.
@@ -36,6 +42,14 @@ export const Media: CollectionConfig = {
   upload: {
     staticDir: 'media',
     mimeTypes: ['image/*', 'application/pdf', 'video/*', 'application/zip'],
+    modifyResponseHeaders: ({ headers }) => {
+      if (headers.get('Content-Type')?.startsWith('video/')) {
+        headers.set('Cache-Control', 'private, no-store')
+        headers.set('Content-Disposition', 'inline')
+        headers.set('X-Content-Type-Options', 'nosniff')
+      }
+      return headers
+    },
     imageSizes: [
       {
         name: 'thumbnail',
@@ -53,7 +67,7 @@ export const Media: CollectionConfig = {
   },
   access: {
     create: canUploadMedia,
-    read: () => true,
+    read: canReadMedia,
     update: isAdmin,
     delete: isAdmin,
   },

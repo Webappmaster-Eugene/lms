@@ -35,7 +35,7 @@ const upstream = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  auth.mockResolvedValue({ user: { id: 1, role: 'student' } })
+  auth.mockResolvedValue({ user: { id: 1, role: 'admin' } })
   fetchPublicDownloadHref.mockResolvedValue(HREF)
   upstream.mockResolvedValue(
     new Response(new Uint8Array([0x47, 0x40, 0x11, 0x10]), {
@@ -76,6 +76,12 @@ describe('доступ', () => {
     const response = await GET(proxyRequest())
 
     expect(response.status).toBe(400)
+  })
+
+  it('ученик получает файл только по идентификаторам урока и блока', async () => {
+    auth.mockResolvedValue({ user: { id: 1, role: 'student' } })
+    expect((await GET(proxyRequest(uniqueVideoUrl()))).status).toBe(403)
+    expect(upstream).not.toHaveBeenCalled()
   })
 })
 
@@ -126,5 +132,12 @@ describe('отдача файла', () => {
     const response = await GET(proxyRequest(uniqueVideoUrl()))
 
     expect(response.status).toBe(502)
+  })
+
+  it('граница недопустимого Range передаётся плееру как 416', async () => {
+    upstream.mockResolvedValue(new Response(null, { status: 416, headers: { 'Content-Range': 'bytes */1000' } }))
+    const response = await GET(proxyRequest(uniqueVideoUrl(), { Range: 'bytes=2000-' }))
+    expect(response.status).toBe(416)
+    expect(response.headers.get('Content-Range')).toBe('bytes */1000')
   })
 })

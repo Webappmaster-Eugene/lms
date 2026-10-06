@@ -198,6 +198,8 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
             ref={videoRef}
             className="aspect-video w-full"
             playsInline
+            disableRemotePlayback
+            onContextMenu={(event) => event.preventDefault()}
             onClick={togglePlay}
           />
           {!ready && (

@@ -387,13 +387,13 @@ describe('маршруты Яндекс.Диска (без обращения к
   it.each([
     ['proxy', ydProxy],
     ['stream', ydStream],
-  ])('%s: без авторизации — 401, без url — 400, не-Яндекс ссылка (SSRF) — 400', async (_, handler) => {
+  ])('%s: без авторизации — 401, без блока — 400, произвольный URL ученика — 403', async (_, handler) => {
     const { token } = await newStudent()
     expect((await handler(request('/api/yandex-disk/x?url=https://disk.yandex.ru/d/a', { method: 'GET' }))).status).toBe(401)
     expect((await handler(request('/api/yandex-disk/x', { token, method: 'GET' }))).status).toBe(400)
     for (const target of ['http://169.254.169.254/latest/meta-data', 'http://localhost:5432', 'file:///etc/passwd']) {
       const res = await handler(request(`/api/yandex-disk/x?url=${encodeURIComponent(target)}`, { token, method: 'GET' }))
-      expect(res.status, target).toBe(400)
+      expect(res.status, target).toBe(403)
     }
     expect(externalFetch).not.toHaveBeenCalled()
   })

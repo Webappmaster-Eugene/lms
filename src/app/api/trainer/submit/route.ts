@@ -11,7 +11,7 @@ import { parseTaskId } from '@/lib/trainer/task-id'
 import { runSolution, TrainerRunnerError } from '@/server/trainer/sandbox'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
 import { logger } from '@/lib/telemetry'
-import { relationId } from '@/lib/relation-id'
+import { saveTrainerProgress } from '@/lib/trainer/save-progress'
 
 /**
  * POST /api/trainer/submit
@@ -24,22 +24,6 @@ import { relationId } from '@/lib/relation-id'
 /** Отправок на пользователя в минуту. Прогон стоит процессорного времени. */
 const rateLimiter = createRateLimiter('submit', 30, 60_000)
 
-/** Краткая сводка прогона для хранения: полный отчёт в БД не нужен. */
-function summarize(result: TrainerRunResult, language: TrainerLanguage) {
-  return {
-    status: result.status,
-    language,
-    passed: result.passedCount,
-    total: result.totalCount,
-    failedTests: result.tests
-      .filter((test) => !test.passed)
-      .slice(0, 10)
-      .map((test) => test.name),
-    ...(result.error ? { error: result.error.slice(0, 300) } : {}),
-    at: new Date().toISOString(),
-  }
-}
-
 export async function POST(request: Request): Promise<Response> {
   const payload = await getPayload({ config })
 
@@ -50,7 +34,11 @@ export async function POST(request: Request): Promise<Response> {
 
   let body: { taskId?: unknown; language?: unknown; code?: unknown }
   try {
-    body = await request.json()
+    const input: unknown = await request.json()
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      return NextResponse.json({ error: 'Ожидается объект JSON' }, { status: 400 })
+    }
+    body = input
   } catch {
     return NextResponse.json({ error: 'Невалидный JSON' }, { status: 400 })
   }
@@ -124,78 +112,9 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ error: 'Не удалось проверить решение' }, { status: 500 })
   }
 
-  const passed = result.status === 'passed'
-
-  const existing = await payload.find({
-    collection: 'user-trainer-progress',
-    where: { user: { equals: user.id }, task: { equals: task.id } },
-    limit: 1,
-    overrideAccess: true,
-  })
-
-  const previous = existing.docs[0]
-  const wasCompleted = previous?.isCompleted === true
-  const attempts = (previous?.attempts ?? 0) + 1
-  const failedAttempts = (previous?.failedAttempts ?? 0) + (passed ? 0 : 1)
-
-  const data = {
-    isCompleted: wasCompleted || passed,
-    userCode: code,
-    language,
-    attempts,
-    failedAttempts,
-    lastResult: summarize(result, language),
-    ...(passed ? { verifiedBy: 'server' as const } : {}),
-    // Дата решения выставляется один раз — при первом успехе.
-    ...(passed && !wasCompleted ? { completedAt: new Date().toISOString() } : {}),
-  }
-
+  let progress: Omit<SubmitResponse, 'result'>
   try {
-    if (previous) {
-      await payload.update({
-        collection: 'user-trainer-progress',
-        id: previous.id,
-        data,
-        overrideAccess: true,
-      })
-    } else {
-      try {
-        await payload.create({
-          collection: 'user-trainer-progress',
-          data: {
-            ...data,
-            user: relationId(user.id),
-            task: relationId(task.id),
-          },
-          overrideAccess: true,
-        })
-      } catch (error) {
-        // Две одновременные отправки: обе не нашли записи и обе пошли создавать.
-        // Уникальный индекс (user_id, task_id) пропустит только первую — вторая
-        // дописывается в уже существующую запись, а не теряет результат.
-        const conflicting = await payload.find({
-          collection: 'user-trainer-progress',
-          where: { user: { equals: user.id }, task: { equals: task.id } },
-          limit: 1,
-          overrideAccess: true,
-        })
-
-        const created = conflicting.docs[0]
-        if (!created) throw error
-
-        await payload.update({
-          collection: 'user-trainer-progress',
-          id: created.id,
-          data: {
-            ...data,
-            isCompleted: created.isCompleted === true || passed,
-            attempts: (created.attempts ?? 0) + 1,
-            failedAttempts: (created.failedAttempts ?? 0) + (passed ? 0 : 1),
-          },
-          overrideAccess: true,
-        })
-      }
-    }
+    progress = await saveTrainerProgress({ payload, user, task, language, code, result })
   } catch (error) {
     logger.error('Не удалось сохранить прогресс тренажёра', error, {
       'trainer.task.id': taskId,
@@ -207,12 +126,7 @@ export async function POST(request: Request): Promise<Response> {
     )
   }
 
-  const response: SubmitResponse = {
-    result,
-    completed: wasCompleted || passed,
-    awardedPoints: passed && !wasCompleted ? (task.pointsReward ?? 10) : null,
-    attempts,
-  }
+  const response: SubmitResponse = { result, ...progress }
 
   return NextResponse.json(response)
 }

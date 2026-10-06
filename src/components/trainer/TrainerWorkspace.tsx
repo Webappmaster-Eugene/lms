@@ -118,8 +118,11 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
     setFocusLine(undefined)
   }
 
+  const busy = isRunning || isSubmitting
+  const ready = hydrated && loadedSlot === draftSlot
+
   useEffect(() => {
-    if (code.length === 0) return
+    if (!ready) return
     const timer = setTimeout(() => {
       writeDraft(task.id, language, code)
       try {
@@ -129,10 +132,14 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
       }
     }, 400)
     return () => clearTimeout(timer)
-  }, [code, language, task.id])
+  }, [code, language, ready, task.id])
 
-  const busy = isRunning || isSubmitting
-  const ready = hydrated && loadedSlot === draftSlot
+  const handleLanguageChange = useCallback((next: TrainerLanguage) => {
+    if (!ready || busy || next === language) return
+    // Смена языка может произойти раньше отложенной записи черновика.
+    writeDraft(task.id, language, code)
+    setLanguage(next)
+  }, [busy, code, language, ready, task.id])
 
   /**
    * Готовит исполняемый JavaScript. Для TypeScript это делает сервер: тащить в
@@ -314,7 +321,7 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
               <button
                 key={item}
                 type="button"
-                onClick={() => setLanguage(item)}
+                onClick={() => handleLanguageChange(item)}
                 disabled={busy || !ready}
                 aria-pressed={language === item}
                 className={cn(

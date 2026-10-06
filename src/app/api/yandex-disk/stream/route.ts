@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { parsePublicResourceUrl, YandexDiskError } from '@/lib/yandex-disk'
+import { YandexDiskError } from '@/lib/yandex-disk'
 import { resolveHref } from '@/lib/yandex-disk-href'
 import { withSpan, logger } from '@/lib/telemetry'
+import { LessonVideoAccessError, resolveLessonVideoSource } from '@/server/lesson-video-access'
 
 /**
  * Яндекс.Диск запрещает встраивание своих страниц в iframe
@@ -24,21 +25,9 @@ export async function GET(request: Request): Promise<Response> {
       return NextResponse.json({ error: 'Требуется авторизация' }, { status: 401 })
     }
 
-    const rawUrl = new URL(request.url).searchParams.get('url')
-    if (!rawUrl) {
-      return NextResponse.json({ error: 'Обязательный параметр: url' }, { status: 400 })
-    }
-
-    const ref = parsePublicResourceUrl(rawUrl)
-    if (!ref) {
-      return NextResponse.json(
-        { error: 'Ссылка не похожа на публичный ресурс Яндекс.Диска' },
-        { status: 400 },
-      )
-    }
-
     try {
-      const href = await resolveHref(ref)
+      const source = await resolveLessonVideoSource(payload, user, new URL(request.url).searchParams)
+      const href = source.kind === 'media' ? source.path : await resolveHref(source.ref)
 
       return new NextResponse(null, {
         status: 302,
@@ -52,13 +41,16 @@ export async function GET(request: Request): Promise<Response> {
         },
       })
     } catch (error) {
+      if (error instanceof LessonVideoAccessError) {
+        return NextResponse.json({ error: error.message }, { status: error.status, headers: { 'Cache-Control': 'private, no-store' } })
+      }
       const status = error instanceof YandexDiskError ? error.statusCode : 502
       const message =
-        error instanceof YandexDiskError ? error.message : 'Не удалось получить ссылку на видео'
+        error instanceof YandexDiskError && user.role === 'admin' ? error.message : 'Не удалось получить ссылку на видео'
 
-      logger.error(`YD stream failed для ${ref.publicKey}${ref.path ?? ''}: ${message}`)
+      logger.error('Не удалось открыть видео урока', { 'http.status_code': status, 'error.type': error instanceof Error ? error.name : 'unknown' })
 
-      return NextResponse.json({ error: message }, { status: status === 404 ? 404 : status })
+      return NextResponse.json({ error: message }, { status, headers: { 'Cache-Control': 'private, no-store' } })
     }
   })
 }
