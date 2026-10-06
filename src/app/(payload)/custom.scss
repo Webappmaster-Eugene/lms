@@ -22,6 +22,31 @@ html[data-theme='dark'] {
     font-weight: 600;
   }
 
+  summary {
+    min-height: 44px;
+    padding: 12px;
+    border-radius: 6px;
+    color: var(--theme-text);
+    font-size: 14px;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+
+    &:hover {
+      background: var(--theme-elevation-100);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--theme-text);
+      outline-offset: 2px;
+    }
+  }
+
+  &__group {
+    margin-left: 12px;
+    border-left: 1px solid var(--theme-elevation-150);
+    padding-left: 4px;
+  }
+
   a {
     display: flex;
     align-items: center;

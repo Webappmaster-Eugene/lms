@@ -16,9 +16,7 @@ import {
   MessagesSquare,
   StickyNote,
   Trophy,
-  ChevronDown,
   Shield,
-  Users,
   User,
   LogOut,
   X,
@@ -28,7 +26,6 @@ import { ThemeToggle } from './ThemeToggle'
 import { SHORTCUTS_OPEN_EVENT } from './KeyboardShortcuts'
 import { cn } from '@/lib/utils'
 import { useSidebar } from './SidebarContext'
-import { ADMIN_NAV_GROUPS, ADMIN_SHORTCUTS, isAdminPathActive } from '@/lib/admin-navigation'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Дашборд', icon: LayoutDashboard },
@@ -44,14 +41,6 @@ const NAV_ITEMS = [
   { href: '/contacts', label: 'Контакты', icon: MessageCircle },
   { href: '/help', label: 'Помощь', icon: HelpCircle },
 ] as const
-
-const ADMIN_ICONS = {
-  '/manage': GraduationCap,
-  '/admin': Shield,
-  '/admin/roadmap-editor': Map,
-  '/admin/collections/users': Users,
-  '/admin/questions': MessagesSquare,
-} as const
 
 export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname()
@@ -86,61 +75,6 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
 
       {/* Navigation */}
       <nav aria-label="Меню платформы" className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {/* Admin-only links */}
-        {isAdmin && (
-          <>
-            <p className="px-3 py-2 text-sm font-semibold text-foreground">Управление</p>
-            {ADMIN_SHORTCUTS.map(({ href, label }) => {
-              const Icon = ADMIN_ICONS[href]
-              const isActive = isAdminPathActive(pathname, href)
-              return (
-                <a
-                  key={href}
-                  href={href}
-                  aria-current={isActive ? 'page' : undefined}
-                  onClick={() => setMobileOpen(false)}
-                  className={cn(
-                    'flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring',
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-                  )}
-                >
-                  <Icon className="h-5 w-5 flex-shrink-0" />
-                  {label}
-                </a>
-              )
-            })}
-            {ADMIN_NAV_GROUPS.map(({ label, items }) => (
-              <details key={label} open={items.some(({ href }) => isAdminPathActive(pathname, href))} className="group">
-                <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
-                  {label}
-                  <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
-                </summary>
-                <div className="ml-3 space-y-1 border-l border-border pl-2">
-                  {items.map(({ href, label: itemLabel }) => {
-                    const isActive = isAdminPathActive(pathname, href)
-                    return (
-                      <a
-                        key={href}
-                        href={href}
-                        aria-current={isActive ? 'page' : undefined}
-                        onClick={() => setMobileOpen(false)}
-                        className={cn(
-                          'flex min-h-[44px] items-center rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-ring',
-                          isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-                        )}
-                      >
-                        {itemLabel}
-                      </a>
-                    )
-                  })}
-                </div>
-              </details>
-            ))}
-          </>
-        )}
-        {isAdmin && <p className="mt-4 border-t border-border px-3 pt-4 pb-2 text-sm font-semibold text-foreground">Обучение</p>}
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href)
           return (
@@ -165,6 +99,17 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
 
       {/* Footer */}
       <div className="border-t border-border p-3 space-y-1">
+        {isAdmin && (
+          <Link
+            href="/admin"
+            prefetch={false}
+            onClick={() => setMobileOpen(false)}
+            className="flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            <Shield aria-hidden="true" className="h-5 w-5 shrink-0" />
+            Админка
+          </Link>
+        )}
         <div className="flex items-center justify-between px-3">
           <div className="flex items-center gap-1">
             <ThemeToggle />
