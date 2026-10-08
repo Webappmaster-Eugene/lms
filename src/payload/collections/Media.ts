@@ -1,24 +1,20 @@
 import type { Access, CollectionConfig } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
+import { learningMediaReadAccess } from '@/server/learning-media-access'
+import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 
 /** Форматы аватара. SVG нельзя: файлы отдаются с нашего домена, и скрипт в SVG дал бы XSS */
 const AVATAR_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024
 
-/** Публичные обложки/аватары сохраняются; видео требуют сессию, в том числе Range. */
-const canReadMedia: Access = ({ req }) => {
-  if (req.user) return true
-  return { mimeType: { not_like: 'video/%' } }
-}
-
 /**
  * Админ загружает любые материалы курса; студент - только картинку для аватара в профиле
  * (/profile/edit). Раньше загрузка была только у админа, и смена аватара всегда падала.
  */
-const canUploadMedia: Access = ({ req }) => {
+const canUploadMedia: Access = async ({ req }) => {
   if (!req.user) return false
-  if (req.user.role === 'admin') return true
+  if ((await getAuthoritativeLearningPolicy(req.payload, req.user.id, req)).role === 'admin') return true
   const file = req.file
   if (!file || !AVATAR_MIME_TYPES.includes(file.mimetype) || file.size > AVATAR_MAX_BYTES) return false
   // mimetype присылает браузер - сверяем с сигнатурой самого файла
@@ -43,11 +39,9 @@ export const Media: CollectionConfig = {
     staticDir: 'media',
     mimeTypes: ['image/*', 'application/pdf', 'video/*', 'application/zip'],
     modifyResponseHeaders: ({ headers }) => {
-      if (headers.get('Content-Type')?.startsWith('video/')) {
-        headers.set('Cache-Control', 'private, no-store')
-        headers.set('Content-Disposition', 'inline')
-        headers.set('X-Content-Type-Options', 'nosniff')
-      }
+      headers.set('Cache-Control', 'private, no-store')
+      headers.set('Content-Disposition', 'inline')
+      headers.set('X-Content-Type-Options', 'nosniff')
       return headers
     },
     imageSizes: [
@@ -67,11 +61,25 @@ export const Media: CollectionConfig = {
   },
   access: {
     create: canUploadMedia,
-    read: canReadMedia,
+    read: learningMediaReadAccess,
     update: isAdmin,
     delete: isAdmin,
   },
+  hooks: {
+    beforeChange: [({ data, req, operation }) => operation === 'create'
+      ? { ...data, uploadedBy: req.user?.id ?? null }
+      : data],
+  },
   fields: [
+    {
+      name: 'uploadedBy',
+      type: 'relationship',
+      relationTo: 'users',
+      index: true,
+      label: 'Загрузил',
+      admin: { readOnly: true },
+      access: { read: ({ req }) => req.user?.role === 'admin' },
+    },
     {
       name: 'alt',
       type: 'text',

@@ -30,7 +30,7 @@ async function loginResponse() {
 }
 
 async function currentUser(token: string) {
-  return payload.auth({ headers: new Headers({ Cookie: `payload-token=${token}` }) })
+  return payload.auth({ headers: new Headers({ Cookie: `payload-token=${token}`, Origin: 'http://lms.test' }) })
 }
 
 describe('сохранение авторизации на 30 дней', () => {
@@ -83,7 +83,7 @@ describe('сохранение авторизации на 30 дней', () => {
       config,
       request: new Request('http://lms.test/api/users/logout', {
         method: 'POST',
-        headers: { Cookie: `payload-token=${token}` },
+        headers: { Cookie: `payload-token=${token}`, Origin: 'http://lms.test' },
       }),
     })
     expect(response.status).toBe(200)
@@ -92,5 +92,24 @@ describe('сохранение авторизации на 30 дней', () => {
     const expiresText = /Expires=([^;]+)/.exec(cookie)?.[1]
     expect(Date.parse(expiresText ?? '')).toBeLessThan(Date.now())
     expect((await currentUser(token)).user).toBeNull()
+  })
+
+  it('штатный REST PATCH не принимает cookie с чужого Origin, включая соседний поддомен', async () => {
+    const { token } = await loginResponse()
+    const previous = await payload.findByID({ collection: 'users', id: student.id })
+    for (const origin of ['https://foreign.example', 'http://evil.lms.test']) {
+      const response = await handleEndpoints({
+        config,
+        request: new Request(`http://lms.test/api/users/${student.id}`, {
+          method: 'PATCH',
+          headers: { Cookie: `payload-token=${token}`, Origin: origin, 'Content-Type': 'application/json', 'Sec-Fetch-Site': 'same-site' },
+          body: JSON.stringify({ firstName: 'Подменено' }),
+        }),
+      })
+      expect(response.status).toBe(403)
+      expect((await payload.findByID({ collection: 'users', id: student.id })).firstName).toBe(previous.firstName)
+    }
+    expect((await payload.auth({ headers: new Headers({ Cookie: `payload-token=${token}`, 'Sec-Fetch-Site': 'none' }) })).user?.id).toBe(student.id)
+    expect((await payload.auth({ headers: new Headers({ Cookie: `payload-token=${token}`, 'Sec-Fetch-Site': 'cross-site' }) })).user).toBeNull()
   })
 })

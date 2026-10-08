@@ -1,4 +1,5 @@
 import { parsePublicResourceUrl } from '@/lib/yandex-disk-url'
+import { lessonAssetUrl } from '@/lib/lesson-asset-source'
 import type { Course, Lesson } from '@/payload-types'
 
 type ContentBlock = NonNullable<Lesson['content']>[number]
@@ -11,10 +12,11 @@ export function isYandexCatalogUrl(rawUrl: string): boolean {
 }
 
 function redactResourceText(value: string, replacements: Map<string, string> = new Map()): string {
-  return value.replace(/https?:\/\/[^\s<>"'()[\]]+/g, (url) => {
+  return value.replace(/https?:\/\/[^\s<>"'()[\]]+/gi, (url) => {
     const replacement = replacements.get(url)
     if (replacement) return replacement
     if (isYandexCatalogUrl(url)) return MATERIALS_NOTICE
+    if (parsePublicResourceUrl(url)) return MATERIALS_NOTICE
     return isLessonVideoUrl(url) ? 'Видео доступно в плеере урока' : url
   })
 }
@@ -26,15 +28,15 @@ function redactResourceTree(value: unknown, replacements: Map<string, string>, f
     const record = value as Record<string, unknown>
     const fields = record.fields && typeof record.fields === 'object' ? record.fields as Record<string, unknown> : null
     const linkUrl = typeof fields?.url === 'string' ? fields.url : record.url
-    if (record.type === 'link' && typeof linkUrl === 'string' && (isYandexCatalogUrl(linkUrl) || isLessonVideoUrl(linkUrl))) {
+    if (record.type === 'link' && typeof linkUrl === 'string' && (parsePublicResourceUrl(linkUrl) || isLessonVideoUrl(linkUrl))) {
       return {
         ...record,
         fields: { ...fields, url: replacements.get(linkUrl) ?? fallbackUrl, newTab: false },
         url: replacements.get(linkUrl) ?? fallbackUrl,
-        children: [{ type: 'text', text: MATERIALS_NOTICE, format: 0, detail: 0, mode: 'normal', style: '', version: 1 }],
+        children: replacements.has(linkUrl) ? record.children : [{ type: 'text', text: MATERIALS_NOTICE, format: 0, detail: 0, mode: 'normal', style: '', version: 1 }],
       }
     }
-    return Object.fromEntries(Object.entries(record).map(([key, child]) => [key, redactResourceTree(child, replacements, fallbackUrl)]))
+    return Object.fromEntries(Object.entries(record).filter(([key]) => key !== 'uploadedBy').map(([key, child]) => [key, redactResourceTree(child, replacements, fallbackUrl)]))
   }
   return value
 }
@@ -86,6 +88,22 @@ export function lessonVideoUrl(lessonId: number, block: ContentBlock, index: num
 /** Не меняет сохранённые блоки: исходники доступны только серверу и редактору. */
 export function protectLessonVideoSources<T extends Pick<Lesson, 'id' | 'content' | 'description'>>(lesson: T): T {
   const replacements = new Map<string, string>()
+  const collectAssetLinks = (value: unknown, blockId: string): void => {
+    if (typeof value === 'string') {
+      for (const match of value.matchAll(/https?:\/\/[^\s<>"'()[\]]+/gi)) {
+        const url = match[0]
+        if (parsePublicResourceUrl(url) && !isYandexCatalogUrl(url) && !isLessonVideoUrl(url)) {
+          replacements.set(url, lessonAssetUrl(lesson.id, blockId, url))
+        }
+      }
+    } else if (Array.isArray(value)) {
+      for (const child of value) collectAssetLinks(child, blockId)
+    } else if (value && typeof value === 'object') {
+      for (const child of Object.values(value)) collectAssetLinks(child, blockId)
+    }
+  }
+  collectAssetLinks(lesson.description, 'description')
+  for (const [index, block] of (lesson.content ?? []).entries()) collectAssetLinks(block, blockVideoId(block, index))
   const blocks = (lesson.content ?? []).map((block, index): ContentBlock => {
     if (block.blockType === 'link' && isYandexCatalogUrl(block.url)) {
       return {

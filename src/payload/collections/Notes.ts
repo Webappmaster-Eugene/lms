@@ -3,6 +3,8 @@ import type { CollectionConfig } from 'payload'
 import { isAuthenticated } from '@/payload/access/isAuthenticated'
 import { isAdminOrSelf } from '@/payload/access/isAdminOrSelf'
 import { assignOwner } from '@/payload/hooks/assignOwner'
+import { guardLearningLessonWrite } from '@/payload/hooks/learningLessonWrite'
+import { learningStateRead } from '@/payload/access/learningStateRead'
 
 export const Notes: CollectionConfig = {
   slug: 'notes',
@@ -12,12 +14,12 @@ export const Notes: CollectionConfig = {
   },
   access: {
     create: isAuthenticated,
-    read: isAdminOrSelf,
+    read: learningStateRead(),
     update: isAdminOrSelf,
     delete: isAdminOrSelf,
   },
   hooks: {
-    beforeChange: [assignOwner],
+    beforeChange: [assignOwner, guardLearningLessonWrite],
   },
   fields: [
     {

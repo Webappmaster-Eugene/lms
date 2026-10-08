@@ -27,7 +27,7 @@ const env = {
   ...process.env,
   DATABASE_URL: databaseUrl(DB),
   PAYLOAD_SECRET: 'e2e-test-secret-not-for-production-000000001',
-  NEXT_PUBLIC_SERVER_URL: `http://localhost:${PORT}`,
+  NEXT_PUBLIC_SERVER_URL: process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`,
   SMTP_HOST: '',
   OTEL_EXPORTER_OTLP_ENDPOINT: '',
   YANDEX_DISK_TOKEN: '',

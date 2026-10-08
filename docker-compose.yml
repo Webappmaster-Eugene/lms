@@ -34,6 +34,8 @@ services:
     depends_on:
       lms-mentor-db:
         condition: service_healthy
+      lms-mentor-otel:
+        condition: service_started
     environment:
       - DATABASE_URL=postgresql://lms:${DB_PASSWORD:-changeme}@lms-mentor-db:5432/lms_platform
       - PAYLOAD_SECRET=${PAYLOAD_SECRET}
@@ -48,7 +50,7 @@ services:
       - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS:-noreply@mentorcareer.ru}
       - EMAIL_FROM_NAME=${EMAIL_FROM_NAME:-MentorCareer}
       # OpenTelemetry
-      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT-http://lms-mentor-otel:4318}
       - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-lms-platform}
     volumes:
       - lms-media:/app/media
@@ -69,6 +71,43 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+
+  lms-mentor-otel:
+    build:
+      context: ./observability
+      dockerfile: Dockerfile.collector
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - GOMEMLIMIT=144MiB
+      - LMS_PROMETHEUS_REMOTE_WRITE_ENDPOINT=${LMS_PROMETHEUS_REMOTE_WRITE_ENDPOINT:-http://prometheus:9090/api/v1/write}
+      - LMS_LOKI_OTLP_ENDPOINT=${LMS_LOKI_OTLP_ENDPOINT:-http://loki:3100/otlp}
+      - LMS_TEMPO_OTLP_GRPC_ENDPOINT=${LMS_TEMPO_OTLP_GRPC_ENDPOINT:-tempo:4317}
+    volumes:
+      - ./observability/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    tmpfs:
+      - /tmp:size=8m,mode=1777
+    networks:
+      - dokploy-network
+    healthcheck:
+      test: ["CMD", "/bin/busybox", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:13133/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   lms-mentor-landing:
     build:

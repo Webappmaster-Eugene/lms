@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
+import { createLocalReq } from 'payload'
 import Link from 'next/link'
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 import { LessonLearningProvider } from '@/components/lesson/LessonLearningProvider'
@@ -18,6 +19,8 @@ import { collectAllPages } from '@/lib/paginate'
 import { relationKey } from '@/lib/course-lessons'
 import { lessonPosition, orderCourseLessons, type LessonPosition } from '@/lib/roadmap-next-step'
 import { protectLessonVideoSources } from '@/lib/lesson-video-source'
+import { getLearningAccess } from '@/server/learning-access'
+import { recordLearningAccess } from '@/lib/learning-observability'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -26,10 +29,14 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const payload = await getPayload()
+  const { user } = await payload.auth({ headers: await headers() })
+  if (!user) return { title: 'Урок' }
   const result = await payload.find({
     collection: 'lessons',
     where: { slug: { equals: slug }, isPublished: { equals: true } },
     limit: 1,
+    depth: 0,
+    select: { title: true },
   })
   const lesson = result.docs[0]
   return { title: lesson?.title ?? 'Урок' }
@@ -40,6 +47,34 @@ export default async function LessonPage({ params }: Props) {
   const payload = await getPayload()
   const headersList = await headers()
   const { user } = await payload.auth({ headers: headersList })
+  if (!user) redirect(`/login?redirect=${encodeURIComponent(`/lessons/${slug}`)}`)
+  const req = await createLocalReq({ user }, payload)
+  const policy = await getLearningAccess(payload, user, req)
+
+  // Catalog metadata is safe to preview; fetch the learning material only after authorization.
+  const metadataResult = await payload.find({
+    collection: 'lessons',
+    where: { slug: { equals: slug }, isPublished: { equals: true } },
+    limit: 1,
+    depth: 0,
+    select: { title: true, slug: true, course: true, section: true, isPublished: true },
+    overrideAccess: true,
+    req,
+  })
+  const metadata = metadataResult.docs[0]
+  if (!metadata) return notFound()
+  if (!policy.canBrowseLessonMetadata(metadata)) return notFound()
+  if (!policy.canAccessLessonMetadata(metadata)) {
+    recordLearningAccess({ resource: 'lesson', outcome: 'deny', reason: 'restricted', userId: user.id, resourceId: metadata.id })
+    return (
+      <div className="mx-auto max-w-2xl space-y-5 rounded-xl border border-border bg-card p-6">
+        <p className="text-sm text-muted-foreground">Программа обучения</p>
+        <h1 className="text-2xl font-bold text-foreground">{metadata.title}</h1>
+        <p className="text-muted-foreground">Доступ к этому уроку пока не назначен. Вы можете посмотреть программу и обратиться к ментору, чтобы обсудить обучение.</p>
+        <Link href="/roadmaps" className="inline-flex rounded-lg bg-primary px-4 py-2 text-primary-foreground">Посмотреть роадмапы</Link>
+      </div>
+    )
+  }
 
   // Загружаем урок
   const lessonResult = await payload.find({
@@ -50,6 +85,10 @@ export default async function LessonPage({ params }: Props) {
     },
     limit: 1,
     depth: 2,
+    // Source IDs are derived before redaction; the policy above authorizes this server-only read.
+    overrideAccess: true,
+    user,
+    req,
   })
 
   const lesson = lessonResult.docs[0]
@@ -64,7 +103,7 @@ export default async function LessonPage({ params }: Props) {
     order: number
     lessons: Array<{ id: string; title: string; slug: string; order: number }>
   }> = []
-  let allCourseLessons: typeof lessonResult.docs = []
+  let allCourseLessons: { id: number }[] = []
   let completedLessonIds = new Set<string>()
   let position: LessonPosition | null = null
 
@@ -74,6 +113,8 @@ export default async function LessonPage({ params }: Props) {
         ({ page, limit }) =>
           payload.find({
             collection: 'sections',
+            select: { title: true, course: true, isPublished: true, order: true },
+            depth: 0,
             where: {
               course: { equals: course.id },
               isPublished: { equals: true },
@@ -88,6 +129,8 @@ export default async function LessonPage({ params }: Props) {
         ({ page, limit }) =>
           payload.find({
             collection: 'lessons',
+            select: { title: true, slug: true, course: true, section: true, order: true, isPublished: true },
+            depth: 0,
             where: {
               course: { equals: course.id },
               isPublished: { equals: true },
@@ -105,7 +148,7 @@ export default async function LessonPage({ params }: Props) {
     // Порядок как на странице курса: секции по их порядку, уроки скрытых секций не участвуют.
     const sectionRank = new Map(sectionDocs.map((section, index) => [String(section.id), index]))
     const ordered = orderCourseLessons(
-      lessonDocs.map((l) => ({
+      lessonDocs.filter((l) => policy.canAccessLessonMetadata(l)).map((l) => ({
         id: String(l.id),
         slug: l.slug,
         title: l.title,
@@ -148,7 +191,7 @@ export default async function LessonPage({ params }: Props) {
     const sectionMap = new Map<string, typeof lessonDocs>()
     const unsectioned: typeof lessonDocs = []
 
-    for (const l of lessonDocs) {
+    for (const l of lessonDocs.filter((item) => policy.canAccessLessonMetadata(item))) {
       const sectionId = typeof l.section === 'object'
         ? l.section?.id ? String(l.section.id) : null
         : l.section ? String(l.section) : null
@@ -217,7 +260,8 @@ export default async function LessonPage({ params }: Props) {
 
   const bookmarkId = user ? await findBookmarkId(payload, user.id, { lesson: lesson.id }) : null
 
-  const blocks = (user?.role === 'admin' ? lesson : protectLessonVideoSources(lesson)).content ?? []
+  const visibleLesson = user.role === 'admin' ? lesson : protectLessonVideoSources(lesson)
+  const blocks = visibleLesson.content ?? []
 
   const hasSidebar = sidebarSections.length > 0
   const totalLessons = allCourseLessons.length
@@ -247,8 +291,8 @@ export default async function LessonPage({ params }: Props) {
             {user?.role === 'admin' && <Link href={`/manage/lessons/${lesson.id}`} className="inline-flex min-h-[44px] items-center rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">Редактировать урок</Link>}
             {user && <BookmarkButton target={{ lesson: lesson.id }} initialId={bookmarkId} />}
           </div>
-          {lesson.description && (
-            <p className="text-muted-foreground">{lesson.description}</p>
+          {visibleLesson.description && (
+            <p className="text-muted-foreground">{visibleLesson.description}</p>
           )}
           {(position || lesson.estimatedMinutes) && (
             <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">

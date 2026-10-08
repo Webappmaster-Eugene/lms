@@ -48,6 +48,21 @@ describe('фильтр каталога', () => {
 })
 
 describe('каталог', () => {
+  it('показывает программу закрытого курса и количество назначенных уроков', () => {
+    render(<CourseCatalog courses={[course('closed', { accessAllowed: false }), course('partial', { accessAllowed: true, accessibleLessons: 1 })]} />)
+    expect(screen.getByRole('link', { name: /Курс closed/ })).toHaveAttribute('href', '/courses/c-closed')
+    expect(screen.getByText('Доступ не назначен · Посмотреть программу')).toBeInTheDocument()
+    expect(screen.getByText('Доступно 1 из 4 уроков')).toBeInTheDocument()
+  })
+
+  it('по фильтру назначений оставляет полный и частичный доступ', async () => {
+    render(<CourseCatalog courses={[course('closed', { accessAllowed: false }), course('partial', { accessAllowed: true, accessibleLessons: 1 }), course('full', { accessAllowed: true })]} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Назначенные мне' }))
+    expect(screen.queryByRole('link', { name: /Курс closed/ })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('link')).toHaveLength(2)
+    await userEvent.click(screen.getByRole('button', { name: 'Весь каталог' }))
+    expect(screen.getAllByRole('link')).toHaveLength(3)
+  })
   it('фильтр «В процессе» оставляет начатые курсы', async () => {
     render(<CourseCatalog courses={courses} />)
 

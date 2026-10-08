@@ -16,7 +16,17 @@ function cleanupDependents(
   return async ({ req, id }) => {
     for (const { collection, field } of dependents) {
       try {
-        await req.payload.delete({ req, collection, where: { [field]: { equals: id } } })
+        const capability = collection === 'learning-access-policies' ? 'syncLearningAccessPolicy' : collection === 'auth-session-revocations' ? 'syncAuthSessionRevocations' : null
+        const previousCapability = capability ? req.context[capability] : undefined
+        if (capability) req.context[capability] = true
+        try {
+          await req.payload.delete({ req, collection, where: { [field]: { equals: id } } })
+        } finally {
+          if (capability) {
+            if (previousCapability === undefined) delete req.context[capability]
+            else req.context[capability] = previousCapability
+          }
+        }
       } catch (error) {
         logger.error(`Не удалось очистить связи: ${label}`, error, { 'doc.id': String(id), collection })
         throw error
@@ -27,6 +37,9 @@ function cleanupDependents(
 
 /** Всё, что принадлежит пользователю: прогресс, баллы, достижения, заметки, уведомления */
 export const cleanupUserRelations = cleanupDependents('пользователь', [
+  { collection: 'auth-session-revocations', field: 'user' },
+  { collection: 'learning-access-policies', field: 'user' },
+  { collection: 'learning-access-grants', field: 'user' },
   { collection: 'lesson-learning-states', field: 'user' },
   { collection: 'user-progress', field: 'user' },
   { collection: 'user-trainer-progress', field: 'user' },

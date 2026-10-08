@@ -149,11 +149,22 @@ async function fetchWithRetry(
   const response = await fetch(url, init)
 
   if (response.ok) return response
+  await response.body?.cancel()
 
   // 429 Too Many Requests или 5xx — ретраим
   if ((response.status === 429 || response.status >= 500) && attempt < MAX_RETRIES) {
     const delay = RETRY_DELAY_MS * Math.pow(2, attempt - 1)
-    await new Promise((resolve) => setTimeout(resolve, delay))
+    await new Promise<void>((resolve, reject) => {
+      const signal = init.signal
+      const abort = () => {
+        clearTimeout(timer)
+        signal?.removeEventListener('abort', abort)
+        reject(new DOMException('Request aborted', 'AbortError'))
+      }
+      const timer = setTimeout(() => { signal?.removeEventListener('abort', abort); resolve() }, delay)
+      signal?.addEventListener('abort', abort, { once: true })
+      if (signal?.aborted) abort()
+    })
     return fetchWithRetry(url, init, attempt + 1)
   }
 
@@ -187,7 +198,7 @@ export class YandexDiskError extends Error {
  */
 export async function fetchPublicDownloadHref(
   ref: PublicResourceRef,
-  options: { token?: string } = {},
+  options: { token?: string; signal?: AbortSignal } = {},
 ): Promise<string> {
   const url = new URL(`${YD_API_BASE}/download`)
   url.searchParams.set('public_key', ref.publicKey)
@@ -200,7 +211,7 @@ export async function fetchPublicDownloadHref(
     headers['Authorization'] = `OAuth ${options.token}`
   }
 
-  const response = await fetchWithRetry(url.toString(), { headers })
+  const response = await fetchWithRetry(url.toString(), { headers, ...(options.signal ? { signal: options.signal } : {}) })
   const data: { href?: string } = await response.json()
 
   if (!data.href) {

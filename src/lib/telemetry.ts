@@ -1,8 +1,31 @@
-import { trace, SpanStatusCode, type Span, type Tracer, type Attributes } from '@opentelemetry/api'
+import { isSpanContextValid, trace, SpanStatusCode, type Span, type Tracer, type Attributes } from '@opentelemetry/api'
 import { logs, SeverityNumber } from '@opentelemetry/api-logs'
 
 const TRACER_NAME = 'lms'
 const LOGGER_NAME = 'lms'
+const SENSITIVE_LOG_ATTRIBUTE = /email|password|token|secret|cookie|authorization|stack|^(?:error\.message|exception\.message)$/i
+
+function safeLogText(value: string): string {
+  return value
+    .replace(/\b(?:https?|postgres(?:ql)?|redis|rediss):\/\/[^\s"'<>]+/gi, '[redacted URL]')
+    .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '[redacted email]')
+    .replace(/\b(password|token|secret|authorization|cookie|public_key|private_key)\s*[:=]\s*(?:["'][^"']*["']|[^\s,;]+)/gi, '$1=[redacted]')
+}
+
+function safeLogAttributes(attributes: Attributes | undefined): Attributes {
+  const safe: Attributes = {}
+  for (const [key, value] of Object.entries(attributes ?? {})) {
+    if (SENSITIVE_LOG_ATTRIBUTE.test(key)) continue
+    if (typeof value === 'string') safe[key] = safeLogText(value)
+    else if (typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) safe[key] = value
+  }
+  const correlation = trace.getActiveSpan()?.spanContext()
+  if (correlation && isSpanContextValid(correlation)) {
+    safe.trace_id = correlation.traceId
+    safe.span_id = correlation.spanId
+  }
+  return safe
+}
 
 /** Returns a Tracer from the global TracerProvider (set by NodeSDK in instrumentation.node.ts). */
 export function getTracer(name: string = TRACER_NAME): Tracer {
@@ -56,17 +79,19 @@ export async function withSpan<T>(
  * и отладка на проде превращается в гадание.
  */
 function emit(severity: SeverityNumber, severityText: string, message: string, attrs?: Attributes): void {
+  const safeMessage = safeLogText(message)
+  const safeAttributes = safeLogAttributes(attrs)
   const otelLogger = logs.getLogger(LOGGER_NAME)
   otelLogger.emit({
     severityNumber: severity,
     severityText,
-    body: message,
-    attributes: attrs,
+    body: safeMessage,
+    attributes: safeAttributes,
   })
 
   if (severity >= SeverityNumber.WARN) {
-    const details = attrs && Object.keys(attrs).length > 0 ? ` ${JSON.stringify(attrs)}` : ''
-    console.error(`[${severityText}] ${message}${details}`)
+    const details = Object.keys(safeAttributes).length > 0 ? ` ${JSON.stringify(safeAttributes)}` : ''
+    console.error(`[${severityText}] ${safeMessage}${details}`)
   }
 }
 

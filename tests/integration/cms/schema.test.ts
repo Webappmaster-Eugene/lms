@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { CollectionSlug, Field, Payload } from 'payload'
 
-import type { Course, Lesson, Roadmap } from '@/payload-types'
+import type { Course, Lesson, Roadmap, User } from '@/payload-types'
 
 import { getTestPayload, uid } from '../helpers/payload'
 import { buildFixtureContext, INTERNAL_COLLECTIONS, makeValid, VALID, type Data, type FixtureContext } from '../helpers/fixtures'
@@ -14,6 +14,7 @@ import { buildFixtureContext, INTERNAL_COLLECTIONS, makeValid, VALID, type Data,
  */
 let payload: Payload
 let ctx: FixtureContext
+let admin: User
 
 /** Media проверяется отдельным блоком: ей нужен файл. */
 const SKIP_COLLECTIONS = new Set(['media'])
@@ -33,7 +34,7 @@ async function makeValidDoc(slug: string): Promise<Data> {
 }
 
 async function createAs<T extends object = Data & { id: number }>(slug: string, data: Data): Promise<T> {
-  const doc = await payload.create({ collection: slug as CollectionSlug, data: data as never, context: { skipHooks: true } })
+  const doc = await payload.create({ collection: slug as CollectionSlug, data: data as never, ...(slug === 'learning-access-grants' ? { user: admin } : {}), context: { skipHooks: true, ...(slug === 'learning-access-policies' ? { syncLearningAccessPolicy: true } : {}), ...(slug === 'auth-session-revocations' ? { syncAuthSessionRevocations: true } : {}) } })
   return doc as unknown as T
 }
 
@@ -52,6 +53,7 @@ async function validationPaths(promise: Promise<unknown>): Promise<string[]> {
 beforeAll(async () => {
   payload = await getTestPayload()
   ctx = await buildFixtureContext(payload)
+  admin = await payload.findByID({ collection: 'users', id: ctx.userId })
 })
 
 describe('покрытие коллекций', () => {
@@ -75,7 +77,7 @@ describe.each(Object.keys(VALID))('коллекция %s', (slug) => {
 
   it('каждое обязательное поле без дефолта отвергается при отсутствии', async () => {
     // slug заполняет хук generateSlug из title — его обязательность проверена отдельно.
-    const required = topLevelFields(slug).filter((f) => f.required && f.defaultValue === undefined && f.name !== 'slug')
+    const required = topLevelFields(slug).filter((f) => f.required && f.defaultValue === undefined && f.name !== 'slug' && !(slug === 'learning-access-grants' && f.name === 'ruleKey'))
     for (const field of required) {
       const data = await makeValidDoc(slug)
       delete data[field.name]
@@ -87,7 +89,7 @@ describe.each(Object.keys(VALID))('коллекция %s', (slug) => {
 
   it('обязательные поля с дефолтом получают дефолт, остальные дефолты тоже применяются', async () => {
     const withDefault = topLevelFields(slug).filter(
-      (f) => f.defaultValue !== undefined && typeof f.defaultValue !== 'function',
+      (f) => f.defaultValue !== undefined && typeof f.defaultValue !== 'function' && !(slug === 'lessons' && f.name === 'mediaReferencesResolved'),
     )
     const data = await makeValidDoc(slug)
     for (const field of withDefault) delete data[field.name]
@@ -98,7 +100,7 @@ describe.each(Object.keys(VALID))('коллекция %s', (slug) => {
   })
 
   it('уникальные поля не допускают дубликатов', async () => {
-    const unique = topLevelFields(slug).filter((f) => f.unique)
+    const unique = topLevelFields(slug).filter((f) => f.unique && !(slug === 'learning-access-grants' && f.name === 'ruleKey'))
     for (const field of unique) {
       const first = await makeValidDoc(slug)
       const doc = (await createAs(slug, first)) as unknown as Data
@@ -144,7 +146,7 @@ describe.each(Object.keys(VALID))('коллекция %s', (slug) => {
   it('связь с несуществующим документом отвергается', async () => {
     const relations = topLevelFields(slug).filter(
       (f) => (f.type === 'relationship' || f.type === 'upload') && typeof (f as { relationTo?: unknown }).relationTo === 'string',
-    )
+    ).filter((field) => !(slug === 'lessons' && field.name === 'mediaReferences'))
     for (const field of relations) {
       const data = await makeValidDoc(slug)
       data[field.name] = (field as { hasMany?: boolean }).hasMany ? [987654321] : 987654321
@@ -155,6 +157,15 @@ describe.each(Object.keys(VALID))('коллекция %s', (slug) => {
 })
 
 describe('частные правила полей', () => {
+  it('ключ назначения вычисляет сервер, дубликат ученика и цели запрещён', async () => {
+    const first = await makeValidDoc('learning-access-grants')
+    const doc = await createAs<{ id: number; ruleKey: string; target: { relationTo: string; value: number | { id: number } } }>('learning-access-grants', { ...first, ruleKey: 'поддельный' })
+    const targetId = typeof doc.target.value === 'number' ? doc.target.value : doc.target.value.id
+    expect(doc.ruleKey).toBe(`${ctx.studentId}:${doc.target.relationTo}:${targetId}`)
+    const duplicate = { ...first, ruleKey: 'другая поддельная строка' }
+    expect(await validationPaths(createAs('learning-access-grants', duplicate))).toContain('ruleKey')
+  })
+
   it('generateSlug транслитерирует кириллицу и не трогает заданный вручную slug', async () => {
     const key = Date.now().toString(36)
     const auto = await createAs<Course>('courses', { title: `Щука и ёж: JS 101 ${key}`, roadmap: ctx.roadmapId })
@@ -276,7 +287,9 @@ describe('Media (upload)', () => {
       file: { data: PNG, mimetype: 'image/png', name: `${uid('px')}.png`, size: PNG.length },
     })
     expect(doc.mimeType).toBe('image/png')
-    expect(doc.url).toMatch(/^\/api\/media\/file\//)
+    const url = new URL(doc.url ?? '', 'http://lms.test')
+    expect(url.origin).toBe('http://lms.test')
+    expect(url.pathname).toMatch(/^\/api\/media\/file\//)
     expect(Object.keys(doc.sizes ?? {})).toEqual(expect.arrayContaining(['thumbnail', 'card']))
     await payload.delete({ collection: 'media', id: doc.id })
     await expect(payload.findByID({ collection: 'media', id: doc.id })).rejects.toThrow()

@@ -17,6 +17,7 @@ export const LinkBlock: Block = {
     {
       name: 'url',
       type: 'text',
+      index: true,
       required: true,
       label: 'URL',
     },

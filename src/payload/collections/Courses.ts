@@ -1,9 +1,11 @@
 import type { CollectionConfig } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
-import { isPublishedOrAdmin } from '@/payload/access/isPublishedOrAdmin'
+import { learningCourseRead } from '@/payload/access/learningCatalogRead'
 import { generateSlug } from '@/payload/hooks/generateSlug'
 import { protectCourseSources } from '@/payload/hooks/protectCourseSources'
+import { cleanupLearningTargetGrants } from '@/payload/hooks/learningAccessCleanup'
+import { learningCourseDescriptionRead } from '@/payload/access/learningCourseDescription'
 
 export const Courses: CollectionConfig = {
   slug: 'courses',
@@ -14,11 +16,12 @@ export const Courses: CollectionConfig = {
   },
   access: {
     create: isAdmin,
-    read: isPublishedOrAdmin,
+    read: learningCourseRead,
     update: isAdmin,
     delete: isAdmin,
   },
   hooks: {
+    beforeDelete: [cleanupLearningTargetGrants('courses')],
     afterRead: [protectCourseSources],
     beforeValidate: [generateSlug],
   },
@@ -43,6 +46,7 @@ export const Courses: CollectionConfig = {
     {
       name: 'description',
       type: 'richText',
+      access: { read: learningCourseDescriptionRead },
       label: 'Описание',
     },
     {

@@ -2,7 +2,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { buildConfig } from 'payload'
-import { postgresAdapter } from '@payloadcms/db-postgres'
+import { securePostgresAdapter } from '@/server/secure-postgres-adapter'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import sharp from 'sharp'
 
@@ -17,6 +17,10 @@ import { Sections } from '@/payload/collections/Sections'
 import { Lessons } from '@/payload/collections/Lessons'
 import { Media } from '@/payload/collections/Media'
 import { LessonLearningStates } from '@/payload/collections/LessonLearningStates'
+import { LearningAccessGrants } from '@/payload/collections/LearningAccessGrants'
+import { LearningAccessAudit } from '@/payload/collections/LearningAccessAudit'
+import { LearningAccessPolicies } from '@/payload/collections/LearningAccessPolicies'
+import { AuthSessionRevocations } from '@/payload/collections/AuthSessionRevocations'
 import { UserProgress } from '@/payload/collections/UserProgress'
 import { Achievements } from '@/payload/collections/Achievements'
 import { UserAchievements } from '@/payload/collections/UserAchievements'
@@ -37,8 +41,12 @@ import { SiteSettings } from '@/payload/globals/SiteSettings'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
+const serverURL = new URL(process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000').origin
 
 export default buildConfig({
+  serverURL,
+  // Payload's empty default accepts cookie authentication from every Origin.
+  csrf: [serverURL],
   admin: {
     user: Users.slug,
     importMap: {
@@ -51,6 +59,10 @@ export default buildConfig({
     components: {
       beforeNavLinks: ['/components/roadmap-editor/NavLink#RoadmapEditorNavLink'],
       views: {
+        learningAccess: {
+          Component: '/components/learning-access/LearningAccessView#LearningAccessView',
+          path: '/learning-access',
+        },
         roadmapEditor: {
           Component: '/components/roadmap-editor/RoadmapEditorView',
           path: '/roadmap-editor/:segments*',
@@ -70,6 +82,10 @@ export default buildConfig({
     Media,
     UserProgress,
     LessonLearningStates,
+    LearningAccessGrants,
+    LearningAccessAudit,
+    LearningAccessPolicies,
+    AuthSessionRevocations,
     Achievements,
     UserAchievements,
     PointsTransactions,
@@ -91,7 +107,7 @@ export default buildConfig({
 
   editor: lexicalEditor(),
 
-  db: postgresAdapter({
+  db: securePostgresAdapter({
     pool: {
       connectionString: process.env.DATABASE_URL,
     },

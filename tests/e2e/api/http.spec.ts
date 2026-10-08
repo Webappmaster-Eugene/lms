@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { CONTENT, USERS } from '../fixtures/data'
-import { storageStateOf } from '../fixtures/env'
+import { APP_URL, storageStateOf } from '../fixtures/env'
 
 /**
  * HTTP-уровень поверх настоящего `next start`: заголовки безопасности,
@@ -41,7 +41,7 @@ test.describe('REST по cookie-сессии', () => {
   })
 
   test('логин ставит HttpOnly cookie, /users/me отдаёт пользователя, logout её снимает', async ({ playwright, baseURL }) => {
-    const api = await playwright.request.newContext({ baseURL })
+    const api = await playwright.request.newContext({ baseURL, extraHTTPHeaders: { Origin: APP_URL } })
     const login = await api.post('/api/users/login', { data: { email: USERS.leader.email, password: USERS.leader.password } })
     expect(login.status()).toBe(200)
     const setCookie = login.headers()['set-cookie'] ?? ''

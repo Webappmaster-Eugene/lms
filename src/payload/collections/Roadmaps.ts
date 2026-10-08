@@ -3,6 +3,8 @@ import type { CollectionConfig } from 'payload'
 import { isAdmin } from '@/payload/access/isAdmin'
 import { isPublishedOrAdmin } from '@/payload/access/isPublishedOrAdmin'
 import { generateSlug } from '@/payload/hooks/generateSlug'
+import { protectRoadmapSources } from '@/payload/hooks/protectCourseSources'
+import { cleanupLearningTargetGrants } from '@/payload/hooks/learningAccessCleanup'
 import {
   normalizeLexicalAfterRead,
   normalizeLexicalBeforeValidate,
@@ -22,6 +24,8 @@ export const Roadmaps: CollectionConfig = {
     delete: isAdmin,
   },
   hooks: {
+    afterRead: [protectRoadmapSources],
+    beforeDelete: [cleanupLearningTargetGrants('roadmaps')],
     beforeValidate: [generateSlug],
   },
   fields: [

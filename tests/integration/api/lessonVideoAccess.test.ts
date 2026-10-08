@@ -58,7 +58,8 @@ describe('источники видео в REST и Media Range', () => {
     expect(learner.status).toBe(200)
     expect(JSON.stringify(learner.json)).not.toContain(VIDEO)
     expect(JSON.stringify(learner.json)).toContain(`/api/yandex-disk/stream?lesson=${tree.lessons[0].id}`)
-    expect(JSON.stringify(learner.json)).toContain(`${ROOT}/source.zip`)
+    expect(JSON.stringify(learner.json)).not.toContain(ROOT)
+    expect(JSON.stringify(learner.json)).toContain(`/api/learning-assets?lesson=${tree.lessons[0].id}`)
     expect(learner.json.content).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'root-1', blockType: 'text' })]))
     const editor = await rest('GET', path, { token: adminToken })
     expect(JSON.stringify(editor.json)).toContain(VIDEO)
@@ -98,8 +99,9 @@ describe('источники видео в REST и Media Range', () => {
   it('ID-видео Media продолжает работать после redaction без обращения к Яндексу', async () => {
     const url = `http://lms.test/api/yandex-disk/stream?lesson=${tree.lessons[0].id}&block=media-1`
     const response = await stream(new Request(url, { headers: { Authorization: `JWT ${studentToken}` } }))
-    expect(response.status).toBe(302)
-    expect(response.headers.get('Location')).toBe(`/api/media/file/${filename}`)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Location')).toBeNull()
+    expect((await response.arrayBuffer()).byteLength).toBe(32)
     expect(response.headers.get('Cache-Control')).toBe('private, no-store')
     expect((await stream(new Request(url))).status).toBe(401)
   })

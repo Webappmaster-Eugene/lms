@@ -9,8 +9,12 @@ function slugs(directory: string) {
     const source = readFileSync(`${path}/${name}`, 'utf8')
     const slug = source.match(/slug:\s*'([^']+)'/)?.[1]
     expect(slug, `нет slug в ${name}`).toBeDefined()
+    if (slug === 'auth-session-revocations' || slug === 'learning-access-policies') {
+      expect(source).toMatch(/hidden:\s*true/)
+      return undefined
+    }
     return slug
-  })
+  }).filter((slug) => slug !== undefined)
 }
 
 describe('полнота меню управления', () => {

@@ -3,10 +3,20 @@ export const ADMIN_SHORTCUTS = [
   { href: '/admin', label: 'CMS и настройки' },
   { href: '/admin/roadmap-editor', label: 'Редактор роадмапов' },
   { href: '/admin/collections/users', label: 'Ученики и администраторы' },
+  { href: '/admin/learning-access', label: 'Назначения обучения' },
   { href: '/admin/questions', label: 'Вопросы учеников' },
 ] as const
 
 export const ADMIN_NAV_GROUPS = [
+  {
+    label: 'Доступ учеников',
+    items: [
+      { href: '/admin/learning-access', label: 'Назначения обучения' },
+      { href: '/admin/collections/users', label: 'Ученики и администраторы' },
+      { href: '/admin/collections/learning-access-grants', label: 'Правила доступа' },
+      { href: '/admin/collections/learning-access-audit', label: 'Журнал назначений' },
+    ],
+  },
   {
     label: 'Настройки контента в CMS',
     items: [

@@ -15,14 +15,15 @@ export function NodeCourseList({ courses }: { courses: NodeCourse[] }) {
         const percent = course.totalLessons > 0 ? Math.round((course.completedLessons / course.totalLessons) * 100) : 0
         const isCompleted = course.totalLessons > 0 && course.completedLessons === course.totalLessons
         const isBlocked = course.blockedBy.length > 0
+        const accessDenied = course.accessAllowed === false
 
         return (
           <li key={course.slug} className="rounded-lg border border-border bg-background p-3">
             <div className="flex items-start gap-2">
-              {isCompleted ? (
+              {accessDenied ? (
+                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-label="Доступ не назначен" />
+              ) : isCompleted ? (
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-label="Пройден" />
-              ) : isBlocked ? (
-                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-label="Закрыт" />
               ) : null}
               <Link
                 href={`/courses/${course.slug}`}
@@ -49,8 +50,8 @@ export function NodeCourseList({ courses }: { courses: NodeCourse[] }) {
               />
             </div>
 
-            {isBlocked ? (
-              <p className="mt-2 text-xs text-muted-foreground">Откроется после курсов: {course.blockedBy.join(', ')}</p>
+            {accessDenied ? (
+              <p className="mt-2 text-xs text-muted-foreground">Доступ к обучению не назначен. Программу курса можно посмотреть.</p>
             ) : course.nextLesson ? (
               <Link
                 href={`/lessons/${course.nextLesson.slug}`}
@@ -62,6 +63,10 @@ export function NodeCourseList({ courses }: { courses: NodeCourse[] }) {
                 <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               </Link>
             ) : null}
+            {!accessDenied && isBlocked && <p className="mt-2 text-xs text-muted-foreground">Рекомендуем сначала пройти курсы: {course.blockedBy.join(', ')}</p>}
+            {!accessDenied && course.accessibleLessons !== undefined && course.accessibleLessons < course.totalLessons && (
+              <p className="mt-2 text-xs text-muted-foreground">Доступно {course.accessibleLessons} из {course.totalLessons} уроков</p>
+            )}
           </li>
         )
       })}

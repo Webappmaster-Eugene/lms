@@ -10,6 +10,8 @@ const VIDEO = `${ROOT}/course/lesson.mp4`
 const findByID = vi.fn()
 const payload = { findByID } as unknown as Payload
 const student = { id: 1, role: 'student' as const }
+const { canAccessLesson } = vi.hoisted(() => ({ canAccessLesson: vi.fn(async () => true) }))
+vi.mock('@/server/learning-access', () => ({ canAccessLesson }))
 const params = () => new URLSearchParams({ lesson: '42', block: 'video-1' })
 const lesson = () => ({
   id: 42, isPublished: true,
@@ -21,6 +23,7 @@ const lesson = () => ({
 beforeEach(() => {
   findByID.mockReset()
   findByID.mockResolvedValue(lesson())
+  canAccessLesson.mockResolvedValue(true)
 })
 
 describe('источник только из опубликованного урока', () => {
@@ -74,6 +77,27 @@ describe('источник только из опубликованного ур
     expect(await resolveLessonVideoSource(payload, { id: 2, role: 'admin' }, source)).toMatchObject({ kind: 'yandex' })
     expect(findByID).not.toHaveBeenCalled()
   })
+
+  it('назначение проверяется до выдачи исходника даже для опубликованного урока', async () => {
+    canAccessLesson.mockResolvedValue(false)
+    await expect(resolveLessonVideoSource(payload, student, params())).rejects.toMatchObject({ status: 403 })
+    expect(canAccessLesson).toHaveBeenCalledWith(payload, student, expect.objectContaining({ id: 42 }))
+  })
+
+  it('выдаёт файл по opaque asset ID, но не отдаёт каталог общей папки', async () => {
+    const { lessonAssetToken } = await import('@/lib/lesson-asset-source')
+    const doc = lesson()
+    doc.content[0].videoUrl = `${ROOT}/source.zip`
+    findByID.mockResolvedValue(doc)
+    const assetParams = params()
+    assetParams.set('asset', lessonAssetToken(`${ROOT}/source.zip`))
+    expect(await resolveLessonVideoSource(payload, student, assetParams, true)).toMatchObject({ kind: 'yandex', ref: { path: '/source.zip' } })
+    assetParams.set('asset', 'forged')
+    await expect(resolveLessonVideoSource(payload, student, assetParams, true)).rejects.toMatchObject({ status: 404 })
+    doc.content[0].videoUrl = ROOT
+    assetParams.delete('asset')
+    await expect(resolveLessonVideoSource(payload, student, assetParams, true)).rejects.toMatchObject({ status: 404 })
+  })
 })
 
 describe('данные, переданные ученику', () => {
@@ -95,8 +119,8 @@ describe('данные, переданные ученику', () => {
     expect(JSON.stringify(protectedDoc)).not.toContain(VIDEO)
     expect(protectedDoc.content?.[2].blockType).toBe('text')
     expect(protectedDoc.content?.[3].blockType).toBe('video')
-    expect(JSON.stringify(protectedDoc)).toContain(`${ROOT}/source.zip`)
-    expect(JSON.stringify(protectedDoc)).toContain(`${ROOT}/slides.pdf`)
+    expect(JSON.stringify(protectedDoc)).not.toContain(ROOT)
+    expect(JSON.stringify(protectedDoc)).toContain('/api/learning-assets?lesson=42')
     expect(raw.content[0]).toMatchObject({ videoUrl: VIDEO, displayMode: 'link' })
     expect(protectedDoc.content?.[1]).toMatchObject({ videoUrl: '/api/yandex-disk/stream?lesson=42&block=v2&format=ts' })
   })
@@ -116,5 +140,23 @@ describe('данные, переданные ученику', () => {
   it('повторная защита сохраняет стабильные ID и URL', () => {
     const once = protectLessonVideoSources({ id: 42, content: content() })
     expect(protectLessonVideoSources(once)).toEqual(once)
+  })
+
+  it('очищает адрес Диска с заглавным протоколом в описании и Lexical-ссылке', () => {
+    const source = 'HTTPS://DISK.YANDEX.RU/d/private-library/slides.pdf'
+    const safe = protectLessonVideoSources({ id: 42, description: `Слайды: ${source}`, content: [{
+      id: 'uppercase', blockType: 'text', content: { root: {
+        type: 'root', direction: 'ltr', format: '', indent: 0, version: 1,
+        children: [{ type: 'paragraph', version: 1, children: [{ type: 'link', version: 3, fields: { url: source, newTab: true }, children: [{ type: 'text', text: 'Слайды', version: 1 }] }] }],
+      } },
+    }] })
+    expect(JSON.stringify(safe)).not.toContain(source)
+    expect(JSON.stringify(safe)).not.toContain('private-library')
+    expect(JSON.stringify(safe)).toContain('/api/learning-assets?')
+    const course = protectCourseSourceLinks({ slug: 'course', description: { root: {
+      type: 'root', direction: 'ltr' as const, format: '' as const, indent: 0, version: 1,
+      children: [{ type: 'paragraph', version: 1, children: [{ type: 'text', text: source, version: 1 }] }],
+    } } })
+    expect(JSON.stringify(course)).not.toContain('private-library')
   })
 })

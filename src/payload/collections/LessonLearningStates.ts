@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import { isAdminOrSelf } from '@/payload/access/isAdminOrSelf'
+import { learningStateRead } from '@/payload/access/learningStateRead'
 
 /** Viewing history never invokes completion, points or achievement hooks. */
 export const LessonLearningStates: CollectionConfig = {
@@ -9,7 +9,7 @@ export const LessonLearningStates: CollectionConfig = {
   labels: { singular: 'Место остановки', plural: 'Места остановки' },
   admin: { group: 'Прогресс', defaultColumns: ['user', 'lesson', 'lastViewedAt'] },
   access: {
-    read: isAdminOrSelf,
+    read: learningStateRead(),
     create: () => false,
     update: () => false,
     delete: () => false,

@@ -16,7 +16,7 @@ type CacheEntry = { href: string; expiresAt: number }
 
 const hrefCache = new Map<string, CacheEntry>()
 
-export async function resolveHref(ref: PublicResourceRef): Promise<string> {
+export async function resolveHref(ref: PublicResourceRef, signal?: AbortSignal): Promise<string> {
   const key = `${ref.publicKey}${ref.path ?? ''}`
   const now = Date.now()
   const cached = hrefCache.get(key)
@@ -27,6 +27,7 @@ export async function resolveHref(ref: PublicResourceRef): Promise<string> {
 
   const href = await fetchPublicDownloadHref(ref, {
     token: process.env.YANDEX_DISK_TOKEN || undefined,
+    ...(signal ? { signal } : {}),
   })
 
   evictExpired(now)

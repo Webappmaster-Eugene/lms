@@ -1,9 +1,12 @@
 import type { CollectionConfig } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
-import { isPublishedOrAdmin } from '@/payload/access/isPublishedOrAdmin'
+import { lessonReadAccess } from '@/server/learning-access'
 import { cleanupLessonRelations } from '@/payload/hooks/cleanupLessonRelations'
+import { cleanupLearningTargetGrants } from '@/payload/hooks/learningAccessCleanup'
+import { deriveLearningMediaReferences } from '@/payload/hooks/deriveLearningMediaReferences'
 import { generateSlug } from '@/payload/hooks/generateSlug'
+import { captureRawCollectionPatch } from '@/payload/hooks/rawCollectionPatch'
 import { protectLessonVideos } from '@/payload/hooks/protectLessonVideos'
 import { TextBlock } from '@/payload/blocks/TextBlock'
 import { VideoBlock } from '@/payload/blocks/VideoBlock'
@@ -21,16 +24,20 @@ export const Lessons: CollectionConfig = {
   },
   access: {
     create: isAdmin,
-    read: isPublishedOrAdmin,
+    read: lessonReadAccess,
     update: isAdmin,
     delete: isAdmin,
   },
   hooks: {
+    beforeOperation: [captureRawCollectionPatch],
+    beforeChange: [deriveLearningMediaReferences],
     afterRead: [protectLessonVideos],
     beforeValidate: [generateSlug],
-    beforeDelete: [cleanupLessonRelations],
+    beforeDelete: [cleanupLearningTargetGrants('lessons'), cleanupLessonRelations],
   },
   fields: [
+    { name: 'mediaReferences', type: 'relationship', relationTo: 'media', hasMany: true, admin: { hidden: true }, access: { read: ({ req }) => req.user?.role === 'admin', create: () => false, update: () => false } },
+    { name: 'mediaReferencesResolved', type: 'checkbox', defaultValue: false, admin: { hidden: true }, access: { read: ({ req }) => req.user?.role === 'admin', create: () => false, update: () => false } },
     {
       name: 'title',
       type: 'text',

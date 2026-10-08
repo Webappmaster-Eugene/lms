@@ -12,9 +12,11 @@ const nextConfig = {
     '@opentelemetry/api-logs',
     '@opentelemetry/auto-instrumentations-node',
     '@opentelemetry/exporter-logs-otlp-http',
+    '@opentelemetry/exporter-metrics-otlp-http',
     '@opentelemetry/exporter-trace-otlp-http',
     '@opentelemetry/resources',
     '@opentelemetry/sdk-logs',
+    '@opentelemetry/sdk-metrics',
     '@opentelemetry/sdk-node',
     '@opentelemetry/semantic-conventions',
     'require-in-the-middle',
@@ -29,6 +31,14 @@ const nextConfig = {
 
   async headers() {
     return [
+      {
+        source: '/api/media/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'private, no-store' },
+          { key: 'Vary', value: 'Cookie, Authorization' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+        ],
+      },
       {
         source: '/monaco/:path*',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=3600, must-revalidate' }],

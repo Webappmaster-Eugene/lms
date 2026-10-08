@@ -41,7 +41,7 @@ const TYPE_ICONS: Record<ResultType, typeof Map> = {
 
 async function fetchDocs<T>(collection: string, q: string, limit: number, extra = ''): Promise<T[]> {
   const res = await fetch(
-    `/api/${collection}?where[title][contains]=${encodeURIComponent(q)}&where[isPublished][equals]=true&limit=${limit}${extra}`,
+    `/api/${collection}?where[title][contains]=${encodeURIComponent(q)}&where[isPublished][equals]=true&limit=${limit}${extra || '&depth=0&select[title]=true&select[slug]=true'}`,
     { credentials: 'include' },
   )
   if (!res.ok) throw new Error(`GET /api/${collection} → ${res.status}`)

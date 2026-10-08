@@ -10,6 +10,10 @@ import * as migration_20260914_170505_trainer_setup_types from './20260914_17050
 import * as migration_20260928_220510_bookmarks from './20260928_220510_bookmarks';
 import * as migration_20261005_213201_interview_rooms_and_contacts from './20261005_213201_interview_rooms_and_contacts';
 import * as migration_20261008_095919_lesson_learning_states from './20261008_095919_lesson_learning_states';
+import * as migration_20261008_133507_learning_access_and_protected_assets from './20261008_133507_learning_access_and_protected_assets';
+import * as migration_20261008_134222_default_assigned_learning_access from './20261008_134222_default_assigned_learning_access';
+import * as migration_20261008_143020_authoritative_learning_access_policies from './20261008_143020_authoritative_learning_access_policies';
+import * as migration_20261008_152004_auth_session_revocations from './20261008_152004_auth_session_revocations';
 
 export const migrations = [
   {
@@ -70,6 +74,26 @@ export const migrations = [
   {
     up: migration_20261008_095919_lesson_learning_states.up,
     down: migration_20261008_095919_lesson_learning_states.down,
-    name: '20261008_095919_lesson_learning_states'
+    name: '20261008_095919_lesson_learning_states',
+  },
+  {
+    up: migration_20261008_133507_learning_access_and_protected_assets.up,
+    down: migration_20261008_133507_learning_access_and_protected_assets.down,
+    name: '20261008_133507_learning_access_and_protected_assets',
+  },
+  {
+    up: migration_20261008_134222_default_assigned_learning_access.up,
+    down: migration_20261008_134222_default_assigned_learning_access.down,
+    name: '20261008_134222_default_assigned_learning_access',
+  },
+  {
+    up: migration_20261008_143020_authoritative_learning_access_policies.up,
+    down: migration_20261008_143020_authoritative_learning_access_policies.down,
+    name: '20261008_143020_authoritative_learning_access_policies',
+  },
+  {
+    up: migration_20261008_152004_auth_session_revocations.up,
+    down: migration_20261008_152004_auth_session_revocations.down,
+    name: '20261008_152004_auth_session_revocations'
   },
 ];

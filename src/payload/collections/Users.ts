@@ -1,7 +1,14 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, PayloadRequest } from 'payload'
+import { validateStudentAvatar } from '@/payload/hooks/validateStudentAvatar'
 
 import { isAdmin } from '@/payload/access/isAdmin'
-import { isAuthenticated } from '@/payload/access/isAuthenticated'
+import { auditLearningAccessMode } from '@/payload/hooks/learningAccessMode'
+import { lockLearningModeChange } from '@/payload/hooks/learningAccessLock'
+import { captureRawCollectionPatch } from '@/payload/hooks/rawCollectionPatch'
+import { createLearningAccessPolicy, normalizeLearningLoginIdentity, reflectLearningAccessPolicy } from '@/payload/hooks/learningAccessPolicy'
+import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
+import { filterRevokedAuthSessions, revokeAuthenticatedSessions } from '@/payload/hooks/authSessionRevocations'
+import { lockSdkAuthOperation } from '@/payload/hooks/lockSdkAuthOperation'
 import { resetPasswordEmail } from '@/payload/emails/templates'
 import { sendInviteEmail } from '@/payload/hooks/sendNotification'
 import { cleanupUserRelations } from '@/payload/hooks/cleanupOwnedRelations'
@@ -9,6 +16,10 @@ import { cleanupUserRelations } from '@/payload/hooks/cleanupOwnedRelations'
 type ForgotPasswordArgs = {
   token?: string
   user?: { firstName?: string | null }
+}
+
+async function canAdministerUsers({ req }: { req: PayloadRequest }): Promise<boolean> {
+  return Boolean(req.user && (await getAuthoritativeLearningPolicy(req.payload, req.user.id, req)).role === 'admin')
 }
 
 /** Дефолт Payload ведёт на `{serverURL}/admin/reset/{token}` — в админку, а не на нашу `/reset-password`. */
@@ -41,22 +52,39 @@ export const Users: CollectionConfig = {
     group: 'Пользователи',
   },
   hooks: {
-    afterChange: [sendInviteEmail],
+    beforeOperation: [captureRawCollectionPatch, lockSdkAuthOperation],
+    beforeLogin: [normalizeLearningLoginIdentity],
+    beforeChange: [lockLearningModeChange, validateStudentAvatar],
+    afterChange: [createLearningAccessPolicy, sendInviteEmail, auditLearningAccessMode],
+    afterRead: [reflectLearningAccessPolicy, filterRevokedAuthSessions],
+    afterLogout: [revokeAuthenticatedSessions],
     beforeDelete: [cleanupUserRelations],
   },
   access: {
     create: isAdmin,
-    read: isAuthenticated,
-    update: ({ req: { user } }) => {
+    read: async ({ req }) => {
+      if (!req.user) return false
+      if ((await getAuthoritativeLearningPolicy(req.payload, req.user.id, req)).role === 'admin') return true
+      return { id: { equals: req.user.id } }
+    },
+    update: async ({ req }) => {
+      const user = req.user
       if (!user) return false
-      if (user.role === 'admin') return true
+      if ((await getAuthoritativeLearningPolicy(req.payload, user.id, req)).role === 'admin') return true
       // Студент может редактировать только свой профиль
       return { id: { equals: user.id } }
     },
     delete: isAdmin,
-    admin: ({ req: { user } }) => user?.role === 'admin',
+    admin: canAdministerUsers,
   },
   fields: [
+    { name: 'learningAccessAssignments', type: 'ui', admin: { components: { Field: '/components/learning-access/UserLearningAccessLink#UserLearningAccessLink' } } },
+    {
+      name: 'learningAccessMode', type: 'select', defaultValue: 'assigned', label: 'Доступ к обучению',
+      options: [{ label: 'Все опубликованные курсы', value: 'all' }, { label: 'Только назначенные материалы', value: 'assigned' }],
+      access: { create: canAdministerUsers, update: canAdministerUsers },
+      admin: { position: 'sidebar', description: 'Назначения и исключения задаются в разделе «Доступ к обучению». Каталог и карты доступны для просмотра.' },
+    },
     {
       name: 'firstName',
       type: 'text',
@@ -80,7 +108,7 @@ export const Users: CollectionConfig = {
         { label: 'Студент', value: 'student' },
       ],
       access: {
-        update: ({ req: { user } }) => Boolean(user?.role === 'admin'),
+        update: canAdministerUsers,
       },
     },
     {
@@ -102,8 +130,8 @@ export const Users: CollectionConfig = {
       label: 'Баллы',
       // Пересчитывается хуками из транзакций; иначе студент выставлял себе баллы через REST
       access: {
-        create: ({ req: { user } }) => Boolean(user?.role === 'admin'),
-        update: ({ req: { user } }) => Boolean(user?.role === 'admin'),
+        create: canAdministerUsers,
+        update: canAdministerUsers,
       },
       admin: {
         readOnly: true,
@@ -115,13 +143,14 @@ export const Users: CollectionConfig = {
       type: 'checkbox',
       defaultValue: true,
       label: 'Активен',
-      // Скрывает студента из лидерборда - решение админа, не самого студента
+      // Отключает вход и сессии аккаунта, а также скрывает студента из лидерборда.
       access: {
-        create: ({ req: { user } }) => Boolean(user?.role === 'admin'),
-        update: ({ req: { user } }) => Boolean(user?.role === 'admin'),
+        create: canAdministerUsers,
+        update: canAdministerUsers,
       },
       admin: {
         position: 'sidebar',
+        description: 'Отключение блокирует новый вход и действующие сессии аккаунта, а также скрывает его из лидерборда.',
       },
     },
   ],

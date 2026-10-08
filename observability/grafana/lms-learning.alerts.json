@@ -1,0 +1,512 @@
+[
+  {
+    "uid": "lms-media-errors",
+    "title": "LMS: ошибки доставки видео",
+    "orgID": 1,
+    "folderUID": "lms-learning",
+    "ruleGroup": "LMS learning",
+    "condition": "B",
+    "for": "3m",
+    "noDataState": "OK",
+    "execErrState": "KeepLast",
+    "isPaused": false,
+    "labels": {
+      "service": "lms-platform",
+      "severity": "warning",
+      "responsible_role": "platform_operator"
+    },
+    "annotations": {
+      "summary": "Более 5% ошибок видео и минимум 10 ошибок за 5 минут",
+      "description": "Проверьте docs/learning-observability.md. Данные не содержат логинов, паролей и source URL.",
+      "__dashboardUid__": "lms-learning-access",
+      "__panelId__": "2"
+    },
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "prometheus",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "((sum(rate(lms_learning_access_total{service_name=\"lms-platform\",resource=\"media\",outcome=\"error\"}[5m])) / clamp_min(sum(rate(lms_learning_access_total{service_name=\"lms-platform\",resource=\"media\",outcome=~\"allow|error\"}[5m])), 0.001)) > bool 0.05) * (sum(increase(lms_learning_access_total{service_name=\"lms-platform\",resource=\"media\",outcome=\"error\"}[5m])) >= bool 10) or vector(0)",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "intervalMs": 1000,
+          "maxDataPoints": 43200
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "expression": "A",
+          "refId": "B",
+          "type": "threshold",
+          "conditions": [
+            {
+              "type": "query",
+              "evaluator": {
+                "type": "gt",
+                "params": [
+                  0.5
+                ]
+              },
+              "operator": {
+                "type": "and"
+              },
+              "reducer": {
+                "type": "last",
+                "params": []
+              },
+              "query": {
+                "params": [
+                  "B"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "uid": "lms-suspicious-denials",
+    "title": "LMS: всплеск подозрительных отказов",
+    "orgID": 1,
+    "folderUID": "lms-learning",
+    "ruleGroup": "LMS learning",
+    "condition": "B",
+    "for": "5m",
+    "noDataState": "OK",
+    "execErrState": "KeepLast",
+    "isPaused": false,
+    "labels": {
+      "service": "lms-platform",
+      "severity": "warning",
+      "responsible_role": "security_operator"
+    },
+    "annotations": {
+      "summary": "30+ invalid_source/origin/rate_limited/unauthenticated отказов за 5 минут",
+      "description": "Проверьте docs/learning-observability.md. Данные не содержат логинов, паролей и source URL.",
+      "__dashboardUid__": "lms-learning-access",
+      "__panelId__": "3"
+    },
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "prometheus",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(increase(lms_learning_access_total{service_name=\"lms-platform\",outcome=\"deny\",reason=~\"invalid_source|invalid_origin|rate_limited|unauthenticated\"}[5m])) >= bool 30) or vector(0)",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "intervalMs": 1000,
+          "maxDataPoints": 43200
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "expression": "A",
+          "refId": "B",
+          "type": "threshold",
+          "conditions": [
+            {
+              "type": "query",
+              "evaluator": {
+                "type": "gt",
+                "params": [
+                  0.5
+                ]
+              },
+              "operator": {
+                "type": "and"
+              },
+              "reducer": {
+                "type": "last",
+                "params": []
+              },
+              "query": {
+                "params": [
+                  "B"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "uid": "lms-assignment-burst",
+    "title": "LMS: серия изменений назначений",
+    "orgID": 1,
+    "folderUID": "lms-learning",
+    "ruleGroup": "LMS learning",
+    "condition": "B",
+    "for": "1m",
+    "noDataState": "OK",
+    "execErrState": "KeepLast",
+    "isPaused": false,
+    "labels": {
+      "service": "lms-platform",
+      "severity": "warning",
+      "responsible_role": "learning_administrator"
+    },
+    "annotations": {
+      "summary": "50+ валидированных изменений доступа за 15 минут; сверить транзакционный аудит",
+      "description": "Проверьте docs/learning-observability.md. Данные не содержат логинов, паролей и source URL.",
+      "__dashboardUid__": "lms-learning-access",
+      "__panelId__": "4"
+    },
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "prometheus",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(increase(lms_learning_assignment_total{service_name=\"lms-platform\"}[15m])) > bool 50) or vector(0)",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "intervalMs": 1000,
+          "maxDataPoints": 43200
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "expression": "A",
+          "refId": "B",
+          "type": "threshold",
+          "conditions": [
+            {
+              "type": "query",
+              "evaluator": {
+                "type": "gt",
+                "params": [
+                  0.5
+                ]
+              },
+              "operator": {
+                "type": "and"
+              },
+              "reducer": {
+                "type": "last",
+                "params": []
+              },
+              "query": {
+                "params": [
+                  "B"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "uid": "lms-access-latency",
+    "title": "LMS: медленная проверка доступа",
+    "orgID": 1,
+    "folderUID": "lms-learning",
+    "ruleGroup": "LMS learning",
+    "condition": "B",
+    "for": "5m",
+    "noDataState": "OK",
+    "execErrState": "KeepLast",
+    "isPaused": false,
+    "labels": {
+      "service": "lms-platform",
+      "severity": "warning",
+      "responsible_role": "platform_operator"
+    },
+    "annotations": {
+      "summary": "p95 больше 2 секунд при 50+ измерениях за 5 минут",
+      "description": "Проверьте docs/learning-observability.md. Данные не содержат логинов, паролей и source URL.",
+      "__dashboardUid__": "lms-learning-access",
+      "__panelId__": "5"
+    },
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "prometheus",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(histogram_quantile(0.95, sum by (le) (rate(lms_learning_access_duration_seconds_bucket{service_name=\"lms-platform\",resource=~\"course|lesson\"}[5m]))) > bool 2) * (sum(increase(lms_learning_access_duration_seconds_count{service_name=\"lms-platform\",resource=~\"course|lesson\"}[5m])) >= bool 50) or vector(0)",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "intervalMs": 1000,
+          "maxDataPoints": 43200
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "expression": "A",
+          "refId": "B",
+          "type": "threshold",
+          "conditions": [
+            {
+              "type": "query",
+              "evaluator": {
+                "type": "gt",
+                "params": [
+                  0.5
+                ]
+              },
+              "operator": {
+                "type": "and"
+              },
+              "reducer": {
+                "type": "last",
+                "params": []
+              },
+              "query": {
+                "params": [
+                  "B"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "uid": "lms-collector-export",
+    "title": "LMS: сбои экспорта наблюдаемости",
+    "orgID": 1,
+    "folderUID": "lms-learning",
+    "ruleGroup": "LMS learning",
+    "condition": "B",
+    "for": "3m",
+    "noDataState": "OK",
+    "execErrState": "KeepLast",
+    "isPaused": false,
+    "labels": {
+      "service": "lms-platform",
+      "severity": "warning",
+      "responsible_role": "platform_operator"
+    },
+    "annotations": {
+      "summary": "Collector не доставляет metrics/logs/traces; проверить backend/DNS/очереди",
+      "description": "Проверьте docs/learning-observability.md. Данные не содержат логинов, паролей и source URL.",
+      "__dashboardUid__": "lms-learning-access",
+      "__panelId__": "11"
+    },
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "prometheus",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(increase({service_name=\"lms-platform\",component=\"lms-mentor-otel\",__name__=~\"otelcol_exporter_send_failed_(metric_points|log_records|spans)_total\"}[5m])) > bool 0) or vector(0)",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "intervalMs": 1000,
+          "maxDataPoints": 43200
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "expression": "A",
+          "refId": "B",
+          "type": "threshold",
+          "conditions": [
+            {
+              "type": "query",
+              "evaluator": {
+                "type": "gt",
+                "params": [
+                  0.5
+                ]
+              },
+              "operator": {
+                "type": "and"
+              },
+              "reducer": {
+                "type": "last",
+                "params": []
+              },
+              "query": {
+                "params": [
+                  "B"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "uid": "lms-collector-heartbeat",
+    "title": "LMS: пропала телеметрия collector",
+    "orgID": 1,
+    "folderUID": "lms-learning",
+    "ruleGroup": "LMS learning",
+    "condition": "B",
+    "for": "3m",
+    "noDataState": "OK",
+    "execErrState": "KeepLast",
+    "isPaused": false,
+    "labels": {
+      "service": "lms-platform",
+      "severity": "warning",
+      "responsible_role": "platform_operator"
+    },
+    "annotations": {
+      "summary": "Self metrics collector не обновлялись больше 90 секунд или self scrape неуспешен",
+      "description": "Проверьте docs/learning-observability.md. Данные не содержат логинов, паролей и source URL.",
+      "__dashboardUid__": "lms-learning-access",
+      "__panelId__": "11"
+    },
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "prometheus",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "((time() - max(timestamp(up{service_name=\"lms-platform\",component=\"lms-mentor-otel\"}))) > bool 90) + (1 - (max(up{service_name=\"lms-platform\",component=\"lms-mentor-otel\"}) or vector(0))) or vector(1)",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "intervalMs": 1000,
+          "maxDataPoints": 43200
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "expression": "A",
+          "refId": "B",
+          "type": "threshold",
+          "conditions": [
+            {
+              "type": "query",
+              "evaluator": {
+                "type": "gt",
+                "params": [
+                  0.5
+                ]
+              },
+              "operator": {
+                "type": "and"
+              },
+              "reducer": {
+                "type": "last",
+                "params": []
+              },
+              "query": {
+                "params": [
+                  "B"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

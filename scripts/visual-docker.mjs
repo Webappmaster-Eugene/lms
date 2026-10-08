@@ -52,7 +52,7 @@ async function waitFor(url, timeoutMs) {
 
 let code = 1
 try {
-  start('scripts/e2e-server.mjs', { E2E_APP_PORT: APP_PORT })
+  start('scripts/e2e-server.mjs', { E2E_APP_PORT: APP_PORT, E2E_BASE_URL: `http://host.docker.internal:${APP_PORT}` })
   start('scripts/landing-server.mjs', { E2E_LANDING_PORT: LANDING_PORT })
   await waitFor(`http://localhost:${APP_PORT}/api/health`, 30 * 60_000)
   await waitFor(`http://localhost:${LANDING_PORT}/`, 5 * 60_000)

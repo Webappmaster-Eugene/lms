@@ -7,7 +7,7 @@ import { collectAllPages } from '@/lib/paginate'
 export type LessonRef = { title: string; slug: string } | null
 
 export type QuestionThread = Thread & {
-  /** null — урок снят с публикации: переписка остаётся видна, но без ссылки. */
+  /** null — доступная ментору переписка снятого урока остаётся без ссылки. */
   lesson: LessonRef
 }
 
@@ -42,6 +42,8 @@ export async function loadQuestionThreads(payload: Payload, user: Viewer): Promi
           ({ page, limit }) =>
             payload.find({
               collection: 'lessons',
+              user: user as never,
+              overrideAccess: false,
               where: { id: { in: lessonIds }, isPublished: { equals: true } },
               select: { title: true, slug: true },
               depth: 0,

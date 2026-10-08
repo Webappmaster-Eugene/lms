@@ -15,7 +15,7 @@ export default async function SavedPage() {
   const { user } = await payload.auth({ headers: await headers() })
   if (!user) redirect('/login')
 
-  const items = await loadSaved(payload, user.id)
+  const items = await loadSaved(payload, user.id, user)
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">

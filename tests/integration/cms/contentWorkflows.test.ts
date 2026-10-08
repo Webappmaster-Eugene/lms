@@ -99,6 +99,8 @@ describe('практические операции lms-content через REST 
       roadmap: roadmap.id, roadmapNode: second.id,
     })
     expect((await rest('GET', `/roadmaps/${roadmap.id}`, { token: studentToken })).status).toBe(404)
+    expect((await rest('GET', `/roadmap-nodes/${second.id}`, { token: studentToken })).status).toBe(404)
+    await patch('roadmaps', roadmap.id, { isPublished: true })
     expect((await rest('GET', `/roadmap-nodes/${second.id}`, { token: studentToken })).status).toBe(200)
     expect((await rest('GET', `/roadmap-edges/${edge.id}`, { token: studentToken })).status).toBe(200)
   })
@@ -141,7 +143,7 @@ describe('практические операции lms-content через REST 
     }
   })
 
-  it('создаёт ученика с приглашением, меняет пароль и не путает активность с блокировкой', async () => {
+  it('создаёт ученика с приглашением, меняет пароль, отключает и повторно включает аккаунт', async () => {
     const email = `${uid('skill-user')}@lms.test`
     const user = await create('users', {
       email, password: 'Content-Local-Test-1', firstName: 'Проверка', lastName: 'Скилла', role: 'student', isActive: true,
@@ -157,9 +159,11 @@ describe('практические операции lms-content через REST 
 
     await patch('users', user.id, { password: 'Content-Local-Test-2', bio: 'Профиль изменён', isActive: false })
     expect((await rest('POST', '/users/login', { body: { email, password: 'Content-Local-Test-1' } })).status).toBe(401)
+    expect((await rest('POST', '/users/login', { body: { email, password: 'Content-Local-Test-2' } })).status).toBe(401)
+    await patch('users', user.id, { isActive: true })
     const signedIn = await rest('POST', '/users/login', { body: { email, password: 'Content-Local-Test-2' } })
     expect(signedIn.status).toBe(200)
-    expect(signedIn.json.user).toMatchObject({ id: user.id, role: 'student', isActive: false, totalPoints: 0 })
+    expect(signedIn.json.user).toMatchObject({ id: user.id, role: 'student', isActive: true, totalPoints: 0 })
     expect(signedIn.json.user).not.toHaveProperty('hash')
     expect(signedIn.json.user).not.toHaveProperty('salt')
     await patch('users', user.id, { role: 'admin' })

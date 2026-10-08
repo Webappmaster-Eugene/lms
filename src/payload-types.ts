@@ -77,6 +77,10 @@ export interface Config {
     media: Media;
     'user-progress': UserProgress;
     'lesson-learning-states': LessonLearningState;
+    'learning-access-grants': LearningAccessGrant;
+    'learning-access-audit': LearningAccessAudit;
+    'learning-access-policies': LearningAccessPolicy;
+    'auth-session-revocations': AuthSessionRevocation;
     achievements: Achievement;
     'user-achievements': UserAchievement;
     'points-transactions': PointsTransaction;
@@ -109,6 +113,10 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     'user-progress': UserProgressSelect<false> | UserProgressSelect<true>;
     'lesson-learning-states': LessonLearningStatesSelect<false> | LessonLearningStatesSelect<true>;
+    'learning-access-grants': LearningAccessGrantsSelect<false> | LearningAccessGrantsSelect<true>;
+    'learning-access-audit': LearningAccessAuditSelect<false> | LearningAccessAuditSelect<true>;
+    'learning-access-policies': LearningAccessPoliciesSelect<false> | LearningAccessPoliciesSelect<true>;
+    'auth-session-revocations': AuthSessionRevocationsSelect<false> | AuthSessionRevocationsSelect<true>;
     achievements: AchievementsSelect<false> | AchievementsSelect<true>;
     'user-achievements': UserAchievementsSelect<false> | UserAchievementsSelect<true>;
     'points-transactions': PointsTransactionsSelect<false> | PointsTransactionsSelect<true>;
@@ -173,12 +181,19 @@ export interface UserAuthOperations {
  */
 export interface User {
   id: number;
+  /**
+   * Назначения и исключения задаются в разделе «Доступ к обучению». Каталог и карты доступны для просмотра.
+   */
+  learningAccessMode?: ('all' | 'assigned') | null;
   firstName: string;
   lastName: string;
   role: 'admin' | 'student';
   avatar?: (number | null) | Media;
   bio?: string | null;
   totalPoints?: number | null;
+  /**
+   * Отключение блокирует новый вход и действующие сессии аккаунта, а также скрывает его из лидерборда.
+   */
   isActive?: boolean | null;
   updatedAt: string;
   createdAt: string;
@@ -205,6 +220,7 @@ export interface User {
  */
 export interface Media {
   id: number;
+  uploadedBy?: (number | null) | User;
   alt?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -404,6 +420,8 @@ export interface Section {
  */
 export interface Lesson {
   id: number;
+  mediaReferences?: (number | Media)[] | null;
+  mediaReferencesResolved?: boolean | null;
   title: string;
   /**
    * Генерируется автоматически из названия
@@ -545,6 +563,100 @@ export interface LessonLearningState {
     | number
     | boolean
     | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "learning-access-grants".
+ */
+export interface LearningAccessGrant {
+  id: number;
+  user: number | User;
+  target:
+    | {
+        relationTo: 'roadmaps';
+        value: number | Roadmap;
+      }
+    | {
+        relationTo: 'roadmap-nodes';
+        value: number | RoadmapNode;
+      }
+    | {
+        relationTo: 'courses';
+        value: number | Course;
+      }
+    | {
+        relationTo: 'sections';
+        value: number | Section;
+      }
+    | {
+        relationTo: 'lessons';
+        value: number | Lesson;
+      };
+  effect: 'allow' | 'deny';
+  startsAt?: string | null;
+  expiresAt?: string | null;
+  note?: string | null;
+  ruleKey: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "learning-access-audit".
+ */
+export interface LearningAccessAudit {
+  id: number;
+  actorId: number;
+  userId: number;
+  grantId?: number | null;
+  operation: 'create' | 'update' | 'delete' | 'mode';
+  targetType: string;
+  targetId: number;
+  effect: 'allow' | 'deny';
+  previous?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  current?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "learning-access-policies".
+ */
+export interface LearningAccessPolicy {
+  id: number;
+  user: number | User;
+  mode: 'all' | 'assigned';
+  role: 'admin' | 'student';
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "auth-session-revocations".
+ */
+export interface AuthSessionRevocation {
+  id: number;
+  user: number | User;
+  sessionHash: string;
+  expiresAt: string;
   updatedAt: string;
   createdAt: string;
 }
@@ -1142,6 +1254,7 @@ export interface PayloadMigration {
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
+  learningAccessMode?: T;
   firstName?: T;
   lastName?: T;
   role?: T;
@@ -1258,6 +1371,8 @@ export interface SectionsSelect<T extends boolean = true> {
  * via the `definition` "lessons_select".
  */
 export interface LessonsSelect<T extends boolean = true> {
+  mediaReferences?: T;
+  mediaReferencesResolved?: T;
   title?: T;
   slug?: T;
   description?: T;
@@ -1351,6 +1466,7 @@ export interface FileBlockSelect<T extends boolean = true> {
  * via the `definition` "media_select".
  */
 export interface MediaSelect<T extends boolean = true> {
+  uploadedBy?: T;
   alt?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -1411,6 +1527,60 @@ export interface LessonLearningStatesSelect<T extends boolean = true> {
   lastViewedAt?: T;
   lastVideoId?: T;
   positions?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "learning-access-grants_select".
+ */
+export interface LearningAccessGrantsSelect<T extends boolean = true> {
+  user?: T;
+  target?: T;
+  effect?: T;
+  startsAt?: T;
+  expiresAt?: T;
+  note?: T;
+  ruleKey?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "learning-access-audit_select".
+ */
+export interface LearningAccessAuditSelect<T extends boolean = true> {
+  actorId?: T;
+  userId?: T;
+  grantId?: T;
+  operation?: T;
+  targetType?: T;
+  targetId?: T;
+  effect?: T;
+  previous?: T;
+  current?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "learning-access-policies_select".
+ */
+export interface LearningAccessPoliciesSelect<T extends boolean = true> {
+  user?: T;
+  mode?: T;
+  role?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "auth-session-revocations_select".
+ */
+export interface AuthSessionRevocationsSelect<T extends boolean = true> {
+  user?: T;
+  sessionHash?: T;
+  expiresAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

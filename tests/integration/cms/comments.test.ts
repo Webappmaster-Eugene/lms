@@ -163,7 +163,7 @@ describe('страницы «Мои вопросы» и «Вопросы уче�
     )
   })
 
-  it('у вопроса к снятому уроку ссылки нет, а переписка остаётся', async () => {
+  it('переписка снятого урока скрыта от ученика и доступна ментору без ссылки', async () => {
     const hidden = await createCourseTree(payload, { lessons: 1 })
     await payload.create({
       collection: 'comments',
@@ -175,8 +175,10 @@ describe('страницы «Мои вопросы» и «Вопросы уче�
 
     const thread = (await loadQuestionThreads(payload, asker)).find((t) => t.question.content === 'Вопрос к снятому уроку')
 
-    expect(thread).toBeDefined()
-    expect(thread?.lesson).toBeNull()
+    expect(thread).toBeUndefined()
+    const mentorThread = (await loadQuestionThreads(payload, mentor)).find((t) => t.question.content === 'Вопрос к снятому уроку')
+    expect(mentorThread).toBeDefined()
+    expect(mentorThread?.lesson).toBeNull()
   })
 })
 

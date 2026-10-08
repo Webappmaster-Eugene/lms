@@ -1,6 +1,7 @@
 import type { Payload } from 'payload'
 
 import { collectAllPages } from '@/lib/paginate'
+import type { User } from '@/payload-types'
 
 type Target = { lesson: number | string } | { task: number | string }
 
@@ -31,7 +32,7 @@ export type SavedItem = {
  * «Сохранённое» ученика — свежие сверху. Снятые с публикации уроки и задачи
  * не показываются: ссылка на них вела бы в 404.
  */
-export async function loadSaved(payload: Payload, userId: number | string): Promise<SavedItem[]> {
+export async function loadSaved(payload: Payload, userId: number | string, viewer?: User): Promise<SavedItem[]> {
   const bookmarks = await collectAllPages(
     ({ page, limit }) =>
       payload.find({
@@ -57,6 +58,7 @@ export async function loadSaved(payload: Payload, userId: number | string): Prom
           ({ page, limit }) =>
             payload.find({
               collection: 'lessons',
+              ...(viewer ? { overrideAccess: false, user: viewer } : {}),
               where: { id: { in: lessonIds }, isPublished: { equals: true } },
               select: { title: true, slug: true, course: true },
               populate: { courses: { title: true } },

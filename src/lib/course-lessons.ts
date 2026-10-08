@@ -2,6 +2,7 @@ import type { Payload } from 'payload'
 
 import { collectAllPages } from '@/lib/paginate'
 import { orderCourseLessons, type LessonRef } from '@/lib/roadmap-next-step'
+import type { Lesson } from '@/payload-types'
 
 export type CourseLessons = {
   /** Все опубликованные уроки курса — по ним считается процент, как и в сертификатах. */
@@ -25,6 +26,7 @@ export async function loadCourseLessons(
   payload: Payload,
   courseIds: (string | number)[],
   label: string,
+  canOpen?: (lesson: Pick<Lesson, 'id' | 'course' | 'section' | 'isPublished'>) => boolean,
 ): Promise<CourseLessons> {
   if (courseIds.length === 0) return { allIds: new Map(), ordered: new Map() }
   const ids = courseIds.map(String)
@@ -35,7 +37,7 @@ export async function loadCourseLessons(
         payload.find({
           collection: 'lessons',
           where: { course: { in: ids }, isPublished: { equals: true } },
-          select: { course: true, section: true, order: true, slug: true, title: true },
+          select: { course: true, section: true, order: true, slug: true, title: true, isPublished: true },
           depth: 0,
           sort: 'id',
           page,
@@ -75,5 +77,6 @@ export async function loadCourseLessons(
   }
 
   const sectionRank = new Map(sectionDocs.map((section, index) => [String(section.id), index]))
-  return { allIds, ordered: orderCourseLessons(refs, sectionRank) }
+  const openIds = canOpen ? new Set(lessonDocs.filter(canOpen).map((lesson) => String(lesson.id))) : null
+  return { allIds, ordered: orderCourseLessons(openIds ? refs.filter((ref) => openIds.has(ref.id)) : refs, sectionRank) }
 }

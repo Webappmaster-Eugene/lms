@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { expect, test, type BrowserContext } from '@playwright/test'
 
 import { USERS } from '../fixtures/data'
-import { query, resetTokenOf } from '../fixtures/db'
+import { resetTokenOf } from '../fixtures/db'
 import { APP_URL, storageStateOf } from '../fixtures/env'
 
 /**
@@ -162,6 +162,7 @@ test.describe('«регистрация»: админ заводит студе�
     await page.locator('#field-lastName').fill('Студент')
     await page.getByRole('button', { name: /Сохранить|Save/ }).first().click()
     await expect(page).toHaveURL(/\/admin\/collections\/users\/\d+/)
+    const userId = page.url().split('/').at(-1)
 
     // Письмо не отправляется (SMTP выключен), но токен из него лежит в базе.
     const token = await resetTokenOf(email)
@@ -179,7 +180,6 @@ test.describe('«регистрация»: админ заводит студе�
     await expect(invited.getByRole('heading', { name: 'Привет, Приглашённый!' })).toBeVisible()
     await guest.close()
 
-    await query('delete from users_sessions where _parent_id = (select id from users where email = $1)', [email])
-    await query('delete from users where email = $1', [email])
+    expect((await page.request.delete(`/api/users/${userId}`)).status()).toBe(200)
   })
 })

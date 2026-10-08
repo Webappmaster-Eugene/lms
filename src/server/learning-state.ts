@@ -4,24 +4,26 @@ import { sql } from '@payloadcms/db-postgres'
 import { commitTransaction, createLocalReq, initTransaction, killTransaction, type Payload, type PayloadRequest } from 'payload'
 import type { Lesson, User } from '@/payload-types'
 import { learningVideoHref, learningVideos, readVideoPositions, type LearningState, type VideoPosition } from '@/lib/learning-state'
+import { LearningAccessError, requireLessonAccess } from '@/server/learning-access'
 
 export class LearningStateError extends Error {
   constructor(message: string, readonly status = 400) { super(message) }
 }
 
-export async function accessibleLearningLesson(payload: Payload, user: User, id: number): Promise<Lesson> {
+export async function accessibleLearningLesson(payload: Payload, user: User, id: number, request?: PayloadRequest): Promise<Lesson> {
+  const req = request ?? await createLocalReq({ user }, payload)
   let lesson
   try {
-    lesson = await payload.findByID({ collection: 'lessons', id, depth: 1, overrideAccess: true })
+    lesson = await payload.findByID({ collection: 'lessons', id, depth: 1, overrideAccess: true, req })
   } catch (error) {
     if (error instanceof Error && 'status' in error && error.status === 404) throw new LearningStateError('Урок недоступен', 404)
     throw error
   }
-  const course = typeof lesson.course === 'object' ? lesson.course : null
-  const section = typeof lesson.section === 'object' ? lesson.section : null
-  const sectionCourse = section && (typeof section.course === 'object' ? section.course.id : section.course)
-  if (user.role !== 'admin' && (!lesson.isPublished || !course?.isPublished || (lesson.section && (!section?.isPublished || sectionCourse !== course.id)))) {
-    throw new LearningStateError('Урок недоступен', 404)
+  try {
+    await requireLessonAccess(payload, user, lesson, req)
+  } catch (error) {
+    if (error instanceof LearningAccessError) throw new LearningStateError('Урок недоступен', error.status)
+    throw error
   }
   return lesson
 }
@@ -101,6 +103,7 @@ export async function saveLearningState(payload: Payload, user: User, lesson: Le
 }
 
 export async function latestLearningResume(payload: Payload, user: User) {
+  const req = await createLocalReq({ user }, payload)
   // Pagination avoids a hidden limit when recent lessons have since been unpublished.
   let page = 1
   for (;;) {
@@ -108,12 +111,12 @@ export async function latestLearningResume(payload: Payload, user: User) {
     for (const state of states.docs) {
       try {
         const id = typeof state.lesson === 'object' ? state.lesson.id : state.lesson
-        const lesson = await accessibleLearningLesson(payload, user, id)
+        const lesson = await accessibleLearningLesson(payload, user, id, req)
         const video = learningVideos(lesson).find((item) => item.id === state.lastVideoId)
         const position: VideoPosition | undefined = video ? readVideoPositions(state.positions)[video.id] : undefined
         return { title: lesson.title, course: typeof lesson.course === 'object' ? lesson.course.title : '', href: learningVideoHref(lesson.slug, video?.id), videoTitle: video?.title, seconds: position?.seconds, ended: position?.ended, lastViewedAt: state.lastViewedAt }
       } catch (error) {
-        if (error instanceof LearningStateError && error.status === 404) continue
+        if (error instanceof LearningStateError && (error.status === 404 || error.status === 403)) continue
         throw error
       }
     }

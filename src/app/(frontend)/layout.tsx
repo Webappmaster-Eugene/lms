@@ -13,6 +13,7 @@ import { KeyboardShortcuts } from '@/components/layout/KeyboardShortcuts'
 import { Suspense } from 'react'
 import { headers } from 'next/headers'
 import { getPayload } from '@/lib/payload'
+import { redirect } from 'next/navigation'
 
 const inter = Inter({
   subsets: ['cyrillic', 'latin'],
@@ -29,14 +30,10 @@ export const metadata: Metadata = {
 }
 
 export default async function FrontendLayout({ children }: { children: React.ReactNode }) {
-  let isAdmin = false
-  try {
-    const payload = await getPayload()
-    const { user } = await payload.auth({ headers: await headers() })
-    isAdmin = user?.role === 'admin'
-  } catch (error) {
-    console.error('Меню: не удалось определить права пользователя', error)
-  }
+  const payload = await getPayload()
+  const { user } = await payload.auth({ headers: await headers() })
+  if (!user) redirect('/login')
+  const isAdmin = user.role === 'admin'
 
   return (
     <html lang="ru" className={inter.variable} suppressHydrationWarning>

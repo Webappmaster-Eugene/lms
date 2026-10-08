@@ -21,6 +21,8 @@ export default async function NotesPage() {
     ({ page, limit }) =>
       payload.find({
         collection: 'notes',
+        overrideAccess: false,
+        user,
         where: { user: { equals: user.id } },
         select: { content: true, lesson: true, updatedAt: true },
         depth: 0,
@@ -41,6 +43,9 @@ export default async function NotesPage() {
           ({ page, limit }) =>
             payload.find({
               collection: 'lessons',
+              overrideAccess: false,
+              user,
+              populate: { courses: { title: true, slug: true, isPublished: true } },
               where: { id: { in: lessonIds }, isPublished: { equals: true } },
               select: { title: true, slug: true, course: true },
               depth: 1,

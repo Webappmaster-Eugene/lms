@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Clock, Search } from 'lucide-react'
+import { Clock, Lock, Search } from 'lucide-react'
 
 import { cn, pluralize } from '@/lib/utils'
 
@@ -15,6 +15,9 @@ export type CatalogCourse = {
   totalLessons: number
   completedCount: number
   progressPercent: number
+  /** Программа видна всем; обучение открывается только по назначению. */
+  accessAllowed?: boolean
+  accessibleLessons?: number
 }
 
 type Status = 'all' | 'active' | 'new' | 'done'
@@ -34,12 +37,13 @@ export function courseStatus(course: CatalogCourse): Exclude<Status, 'all'> {
 /** Фильтр по роадмапу, статусу и названию: полсотни курсов одной сеткой не просмотреть. */
 export function filterCourses(
   courses: CatalogCourse[],
-  { roadmap, status, query }: { roadmap: string | null; status: Status; query: string },
+  { roadmap, status, query, assignedOnly = false }: { roadmap: string | null; status: Status; query: string; assignedOnly?: boolean },
 ): CatalogCourse[] {
   const needle = query.trim().toLowerCase()
   return courses.filter(
     (c) =>
       (roadmap === null || c.roadmapTitle === roadmap) &&
+      (!assignedOnly || c.accessAllowed !== false) &&
       (status === 'all' || courseStatus(c) === status) &&
       (needle === '' || c.title.toLowerCase().includes(needle)),
   )
@@ -67,6 +71,7 @@ export function CourseCatalog({ courses }: { courses: CatalogCourse[] }) {
   const [roadmap, setRoadmap] = useState<string | null>(null)
   const [status, setStatus] = useState<Status>('all')
   const [query, setQuery] = useState('')
+  const [assignedOnly, setAssignedOnly] = useState(false)
 
   const roadmaps = useMemo(
     () => [...new Set(courses.flatMap((c) => (c.roadmapTitle ? [c.roadmapTitle] : [])))],
@@ -77,7 +82,7 @@ export function CourseCatalog({ courses }: { courses: CatalogCourse[] }) {
     for (const c of courses) result[courseStatus(c)] += 1
     return result
   }, [courses])
-  const shown = filterCourses(courses, { roadmap, status, query })
+  const shown = filterCourses(courses, { roadmap, status, query, assignedOnly })
 
   return (
     <div className="space-y-4">
@@ -100,6 +105,12 @@ export function CourseCatalog({ courses }: { courses: CatalogCourse[] }) {
             </Chip>
           ))}
         </div>
+        {courses.some((course) => course.accessAllowed === false) && (
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Назначение доступа">
+            <Chip active={!assignedOnly} onClick={() => setAssignedOnly(false)}>Весь каталог</Chip>
+            <Chip active={assignedOnly} onClick={() => setAssignedOnly(true)}>Назначенные мне</Chip>
+          </div>
+        )}
         {roadmaps.length > 1 && (
           <div className="flex flex-wrap gap-2" role="group" aria-label="Роадмап">
             <Chip active={roadmap === null} onClick={() => setRoadmap(null)}>
@@ -144,6 +155,16 @@ export function CourseCatalog({ courses }: { courses: CatalogCourse[] }) {
                     </span>
                   ) : null}
                 </div>
+                {course.accessAllowed === false ? (
+                  <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    Доступ не назначен · Посмотреть программу
+                  </p>
+                ) : course.accessibleLessons !== undefined && course.accessibleLessons < course.totalLessons ? (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Доступно {course.accessibleLessons} из {course.totalLessons} уроков
+                  </p>
+                ) : null}
               </div>
 
               <div className="mt-4 space-y-1.5">

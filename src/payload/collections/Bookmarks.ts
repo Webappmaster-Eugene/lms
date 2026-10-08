@@ -3,6 +3,8 @@ import { ValidationError, type CollectionBeforeValidateHook, type CollectionConf
 import { isAuthenticated } from '@/payload/access/isAuthenticated'
 import { isAdminOrSelf } from '@/payload/access/isAdminOrSelf'
 import { assignOwner } from '@/payload/hooks/assignOwner'
+import { guardLearningLessonWrite } from '@/payload/hooks/learningLessonWrite'
+import { learningStateRead } from '@/payload/access/learningStateRead'
 
 /** Закладка ведёт ровно на одно: урок или задачу тренажёра. */
 const oneTarget: CollectionBeforeValidateHook = ({ data, originalDoc }) => {
@@ -26,13 +28,13 @@ export const Bookmarks: CollectionConfig = {
   },
   access: {
     create: isAuthenticated,
-    read: isAdminOrSelf,
+    read: learningStateRead({ allowTask: true }),
     update: isAdminOrSelf,
     delete: isAdminOrSelf,
   },
   hooks: {
     beforeValidate: [oneTarget],
-    beforeChange: [assignOwner],
+    beforeChange: [assignOwner, guardLearningLessonWrite],
   },
   // Повторное «сохранить» не плодит дубли. NULL в Postgres уникальности не мешает,
   // поэтому закладки на урок и на задачу живут в одной таблице.

@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
 import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
+import { createLocalReq } from 'payload'
+import { getLearningAccess } from '@/server/learning-access'
 import { groupCoursesByNode, summarizeNode } from '@/lib/roadmap-node-courses'
 import {
   blockingPrerequisites,
@@ -29,10 +31,15 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const payload = await getPayload()
+  const { user } = await payload.auth({ headers: await headers() })
+  if (!user) return { title: 'Вход' }
   const result = await payload.find({
     collection: 'roadmaps',
     where: { slug: { equals: slug }, isPublished: { equals: true } },
     limit: 1,
+    depth: 0,
+    select: { title: true },
+    overrideAccess: true,
   })
   const roadmap = result.docs[0]
   return { title: roadmap?.title ?? 'Роадмап' }
@@ -43,6 +50,9 @@ export default async function RoadmapDetailPage({ params }: Props) {
   const payload = await getPayload()
   const headersList = await headers()
   const { user } = await payload.auth({ headers: headersList })
+  if (!user) redirect('/login')
+  const req = await createLocalReq({ user }, payload)
+  const access = await getLearningAccess(payload, user, req)
 
   const roadmapResult = await payload.find({
     collection: 'roadmaps',
@@ -51,6 +61,10 @@ export default async function RoadmapDetailPage({ params }: Props) {
       isPublished: { equals: true },
     },
     limit: 1,
+    depth: 0,
+    select: { title: true, slug: true },
+    overrideAccess: true,
+    req,
   })
 
   const roadmap = roadmapResult.docs[0]
@@ -66,16 +80,20 @@ export default async function RoadmapDetailPage({ params }: Props) {
           isPublished: { equals: true },
         },
         sort: ['order', 'id'],
-        depth: 1,
+        depth: 0,
+        select: { title: true, slug: true, estimatedHours: true, prerequisites: true, roadmapNode: true },
+        overrideAccess: true,
+        req,
         page,
         limit,
       }),
     { label: `курсы роадмапа «${roadmap.slug}»` },
   )
 
-  const courseIds = courseDocs.map((c) => String(c.id))
+  const visibleCourses = courseDocs.filter((course) => access.canBrowseCourse(course.id))
+  const courseIds = visibleCourses.map((c) => String(c.id))
 
-  const [lessonDocs, sectionDocs, progressDocs] = await Promise.all([
+  const [loadedLessonDocs, sectionDocs, progressDocs] = await Promise.all([
     courseIds.length > 0
       ? collectAllPages(
           ({ page, limit }) =>
@@ -85,7 +103,9 @@ export default async function RoadmapDetailPage({ params }: Props) {
                 course: { in: courseIds },
                 isPublished: { equals: true },
               },
-              select: { course: true, section: true, order: true, slug: true, title: true },
+              select: { course: true, section: true, order: true, slug: true, title: true, isPublished: true },
+              overrideAccess: true,
+              req,
               depth: 0,
               sort: 'id',
               page,
@@ -103,6 +123,8 @@ export default async function RoadmapDetailPage({ params }: Props) {
               collection: 'sections',
               where: { course: { in: courseIds }, isPublished: { equals: true } },
               select: { order: true },
+              overrideAccess: true,
+              req,
               depth: 0,
               sort: ['order', 'id'],
               page,
@@ -121,6 +143,8 @@ export default async function RoadmapDetailPage({ params }: Props) {
                 isCompleted: { equals: true },
               },
               select: { lesson: true },
+              overrideAccess: false,
+              req,
               depth: 0,
               sort: 'id',
               page,
@@ -130,6 +154,8 @@ export default async function RoadmapDetailPage({ params }: Props) {
         )
       : [],
   ])
+
+  const lessonDocs = loadedLessonDocs.filter((lesson) => access.canBrowseLessonMetadata(lesson))
 
   // Группируем уроки по курсу
   const lessonsByCourse = new Map<string, string[]>()
@@ -144,6 +170,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
     progressDocs.map((p) => String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson)),
   )
 
+  const accessibleLessons = new Set(lessonDocs.filter((lesson) => access.canAccessLessonMetadata(lesson)).map((lesson) => String(lesson.id)))
   const sectionRank = new Map(sectionDocs.map((section, index) => [String(section.id), index]))
   const lessonRefs: LessonRef[] = lessonDocs.map((lesson) => ({
     id: String(lesson.id),
@@ -161,7 +188,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
   }
 
   // Вычисляем прогресс для каждого курса (без доп. запросов!)
-  const coursesWithProgress = courseDocs.map((course) => {
+  const coursesWithProgress = visibleCourses.map((course) => {
     const cId = String(course.id)
     const courseLessonIds = lessonsByCourse.get(cId) ?? []
     const totalLessons = courseLessonIds.length
@@ -184,16 +211,19 @@ export default async function RoadmapDetailPage({ params }: Props) {
       }
     }
 
-    const prerequisites = (course.prerequisites ?? []).flatMap((p) =>
-      typeof p === 'object' ? [{ id: String(p.id), title: p.title }] : [],
-    )
+    const prerequisites = (course.prerequisites ?? []).flatMap((p) => {
+      const prerequisite = visibleCourses.find((candidate) => String(candidate.id) === resolveRelationId(p))
+      return prerequisite ? [{ id: String(prerequisite.id), title: prerequisite.title }] : []
+    })
 
     return {
       id: cId,
       title: course.title,
       slug: course.slug,
       estimatedHours: course.estimatedHours,
-      nextLesson: nextLesson(orderedLessons.get(cId) ?? [], completedLessonIds),
+      nextLesson: nextLesson((orderedLessons.get(cId) ?? []).filter((lesson) => accessibleLessons.has(lesson.id)), completedLessonIds),
+      accessAllowed: access.canAccessCourse(course.id),
+      accessibleLessons: courseLessonIds.filter((id) => accessibleLessons.has(id)).length,
       blockedBy: prerequisitesMet ? [] : blockingPrerequisites(prerequisites, isCourseComplete),
       nodeId: resolveRelationId(course.roadmapNode),
       totalLessons,
@@ -208,7 +238,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
   const totalLessons = coursesWithProgress.reduce((s, c) => s + c.totalLessons, 0)
   const completedTotal = coursesWithProgress.reduce((s, c) => s + c.completedCount, 0)
   const overallPercent = totalLessons > 0 ? Math.round((completedTotal / totalLessons) * 100) : 0
-  const nextStep = pickNextStep(coursesWithProgress)
+  const nextStep = pickNextStep(coursesWithProgress.filter((course) => course.accessAllowed))
 
   // Загружаем узлы и связи графа роадмапа (параллельно)
   const [nodeDocs, edgeDocs] = await Promise.all([
@@ -218,7 +248,10 @@ export default async function RoadmapDetailPage({ params }: Props) {
           collection: 'roadmap-nodes',
           where: { roadmap: { equals: roadmap.id } },
           sort: ['order', 'id'],
-          depth: 1,
+          depth: 0,
+          select: { nodeId: true, nodeType: true, course: true, label: true, positionX: true, positionY: true, bullets: true, icon: true, description: true, stage: true, color: true },
+          overrideAccess: true,
+          req,
           page,
           limit,
         }),
@@ -230,7 +263,10 @@ export default async function RoadmapDetailPage({ params }: Props) {
           collection: 'roadmap-edges',
           where: { roadmap: { equals: roadmap.id } },
           sort: 'id',
-          depth: 1,
+          depth: 0,
+          select: { edgeId: true, source: true, target: true, edgeType: true, animated: true },
+          overrideAccess: true,
+          req,
           page,
           limit,
         }),
@@ -308,7 +344,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
 
       <NextStepCard
         nextStep={nextStep}
-        allDone={totalLessons > 0 && completedTotal === totalLessons}
+        allDone={totalLessons > 0 && accessibleLessons.size === totalLessons && completedTotal === totalLessons}
       />
 
       <section>
@@ -335,6 +371,8 @@ type CourseWithProgress = {
   estimatedHours: number | null | undefined
   nextLesson: LessonLink | null
   blockedBy: string[]
+  accessAllowed: boolean
+  accessibleLessons: number
   /** Тема карты, к которой курс привязан (может быть не задана). */
   nodeId: string | null
   totalLessons: number
@@ -352,6 +390,8 @@ function toNodeCourse(course: CourseWithProgress): NodeCourse {
     completedLessons: course.completedCount,
     nextLesson: course.nextLesson,
     blockedBy: course.blockedBy,
+    accessAllowed: course.accessAllowed,
+    accessibleLessons: course.accessibleLessons,
   }
 }
 
@@ -413,23 +453,9 @@ function resolveRelationId(ref: unknown): string | null {
   return null
 }
 
-function resolveNodeId(ref: PayloadRoadmapEdge['source'], edgeId: string, field: 'source' | 'target'): string {
-  if (typeof ref === 'object' && ref !== null && 'nodeId' in ref) {
-    return ref.nodeId
-  }
-  // Relation не populate'нут (depth слишком низкий) — ребро будет отброшено в buildGraphData.
-  // В dev это почти всегда баг конфигурации запроса, а не валидные данные.
-  if (process.env.NODE_ENV !== 'production') {
-    console.warn(
-      `[roadmap] edge "${edgeId}".${field} не populate'нут: ${String(ref)}. Проверьте depth в payload.find({ collection: 'roadmap-edges' }).`,
-    )
-  }
-  return ''
-}
-
 function buildGraphData(
-  rawNodes: PayloadRoadmapNode[],
-  rawEdges: PayloadRoadmapEdge[],
+  rawNodes: Pick<PayloadRoadmapNode, 'id' | 'nodeId' | 'label' | 'nodeType' | 'course' | 'positionX' | 'positionY' | 'description' | 'icon' | 'stage' | 'color' | 'bullets'>[],
+  rawEdges: Pick<PayloadRoadmapEdge, 'id' | 'edgeId' | 'source' | 'target' | 'edgeType' | 'animated'>[],
   coursesWithProgress: CourseWithProgress[],
   nextStepCourseId: string | null,
   canManage = false,
@@ -453,8 +479,11 @@ function buildGraphData(
       byNode.get(String(n.id)) ?? [],
       n.nodeType === 'category',
     )
-    const { courses: nodeCourses, totalLessons, completedLessons, progressPercent, status, comingSoon } = summary
+    const { courses: nodeCourses, totalLessons, completedLessons, progressPercent, comingSoon } = summary
     const fullCourses = nodeCourses.flatMap((c) => courseMap.get(c.id) ?? [])
+    const status = comingSoon || (fullCourses.length > 0 && !fullCourses.some((course) => course.accessAllowed)) ? 'locked'
+      : totalLessons > 0 && completedLessons === totalLessons && fullCourses.every((course) => course.accessibleLessons === course.totalLessons) ? 'completed'
+        : completedLessons > 0 ? 'in-progress' : 'available'
     if (n.nodeType !== 'category') for (const c of fullCourses) placedCourseIds.add(c.id)
 
     const bullets = Array.isArray(n.bullets)
@@ -487,11 +516,12 @@ function buildGraphData(
     }
   })
 
+  const nodesById = new Map(rawNodes.map((node) => [String(node.id), node.nodeId]))
   const graphEdges: GraphEdge[] = rawEdges
     .map((e) => ({
       id: e.edgeId,
-      source: resolveNodeId(e.source, e.edgeId, 'source'),
-      target: resolveNodeId(e.target, e.edgeId, 'target'),
+      source: nodesById.get(resolveRelationId(e.source) ?? '') ?? '',
+      target: nodesById.get(resolveRelationId(e.target) ?? '') ?? '',
       type: e.edgeType ?? 'smoothstep',
       animated: e.animated === true,
     }))

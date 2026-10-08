@@ -1,9 +1,11 @@
-import type { CollectionConfig, Where } from 'payload'
+import type { CollectionConfig } from 'payload'
 
 import { isAuthenticated } from '@/payload/access/isAuthenticated'
 import { isAdmin } from '@/payload/access/isAdmin'
 import { assignOwner } from '@/payload/hooks/assignOwner'
 import { notifyCommentThread, restrictCommentThread } from '@/payload/hooks/commentThread'
+import { guardLearningLessonWrite } from '@/payload/hooks/learningLessonWrite'
+import { learningStateRead } from '@/payload/access/learningStateRead'
 
 export const Comments: CollectionConfig = {
   slug: 'comments',
@@ -13,14 +15,7 @@ export const Comments: CollectionConfig = {
   },
   access: {
     create: isAuthenticated,
-    read: ({ req: { user } }) => {
-      if (!user) return false
-      if (user.role === 'admin') return true
-      // Студент видит свою ветку: свои вопросы и ответы ментора на них.
-      // Писать в чужую ветку запрещает restrictCommentThread.
-      const own: Where[] = [{ user: { equals: user.id } }, { 'parentComment.user': { equals: user.id } }]
-      return { or: own }
-    },
+    read: learningStateRead({ comments: true }),
     update: ({ req: { user } }) => {
       if (!user) return false
       if (user.role === 'admin') return true
@@ -31,7 +26,7 @@ export const Comments: CollectionConfig = {
   },
   hooks: {
     beforeValidate: [restrictCommentThread],
-    beforeChange: [assignOwner],
+    beforeChange: [assignOwner, guardLearningLessonWrite],
     afterChange: [notifyCommentThread],
   },
   fields: [

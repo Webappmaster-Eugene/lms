@@ -1,16 +1,19 @@
 import type { Metadata } from 'next'
 import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
+import { createLocalReq } from 'payload'
+import { getLearningAccess } from '@/server/learning-access'
+import { CourseLessonItem } from '@/components/course/CourseLessonItem'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, Circle, Clock, PartyPopper } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, Clock, Lock, PartyPopper } from 'lucide-react'
 import { collectAllPages } from '@/lib/paginate'
 import { relationKey } from '@/lib/course-lessons'
 import { pluralize } from '@/lib/utils'
 import { remainingTime } from '@/lib/course-time'
 import { nextLesson, orderCourseLessons } from '@/lib/roadmap-next-step'
 import { RichText } from '@payloadcms/richtext-lexical/react'
-import { protectCourseSourceLinks, protectLessonVideoSources } from '@/lib/lesson-video-source'
+import { protectCourseSourceLinks } from '@/lib/lesson-video-source'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -19,10 +22,15 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const payload = await getPayload()
+  const { user } = await payload.auth({ headers: await headers() })
+  if (!user) return { title: 'Вход' }
   const result = await payload.find({
     collection: 'courses',
     where: { slug: { equals: slug }, isPublished: { equals: true } },
     limit: 1,
+    depth: 0,
+    select: { title: true },
+    overrideAccess: true,
   })
   const course = result.docs[0]
   return { title: course?.title ?? 'Курс' }
@@ -33,6 +41,9 @@ export default async function CourseDetailPage({ params }: Props) {
   const payload = await getPayload()
   const headersList = await headers()
   const { user } = await payload.auth({ headers: headersList })
+  if (!user) redirect('/login')
+  const req = await createLocalReq({ user }, payload)
+  const access = await getLearningAccess(payload, user, req)
 
   const courseResult = await payload.find({
     collection: 'courses',
@@ -41,13 +52,16 @@ export default async function CourseDetailPage({ params }: Props) {
       isPublished: { equals: true },
     },
     limit: 1,
-    depth: 1,
+    depth: 0,
+    select: { title: true, slug: true, roadmap: true, estimatedHours: true },
+    overrideAccess: true,
+    req,
   })
 
   const course = courseResult.docs[0]
-  if (!course) return notFound()
+  if (!course || !access.canBrowseCourse(course.id)) return notFound()
 
-  const [sectionDocs, loadedLessonDocs, progressDocs] = await Promise.all([
+  const [sectionDocs, loadedLessonDocs, progressDocs, roadmapDocs, courseContent] = await Promise.all([
     collectAllPages(
       ({ page, limit }) =>
         payload.find({
@@ -57,6 +71,10 @@ export default async function CourseDetailPage({ params }: Props) {
             isPublished: { equals: true },
           },
           sort: ['order', 'id'],
+          select: { title: true, order: true },
+          depth: 0,
+          overrideAccess: true,
+          req,
           page,
           limit,
         }),
@@ -71,6 +89,10 @@ export default async function CourseDetailPage({ params }: Props) {
             isPublished: { equals: true },
           },
           sort: ['order', 'id'],
+          select: { title: true, slug: true, course: true, section: true, order: true, isPublished: true, estimatedMinutes: true },
+          depth: 0,
+          overrideAccess: true,
+          req,
           page,
           limit,
         }),
@@ -86,6 +108,8 @@ export default async function CourseDetailPage({ params }: Props) {
                 isCompleted: { equals: true },
               },
               select: { lesson: true },
+              overrideAccess: false,
+              req,
               depth: 0,
               sort: 'id',
               page,
@@ -94,9 +118,11 @@ export default async function CourseDetailPage({ params }: Props) {
           { label: `прогресс пользователя ${user.id}` },
         )
       : [],
+    course.roadmap ? payload.find({ collection: 'roadmaps', where: { id: { equals: relationKey(course.roadmap) }, isPublished: { equals: true } }, select: { title: true, slug: true }, depth: 0, limit: 1, overrideAccess: true, req }) : null,
+    access.canAccessCourse(course.id) ? payload.findByID({ collection: 'courses', id: course.id, select: { description: true }, depth: 0, overrideAccess: true, req }) : null,
   ])
 
-  const lessonDocs = user?.role === 'admin' ? loadedLessonDocs : loadedLessonDocs.map(protectLessonVideoSources)
+  const lessonDocs = loadedLessonDocs.filter((lesson) => access.canBrowseLessonMetadata(lesson))
 
   const completedLessonIds = new Set(
     progressDocs.map((p) => String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson)),
@@ -127,7 +153,8 @@ export default async function CourseDetailPage({ params }: Props) {
   // До первого урока ученику нужна оценка курса целиком — она уже есть в шапке.
   const timeLeft = completedCount > 0 ? remainingTime(lessonDocs, completedLessonIds) : null
 
-  const roadmap = typeof course.roadmap === 'object' ? course.roadmap : null
+  const roadmap = roadmapDocs?.docs[0] ?? null
+  const accessibleLessons = new Set(lessonDocs.filter((lesson) => access.canAccessLessonMetadata(lesson)).map((lesson) => String(lesson.id)))
 
   const sectionRank = new Map(sectionDocs.map((section, index) => [String(section.id), index]))
   const ordered = orderCourseLessons(
@@ -141,7 +168,7 @@ export default async function CourseDetailPage({ params }: Props) {
     })),
     sectionRank,
   ).get(String(course.id)) ?? []
-  const next = nextLesson(ordered, completedLessonIds)
+  const next = nextLesson(ordered.filter((lesson) => accessibleLessons.has(lesson.id)), completedLessonIds)
   const nextId = next ? ordered.find((l) => l.slug === next.slug)?.id ?? null : null
 
   return (
@@ -195,10 +222,17 @@ export default async function CourseDetailPage({ params }: Props) {
         <Link href={`/manage/courses/${course.id}`} className="inline-flex min-h-[44px] items-center rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">Редактировать программу</Link>
       )}
 
-      {course.description && (
+      {courseContent?.description && (
         <section aria-label="Описание курса" className="prose prose-sm dark:prose-invert max-w-none break-words">
-          <RichText data={user?.role === 'admin' ? course.description : protectCourseSourceLinks(course).description ?? course.description} />
+          <RichText data={user?.role === 'admin' ? courseContent.description : protectCourseSourceLinks({ slug: course.slug, description: courseContent.description }).description ?? courseContent.description} />
         </section>
+      )}
+
+      {(!access.canAccessCourse(course.id) || accessibleLessons.size < totalLessons) && (
+        <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 p-4">
+          <Lock className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <p className="text-sm text-muted-foreground">{accessibleLessons.size === 0 ? 'Доступ к обучению в этом курсе не назначен. Вы можете посмотреть программу и темы роадмапа. Чтобы открыть уроки, обратитесь к администратору.' : `Вам назначено ${accessibleLessons.size} из ${totalLessons} уроков. Остальные темы видны в программе; доступ к ним может открыть администратор.`}</p>
+        </div>
       )}
 
       {next ? (
@@ -217,7 +251,7 @@ export default async function CourseDetailPage({ params }: Props) {
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </span>
         </Link>
-      ) : totalLessons > 0 && completedCount === totalLessons ? (
+      ) : totalLessons > 0 && accessibleLessons.size === totalLessons && completedCount === totalLessons ? (
         <div className="flex items-center gap-3 rounded-xl border border-success/40 bg-success/10 p-4">
           <PartyPopper className="h-6 w-6 shrink-0 text-success" aria-hidden="true" />
           <p className="text-sm text-foreground">
@@ -262,11 +296,12 @@ export default async function CourseDetailPage({ params }: Props) {
 
               <div className="border-t border-border px-2 pb-2">
                 {sectionLessons.map((lesson) => (
-                  <LessonItem
+                  <CourseLessonItem
                     key={lesson.id}
                     lesson={lesson}
                     isCompleted={completedLessonIds.has(String(lesson.id))}
                     isNext={String(lesson.id) === nextId}
+                    accessAllowed={accessibleLessons.has(String(lesson.id))}
                   />
                 ))}
                 {sectionLessons.length === 0 && (
@@ -284,11 +319,12 @@ export default async function CourseDetailPage({ params }: Props) {
               <h3 className="text-sm font-medium text-muted-foreground px-1 mb-2">Другие уроки</h3>
             )}
             {unsectionedLessons.map((lesson) => (
-              <LessonItem
+              <CourseLessonItem
                 key={lesson.id}
                 lesson={lesson}
                 isCompleted={completedLessonIds.has(String(lesson.id))}
                 isNext={String(lesson.id) === nextId}
+                accessAllowed={accessibleLessons.has(String(lesson.id))}
               />
             ))}
           </div>
@@ -299,52 +335,5 @@ export default async function CourseDetailPage({ params }: Props) {
         )}
       </div>
     </div>
-  )
-}
-
-function LessonItem({
-  lesson,
-  isCompleted,
-  isNext,
-}: {
-  lesson: { id: number | string; slug: string; title: string; description?: string | null; estimatedMinutes?: number | null }
-  isCompleted: boolean
-  isNext: boolean
-}) {
-  return (
-    <Link
-      href={`/lessons/${lesson.slug}`}
-      aria-current={isNext ? 'step' : undefined}
-      className={`group flex items-center gap-3 rounded-lg px-4 py-3 transition-colors hover:bg-accent/50 ${
-        isNext ? 'bg-primary/5 ring-1 ring-primary/40' : ''
-      }`}
-    >
-      {isCompleted ? (
-        <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-success" />
-      ) : (
-        <Circle className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-      )}
-
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate">
-          {lesson.title}
-        </p>
-        {lesson.description && (
-          <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{lesson.description}</p>
-        )}
-      </div>
-
-      {isNext && (
-        <span className="flex-shrink-0 rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">
-          Следующий
-        </span>
-      )}
-      {lesson.estimatedMinutes && (
-        <span className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
-          <Clock className="h-3 w-3" />
-          {lesson.estimatedMinutes} мин
-        </span>
-      )}
-    </Link>
   )
 }

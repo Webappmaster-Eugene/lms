@@ -20,13 +20,17 @@ const CONTENT: Matrix = { create: 'admin', read: 'auth', update: 'admin', delete
 const PUBLISHABLE: Matrix = { ...CONTENT, read: 'published' }
 
 const MATRIX: Record<string, Matrix> = {
-  users: { create: 'admin', read: 'auth', update: 'own', delete: 'admin' },
+  users: { create: 'admin', read: 'own', update: 'own', delete: 'admin' },
   roadmaps: PUBLISHABLE,
   'roadmap-nodes': CONTENT,
   'roadmap-edges': CONTENT,
   courses: PUBLISHABLE,
   sections: PUBLISHABLE,
   lessons: PUBLISHABLE,
+  'learning-access-grants': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
+  'learning-access-audit': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
+  'learning-access-policies': { create: 'nobody', read: 'own', update: 'nobody', delete: 'nobody' },
+  'auth-session-revocations': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
   achievements: CONTENT,
   'interview-rooms': { create: 'nobody', read: 'member', update: 'nobody', delete: 'nobody' },
   'trainer-topics': PUBLISHABLE,
@@ -56,6 +60,10 @@ const PATCH: Record<string, Record<string, unknown>> = {
   courses: { order: 7 },
   sections: { order: 7 },
   lessons: { order: 7 },
+  'learning-access-grants': { note: 'Обновлено' },
+  'learning-access-audit': { effect: 'deny' },
+  'learning-access-policies': { mode: 'all' },
+  'auth-session-revocations': { expiresAt: new Date().toISOString() },
   achievements: { pointsReward: 7 },
   'interview-rooms': { title: 'обновлено' },
   'trainer-topics': { order: 7 },
@@ -107,15 +115,22 @@ function allowed(rule: Rule, who: Who): boolean {
 /** Документ, которым владеет owner (для users — сам owner). */
 async function ownedDoc(slug: string, overrides: Record<string, unknown> = {}): Promise<number> {
   if (slug === 'users') return owner.id
+  if (slug === 'learning-access-policies') {
+    const policies = await payload.find({ collection: 'learning-access-policies', where: { user: { equals: owner.id } }, limit: 1, depth: 0 })
+    if (!policies.docs[0]) throw new Error('Фабрика пользователя не создала политику доступа')
+    return policies.docs[0].id
+  }
   if (slug === 'streaks') {
     // Серия у пользователя одна — берём существующую, если она уже есть.
     const existing = await payload.find({ collection: 'streaks', where: { user: { equals: owner.id } }, limit: 1 })
     if (existing.docs[0]) return existing.docs[0].id
   }
   const data = { ...(await makeValid(payload, slug, ctx, owner.id)), ...overrides }
+  // Exercise owner access against published resources; revoked cases are covered separately.
+  if (['user-progress', 'notes', 'comments'].includes(slug)) data.lesson = ctx.lessonId
   // Пара (user, task) уникальна — под каждый документ своя задача.
   if (slug === 'user-trainer-progress') data.task = (await createSumTask(payload)).id
-  const doc = await payload.create({ collection: slug as CollectionSlug, data: data as never, context: { skipHooks: true } })
+  const doc = await payload.create({ collection: slug as CollectionSlug, data: data as never, ...(slug === 'learning-access-grants' ? { user: admin } : {}), context: { skipHooks: true, ...(slug === 'auth-session-revocations' ? { syncAuthSessionRevocations: true } : {}) } })
   return doc.id as number
 }
 
@@ -315,15 +330,14 @@ describe('попытки эскалации прав', () => {
     expect(asAdmin.expectedOutput).toBe('секрет')
   })
 
-  it('студент видит чужие профили (нужно лидерборду), но без хеша пароля и токенов', async () => {
+  it('студент не видит чужие профили; свой профиль не содержит хеша пароля и токенов', async () => {
     await login(payload, other)
-    const found = await payload.findByID({ collection: 'users', id: other.id, user: owner, overrideAccess: false })
+    await expect(payload.findByID({ collection: 'users', id: other.id, user: owner, overrideAccess: false })).rejects.toMatchObject({ status: 404 })
+    const found = await payload.findByID({ collection: 'users', id: other.id, user: other, overrideAccess: false })
     expect(found.email).toBe(other.email)
     for (const secret of ['hash', 'salt', 'resetPasswordToken', 'resetPasswordExpiration', 'password', 'loginAttempts', 'lockUntil']) {
       expect(found, secret).not.toHaveProperty(secret)
     }
-    // Сессии чужого пользователя (после его входа) наружу не отдаются.
-    expect((found as { sessions?: unknown[] }).sessions ?? []).toEqual([])
   })
 
   // ↓ Найденные дефекты: тест описывает ожидаемое поведение и помечен it.fails,

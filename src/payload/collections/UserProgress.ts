@@ -8,6 +8,8 @@ import { checkAchievements } from '@/payload/hooks/checkAchievements'
 import { updateStreak } from '@/payload/hooks/updateStreak'
 import { lockUserProgress } from '@/payload/hooks/lockUserProgress'
 import { assignOwner } from '@/payload/hooks/assignOwner'
+import { guardLearningLessonWrite } from '@/payload/hooks/learningLessonWrite'
+import { learningStateRead } from '@/payload/access/learningStateRead'
 
 export const UserProgress: CollectionConfig = {
   slug: 'user-progress',
@@ -17,12 +19,12 @@ export const UserProgress: CollectionConfig = {
   },
   access: {
     create: isAuthenticated,
-    read: isAdminOrSelf,
+    read: learningStateRead(),
     update: isAdminOrSelf,
     delete: isAdmin,
   },
   hooks: {
-    beforeChange: [assignOwner, lockUserProgress],
+    beforeChange: [assignOwner, guardLearningLessonWrite, lockUserProgress],
     afterChange: [awardPoints, checkAchievements, updateStreak],
   },
   fields: [

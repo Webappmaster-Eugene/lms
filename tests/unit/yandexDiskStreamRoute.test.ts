@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 const auth = vi.fn()
 const fetchPublicDownloadHref = vi.fn()
+const upstream = vi.fn()
+vi.mock('@/server/learning-access', () => ({ canAccessLesson: vi.fn(async () => true) }))
 
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('payload', () => ({
@@ -33,11 +35,22 @@ function uniqueVideoUrl(): string {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  auth.mockResolvedValue({ user: { id: 1, role: 'admin' } })
+  auth.mockResolvedValue({ user: { id: ++fileCounter + 10000, role: 'admin' } })
   fetchPublicDownloadHref.mockResolvedValue(HREF)
+  upstream.mockImplementation(async () => new Response(new Uint8Array([1, 2, 3]), { headers: { 'Content-Type': 'video/mp4', 'Content-Length': '3' } }))
+  vi.stubGlobal('fetch', upstream)
 })
+afterEach(() => vi.unstubAllGlobals())
 
 describe('доступ', () => {
+  it('ошибка проверки сессии закрывает выдачу и сохраняет private,no-store', async () => {
+    auth.mockRejectedValue(new Error('database is unavailable'))
+    const response = await GET(streamRequest(uniqueVideoUrl()))
+    expect(response.status).toBe(503)
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+    expect(fetchPublicDownloadHref).not.toHaveBeenCalled()
+    expect(upstream).not.toHaveBeenCalled()
+  })
   it('без сессии — 401 и без обращения к Яндексу', async () => {
     auth.mockResolvedValue({ user: null })
 
@@ -50,7 +63,8 @@ describe('доступ', () => {
   it('админская диагностика исходного URL остаётся доступна', async () => {
     const response = await GET(streamRequest(uniqueVideoUrl()))
 
-    expect(response.status).toBe(302)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Location')).toBeNull()
   })
 
   it('ученик не может получать произвольные публичные источники вместо урока', async () => {
@@ -81,13 +95,14 @@ describe('проверка параметров', () => {
   })
 })
 
-describe('редирект на прямую ссылку', () => {
-  it('отдаёт 302 на ссылку Яндекса и запрещает кеширование', async () => {
+describe('защищённый поток без CDN capability', () => {
+  it('отдаёт байты сервера и запрещает кеширование', async () => {
     const response = await GET(streamRequest(uniqueVideoUrl()))
 
-    expect(response.status).toBe(302)
-    expect(response.headers.get('Location')).toBe(HREF)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Location')).toBeNull()
     expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]))
   })
 
   it('снимает Referer с запроса по Location — иначе CDN Яндекса отвечает 403', async () => {
@@ -113,7 +128,7 @@ describe('редирект на прямую ссылку', () => {
     await GET(streamRequest(url))
     const second = await GET(streamRequest(url))
 
-    expect(second.status).toBe(302)
+    expect(second.status).toBe(200)
     expect(fetchPublicDownloadHref).toHaveBeenCalledTimes(1)
   })
 
@@ -133,7 +148,7 @@ describe('ошибки Яндекс.Диска', () => {
     const response = await GET(streamRequest(uniqueVideoUrl()))
 
     expect(response.status).toBe(404)
-    await expect(response.json()).resolves.toMatchObject({ error: 'Файл не найден' })
+    await expect(response.json()).resolves.toMatchObject({ error: 'Не удалось открыть файл. Попробуйте ещё раз' })
   })
 
   it('неизвестная ошибка — 502, без деталей наружу', async () => {
@@ -143,7 +158,7 @@ describe('ошибки Яндекс.Диска', () => {
 
     expect(response.status).toBe(502)
     await expect(response.json()).resolves.toMatchObject({
-      error: 'Не удалось получить ссылку на видео',
+      error: 'Не удалось открыть файл. Попробуйте ещё раз',
     })
   })
 
@@ -154,7 +169,7 @@ describe('ошибки Яндекс.Диска', () => {
     await GET(streamRequest(url))
     const second = await GET(streamRequest(url))
 
-    expect(second.status).toBe(302)
+    expect(second.status).toBe(200)
     expect(fetchPublicDownloadHref).toHaveBeenCalledTimes(2)
   })
 })

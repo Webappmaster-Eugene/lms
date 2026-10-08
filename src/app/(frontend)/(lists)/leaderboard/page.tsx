@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import { Star, Trophy } from 'lucide-react'
+import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = {
   title: 'Лидерборд',
@@ -14,6 +15,7 @@ export default async function LeaderboardPage() {
   const payload = await getPayload()
   const headersList = await headers()
   const { user: currentUser } = await payload.auth({ headers: headersList })
+  if (!currentUser) redirect('/login')
 
   // Ничьи по баллам разводим по id: иначе порядок в таблице плавает между запросами.
   const users = await payload.find({
@@ -24,6 +26,10 @@ export default async function LeaderboardPage() {
     },
     sort: ['-totalPoints', 'id'],
     limit: LEADERBOARD_SIZE,
+    select: { firstName: true, lastName: true, totalPoints: true, avatar: true },
+    populate: { media: { url: true, alt: true } },
+    depth: 1,
+    overrideAccess: true,
   })
 
   return (

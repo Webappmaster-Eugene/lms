@@ -1,8 +1,11 @@
 import type { Access } from 'payload'
+import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 
-export const isAdminOrSelf: Access = ({ req: { user } }) => {
+export const isAdminOrSelf: Access = async ({ req }) => {
+  const user = req.user
   if (!user) return false
-  if (user.role === 'admin') return true
+  if (!req.payload) return false
+  if ((await getAuthoritativeLearningPolicy(req.payload, user.id, req)).role === 'admin') return true
 
   return {
     user: {

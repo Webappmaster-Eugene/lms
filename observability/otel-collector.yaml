@@ -1,0 +1,138 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        max_recv_msg_size_mib: 8
+      http:
+        endpoint: 0.0.0.0:4318
+        max_request_body_size: 8388608
+  prometheus/self:
+    config:
+      scrape_configs:
+        - job_name: lms-mentor-otel
+          scrape_interval: 15s
+          static_configs:
+            - targets: [127.0.0.1:8888]
+              labels:
+                component: lms-mentor-otel
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 128
+    spike_limit_mib: 32
+  filter/lms_only:
+    error_mode: propagate
+    traces:
+      span:
+        - 'resource.attributes["service.name"] != "lms-platform"'
+    metrics:
+      metric:
+        - 'resource.attributes["service.name"] != "lms-platform"'
+    logs:
+      log_record:
+        - 'resource.attributes["service.name"] != "lms-platform"'
+  transform/resource_privacy:
+    error_mode: propagate
+    trace_statements:
+      - context: resource
+        statements:
+          - 'keep_keys(attributes, ["service.name", "service.version", "deployment.environment"])'
+    metric_statements:
+      - context: resource
+        statements:
+          - 'keep_keys(attributes, ["service.name", "service.version", "deployment.environment"])'
+    log_statements:
+      - context: resource
+        statements:
+          - 'keep_keys(attributes, ["service.name", "service.version", "deployment.environment"])'
+  resource/self:
+    attributes:
+      - key: service.name
+        value: lms-platform
+        action: upsert
+  batch:
+    timeout: 2s
+    send_batch_size: 256
+    send_batch_max_size: 512
+
+exporters:
+  prometheusremotewrite:
+    endpoint: ${env:LMS_PROMETHEUS_REMOTE_WRITE_ENDPOINT:-http://prometheus:9090/api/v1/write}
+    timeout: 5s
+    add_metric_suffixes: true
+    send_metadata: true
+    max_batch_size_bytes: 1048576
+    max_batch_request_parallelism: 1
+    resource_to_telemetry_conversion:
+      enabled: true
+    remote_write_queue:
+      enabled: true
+      queue_size: 32
+      num_consumers: 1
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 10s
+      max_elapsed_time: 60s
+  otlp_http/loki:
+    endpoint: ${env:LMS_LOKI_OTLP_ENDPOINT:-http://loki:3100/otlp}
+    timeout: 5s
+    sending_queue:
+      enabled: true
+      num_consumers: 1
+      queue_size: 32
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 10s
+      max_elapsed_time: 60s
+  otlp_grpc/tempo:
+    endpoint: ${env:LMS_TEMPO_OTLP_GRPC_ENDPOINT:-tempo:4317}
+    tls:
+      insecure: true
+    timeout: 5s
+    sending_queue:
+      enabled: true
+      num_consumers: 1
+      queue_size: 32
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 10s
+      max_elapsed_time: 60s
+
+service:
+  extensions: [health_check]
+  telemetry:
+    logs:
+      level: warn
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 127.0.0.1
+                port: 8888
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/lms_only, transform/resource_privacy, batch]
+      exporters: [otlp_grpc/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/lms_only, transform/resource_privacy, batch]
+      exporters: [prometheusremotewrite]
+    metrics/self:
+      receivers: [prometheus/self]
+      processors: [memory_limiter, resource/self, transform/resource_privacy, batch]
+      exporters: [prometheusremotewrite]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/lms_only, transform/resource_privacy, batch]
+      exporters: [otlp_http/loki]

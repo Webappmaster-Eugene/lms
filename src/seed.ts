@@ -54,7 +54,7 @@ export const seed = async (payload: Payload) => {
     if (await findIdBy(payload, 'users', 'email', student.email)) continue
     await payload.create({
       collection: 'users',
-      data: { ...student, password: 'student123', role: 'student', isActive: true },
+      data: { ...student, password: 'student123', role: 'student', learningAccessMode: 'all', isActive: true },
       context: { skipHooks: true },
     })
   }

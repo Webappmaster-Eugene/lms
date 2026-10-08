@@ -62,6 +62,8 @@ export default defineConfig({
     : [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
   use: {
     baseURL: APP_URL,
+    // APIRequestContext has no browser Fetch Metadata; cookie calls need the canonical Origin.
+    extraHTTPHeaders: { Origin: APP_URL },
     locale: 'ru-RU',
     timezoneId: 'Europe/Moscow',
     reducedMotion: 'reduce',

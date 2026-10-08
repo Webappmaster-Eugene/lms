@@ -49,7 +49,7 @@ const created: Record<keyof typeof USERS, number> = { admin: 0, student: 0, lead
 for (const [key, u] of Object.entries(USERS) as [keyof typeof USERS, (typeof USERS)[keyof typeof USERS]][]) {
   const doc = await payload.create({
     collection: 'users',
-    data: { ...u, role: key === 'admin' ? 'admin' : 'student', isActive: true },
+    data: { ...u, role: key === 'admin' ? 'admin' : 'student', learningAccessMode: 'all', isActive: true },
     context: { skipHooks: true },
   })
   created[key] = doc.id

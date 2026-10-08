@@ -102,7 +102,7 @@ describe('коллекции с пользовательскими данным�
   it.each(USER_OWNED)('%s ограничивает чтение владельцем', (name) => {
     const read = operationValue(name, 'read')
 
-    expect(read, `${name}: read = ${read}`).toMatch(/isAdminOrSelf|isAdmin\b|=>/)
+    expect(read, `${name}: read = ${read}`).toMatch(/isAdminOrSelf|isAdmin\b|learningStateRead\(|=>/)
     expect(read, `${name}: read = ${read}`).not.toMatch(/isAuthenticated/)
   })
 })
@@ -131,8 +131,13 @@ describe('отдельные правила', () => {
   })
 
   it('в админку пускают только админов', () => {
-    expect(accessBlock('Users')).toMatch(
-      /admin:\s*\(\{\s*req:\s*\{\s*user\s*\}\s*\}\)\s*=>\s*user\?\.role\s*===\s*'admin'/,
-    )
+    expect(accessBlock('Users')).toMatch(/admin:\s*canAdministerUsers/)
+    expect(sourceOf('Users')).toMatch(/getAuthoritativeLearningPolicy\(req\.payload, req\.user\.id, req\)\)\.role === 'admin'/)
+  })
+
+  it('отозванные сессии недоступны через все внешние операции', () => {
+    for (const operation of OPERATIONS) {
+      expect(operationValue('AuthSessionRevocations', operation)).toMatch(/\(\)\s*=>\s*false/)
+    }
   })
 })

@@ -14,6 +14,9 @@ export type NodeCourse = {
   nextLesson: LessonLink | null
   /** Непройденные курсы, которые закрывают этот. Пусто — курс открыт. */
   blockedBy: string[]
+  /** Назначение доступа независимо от рекомендуемых пререквизитов. */
+  accessAllowed?: boolean
+  accessibleLessons?: number
 }
 
 export type RoadmapNodeData = {

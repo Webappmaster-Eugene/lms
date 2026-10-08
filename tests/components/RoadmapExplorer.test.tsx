@@ -100,7 +100,7 @@ describe('панель темы', () => {
     expect(screen.getByRole('link', { name: 'Хуки React' })).toHaveAttribute('href', '/courses/react-hooks')
   })
 
-  it('закрытый курс называет, что его открывает', () => {
+  it('рекомендует пререквизиты без запрета назначенного урока', () => {
     render(
       <RoadmapNodePanel
         data={data({ status: 'locked', courses: [course({ blockedBy: ['Основы JS', 'TypeScript'] })] })}
@@ -108,8 +108,23 @@ describe('панель темы', () => {
       />,
     )
 
-    expect(screen.getByText('Откроется после курсов: Основы JS, TypeScript')).toBeInTheDocument()
+    expect(screen.getByText('Рекомендуем сначала пройти курсы: Основы JS, TypeScript')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Продолжить/ })).toBeInTheDocument()
+  })
+
+  it('сохраняет программу неназначенного курса без ссылки на урок', () => {
+    render(<RoadmapNodePanel data={data({ courses: [course({ accessAllowed: false })] })} onClose={vi.fn()} />)
+    expect(screen.getByRole('link', { name: 'Основы React' })).toHaveAttribute('href', '/courses/react-basics')
+    expect(screen.getByText(/Доступ к обучению не назначен/)).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /Продолжить/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'React' })).toHaveFocus()
+  })
+
+  it('назначение отдельных уроков не сокращает общее число уроков', () => {
+    render(<RoadmapNodePanel data={data({ courses: [course({ accessAllowed: true, accessibleLessons: 2 })] })} onClose={vi.fn()} />)
+    expect(screen.getByText('Доступно 2 из 10 уроков')).toBeInTheDocument()
+    expect(screen.getByText('3/10')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Продолжить/ })).toHaveAttribute('href', '/lessons/react-state')
   })
 
   it('закрывается по Escape и кнопке', async () => {

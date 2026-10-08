@@ -17,6 +17,7 @@ export const VideoBlock: Block = {
     {
       name: 'videoUrl',
       type: 'text',
+      index: true,
       required: true,
       label: 'Ссылка на видео (Яндекс.Диск или YouTube)',
     },

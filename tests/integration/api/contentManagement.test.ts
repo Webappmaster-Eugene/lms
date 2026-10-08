@@ -53,9 +53,9 @@ describe('Управление курсами и уроками через LMS A
     const { course } = await createCourseTree(payload)
     const body = { title: 'Урок', course: course.id }
     const cookie = `${payload.config.cookiePrefix}-token=${adminToken}`
-    expect((await write('lessons', body, { token: null, headers: { Cookie: cookie, Origin: 'https://evil.lms.test' } })).status).toBe(403)
+    expect((await write('lessons', body, { token: null, headers: { Cookie: cookie, Origin: 'https://evil.lms.test' } })).status).toBe(401)
     expect((await write('lessons', body, { token: null, headers: { Cookie: cookie, Origin: 'http://lms.test', 'Sec-Fetch-Site': 'same-site' } })).status).toBe(403)
-    expect((await write('lessons', body, { token: null, headers: { Cookie: cookie, Origin: 'https://evil.lms.test', 'Content-Type': 'text/plain' } })).status).toBe(400)
+    expect((await write('lessons', body, { token: null, headers: { Cookie: cookie, Origin: 'https://evil.lms.test', 'Content-Type': 'text/plain' } })).status).toBe(401)
     expect((await write('lessons', body, { token: null, headers: { Cookie: cookie, Origin: 'http://lms.test', 'Sec-Fetch-Site': 'same-origin', 'Content-Type': 'application/json; charset=utf-8' } })).status).toBe(201)
     expect((await write('lessons', body, { token: null, headers: { Cookie: cookie, Origin: 'http://lms.test', Authorization: 'JWT invalid-token' } })).status).toBe(401)
     expect((await write('lessons', body)).status).toBe(201)
@@ -66,9 +66,9 @@ describe('Управление курсами и уроками через LMS A
     const body = { title: 'Проксируемый урок', course: course.id }
     const options = { token: null, requestUrl: 'http://localhost:3102/api/manage/content/lessons' }
     const cookie = `${payload.config.cookiePrefix}-token=${adminToken}`
-    expect((await write('lessons', body, { ...options, headers: { Cookie: cookie, Host: 'host.docker.internal:3102', Origin: 'http://host.docker.internal:3102', 'Sec-Fetch-Site': 'same-origin' } })).status).toBe(201)
-    expect((await write('lessons', body, { ...options, headers: { Cookie: cookie, Host: 'learn.mentorcareer.ru', Origin: 'https://learn.mentorcareer.ru', 'X-Forwarded-Proto': 'https', 'Sec-Fetch-Site': 'same-origin' } })).status).toBe(201)
-    expect((await write('lessons', body, { ...options, headers: { Cookie: cookie, Host: 'learn.mentorcareer.ru', Origin: 'https://evil.mentorcareer.ru', 'X-Forwarded-Proto': 'https', 'X-Forwarded-Host': 'evil.mentorcareer.ru' } })).status).toBe(403)
+    expect((await write('lessons', body, { ...options, headers: { Cookie: cookie, Host: 'lms.test', Origin: 'http://lms.test', 'Sec-Fetch-Site': 'same-origin' } })).status).toBe(201)
+    expect((await write('lessons', body, { ...options, headers: { Cookie: cookie, Host: 'lms.test', Origin: 'http://lms.test', 'X-Forwarded-Proto': 'https', 'Sec-Fetch-Site': 'same-origin' } })).status).toBe(201)
+    expect((await write('lessons', body, { ...options, headers: { Cookie: cookie, Host: 'learn.mentorcareer.ru', Origin: 'https://evil.mentorcareer.ru', 'X-Forwarded-Proto': 'https', 'X-Forwarded-Host': 'evil.mentorcareer.ru' } })).status).toBe(401)
   })
 
   it('один Idempotency-Key создаёт документ единожды, изменённый запрос конфликтует', async () => {

@@ -6,10 +6,10 @@ import { CONTENT } from '../fixtures/data'
 import { APP_URL, storageStateOf } from '../fixtures/env'
 
 test('другое устройство видит точный урок/ролик/время, текстовый урок обновляется после реального открытия', async ({ browser }) => {
-  const admin = await browser.newContext({ storageState: storageStateOf('admin') })
-  const first = await browser.newContext({ storageState: { cookies: [], origins: [] } })
-  const second = await browser.newContext({ storageState: { cookies: [], origins: [] }, viewport: { width: 390, height: 844 } })
-  const stranger = await browser.newContext({ storageState: storageStateOf('student') })
+  const admin = await browser.newContext({ extraHTTPHeaders: { Origin: APP_URL }, storageState: storageStateOf('admin') })
+  const first = await browser.newContext({ extraHTTPHeaders: { Origin: APP_URL }, storageState: { cookies: [], origins: [] } })
+  const second = await browser.newContext({ extraHTTPHeaders: { Origin: APP_URL }, storageState: { cookies: [], origins: [] }, viewport: { width: 390, height: 844 } })
+  const stranger = await browser.newContext({ extraHTTPHeaders: { Origin: APP_URL }, storageState: storageStateOf('student') })
   let mediaId: number | undefined
   let userId: number | undefined
   let videoLessonId: number | undefined
@@ -17,7 +17,7 @@ test('другое устройство видит точный урок/рол�
   const email = `resume-${Date.now()}@lms.test`
   const password = 'Resume-Test-Pass-1'
   try {
-    const createdUser = await admin.request.post(`${APP_URL}/api/users`, { data: { email, password, firstName: 'Продолжение', lastName: 'Урока', role: 'student' } })
+    const createdUser = await admin.request.post(`${APP_URL}/api/users`, { data: { email, password, firstName: 'Продолжение', lastName: 'Урока', role: 'student', learningAccessMode: 'all' } })
     expect(createdUser.status()).toBe(201)
     userId = (await createdUser.json()).doc.id as number
     for (const context of [first, second]) {

@@ -10,6 +10,8 @@ import { loadCourseLessons, relationKey } from '@/lib/course-lessons'
 import { latestLearningResume } from '@/server/learning-state'
 import { formatTime } from '@/lib/video-memory'
 import { nextLesson, recentCourseIds } from '@/lib/roadmap-next-step'
+import { createLocalReq, type Where } from 'payload'
+import { getLearningAccess } from '@/server/learning-access'
 
 export const metadata: Metadata = {
   title: 'Дашборд',
@@ -24,6 +26,9 @@ export default async function DashboardPage() {
   const { user } = await payload.auth({ headers: headersList })
 
   if (!user) return null
+  const req = await createLocalReq({ user }, payload)
+  const policy = await getLearningAccess(payload, user, req)
+  const assignedCourses: Where = user.role === 'admin' ? {} : { id: { in: policy.accessibleCourseIds } }
 
   // Загружаем данные параллельно
   const [roadmapDocs, courses, progressData, achievementsData, streakData, certificatesData, answers] = await Promise.all([
@@ -40,10 +45,11 @@ export default async function DashboardPage() {
     ),
     payload.find({
       collection: 'courses',
-      where: { isPublished: { equals: true } },
+      where: { and: [{ isPublished: { equals: true } }, assignedCourses] },
       sort: ['order', 'id'],
       limit: DASHBOARD_COURSES,
-      depth: 1,
+      depth: 0,
+      select: { title: true, slug: true, estimatedHours: true },
     }),
     payload.find({
       collection: 'user-progress',
@@ -142,7 +148,7 @@ export default async function DashboardPage() {
       ? (
           await payload.find({
             collection: 'courses',
-            where: { id: { in: recentIds }, isPublished: { equals: true } },
+            where: { and: [{ id: { in: recentIds }, isPublished: { equals: true } }, assignedCourses] },
             select: { title: true, slug: true, estimatedHours: true },
             depth: 0,
             limit: recentIds.length,
@@ -152,7 +158,7 @@ export default async function DashboardPage() {
   const hasStarted = startedCourses.length > 0
   const shownCourses = hasStarted ? startedCourses.slice(0, DASHBOARD_COURSES) : courses.docs
 
-  const courseLessons = await loadCourseLessons(payload, shownCourses.map((c) => c.id), 'дашборд')
+  const courseLessons = await loadCourseLessons(payload, shownCourses.map((c) => c.id), 'дашборд', policy.canAccessLessonMetadata)
 
   const coursesWithProgress = shownCourses.map((course) => {
     const cId = String(course.id)

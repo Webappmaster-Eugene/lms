@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 
 const auth = vi.fn()
 const fetchPublicDownloadHref = vi.fn()
+vi.mock('@/server/learning-access', () => ({ canAccessLesson: vi.fn(async () => true) }))
 
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('payload', () => ({
@@ -35,7 +36,7 @@ const upstream = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  auth.mockResolvedValue({ user: { id: 1, role: 'admin' } })
+  auth.mockResolvedValue({ user: { id: ++fileCounter + 20000, role: 'admin' } })
   fetchPublicDownloadHref.mockResolvedValue(HREF)
   upstream.mockResolvedValue(
     new Response(new Uint8Array([0x47, 0x40, 0x11, 0x10]), {
@@ -104,7 +105,7 @@ describe('отдача файла', () => {
 
     expect(response.status).toBe(200)
     const [, init] = upstream.mock.calls[0]
-    expect(init?.headers).toEqual({})
+    expect(init?.headers).toEqual({ 'Accept-Encoding': 'identity' })
   })
 
   it('тип содержимого у потока — video/mp2t', async () => {

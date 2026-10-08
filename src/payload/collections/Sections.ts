@@ -1,8 +1,9 @@
 import type { CollectionConfig } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
-import { isPublishedOrAdmin } from '@/payload/access/isPublishedOrAdmin'
+import { learningSectionRead } from '@/payload/access/learningCatalogRead'
 import { generateSlug } from '@/payload/hooks/generateSlug'
+import { cleanupLearningTargetGrants } from '@/payload/hooks/learningAccessCleanup'
 
 export const Sections: CollectionConfig = {
   slug: 'sections',
@@ -13,11 +14,12 @@ export const Sections: CollectionConfig = {
   },
   access: {
     create: isAdmin,
-    read: isPublishedOrAdmin,
+    read: learningSectionRead,
     update: isAdmin,
     delete: isAdmin,
   },
   hooks: {
+    beforeDelete: [cleanupLearningTargetGrants('sections')],
     beforeValidate: [generateSlug],
   },
   fields: [

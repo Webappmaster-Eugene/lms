@@ -1,0 +1,6 @@
+FROM busybox:1.37.0-musl AS health-probe
+
+FROM otel/opentelemetry-collector-contrib:0.145.0
+
+# The upstream distroless image has no HTTP probe executable.
+COPY --from=health-probe /bin/busybox /bin/busybox
