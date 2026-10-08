@@ -106,8 +106,13 @@ describe('единая политика назначений через наст
     const node = await payload.create({ collection: 'roadmap-nodes', data: { nodeId: uid('policy-node'), label: 'Тема', nodeType: 'topic', roadmap: otherTree.roadmap.id, course: otherTree.course.id, positionX: 0, positionY: 0 } })
     await assignment('roadmap-nodes', node.id)
     expect((await rest('GET', `/lessons/${otherTree.lessons[0].id}`, { token })).status).toBe(200)
-    await payload.update({ collection: 'roadmap-nodes', id: node.id, data: { roadmap: tree.roadmap.id } })
-    expect((await rest('GET', `/lessons/${otherTree.lessons[0].id}`, { token })).status).toBe(404)
+    try {
+      await payload.update({ collection: 'roadmap-nodes', id: node.id, data: { roadmap: tree.roadmap.id } })
+      expect((await rest('GET', `/lessons/${otherTree.lessons[0].id}`, { token })).status).toBe(404)
+    } finally {
+      // Other suites inspect the shared catalog; do not leave this deliberately corrupt fixture behind.
+      await payload.delete({ collection: 'roadmap-nodes', id: node.id })
+    }
   })
 
   it('аудит неизменяемый, unique rule key вычисляется сервером, истёкшие назначения не работают', async () => {
@@ -128,7 +133,7 @@ describe('единая политика назначений через наст
     const grants = await payload.find({ collection: 'learning-access-grants', where: { user: { equals: student.id } }, depth: 0 })
     expect(grants.docs.some((item) => item.target.relationTo === 'lessons' && item.target.value === tree.lessons[0].id)).toBe(false)
     expect(await canAccessLesson(payload, student, tree.lessons[0].id)).toBe(false)
-    expect((await payload.count({ collection: 'learning-access-audit', where: { and: [{ operation: { equals: 'delete' } }, { targetId: { equals: tree.lessons[0].id } }] } })).totalDocs).toBe(1)
+    expect((await payload.count({ collection: 'learning-access-audit', where: { and: [{ operation: { equals: 'delete' } }, { targetType: { equals: 'lessons' } }, { targetId: { equals: tree.lessons[0].id } }] } })).totalDocs).toBe(1)
   })
 
   it('request cache повторно используется, но запись назначения немедленно инвалидирует его', async () => {

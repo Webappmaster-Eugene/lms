@@ -219,4 +219,23 @@ describe('learning observability: real in-memory OpenTelemetry export', () => {
       expect(output).toContain('17')
     }
   })
+
+  it.each([
+    'Failed query: select "id" from "users" where "reset_password_token" = $1\nparams: syntheticResetSecret',
+    'update "users" set "invite_token" = $1\nparameters: syntheticResetSecret',
+    'resetPasswordToken: syntheticResetSecret',
+  ])('redacts SQL parameters and reset-token literals from exporter and legacy logger bodies: %s', async (body) => {
+    const { sanitizeTelemetryLog } = await import('@/instrumentation.node')
+    const { logger } = await import('@/lib/telemetry')
+    logProvider.getLogger('test').emit({ body, attributes: { 'user.id': 37 } })
+    logger.error(body, undefined, { 'user.id': 37 })
+    await logProvider.forceFlush()
+    const records = logExporter.getFinishedLogRecords()
+    const first = records[0]
+    if (!first) throw new Error('Real log was not exported')
+    expect(sanitizeTelemetryLog(first).body).toBe('redacted.telemetry')
+    expect(JSON.stringify(records[1])).not.toContain('syntheticResetSecret')
+    expect(String(vi.mocked(console.error).mock.calls[0]?.[0])).not.toContain('syntheticResetSecret')
+    expect(records[1]?.attributes['user.id']).toBe(37)
+  })
 })

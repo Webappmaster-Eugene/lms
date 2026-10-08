@@ -30,7 +30,7 @@ type ExportedSpan = Parameters<OTLPTraceExporter['export']>[0][number]
 type ExportedLog = Parameters<OTLPLogExporter['export']>[0][number]
 
 const SENSITIVE_ATTRIBUTE = /(?:url|uri|email|password|token|secret|cookie|authorization|stack|statement|query)|^(?:http\.target|error\.message|exception\.message|process\.command.*)$/i
-const SENSITIVE_TEXT = /:\/\/|\?|[^\s@]+@[^\s@]+\.[^\s@]+/
+const SENSITIVE_TEXT = /:\/\/|\?|[^\s@]+@[^\s@]+\.[^\s@]+|\b(?:failed\s+query|query\s+failed|params|parameters)\s*:|\b(?:select\b[\s\S]*?\bfrom|insert\s+into|update\s+\S+\s+set|delete\s+from)\b|\b(?:reset[-_]?(?:password[-_]?)?token|invite[-_]?token|invitation[-_]?token|password|token|secret|authorization|cookie)\s*[:=]\s*\S+/i
 
 function safeSpanContext(value: SpanContext): SpanContext {
   return { traceId: value.traceId, spanId: value.spanId, traceFlags: value.traceFlags, isRemote: value.isRemote }

@@ -102,7 +102,7 @@ describe('гранулярная политика учебного доступ�
     const policy = resolve([grant('courses', 10), grant('lessons', 40, 'deny'), grant('lessons', 42)])
     expect(policy.lessonWhere).toEqual({ and: [
       { isPublished: { equals: true } },
-      { or: [{ and: [{ course: { equals: 10 } }, { or: [{ section: { exists: false } }, { section: { in: [30] } }] }] }, { id: { in: [42] } }] },
+      { or: [{ and: [{ course: { in: [10] } }, { section: { exists: false } }] }, { and: [{ course: { in: [10, 11, 20] } }, { section: { in: [30] } }] }, { id: { in: [42] } }] },
       { id: { not_in: [40] } },
     ] })
     expect(resolve().lessonWhere).toEqual({ and: [{ isPublished: { equals: true } }, { id: { equals: -1 } }] })
@@ -112,5 +112,12 @@ describe('гранулярная политика учебного доступ�
     expect(resolve([{ target: { relationTo: 'courses', value: null }, effect: 'allow' }]).canAccessCourse(10)).toBe(false)
     for (const invalid of [null, undefined, '', false, -1, 1.5, 'abc']) expect(learningRelationId(invalid)).toBeNull()
     expect(learningRelationId({ id: 10 })).toBe(10)
+  })
+
+  it('метаданные неконсистентных связей закрывают урок даже при явном разрешении', () => {
+    const policy = resolve([grant('roadmaps', 1), grant('lessons', 40)], { ...metadata, invalidLessonIds: [40] })
+    expect(policy.canBrowseLessonMetadata(metadata.lessons[0])).toBe(false)
+    expect(policy.canAccessLessonMetadata(metadata.lessons[0])).toBe(false)
+    expect(policy.lessonWhere.and).toContainEqual({ id: { not_in: [40] } })
   })
 })

@@ -20,6 +20,8 @@ export type LearningPolicyMetadata = {
   roadmaps: { id: number; isPublished?: boolean | null }[]
   nodes: LearningNodeMetadata[]
   lessons: LearningLessonMetadata[]
+  /** SQL returns only inconsistent parent pairs, never the complete lesson catalog. */
+  invalidLessonIds?: number[]
 }
 
 export function learningRelationId(value: unknown): number | null {
@@ -57,6 +59,7 @@ export function buildLearningAccess(
 ): LearningAccessSnapshot {
   const admin = user?.role === 'admin'
   const mode = user?.learningAccessMode === 'all' ? 'all' : 'assigned'
+  const invalidLessonIds = new Set(metadata.invalidLessonIds ?? [])
   const rules = new Map<string, LearningEffect>()
   for (const grant of grants) {
     const id = learningRelationId(grant.target?.value)
@@ -114,7 +117,7 @@ export function buildLearningAccess(
   }
   const canBrowseLessonMetadata = (lesson: LearningLessonMetadata) => {
     if (admin) return true
-    if (!user || !lesson.isPublished) return false
+    if (!user || !lesson.isPublished || invalidLessonIds.has(lesson.id)) return false
     const courseId = learningRelationId(lesson.course)
     if (courseId === null || !courses.has(courseId)) return false
     const sectionId = learningRelationId(lesson.section)
@@ -134,32 +137,37 @@ export function buildLearningAccess(
   }
   const arms: Where[] = []
   const accessible = new Set<number>()
+  const allowedCourseIds: number[] = []
+  const allowedSectionIds: number[] = []
   for (const course of courses.values()) {
     const allowedSections = (sectionsByCourse.get(course.id) ?? []).filter(sectionAllowed).map((section) => section.id)
     const allowedBase = Boolean(courseEffects.get(course.id))
     if (!allowedBase && allowedSections.length === 0) continue
-    const sectionArms: Where[] = []
-    if (allowedBase) sectionArms.push({ section: { exists: false } })
-    if (allowedSections.length) sectionArms.push({ section: { in: allowedSections } })
-    arms.push({ and: [{ course: { equals: course.id } }, { or: sectionArms }] })
+    if (allowedBase) allowedCourseIds.push(course.id)
+    allowedSectionIds.push(...allowedSections)
     accessible.add(course.id)
   }
+  // Constant-size predicate tree: Payload creates a new relation JOIN for each nested predicate.
+  // One arm per course makes notes/progress/history query planning grow with the entire catalog.
+  if (allowedCourseIds.length) arms.push({ and: [{ course: { in: allowedCourseIds } }, { section: { exists: false } }] })
+  if (allowedSectionIds.length) arms.push({ and: [{ course: { in: [...courses.keys()] } }, { section: { in: allowedSectionIds } }] })
   const allowedLessons: number[] = []
-  const deniedLessons: number[] = []
+  const deniedLessons = new Set(invalidLessonIds)
   for (const lesson of metadata.lessons) {
+    if (!canBrowseLessonMetadata(lesson)) { deniedLessons.add(lesson.id); continue }
     if (effect('lessons', lesson.id) === undefined) continue
     if (canAccessLessonMetadata(lesson)) {
       allowedLessons.push(lesson.id)
       const courseId = learningRelationId(lesson.course)
       if (courseId !== null) accessible.add(courseId)
-    } else deniedLessons.push(lesson.id)
+    } else deniedLessons.add(lesson.id)
   }
   if (allowedLessons.length) arms.push({ id: { in: allowedLessons } })
   const lessonWhere: Where = admin ? {} : {
     and: [
       { isPublished: { equals: true } },
       arms.length ? { or: arms } : { id: { equals: -1 } },
-      ...(deniedLessons.length ? [{ id: { not_in: deniedLessons } }] : []),
+      ...(deniedLessons.size ? [{ id: { not_in: [...deniedLessons] } }] : []),
     ],
   }
   return { admin, mode, lessonWhere, accessibleCourseIds: [...accessible], browseCourseIds: user ? [...courses.keys()] : [], canBrowseCourse: (id) => admin || (Boolean(user) && courses.has(id)), canBrowseLessonMetadata, canAccessCourse: (id) => admin || accessible.has(id), canAccessLessonMetadata }

@@ -6,10 +6,14 @@ const LOGGER_NAME = 'lms'
 const SENSITIVE_LOG_ATTRIBUTE = /email|password|token|secret|cookie|authorization|stack|^(?:error\.message|exception\.message)$/i
 
 function safeLogText(value: string): string {
+  // SQL errors can include reset/invite token values in a separate params line.
+  if (/\b(?:failed\s+query|query\s+failed|params|parameters)\s*:|\b(?:select\b[\s\S]*?\bfrom|insert\s+into|update\s+\S+\s+set|delete\s+from)\b/i.test(value)) {
+    return '[redacted SQL]'
+  }
   return value
     .replace(/\b(?:https?|postgres(?:ql)?|redis|rediss):\/\/[^\s"'<>]+/gi, '[redacted URL]')
     .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '[redacted email]')
-    .replace(/\b(password|token|secret|authorization|cookie|public_key|private_key)\s*[:=]\s*(?:["'][^"']*["']|[^\s,;]+)/gi, '$1=[redacted]')
+    .replace(/\b(reset[-_]?(?:password[-_]?)?token|invite[-_]?token|invitation[-_]?token|password|token|secret|authorization|cookie|public_key|private_key)\s*[:=]\s*(?:["'][^"']*["']|[^\s,;]+)/gi, '$1=[redacted]')
 }
 
 function safeLogAttributes(attributes: Attributes | undefined): Attributes {
