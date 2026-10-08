@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { BookOpen, Pencil, Star, Target, Trophy } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { collectAllPages } from '@/lib/paginate'
+import { streakView } from '@/lib/streak'
 import { nearestGoals } from '@/lib/achievement-progress'
 import { activityGrid, activityStart, countByDay } from '@/lib/activity'
 import { ActivityCalendar } from '@/components/profile/ActivityCalendar'
@@ -22,15 +23,11 @@ export default async function ProfilePage() {
   if (!user) redirect('/login')
 
   // Загружаем данные параллельно
-  const [progressData, achievementsData, recentTransactions, activeAchievements, unlockedDocs, trainerSolved, completionBonuses] = await Promise.all([
-    payload.find({
-      collection: 'user-progress',
-      where: {
-        user: { equals: user.id },
-        isCompleted: { equals: true },
-      },
-      limit: 0,
-    }),
+  const [progressData, achievementsData, recentTransactions, activeAchievements, unlockedDocs, trainerSolved, completionBonuses, streaks] = await Promise.all([
+    collectAllPages(({ page, limit }) => payload.find({
+      collection: 'user-progress', depth: 0, select: { lesson: true }, sort: 'id', page, limit,
+      where: { user: { equals: user.id }, isCompleted: { equals: true } },
+    }), { label: `уникальные пройденные уроки ${user.id}` }),
     payload.find({
       collection: 'user-achievements',
       where: { user: { equals: user.id } },
@@ -70,16 +67,16 @@ export default async function ProfilePage() {
     ),
     payload.find({
       collection: 'user-trainer-progress',
-      where: { user: { equals: user.id }, isCompleted: { equals: true } },
+      where: { user: { equals: user.id }, isCompleted: { equals: true }, verifiedBy: { equals: 'server' } },
       limit: 0,
     }),
-    // Завершённые курсы и роадмапы хук достижений считает по бонусам за них — здесь так же.
+    // Сертификаты подтверждаются полной программой курса, а не ручным бонусом.
     collectAllPages(
       ({ page, limit }) =>
         payload.find({
-          collection: 'points-transactions',
-          where: { user: { equals: user.id }, reason: { in: ['course_completed', 'roadmap_completed'] } },
-          select: { reason: true, relatedEntity: true },
+          collection: 'certificates',
+          where: { user: { equals: user.id } },
+          select: { type: true, relatedEntity: true },
           depth: 0,
           sort: 'id',
           page,
@@ -87,6 +84,7 @@ export default async function ProfilePage() {
         }),
       { label: `бонусы за завершение ${user.id}` },
     ),
+    payload.find({ collection: 'streaks', where: { user: { equals: user.id } }, depth: 0, limit: 1 }),
   ])
 
   // Отдельно от счётчиков выше: календарю нужны даты, а не только количество.
@@ -128,19 +126,20 @@ export default async function ProfilePage() {
     now,
   )
 
-  const entityIds = (reason: string) =>
-    new Set(completionBonuses.filter((t) => t.reason === reason && t.relatedEntity).map((t) => String(t.relatedEntity)))
-  const completedCourseIds = entityIds('course_completed')
-  const completedRoadmapIds = entityIds('roadmap_completed')
+  const entityIds = (type: string) =>
+    new Set(completionBonuses.filter((t) => t.type === type && t.relatedEntity).map((t) => String(t.relatedEntity)))
+  const completedCourseIds = entityIds('course')
+  const completedRoadmapIds = entityIds('roadmap')
   const goals = nearestGoals(
     activeAchievements,
     new Set(unlockedDocs.map((u) => String(typeof u.achievement === 'object' ? u.achievement.id : u.achievement))),
     {
-      lessons: progressData.totalDocs,
+      lessons: new Set(progressData.map(progress => String(typeof progress.lesson === 'object' ? progress.lesson.id : progress.lesson))).size,
       courses: completedCourseIds.size,
       roadmaps: completedRoadmapIds.size,
       trainerTasks: trainerSolved.totalDocs,
       points: user.totalPoints ?? 0,
+      streakDays: streakView(streaks.docs[0]).days,
       completedCourseIds,
       completedRoadmapIds,
     },
@@ -188,7 +187,7 @@ export default async function ProfilePage() {
             <BookOpen className="h-6 w-6 text-info" />
           </div>
           <div>
-            <p className="text-2xl font-bold text-foreground">{progressData.totalDocs}</p>
+            <p className="text-2xl font-bold text-foreground">{new Set(progressData.map(progress => String(typeof progress.lesson === 'object' ? progress.lesson.id : progress.lesson))).size}</p>
             <p className="text-sm text-muted-foreground">Уроков пройдено</p>
           </div>
         </div>

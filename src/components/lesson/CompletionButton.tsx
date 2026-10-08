@@ -106,17 +106,17 @@ export function CompletionButton({
   const showPrompt = prompt && (!completed || (next !== null && !loading))
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex w-full min-w-0 flex-col items-center gap-2">
       {showPrompt && (
         <div
           role="dialog"
           aria-label="Видео досмотрено"
-          className="fixed inset-x-4 bottom-20 z-40 mx-auto flex max-w-md items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-xl sm:inset-x-auto sm:right-6 sm:bottom-6"
+          className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] z-40 mx-auto flex max-w-md items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-xl lg:inset-x-auto lg:right-6 lg:bottom-6"
         >
           <div className="min-w-0 flex-1 text-sm">
             {completed && next ? (
-              <Link href={`/lessons/${next.slug}`} className="flex items-center gap-2 font-medium text-foreground hover:text-primary">
-                <span className="truncate">Дальше: {next.title}</span>
+              <Link href={`/lessons/${next.slug}`} className="flex min-h-11 min-w-0 items-center gap-2 font-medium text-foreground hover:text-primary">
+                <span className="min-w-0 break-words">Дальше: {next.title}</span>
                 <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
               </Link>
             ) : (
@@ -131,7 +131,7 @@ export function CompletionButton({
               type="button"
               onClick={toggleCompletion}
               disabled={loading}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
               Отметить
@@ -141,7 +141,7 @@ export function CompletionButton({
             type="button"
             onClick={() => setPrompt(false)}
             aria-label="Закрыть"
-            className="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
@@ -173,9 +173,9 @@ export function CompletionButton({
       {completed && !loading && next && (
         <Link
           href={`/lessons/${next.slug}`}
-          className="mt-2 inline-flex max-w-full items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+          className="mt-2 inline-flex min-h-12 w-full min-w-0 max-w-xl items-center gap-3 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-ring"
         >
-          <span className="truncate">Следующий урок: {next.title}</span>
+          <span className="min-w-0 flex-1 break-words text-left leading-5">Следующий урок: {next.title}</span>
           <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
         </Link>
       )}

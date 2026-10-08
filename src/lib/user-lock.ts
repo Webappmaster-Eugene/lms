@@ -1,9 +1,6 @@
 import type { PayloadRequest } from 'payload'
 import { sql } from '@payloadcms/db-postgres'
 
-/** Пространство advisory-блокировок: начисления баллов пользователю */
-const POINTS_LOCK_NAMESPACE = 7201
-
 interface Executor {
   execute: (query: ReturnType<typeof sql>) => Promise<unknown>
 }
@@ -23,5 +20,5 @@ export async function lockUserPoints(req: PayloadRequest, userId: number): Promi
   const adapter = req.payload.db as unknown as AdapterWithSessions
   const transactionID = await req.transactionID
   const db = (transactionID !== undefined && adapter.sessions?.[transactionID]?.db) || adapter.drizzle
-  await db.execute(sql`select pg_advisory_xact_lock(${POINTS_LOCK_NAMESPACE}, ${userId})`)
+  await db.execute(sql`select id from users where id = ${userId} for update`)
 }

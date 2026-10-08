@@ -14,6 +14,7 @@ import * as migration_20261008_133507_learning_access_and_protected_assets from 
 import * as migration_20261008_134222_default_assigned_learning_access from './20261008_134222_default_assigned_learning_access';
 import * as migration_20261008_143020_authoritative_learning_access_policies from './20261008_143020_authoritative_learning_access_policies';
 import * as migration_20261008_152004_auth_session_revocations from './20261008_152004_auth_session_revocations';
+import * as migration_20261008_193430_pwa_notifications_and_learning_rewards from './20261008_193430_pwa_notifications_and_learning_rewards';
 
 export const migrations = [
   {
@@ -94,6 +95,11 @@ export const migrations = [
   {
     up: migration_20261008_152004_auth_session_revocations.up,
     down: migration_20261008_152004_auth_session_revocations.down,
-    name: '20261008_152004_auth_session_revocations'
+    name: '20261008_152004_auth_session_revocations',
+  },
+  {
+    up: migration_20261008_193430_pwa_notifications_and_learning_rewards.up,
+    down: migration_20261008_193430_pwa_notifications_and_learning_rewards.down,
+    name: '20261008_193430_pwa_notifications_and_learning_rewards'
   },
 ];

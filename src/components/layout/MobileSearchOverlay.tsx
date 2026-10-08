@@ -1,56 +1,33 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
-import { Search, X } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Search } from 'lucide-react'
 
-import { useHydrated } from '@/hooks/use-hydrated'
 import { SearchBar } from './SearchBar'
+import { MobileSheet } from './MobileSheet'
 
 export function MobileSearchOverlay() {
   const [isOpen, setIsOpen] = useState(false)
-  const hydrated = useHydrated()
-
-  // Close on Escape
-  useEffect(() => {
-    if (!isOpen) return
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setIsOpen(false)
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen])
-
-  const overlay = isOpen ? (
-    <div className="fixed inset-0 z-50 bg-background lg:hidden">
-      <div className="flex h-16 items-center gap-3 border-b border-border px-4">
-        <button
-          onClick={() => setIsOpen(false)}
-          className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground"
-          aria-label="Закрыть поиск"
-        >
-          <X className="h-5 w-5" />
-        </button>
-        <div className="flex-1">
-          <SearchBar autoFocus onNavigate={() => setIsOpen(false)} />
-        </div>
-      </div>
-    </div>
-  ) : null
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   return (
     <>
       {/* Search icon trigger */}
       <button
+        ref={triggerRef}
+        type="button"
         onClick={() => setIsOpen(true)}
-        className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:hidden"
+        className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring lg:hidden"
         aria-label="Поиск"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
       >
-        <Search className="h-5 w-5" />
+        <Search aria-hidden="true" className="h-5 w-5" />
       </button>
 
-      {/* Portal to body to escape header stacking context */}
-      {hydrated && overlay && createPortal(overlay, document.body)}
+      <MobileSheet title="Поиск" open={isOpen} onClose={() => setIsOpen(false)} returnFocusRef={triggerRef} initialFocusSelector='[role="combobox"]'>
+        <div className="min-h-[55dvh] p-4"><SearchBar autoFocus onNavigate={() => setIsOpen(false)} /></div>
+      </MobileSheet>
     </>
   )
 }

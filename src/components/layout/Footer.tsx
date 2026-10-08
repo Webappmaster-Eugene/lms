@@ -30,8 +30,8 @@ export async function Footer() {
   ).filter((item, index, links) => links.findIndex((link) => link.href === item.href) === index)
 
   return (
-    <footer className="border-t border-border bg-card/40 px-4 pb-24 pt-8 text-sm lg:px-8 lg:pb-8">
-      <div className="mx-auto grid w-full max-w-5xl gap-8 sm:grid-cols-2 lg:grid-cols-3">
+    <footer className="border-t border-border bg-card/40 pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] pb-[calc(5rem+env(safe-area-inset-bottom,0px))] pt-5 text-sm lg:px-8 lg:pb-8 lg:pt-8">
+      <div className="mx-auto hidden w-full max-w-5xl gap-8 lg:grid lg:grid-cols-3">
         <div className="space-y-2">
           <p className="font-semibold text-foreground">MentorCareer</p>
           <p className="max-w-xs text-muted-foreground">
@@ -77,7 +77,11 @@ export async function Footer() {
         </nav>
       </div>
 
-      <div className="mx-auto mt-8 flex w-full max-w-5xl flex-col gap-2 border-t border-border pt-5 text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center justify-between gap-3 lg:hidden">
+        <Link href="/help" className="inline-flex min-h-11 items-center text-muted-foreground hover:text-foreground">Нужна помощь?</Link>
+        <a href={PROMO_URL} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-muted-foreground hover:text-foreground">Как пользоваться</a>
+      </div>
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 pt-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between lg:mt-8 lg:border-t lg:border-border lg:pt-5 lg:text-sm">
         <p>MentorCareer © {year}</p>
         <p>
           Автор и ментор —{' '}

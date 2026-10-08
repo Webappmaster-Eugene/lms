@@ -5,6 +5,7 @@ import { isAdmin } from '@/payload/access/isAdmin'
 
 export const Certificates: CollectionConfig = {
   slug: 'certificates',
+  indexes: [{ fields: ['user', 'type', 'relatedEntity'], unique: true }],
   admin: {
     defaultColumns: ['user', 'type', 'title', 'issuedAt'],
     group: 'Прогресс',

@@ -41,9 +41,8 @@ describe('коллекции подключены к конфигу', () => {
     expect(end).toBeGreaterThan(start)
 
     const collectionsArray = CONFIG.slice(start, end)
-    const missing = COLLECTION_FILES.filter(
-      (name) => !new RegExp(`\\b${name}\\b`).test(collectionsArray),
-    )
+    const exportedNames = COLLECTION_FILES.flatMap((file) => [...read(`../../src/payload/collections/${file}.ts`).matchAll(/export const (\w+): CollectionConfig/g)].map((match) => match[1]))
+    const missing = exportedNames.filter((name) => !new RegExp(`\\b${name}\\b`).test(collectionsArray))
 
     expect(missing, `не включены в collections: ${missing.join(', ')}`).toEqual([])
   })

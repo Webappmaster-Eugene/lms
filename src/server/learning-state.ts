@@ -5,6 +5,7 @@ import { commitTransaction, createLocalReq, initTransaction, killTransaction, ty
 import type { Lesson, User } from '@/payload-types'
 import { learningVideoHref, learningVideos, readVideoPositions, type LearningState, type VideoPosition } from '@/lib/learning-state'
 import { LearningAccessError, requireLessonAccess } from '@/server/learning-access'
+import { recordLearningActivity } from '@/server/notification-service'
 
 export class LearningStateError extends Error {
   constructor(message: string, readonly status = 400) { super(message) }
@@ -87,13 +88,16 @@ export async function saveLearningState(payload: Payload, user: User, lesson: Le
     for (const id of Object.keys(positions)) if (!validIds.has(id)) delete positions[id]
     const previousAt = existing ? new Date(existing.lastViewedAt).getTime() : 0
     let lastVideoId = existing?.lastVideoId ?? null
+    let studiedVideo = false
     if (mutation.videoId && (!positions[mutation.videoId] || positions[mutation.videoId].at < mutation.at)) {
+      studiedVideo = (mutation.seconds ?? 0) > 0 && positions[mutation.videoId]?.seconds !== mutation.seconds
       positions[mutation.videoId] = { at: mutation.at, seconds: mutation.seconds ?? 0, ended: mutation.ended ?? false }
       if (mutation.at >= previousAt) lastVideoId = mutation.videoId
     }
     const data = { user: user.id, lesson: lesson.id, positions, lastVideoId, lastViewedAt: new Date(Math.max(previousAt, mutation.at)).toISOString() }
     if (existing) await payload.update({ collection: 'lesson-learning-states', id: existing.id, data, req, depth: 0, overrideAccess: true })
     else await payload.create({ collection: 'lesson-learning-states', data, req, depth: 0, overrideAccess: true })
+    if (studiedVideo) await recordLearningActivity(req, user.id, new Date(mutation.at))
     await commitTransaction(req)
     return { userId: user.id, positions, lastVideoId, lastViewedAt: data.lastViewedAt } satisfies LearningState
   } catch (error) {

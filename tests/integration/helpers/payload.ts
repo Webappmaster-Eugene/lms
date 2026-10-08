@@ -1,5 +1,6 @@
 import { getPayload, handleEndpoints, type Payload } from 'payload'
 import config from '@payload-config'
+import { DEFAULT_ACHIEVEMENTS } from '@/lib/default-achievements'
 import { vi } from 'vitest'
 
 import type { Course, Lesson, Roadmap, Section, TrainerTask, TrainerTopic, User } from '@/payload-types'
@@ -8,7 +9,11 @@ let instance: Promise<Payload> | undefined
 
 /** Настоящий Payload поверх тестовой базы. Один экземпляр на файл тестов. */
 export function getTestPayload(): Promise<Payload> {
-  instance ??= getPayload({ config })
+  instance ??= getPayload({ config }).then(async (payload) => {
+    // Most fixtures define their own rewards; the rewards suite explicitly activates the catalogue.
+    await payload.update({ collection: 'achievements', where: { slug: { in: DEFAULT_ACHIEVEMENTS.map((definition) => definition.slug) } }, data: { isActive: false } })
+    return payload
+  })
   return instance
 }
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 vi.mock('next/link', async () => (await import('../helpers/component-mocks')).linkMock())
@@ -43,8 +43,12 @@ function mockApi(docs: Notification[]) {
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     if (init?.method === 'PATCH') {
       patched.push(String(input))
-      return Response.json({})
+      const id = String(input).split('/').at(-1)
+      const doc = docs.find((notification) => notification.id === id)
+      if (doc) doc.isRead = true
+      return Response.json({ doc: { isRead: true } })
     }
+    if (String(input).includes('/count?')) return Response.json({ totalDocs: docs.filter((notification) => !notification.isRead).length })
     return Response.json({ docs })
   }) as unknown as typeof fetch
 }
@@ -143,7 +147,7 @@ describe('колокольчик уведомлений', () => {
 
       await openBell(user)
 
-      expect(await screen.findByRole('link')).toHaveAttribute('href', '/profile')
+      expect(await screen.findByRole('link', { name: /Уведомление 1/ })).toHaveAttribute('href', '/profile')
     })
 
     it('уведомление без ссылки ссылкой не становится', async () => {
@@ -154,7 +158,7 @@ describe('колокольчик уведомлений', () => {
       await openBell(user)
 
       await screen.findByText('Уведомление 1')
-      expect(screen.queryByRole('link')).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /Уведомление 1/ })).not.toBeInTheDocument()
     })
   })
 
@@ -166,7 +170,7 @@ describe('колокольчик уведомлений', () => {
 
       await openBell(user)
 
-      expect(screen.queryByRole('button', { name: 'Прочитать все' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Прочитать показанные' })).not.toBeInTheDocument()
     })
 
     it('отмечает на сервере каждое непрочитанное', async () => {
@@ -175,7 +179,7 @@ describe('колокольчик уведомлений', () => {
       render(<NotificationsBell />)
 
       await openBell(user)
-      await user.click(await screen.findByRole('button', { name: 'Прочитать все' }))
+      await user.click(await screen.findByRole('button', { name: 'Прочитать показанные' }))
 
       await waitFor(() => expect(patched).toHaveLength(2))
       expect(patched).toEqual(['/api/notifications/1', '/api/notifications/2'])
@@ -187,15 +191,64 @@ describe('колокольчик уведомлений', () => {
       render(<NotificationsBell />)
 
       await openBell(user)
-      await user.click(await screen.findByRole('button', { name: 'Прочитать все' }))
+      await user.click(await screen.findByRole('button', { name: 'Прочитать показанные' }))
 
       await waitFor(() =>
-        expect(screen.queryByRole('button', { name: 'Прочитать все' })).not.toBeInTheDocument(),
+        expect(screen.queryByRole('button', { name: 'Прочитать показанные' })).not.toBeInTheDocument(),
       )
     })
   })
 
   describe('загрузка', () => {
+    it('считает все непрочитанные, даже за пределами последних десяти, и сообщает PWA badge', async () => {
+      const event = vi.fn()
+      window.addEventListener('lms:notification-count', event)
+      global.fetch = vi.fn(async (input) => String(input).includes('/count?') ? Response.json({ totalDocs: 42 }) : Response.json({ docs: [notification('1')] })) as typeof fetch
+      try {
+        render(<NotificationsBell userId={34} />)
+        expect(await screen.findByText('9+')).toBeInTheDocument()
+        expect(event.mock.calls.some(([value]) => (value as CustomEvent<number>).detail === 42)).toBe(true)
+        expect(vi.mocked(global.fetch).mock.calls.every(([url]) => String(url).includes('where[user][equals]=34'))).toBe(true)
+      } finally {
+        window.removeEventListener('lms:notification-count', event)
+      }
+    })
+
+    it('не отмечает прочитанным после ошибки PATCH', async () => {
+      global.fetch = vi.fn(async (input, init) => init?.method === 'PATCH' ? new Response(null, { status: 500 }) : String(input).includes('/count?') ? Response.json({ totalDocs: 1 }) : Response.json({ docs: [notification('1')] })) as typeof fetch
+      const user = userEvent.setup()
+      render(<NotificationsBell />)
+      await openBell(user)
+      await user.click(await screen.findByRole('button', { name: 'Прочитать показанные' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent('Не все уведомления')
+      expect(screen.getByText('1', { exact: true })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Прочитать показанные' })).toBeInTheDocument()
+    })
+
+    it('Escape закрывает список и возвращает фокус; сообщение SW перезагружает список', async () => {
+      const user = userEvent.setup()
+      render(<NotificationsBell />)
+      await openBell(user)
+      expect(screen.getByRole('button', { name: 'Уведомления' })).toHaveAttribute('aria-expanded', 'true')
+      await user.keyboard('{Escape}')
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Уведомления' })).toHaveFocus()
+      const calls = vi.mocked(global.fetch).mock.calls.length
+      act(() => window.dispatchEvent(new Event('lms:notification')))
+      await waitFor(() => expect(vi.mocked(global.fetch).mock.calls.length).toBeGreaterThan(calls))
+    })
+
+    it('401 прекращает опрос и обновления SW даже при ошибке второго запроса', async () => {
+      global.fetch = vi.fn(async (input) => new Response(null, { status: String(input).includes('/count?') ? 500 : 401 })) as typeof fetch
+      const user = userEvent.setup()
+      render(<NotificationsBell />)
+      await openBell(user)
+      expect(await screen.findByText(/Сессия истекла/)).toBeInTheDocument()
+      const calls = vi.mocked(global.fetch).mock.calls.length
+      await act(async () => window.dispatchEvent(new Event('lms:notification')))
+      expect(vi.mocked(global.fetch).mock.calls.length).toBe(calls)
+    })
+
     it('запрашивает последние уведомления с сессией', async () => {
       render(<NotificationsBell />)
 

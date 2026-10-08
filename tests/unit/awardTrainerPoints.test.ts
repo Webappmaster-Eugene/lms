@@ -98,6 +98,7 @@ describe('начисление баллов за задачу тренажёра
     user: USER_ID,
     task: TASK_ID,
     isCompleted: true,
+    verifiedBy: 'server',
     ...overrides,
   })
 
@@ -126,6 +127,11 @@ describe('начисление баллов за задачу тренажёра
   })
 
   describe('когда начисляем', () => {
+    it('первый серверный зачёт ранее клиентского решения начисляется', async () => {
+      await run(progress(), { previousDoc: { isCompleted: true, verifiedBy: 'client' }, operation: 'update' })
+      expect(awarded()).toHaveLength(1)
+    })
+
     it('за впервые решённую задачу', async () => {
       await run(progress())
 
@@ -146,6 +152,13 @@ describe('начисление баллов за задачу тренажёра
   })
 
   describe('когда не начисляем', () => {
+    it.each(['client', undefined])('неподтверждённый результат %s не начисляет XP', async (verifiedBy) => {
+      await run(progress({ verifiedBy }))
+      expect(payload.find).not.toHaveBeenCalled()
+      expect(payload.create).not.toHaveBeenCalled()
+      expect(payload.update).not.toHaveBeenCalled()
+    })
+
     it('задача ещё не решена', async () => {
       await run(progress({ isCompleted: false }))
 
@@ -153,7 +166,7 @@ describe('начисление баллов за задачу тренажёра
     })
 
     it('задача уже была решена — правка записи баллов не добавляет', async () => {
-      await run(progress(), { previousDoc: { isCompleted: true }, operation: 'update' })
+      await run(progress(), { previousDoc: { isCompleted: true, verifiedBy: 'server' }, operation: 'update' })
 
       expect(payload.create).not.toHaveBeenCalled()
     })
@@ -282,11 +295,12 @@ describe('начисление баллов за задачу тренажёра
       expect(store.users[USER_ID].totalPoints).toBe(10 + DEFAULT_POINTS.TRAINER_TASK_COMPLETED)
     })
 
-    it('сорвавшаяся запись транзакции не оставляет сумму несчитанной', async () => {
+    it('сбой записи награды откатывает зачёт и не обновляет сумму', async () => {
       store.createFails = true
 
-      await expect(run(progress())).resolves.toBeDefined()
-      expect(payload.update).toHaveBeenCalled()
+      await expect(run(progress())).rejects.toThrow('duplicate key')
+      expect(payload.update).not.toHaveBeenCalled()
+      expect(awarded()).toHaveLength(0)
       expect(logger.info).not.toHaveBeenCalled()
     })
   })

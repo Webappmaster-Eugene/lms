@@ -13,6 +13,8 @@ const STATIC_FILES = new Set([
   '/favicon.ico',
   '/icon.svg',
   '/manifest.webmanifest',
+  '/sw.js',
+  '/offline.html',
   '/robots.txt',
   '/sitemap.xml',
 ])

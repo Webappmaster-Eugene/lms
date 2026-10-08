@@ -25,7 +25,7 @@ const NAV: [string, RegExp, string][] = [
 
 test('боковое меню ведёт во все разделы', async ({ page }) => {
   await page.goto('/')
-  // Первый <aside> — выезжающее мобильное меню, второй — постоянное десктопное.
+  // Desktop sidebar stays an aside; mobile menu uses a modal dialog.
   const sidebar = page.locator('aside').last()
   for (const [link, url, heading] of NAV) {
     await sidebar.getByRole('link', { name: link, exact: true }).click()
@@ -40,8 +40,8 @@ test.describe('телефон 375px', () => {
   test('боковое меню скрыто, нижняя навигация работает, горизонтального скролла нет', async ({ page }) => {
     await page.goto('/')
     await expect(page.locator('aside').last()).toBeHidden()
-    await expect(page.locator('aside').first()).not.toBeInViewport()
-    const bottom = page.locator('nav').filter({ has: page.getByRole('link', { name: /Курсы/ }) }).last()
+    await expect(page.getByRole('dialog', { name: 'Меню платформы' })).toHaveCount(0)
+    const bottom = page.getByRole('navigation', { name: 'Основная навигация' })
     await bottom.getByRole('link', { name: /Курсы/ }).click()
     await expect(page).toHaveURL(/\/courses$/)
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)

@@ -7,6 +7,7 @@ export type LearnerStats = {
   roadmaps: number
   trainerTasks: number
   points: number
+  streakDays?: number
   completedCourseIds: Set<string>
   completedRoadmapIds: Set<string>
 }
@@ -39,6 +40,7 @@ const UNITS: Record<string, [string, string, string]> = {
   roadmap_completion: ['роадмап', 'роадмапа', 'роадмапов'],
   trainer_task_count: ['задача', 'задачи', 'задач'],
   total_points: ['балл', 'балла', 'баллов'],
+  streak_days: ['день', 'дня', 'дней'],
 }
 
 /**
@@ -60,6 +62,9 @@ export function achievementGoal(achievement: AchievementLike, stats: LearnerStat
       break
     case 'trainer_task_count':
       current = stats.trainerTasks
+      break
+    case 'streak_days':
+      current = stats.streakDays ?? 0
       break
     case 'total_points':
       current = stats.points

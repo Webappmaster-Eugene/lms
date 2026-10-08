@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
 
 const DIR = new URL('../../src/payload/collections/', import.meta.url)
 
 const collections = readdirSync(fileURLToPath(DIR))
   .filter((f) => f.endsWith('.ts'))
-  .map((file) => ({
-    name: file.replace(/\.ts$/, ''),
-    source: readFileSync(fileURLToPath(new URL(file, DIR)), 'utf8'),
-  }))
+  .flatMap((file) => {
+    const source = readFileSync(fileURLToPath(new URL(file, DIR)), 'utf8')
+    return [...source.matchAll(/export const (\w+): CollectionConfig/g)].map((match) => ({ name: match[1], source }))
+  })
 
 const names = collections.map((c) => c.name)
 
@@ -55,26 +56,25 @@ function sourceOf(name: string): string {
  * (`fields:`, конец файла) зависят от порядка полей и при его изменении дают либо
  * пустой срез, либо срез до конца файла, где найдётся что угодно.
  */
-function accessBlock(name: string): string {
-  const source = sourceOf(name)
-  const start = source.indexOf('access: {')
-  expect(start, `${name}: нет блока access`).toBeGreaterThanOrEqual(0)
-
-  let depth = 0
-  for (let i = source.indexOf('{', start); i < source.length; i += 1) {
-    if (source[i] === '{') depth += 1
-    else if (source[i] === '}') {
-      depth -= 1
-      if (depth === 0) return source.slice(start, i + 1)
-    }
-  }
-
-  throw new Error(`${name}: блок access не закрыт`)
+function accessProperties(name: string) {
+  const source = ts.createSourceFile(name + '.ts', sourceOf(name), ts.ScriptTarget.Latest, true)
+  const declarations = source.statements.filter(ts.isVariableStatement).flatMap((statement) => [...statement.declarationList.declarations])
+  const definition = declarations.find((declaration) => declaration.name.getText(source) === name)?.initializer
+  if (!definition || !ts.isObjectLiteralExpression(definition)) throw new Error(`${name}: нет конфигурации`)
+  const access = definition.properties.filter(ts.isPropertyAssignment).find((property) => property.name.getText(source) === 'access')?.initializer
+  const resolved = access && ts.isIdentifier(access) ? declarations.find((declaration) => declaration.name.getText(source) === access.text)?.initializer : access
+  if (!resolved || !ts.isObjectLiteralExpression(resolved)) throw new Error(`${name}: нет явного объекта access`)
+  return { source, properties: resolved.properties.filter(ts.isPropertyAssignment) }
 }
 
-/** Значение операции верхнего уровня: вложенные объекты в расчёт не берутся. */
+function accessBlock(name: string): string {
+  const { source, properties } = accessProperties(name)
+  return properties.map((property) => property.getText(source)).join('\n')
+}
+
 function operationValue(name: string, operation: string): string {
-  return accessBlock(name).match(new RegExp(`^ {4}${operation}:\\s*(.+)$`, 'm'))?.[1] ?? ''
+  const { source, properties } = accessProperties(name)
+  return properties.find((property) => property.name.getText(source) === operation)?.initializer.getText(source) ?? ''
 }
 
 describe('у каждой коллекции есть явные права', () => {
@@ -83,7 +83,7 @@ describe('у каждой коллекции есть явные права', ()
   })
 
   it.each(names)('%s объявляет блок access', (name) => {
-    expect(sourceOf(name)).toMatch(/^ {2}access:\s*\{/m)
+    expect(accessProperties(name).properties.length).toBeGreaterThanOrEqual(4)
   })
 
   it.each(names)('%s задаёт все четыре операции', (name) => {

@@ -11,6 +11,8 @@ import { updateStreak } from '@/payload/hooks/updateStreak'
  * начислялись баллы, но не выдавались достижения и не росла серия.
  */
 
+vi.mock('@/server/notification-service', () => ({ recordLearningActivity: vi.fn(async () => undefined) }))
+
 type Doc = Record<string, unknown>
 
 const TODAY = new Date().toISOString().split('T')[0]
@@ -92,9 +94,9 @@ describe('цепочка хуков user-progress', () => {
     // @ts-expect-error — хуку достаточно используемых полей
     await awardPoints({ ...args, req })
     // @ts-expect-error — хуку достаточно используемых полей
-    await checkAchievements({ ...args, req })
-    // @ts-expect-error — хуку достаточно используемых полей
     await updateStreak({ ...args, req })
+    // @ts-expect-error — хуку достаточно используемых полей
+    await checkAchievements({ ...args, req })
 
     expect(store.streaks).toHaveLength(1)
     expect(store.streaks[0]).toMatchObject({ currentStreak: 1, lastActivityDate: TODAY })

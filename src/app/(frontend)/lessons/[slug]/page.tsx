@@ -4,7 +4,7 @@ import { headers } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import { createLocalReq } from 'payload'
 import Link from 'next/link'
-import { ArrowLeft, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
+import { ArrowLeft, Clock } from 'lucide-react'
 import { LessonLearningProvider } from '@/components/lesson/LessonLearningProvider'
 import { learningVideos } from '@/lib/learning-state'
 import { ContentBlockRenderer } from '@/components/lesson/ContentBlockRenderer'
@@ -12,6 +12,7 @@ import { CompletionButton } from '@/components/lesson/CompletionButton'
 import { LessonNotes } from '@/components/lesson/LessonNotes'
 import { LessonComments } from '@/components/lesson/LessonComments'
 import { LessonKeyboardNav } from '@/components/lesson/LessonKeyboardNav'
+import { LessonNavigation } from '@/components/lesson/LessonNavigation'
 import { CourseSidebar } from '@/components/course/CourseSidebar'
 import { BookmarkButton } from '@/components/bookmarks/BookmarkButton'
 import { findBookmarkId } from '@/lib/bookmarks'
@@ -270,17 +271,28 @@ export default async function LessonPage({ params }: Props) {
   const othersDone = allCourseLessons.every((l) => l.id === lesson.id || completedLessonIds.has(String(l.id)))
 
   return (
-    <div className={hasSidebar ? 'flex gap-6' : ''}>
+    <div className={hasSidebar ? 'flex flex-col gap-6 lg:flex-row' : ''}>
+      {hasSidebar && (
+        <CourseSidebar
+          key={String(lesson.id)}
+          courseTitle={course?.title ?? ''}
+          sections={sidebarSections}
+          completedLessonIds={completedLessonIds}
+          currentLessonId={String(lesson.id)}
+          totalLessons={totalLessons}
+          totalCompleted={totalCompleted}
+        />
+      )}
       {/* Main content */}
       <div className={`space-y-8 ${hasSidebar ? 'flex-1 min-w-0' : 'mx-auto max-w-4xl'}`}>
         {/* Навигация */}
         {course && (
           <Link
             href={`/courses/${course.slug}`}
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="inline-flex min-h-11 max-w-full items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
-            <ArrowLeft className="h-4 w-4" />
-            {course.title}
+            <ArrowLeft aria-hidden="true" className="h-4 w-4 shrink-0" />
+            <span className="min-w-0 break-words">{course.title}</span>
           </Link>
         )}
 
@@ -337,68 +349,13 @@ export default async function LessonPage({ params }: Props) {
           prevHref={prevLesson ? `/lessons/${prevLesson.slug}` : null}
           nextHref={nextLesson ? `/lessons/${nextLesson.slug}` : null}
         />
-        <div className="flex items-center justify-between gap-4">
-          {prevLesson ? (
-            <Link
-              href={`/lessons/${prevLesson.slug}`}
-              title="Предыдущий урок (←)"
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              <span className="max-w-[200px] truncate">{prevLesson.title}</span>
-            </Link>
-          ) : (
-            <div />
-          )}
-          {nextLesson ? (
-            <Link
-              href={`/lessons/${nextLesson.slug}`}
-              title="Следующий урок (→)"
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <span className="max-w-[200px] truncate">{nextLesson.title}</span>
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          ) : (
-            <div />
-          )}
-        </div>
+        <LessonNavigation previous={prevLesson} next={nextLesson} />
 
         {/* Обсуждение */}
         <div className="border-t border-border pt-8">
           <LessonComments lessonId={lesson.id} />
         </div>
       </div>
-
-      {/* Course Sidebar — visible on mobile as drawer, desktop as sticky sidebar */}
-      {hasSidebar && (
-        <>
-          {/* Desktop wrapper */}
-          <div className="hidden lg:block w-72 flex-shrink-0">
-            <CourseSidebar
-              key={`desktop-${String(lesson.id)}`}
-              courseTitle={course?.title ?? ''}
-              sections={sidebarSections}
-              completedLessonIds={completedLessonIds}
-              currentLessonId={String(lesson.id)}
-              totalLessons={totalLessons}
-              totalCompleted={totalCompleted}
-            />
-          </div>
-          {/* Mobile drawer — rendered outside the flex layout */}
-          <div className="lg:hidden">
-            <CourseSidebar
-              key={`mobile-${String(lesson.id)}`}
-              courseTitle={course?.title ?? ''}
-              sections={sidebarSections}
-              completedLessonIds={completedLessonIds}
-              currentLessonId={String(lesson.id)}
-              totalLessons={totalLessons}
-              totalCompleted={totalCompleted}
-            />
-          </div>
-        </>
-      )}
     </div>
   )
 }

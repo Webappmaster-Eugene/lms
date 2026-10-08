@@ -231,6 +231,12 @@ describe('кнопка завершения урока', () => {
       expect(await screen.findByRole('link', { name: /Следующий урок: Хуки/ })).toHaveAttribute('href', '/lessons/lesson-3')
     })
 
+    it('длинное название следующего урока доступно полностью', () => {
+      const title = 'Лиды, квалификация и онбординг: полный разбор работы с новыми учениками'
+      render(<CompletionButton lessonId={42} isCompleted progressId="p-1" next={{ slug: 'onboarding', title }} />)
+      expect(screen.getByRole('link', { name: `Следующий урок: ${title}` })).toHaveAttribute('href', '/lessons/onboarding')
+    })
+
     it('последний урок завершает курс, если остальные пройдены', async () => {
       render(<CompletionButton lessonId={42} isCompleted={false} completesCourse courseHref="/courses/react" />)
 

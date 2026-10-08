@@ -11,7 +11,7 @@ import { collectAllPages } from '@/lib/paginate'
  *
  * Защита от дублей:
  * - Перед начислением проверяется наличие существующей транзакции
- * - При race condition (duplicate key) — ошибка перехватывается
+ * - Общая блокировка users сериализует конкурентные запросы
  * - totalPoints пересчитывается как SUM всех транзакций (идемпотентно)
  *
  * Все обращения к БД идут через req: local API тогда работает в транзакции
@@ -24,11 +24,11 @@ export const awardTrainerPoints: CollectionAfterChangeHook = async ({
   operation,
   req,
 }) => {
-  if (req.context?.skipHooks) return doc
+  if (req.context?.skipHooks || doc.verifiedBy !== 'server') return doc
 
   const justCompleted =
     doc.isCompleted === true &&
-    (operation === 'create' || previousDoc?.isCompleted !== true)
+    (operation === 'create' || previousDoc?.isCompleted !== true || previousDoc?.verifiedBy !== 'server')
 
   if (!justCompleted) return doc
 
@@ -117,22 +117,18 @@ async function safeCreateTransaction(
 
     if (existing.totalDocs > 0) return false
 
-    try {
-      await req.payload.create({
-        req: skipHooksReq(req),
-        collection: 'points-transactions',
-        data: {
-          user: userId,
-          amount,
-          reason,
-          relatedEntity,
-          description,
-        },
-      })
-      return true
-    } catch {
-      return false
-    }
+    await req.payload.create({
+      req: skipHooksReq(req),
+      collection: 'points-transactions',
+      data: {
+        user: userId,
+        amount,
+        reason,
+        relatedEntity,
+        description,
+      },
+    })
+    return true
   })
 }
 

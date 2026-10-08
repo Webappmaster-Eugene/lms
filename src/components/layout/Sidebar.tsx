@@ -17,15 +17,17 @@ import {
   StickyNote,
   Trophy,
   Shield,
+  Bell,
   User,
   LogOut,
-  X,
 } from 'lucide-react'
 import { useEffect } from 'react'
+import { MobileSheet } from './MobileSheet'
 import { ThemeToggle } from './ThemeToggle'
 import { SHORTCUTS_OPEN_EVENT } from './KeyboardShortcuts'
 import { cn } from '@/lib/utils'
 import { useSidebar } from './SidebarContext'
+import { disconnectDevicePush } from '@/lib/pwa-client'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Дашборд', icon: LayoutDashboard },
@@ -38,6 +40,7 @@ const NAV_ITEMS = [
   { href: '/questions', label: 'Вопросы', icon: MessagesSquare },
   { href: '/saved', label: 'Сохранённое', icon: Bookmark },
   { href: '/profile', label: 'Профиль', icon: User },
+  { href: '/settings/notifications', label: 'Приложение и уведомления', icon: Bell },
   { href: '/contacts', label: 'Контакты', icon: MessageCircle },
   { href: '/help', label: 'Помощь', icon: HelpCircle },
 ] as const
@@ -46,27 +49,21 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname()
   const { mobileOpen, setMobileOpen } = useSidebar()
 
-  // Lock body scroll when mobile sidebar is open
+  // A navigation outside the menu (history, deep link) must also dismiss it.
   useEffect(() => {
-    if (mobileOpen) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
-    return () => {
-      document.body.style.overflow = ''
-    }
-  }, [mobileOpen])
+    setMobileOpen(false)
+  }, [pathname, setMobileOpen])
 
   async function handleLogout() {
+    await disconnectDevicePush()
     await fetch('/api/users/logout', { method: 'POST', credentials: 'include' })
     window.location.href = '/login'
   }
 
-  const navContent = (
+  const navContent = (mobile: boolean) => (
     <>
       {/* Logo */}
-      <div className="flex h-16 items-center gap-3 px-4">
+      <div className={cn('flex h-16 items-center gap-3 px-4', mobile && 'hidden')}>
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
           <BookOpen className="h-5 w-5 text-primary-foreground" />
         </div>
@@ -74,9 +71,9 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
       </div>
 
       {/* Navigation */}
-      <nav aria-label="Меню платформы" className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+      <nav aria-label="Меню платформы" className={cn('flex-1 overflow-y-auto px-3 py-4', mobile ? 'grid grid-cols-1 gap-2 min-[360px]:grid-cols-2' : 'space-y-1')}>
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href)
+          const isActive = href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)
           return (
             <Link
               key={href}
@@ -84,14 +81,15 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
               aria-current={isActive ? 'page' : undefined}
               onClick={() => setMobileOpen(false)}
               className={cn(
-                'flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                'flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring',
+                mobile && 'min-h-14 border border-border',
                 isActive
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:bg-accent hover:text-foreground',
               )}
             >
-              <Icon className="h-5 w-5 flex-shrink-0" />
-              {label}
+              <Icon aria-hidden="true" className="h-5 w-5 flex-shrink-0" />
+              <span className="min-w-0 whitespace-normal">{label}</span>
             </Link>
           )
         })}
@@ -137,36 +135,13 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
 
   return (
     <>
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/50 lg:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-
-      {/* Mobile sidebar */}
-      <aside
-        aria-hidden={!mobileOpen}
-        inert={!mobileOpen}
-        className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-border bg-card transition-transform duration-300 ease-in-out lg:hidden',
-          mobileOpen ? 'translate-x-0' : '-translate-x-full',
-        )}
-      >
-        <button
-          onClick={() => setMobileOpen(false)}
-          className="absolute right-3 top-4 flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground"
-          aria-label="Закрыть меню"
-        >
-          <X className="h-5 w-5" />
-        </button>
-        {navContent}
-      </aside>
+      <MobileSheet id="platform-mobile-menu" open={mobileOpen} onClose={() => setMobileOpen(false)} title="Меню платформы">
+        {navContent(true)}
+      </MobileSheet>
 
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:border-r lg:border-border lg:bg-card">
-        {navContent}
+        {navContent(false)}
       </aside>
     </>
   )

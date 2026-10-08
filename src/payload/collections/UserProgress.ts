@@ -25,7 +25,7 @@ export const UserProgress: CollectionConfig = {
   },
   hooks: {
     beforeChange: [assignOwner, guardLearningLessonWrite, lockUserProgress],
-    afterChange: [awardPoints, checkAchievements, updateStreak],
+    afterChange: [awardPoints, updateStreak, checkAchievements],
   },
   fields: [
     {

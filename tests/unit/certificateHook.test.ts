@@ -4,10 +4,12 @@ import type { PayloadRequest } from 'payload'
 /**
  * Выдача сертификата при завершении курса или роадмапа.
  *
- * Собственный catch хука гасит любую ошибку, чтобы не уронить начисление
- * баллов, поэтому отказ здесь не виден снаружи — отсюда проверка на `req`
- * в каждом обращении к БД.
+ * Ошибка выдачи откатывает составную операцию. Каждый запрос использует req.
  */
+
+const completion = { course: vi.fn(async () => true), roadmap: vi.fn(async () => true) }
+vi.mock('@/lib/course-completion', () => ({ isCourseCompleted: completion.course, isRoadmapCompleted: completion.roadmap }))
+vi.mock('@/lib/user-lock', () => ({ lockUserPoints: vi.fn(async () => undefined) }))
 
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 
@@ -89,10 +91,12 @@ describe('выдача сертификата', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    completion.course.mockResolvedValue(true)
+    completion.roadmap.mockResolvedValue(true)
     store = {
       certificates: [],
-      courses: { '51': { id: 51, title: 'Глубокий React' } },
-      roadmaps: { '2': { id: 2, title: 'Frontend React' } },
+      courses: { '51': { id: 51, title: 'Глубокий React', isPublished: true } },
+      roadmaps: { '2': { id: 2, title: 'Frontend React', isPublished: true } },
       calls: [],
     }
     payload = makePayload(store)
@@ -177,6 +181,12 @@ describe('выдача сертификата', () => {
     })
   })
 
+  it('доступная часть курса не считается всем курсом', async () => {
+    completion.course.mockResolvedValue(false)
+    await run(transaction())
+    expect(payload.create).not.toHaveBeenCalled()
+  })
+
   describe('когда хук не должен срабатывать', () => {
     it.each([
       ['lesson_completed'],
@@ -210,19 +220,18 @@ describe('выдача сертификата', () => {
     })
   })
 
-  describe('сбой не рушит начисление баллов', () => {
-    it('пропавший курс не роняет хук, но попадает в лог', async () => {
-      await expect(run(transaction({ relatedEntity: '999' }))).resolves.toBeDefined()
+  describe('сбой откатывает составную операцию', () => {
+    it('пропавший курс откатывает операцию', async () => {
+      await expect(run(transaction({ relatedEntity: '999' }))).rejects.toThrow()
 
       expect(store.certificates).toHaveLength(0)
-      expect(logger.error).toHaveBeenCalled()
+
     })
 
-    it('отказ записи проглатывается — транзакция баллов уже сохранена', async () => {
+    it('отказ записи не оставляет успешный зачёт без сертификата', async () => {
       payload.create.mockRejectedValueOnce(new Error('БД недоступна'))
 
-      await expect(run(transaction())).resolves.toBeDefined()
-      expect(logger.error).toHaveBeenCalled()
+      await expect(run(transaction())).rejects.toThrow('БД недоступна')
     })
   })
 })

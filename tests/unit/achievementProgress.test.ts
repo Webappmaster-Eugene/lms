@@ -36,8 +36,12 @@ describe('прогресс к достижению', () => {
     expect(todo).toMatchObject({ current: 0, target: 1, remaining: 'Завершите нужный курс или роадмап' })
   })
 
+  it('серия дней использует актуальную серию, а не исторический рекорд', () => {
+    expect(achievementGoal({ id: 6, title: 'Неделя', criteriaType: 'streak_days', criteriaValue: 7 }, { ...stats, streakDays: 3 })).toMatchObject({ current: 3, target: 7, remaining: 'Ещё 4 дня' })
+  })
+
   it('неизвестный тип условия целью не становится', () => {
-    expect(achievementGoal({ id: 6, title: 'x', criteriaType: 'streak_days', criteriaValue: 7 }, stats)).toBeNull()
+    expect(achievementGoal({ id: 6, title: 'x', criteriaType: 'unknown_type', criteriaValue: 7 }, stats)).toBeNull()
   })
 
   it('перевыполнение не даёт больше 100%', () => {

@@ -1,7 +1,6 @@
 import type { CollectionAfterChangeHook } from 'payload'
 import { withSpan, logger } from '@/lib/telemetry'
 import { relationId } from '@/lib/relation-id'
-import { skipHooksReq } from '@/lib/payload-req'
 
 /**
  * Hook: создаёт in-app уведомление при важных событиях.
@@ -22,12 +21,12 @@ export const createPointsNotification: CollectionAfterChangeHook = async ({
     course_completed: {
       title: 'Курс завершён!',
       type: 'course_completed',
-      link: '/profile',
+      link: '/certificates',
     },
     roadmap_completed: {
       title: 'Роадмап завершён!',
       type: 'roadmap_completed',
-      link: '/profile',
+      link: '/certificates',
     },
   }
 
@@ -38,7 +37,7 @@ export const createPointsNotification: CollectionAfterChangeHook = async ({
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (req.payload as any).create({
-        req: skipHooksReq(req),
+        req,
         collection: 'notifications',
         data: {
           user: userId,
@@ -51,6 +50,7 @@ export const createPointsNotification: CollectionAfterChangeHook = async ({
       })
     } catch (err) {
       logger.error('Failed to create notification', err, { 'user.id': userId, 'notification.type': config.type })
+      throw err
     }
 
     return doc
@@ -81,7 +81,7 @@ export const createAchievementNotification: CollectionAfterChangeHook = async ({
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (req.payload as any).create({
-        req: skipHooksReq(req),
+        req,
         collection: 'notifications',
         data: {
           user: userId,
@@ -94,6 +94,7 @@ export const createAchievementNotification: CollectionAfterChangeHook = async ({
       })
     } catch (err) {
       logger.error('Failed to create achievement notification', err, { 'user.id': userId })
+      throw err
     }
 
     return doc

@@ -29,6 +29,8 @@ import { Bookmarks } from '@/payload/collections/Bookmarks'
 import { Notes } from '@/payload/collections/Notes'
 import { Comments } from '@/payload/collections/Comments'
 import { Notifications } from '@/payload/collections/Notifications'
+import { NotificationPreferences, PushSubscriptions, NotificationDeliveries, NotificationJobState } from '@/payload/collections/NotificationInfrastructure'
+import { bootstrapDefaultAchievements } from '@/lib/default-achievements'
 import { Certificates } from '@/payload/collections/Certificates'
 import { Streaks } from '@/payload/collections/Streaks'
 import { TrainerTopics } from '@/payload/collections/TrainerTopics'
@@ -93,6 +95,10 @@ export default buildConfig({
     Bookmarks,
     Comments,
     Notifications,
+    NotificationPreferences,
+    PushSubscriptions,
+    NotificationDeliveries,
+    NotificationJobState,
     Certificates,
     Streaks,
     TrainerTopics,
@@ -125,6 +131,7 @@ export default buildConfig({
   },
 
   onInit: async (payload) => {
+    await bootstrapDefaultAchievements(payload)
     // --- Auto-create admin user on first launch ---
     const { totalDocs: usersCount } = await payload.count({ collection: 'users' })
 

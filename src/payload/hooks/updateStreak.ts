@@ -1,93 +1,42 @@
-import type { CollectionAfterChangeHook } from 'payload'
+import type { CollectionAfterChangeHook, PayloadRequest } from 'payload'
 import { relationId } from '@/lib/relation-id'
-import { withSpan, logger } from '@/lib/telemetry'
+import { withSpan } from '@/lib/telemetry'
 import { skipHooksReq } from '@/lib/payload-req'
+import { recordLearningActivity } from '@/server/notification-service'
+import { utcDay } from '@/lib/streak'
 
-type StreakDoc = {
-  id: string | number
-  currentStreak?: number | null
-  longestStreak?: number | null
-  lastActivityDate?: string | null
-  totalActiveDays?: number | null
+/** Shared by lessons and server-verified trainer solutions. Calendar days stay UTC. */
+export async function updateLearningStreak(req: PayloadRequest, userId: number, now = new Date()): Promise<void> {
+  const today = utcDay(now)
+  const existing = await req.payload.find({ req, collection: 'streaks', where: { user: { equals: userId } }, depth: 0, limit: 1 })
+  const streak = existing.docs[0]
+  const lastDate = streak?.lastActivityDate?.slice(0, 10)
+  if (lastDate === today || (lastDate && lastDate > today)) return
+  const yesterday = utcDay(new Date(now.getTime() - 24 * 60 * 60 * 1000))
+  const currentStreak = lastDate === yesterday ? (streak?.currentStreak ?? 0) + 1 : 1
+  const data = {
+    currentStreak,
+    longestStreak: Math.max(currentStreak, streak?.longestStreak ?? 0),
+    lastActivityDate: today,
+    totalActiveDays: (streak?.totalActiveDays ?? 0) + 1,
+  }
+  if (streak) {
+    await req.payload.update({ req: skipHooksReq(req), collection: 'streaks', id: streak.id, data })
+  } else {
+    await req.payload.create({ req: skipHooksReq(req), collection: 'streaks', data: { user: userId, ...data } })
+  }
 }
 
-/**
- * Hook: обновляет серию (streak) при завершении урока.
- */
-export const updateStreak: CollectionAfterChangeHook = async ({
-  doc,
-  previousDoc,
-  operation,
-  req,
-}) => {
+export const updateStreak: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, req, collection }) => {
   if (req.context?.skipHooks) return doc
-
-  const justCompleted =
-    doc.isCompleted === true &&
-    (operation === 'create' || previousDoc?.isCompleted !== true)
-
+  if (collection.slug === 'user-trainer-progress' && doc.verifiedBy !== 'server') return doc
+  const justCompleted = doc.isCompleted === true && (operation === 'create' || previousDoc?.isCompleted !== true ||
+      (collection.slug === 'user-trainer-progress' && previousDoc?.verifiedBy !== 'server'))
   if (!justCompleted) return doc
-
   const userId = relationId(doc.user)
-  const today = new Date().toISOString().split('T')[0]
-
-  return withSpan('hook.updateStreak', { 'user.id': userId }, async () => {
-    try {
-      const existing = await req.payload.find({
-        req,
-        collection: 'streaks',
-        where: { user: { equals: userId } },
-        limit: 1,
-      })
-
-      if (existing.docs.length > 0) {
-        const streak = existing.docs[0] as StreakDoc
-        // Payload отдаёт дату полным ISO, а сравниваем мы календарные дни
-        const lastDate = streak.lastActivityDate?.split('T')[0] ?? null
-
-        if (lastDate === today) return doc
-
-        const yesterday = new Date()
-        yesterday.setDate(yesterday.getDate() - 1)
-        const yesterdayStr = yesterday.toISOString().split('T')[0]
-
-        let newStreak: number
-        if (lastDate === yesterdayStr) {
-          newStreak = (streak.currentStreak ?? 0) + 1
-        } else {
-          newStreak = 1
-        }
-
-        const newLongest = Math.max(newStreak, streak.longestStreak ?? 0)
-
-        await req.payload.update({
-          req: skipHooksReq(req),
-          collection: 'streaks',
-          id: streak.id,
-          data: {
-            currentStreak: newStreak,
-            longestStreak: newLongest,
-            lastActivityDate: today,
-            totalActiveDays: (streak.totalActiveDays ?? 0) + 1,
-          },
-        })
-      } else {
-        await req.payload.create({
-          req: skipHooksReq(req),
-          collection: 'streaks',
-          data: {
-            user: userId,
-            currentStreak: 1,
-            longestStreak: 1,
-            lastActivityDate: today,
-            totalActiveDays: 1,
-          },
-        })
-      }
-    } catch (err) {
-      logger.error('Failed to update streak', err, { 'user.id': userId })
-    }
-
-    return doc
+  await withSpan('hook.updateStreak', { 'user.id': userId }, async () => {
+    await updateLearningStreak(req, userId)
+    await recordLearningActivity(req, userId)
   })
+  return doc
 }

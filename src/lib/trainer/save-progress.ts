@@ -33,7 +33,7 @@ export async function saveTrainerProgress(input: {
     })
     const previous = existing.docs[0]
     const passed = result.status === 'passed'
-    const wasCompleted = previous?.isCompleted === true
+    const wasCompleted = previous?.isCompleted === true && previous.verifiedBy === 'server'
     const attempts = (previous?.attempts ?? 0) + 1
     const completed = wasCompleted || passed
     const data = {

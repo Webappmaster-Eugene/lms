@@ -11,6 +11,7 @@ export async function Header() {
   const headersList = await headers()
 
   let isAuthenticated = false
+  let userId: number | undefined
   let userName = ''
   let totalPoints = 0
   let streakDays = 0
@@ -19,6 +20,7 @@ export async function Header() {
     const { user } = await payload.auth({ headers: headersList })
     if (user) {
       isAuthenticated = true
+      userId = user.id
       userName = `${user.firstName} ${user.lastName}`
       totalPoints = user.totalPoints ?? 0
 
@@ -40,7 +42,7 @@ export async function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur-sm lg:px-8">
+    <header className="sticky top-0 z-30 flex h-[calc(4rem+env(safe-area-inset-top,0px))] shrink-0 items-center gap-3 border-b border-border bg-card/80 pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] pt-[env(safe-area-inset-top,0px)] backdrop-blur-sm lg:h-16 lg:px-8 lg:pt-0">
       {/* Search — desktop inline, mobile icon+overlay */}
       <div className="hidden flex-1 lg:block lg:max-w-md">
         <SearchBar hotkey />
@@ -54,7 +56,7 @@ export async function Header() {
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Streak */}
         {streakDays > 0 && (
-          <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-[hsl(var(--streak)_/_0.1)] px-3 py-1.5 text-sm font-medium text-[hsl(var(--streak))]">
+          <div title="Серия занятий: учебные дни считаются по UTC" className="hidden sm:flex items-center gap-1.5 rounded-full bg-[hsl(var(--streak)_/_0.1)] px-3 py-1.5 text-sm font-medium text-[hsl(var(--streak))]">
             🔥 {streakDays}
           </div>
         )}
@@ -69,11 +71,11 @@ export async function Header() {
 
         {/* Notifications — только для вошедших: колокольчик опрашивает закрытую
             коллекцию по таймеру, и без сессии это бесконечные 403 */}
-        {isAuthenticated && <NotificationsBell />}
+        {isAuthenticated && <NotificationsBell userId={userId} />}
 
         {/* User name */}
         {userName && (
-          <span className="hidden sm:block text-sm font-medium text-foreground">{userName}</span>
+          <span className="hidden max-w-48 truncate text-sm font-medium text-foreground sm:block" title={userName}>{userName}</span>
         )}
       </div>
     </header>

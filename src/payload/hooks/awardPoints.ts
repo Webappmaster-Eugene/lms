@@ -1,4 +1,5 @@
 import type { CollectionAfterChangeHook, PayloadRequest } from 'payload'
+import { ensureCertificate } from '@/payload/hooks/createCertificate'
 import { DEFAULT_POINTS } from '@/lib/points-config'
 import type { PointsReason } from '@/lib/points-config'
 import { relationId } from '@/lib/relation-id'
@@ -12,7 +13,7 @@ import { collectAllPages } from '@/lib/paginate'
  *
  * Защита от дублей:
  * - Перед начислением проверяется наличие существующей транзакции
- * - При race condition (duplicate key) — ошибка перехватывается, дубль пропускается
+ * - Общая блокировка users сериализует конкурентные запросы
  * - totalPoints пересчитывается как SUM всех транзакций (идемпотентно)
  *
  * Все обращения к БД идут через req: local API тогда работает в транзакции
@@ -164,7 +165,7 @@ async function checkCourseCompletion(
     const created = await safeCreateTransaction(
       req, userId, coursePoints, 'course_completed', courseId, 'Курс завершён',
     )
-    if (!created) return // Уже начислено
+    if (!created) await ensureCertificate(req, userId, courseId, 'course')
 
     // 3. Проверяем завершение роадмапа
     const course = typeof lesson.course === 'object'
@@ -232,7 +233,7 @@ async function checkCourseCompletion(
 
 /**
  * Создаёт транзакцию баллов с защитой от дублей.
- * Проверяет существование + ловит race condition ошибки.
+ * Проверяет существование под блокировкой пользователя. Ошибка записи откатывает прогресс.
  * Возвращает true если транзакция создана, false если дубль.
  */
 async function safeCreateTransaction(
@@ -258,31 +259,19 @@ async function safeCreateTransaction(
 
     if (existing.totalDocs > 0) return false
 
-    try {
-      // Без skipHooks: хуки транзакции выдают сертификат, уведомление и письмо о завершении
-      await req.payload.create({
-        req,
-        collection: 'points-transactions',
-        data: {
-          user: userId,
-          amount,
-          reason,
-          relatedEntity,
-          description,
-        },
-      })
-      return true
-    } catch (error) {
-      // Сюда попадает и гонка (уникальный индекс отверг дубль), и реальный отказ БД:
-      // различить их можно только по логу
-      logger.warn('awardPoints: транзакция не создана', {
-        'user.id': userId,
-        'points.reason': reason,
-        'points.relatedEntity': relatedEntity,
-        'error.message': error instanceof Error ? error.message : String(error),
-      })
-      return false
-    }
+    // Без skipHooks: хуки транзакции выдают сертификат, уведомление и письмо о завершении
+    await req.payload.create({
+      req,
+      collection: 'points-transactions',
+      data: {
+        user: userId,
+        amount,
+        reason,
+        relatedEntity,
+        description,
+      },
+    })
+    return true
   })
 }
 

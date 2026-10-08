@@ -265,7 +265,7 @@ describe('тренажёр (awardTrainerPoints)', () => {
   it('задача с нулевой наградой берёт баллы из настроек сайта', async () => {
     const student = await createStudent(payload)
     const task = await createSumTask(payload, { pointsReward: 0 })
-    await payload.create({ collection: 'user-trainer-progress', data: { user: student.id, task: task.id, isCompleted: true } })
+    await payload.create({ collection: 'user-trainer-progress', data: { user: student.id, task: task.id, isCompleted: true, verifiedBy: 'server' } })
     expect((await transactions(student.id))[0]).toMatchObject({ reason: 'trainer_task_completed', amount: 10 })
   })
 
@@ -288,6 +288,7 @@ describe('сертификаты и уведомления по транзакц
   it('транзакция за курс выдаёт ровно один сертификат, повторная — не дублирует', async () => {
     const student = await createStudent(payload)
     const tree = await createCourseTree(payload, { lessons: 1 })
+    await completeLesson(student, tree.lessons[0].id)
     for (let i = 0; i < 2; i += 1) {
       await payload.create({
         collection: 'points-transactions',
@@ -295,7 +296,7 @@ describe('сертификаты и уведомления по транзакц
       })
     }
     const certs = await payload.find({ collection: 'certificates', where: { user: { equals: student.id } } })
-    expect(certs.totalDocs).toBe(1)
+    expect(certs.docs.filter(cert => cert.type === 'course')).toHaveLength(1)
   })
 
   it('ручная корректировка баллов не создаёт ни сертификата, ни уведомления, ни письма', async () => {

@@ -44,6 +44,10 @@ const MATRIX: Record<string, Matrix> = {
   bookmarks: { create: 'auth', read: 'own', update: 'own', delete: 'own' },
   comments: { create: 'auth', read: 'own', update: 'own', delete: 'admin' },
   notifications: { create: 'admin', read: 'own', update: 'own', delete: 'admin' },
+  'notification-preferences': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
+  'push-subscriptions': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
+  'notification-deliveries': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
+  'notification-job-state': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
   certificates: { create: 'admin', read: 'own', update: 'admin', delete: 'admin' },
   streaks: { create: 'admin', read: 'own', update: 'admin', delete: 'admin' },
   // Пишет только сервер после проверки в песочнице (/api/trainer/submit)
@@ -77,6 +81,10 @@ const PATCH: Record<string, Record<string, unknown>> = {
   bookmarks: { task: null },
   comments: { content: 'обновлено' },
   notifications: { isRead: true },
+  'notification-preferences': { remindersEnabled: false },
+  'push-subscriptions': { enabled: false },
+  'notification-deliveries': { status: 'cancelled' },
+  'notification-job-state': { userCursor: 0 },
   certificates: { title: 'обновлено' },
   streaks: { totalActiveDays: 7 },
   'user-trainer-progress': { userCode: '// обновлено' },
@@ -120,9 +128,9 @@ async function ownedDoc(slug: string, overrides: Record<string, unknown> = {}): 
     if (!policies.docs[0]) throw new Error('Фабрика пользователя не создала политику доступа')
     return policies.docs[0].id
   }
-  if (slug === 'streaks') {
+  if (slug === 'streaks' || slug === 'notification-preferences') {
     // Серия у пользователя одна — берём существующую, если она уже есть.
-    const existing = await payload.find({ collection: 'streaks', where: { user: { equals: owner.id } }, limit: 1 })
+    const existing = await payload.find({ collection: slug, where: { user: { equals: owner.id } }, limit: 1 })
     if (existing.docs[0]) return existing.docs[0].id
   }
   const data = { ...(await makeValid(payload, slug, ctx, owner.id)), ...overrides }

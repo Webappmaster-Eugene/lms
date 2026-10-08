@@ -1,7 +1,12 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, FieldAccess } from 'payload'
 
 import { isAdminOrSelf } from '@/payload/access/isAdminOrSelf'
 import { isAdmin } from '@/payload/access/isAdmin'
+import { queueNotificationPush } from '@/server/notification-service'
+import { safeNotificationLink } from '@/lib/notification-policy'
+
+const editNotification: FieldAccess = async ({ req }) => (await isAdmin({ req })) === true
+const adminEdit = { create: editNotification, update: editNotification }
 
 export const Notifications: CollectionConfig = {
   slug: 'notifications',
@@ -15,6 +20,14 @@ export const Notifications: CollectionConfig = {
     update: isAdminOrSelf,
     delete: isAdmin,
   },
+  hooks: {
+    beforeChange: [({ data }) => {
+      if (typeof data.link === 'string' && data.link.length <= 500) data.link = safeNotificationLink(data.link, true)
+      return data
+    }],
+    afterChange: [queueNotificationPush],
+    beforeDelete: [async ({ id, req }) => { await req.payload.delete({ collection: 'notification-deliveries', where: { notification: { equals: id } }, req, overrideAccess: true }) }],
+  },
   fields: [
     {
       name: 'user',
@@ -22,18 +35,23 @@ export const Notifications: CollectionConfig = {
       relationTo: 'users',
       required: true,
       label: 'Пользователь',
+      access: adminEdit,
     },
     {
       name: 'title',
       type: 'text',
       required: true,
       label: 'Заголовок',
+      maxLength: 200,
+      access: adminEdit,
     },
     {
       name: 'message',
       type: 'textarea',
       required: true,
       label: 'Текст',
+      maxLength: 3000,
+      access: adminEdit,
     },
     {
       name: 'type',
@@ -41,6 +59,7 @@ export const Notifications: CollectionConfig = {
       required: true,
       label: 'Тип',
       defaultValue: 'info',
+      access: adminEdit,
       options: [
         { label: 'Информация', value: 'info' },
         { label: 'Достижение', value: 'achievement' },
@@ -49,12 +68,15 @@ export const Notifications: CollectionConfig = {
         { label: 'Комментарий', value: 'comment' },
         { label: 'Задача тренажёра', value: 'trainer_task' },
         { label: 'Обращение в поддержку', value: 'support_message' },
+        { label: 'Напоминание об обучении', value: 'learning_reminder' },
       ],
     },
     {
       name: 'link',
       type: 'text',
       label: 'Ссылка (куда вести при клике)',
+      maxLength: 500,
+      access: adminEdit,
     },
     {
       name: 'isRead',

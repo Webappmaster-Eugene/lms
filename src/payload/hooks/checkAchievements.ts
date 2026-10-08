@@ -2,6 +2,7 @@ import type { CollectionAfterChangeHook, PayloadRequest } from 'payload'
 import { relationId } from '@/lib/relation-id'
 import { withSpan } from '@/lib/telemetry'
 import { skipHooksReq } from '@/lib/payload-req'
+import { streakView } from '@/lib/streak'
 import { collectAllPages } from '@/lib/paginate'
 
 /**
@@ -18,12 +19,15 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
   previousDoc,
   operation,
   req,
+  collection,
 }) => {
   if (req.context?.skipHooks) return doc
+  if (collection.slug === 'user-trainer-progress' && doc.verifiedBy !== 'server') return doc
 
   const justCompleted =
     doc.isCompleted === true &&
-    (operation === 'create' || previousDoc?.isCompleted !== true)
+    (operation === 'create' || previousDoc?.isCompleted !== true ||
+      (collection.slug === 'user-trainer-progress' && previousDoc?.verifiedBy !== 'server'))
 
   if (!justCompleted) return doc
 
@@ -31,7 +35,7 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
 
   return withSpan('hook.checkAchievements', { 'user.id': userId }, async () => {
     // Загружаем данные параллельно
-    const [achievementDocs, userAchievementDocs, user, completedLessons, courseBonuses, roadmapBonuses, trainerProgress] =
+    const [achievementDocs, userAchievementDocs, user, completedLessons, courseBonuses, roadmapBonuses, trainerProgress, streaks] =
       await Promise.all([
         collectAllPages(
           ({ page, limit }) =>
@@ -60,23 +64,18 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
           { label: `достижения пользователя ${userId}` },
         ),
         req.payload.findByID({ req, collection: 'users', id: userId }),
-        req.payload.find({
-          req,
-          collection: 'user-progress',
-          where: {
-            user: { equals: userId },
-            isCompleted: { equals: true },
-          },
-          limit: 0, // только totalDocs
-        }),
+        collectAllPages(({ page, limit }) => req.payload.find({
+          req, collection: 'user-progress', depth: 0, select: { lesson: true }, sort: 'id', page, limit,
+          where: { user: { equals: userId }, isCompleted: { equals: true } },
+        }), { label: `уникальные пройденные уроки пользователя ${userId}` }),
         collectAllPages(
           ({ page, limit }) =>
             req.payload.find({
               req,
-              collection: 'points-transactions',
+              collection: 'certificates',
               where: {
                 user: { equals: userId },
-                reason: { equals: 'course_completed' },
+                type: { equals: 'course' },
               },
               select: { relatedEntity: true },
               depth: 0,
@@ -90,10 +89,10 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
           ({ page, limit }) =>
             req.payload.find({
               req,
-              collection: 'points-transactions',
+              collection: 'certificates',
               where: {
                 user: { equals: userId },
-                reason: { equals: 'roadmap_completed' },
+                type: { equals: 'roadmap' },
               },
               select: { relatedEntity: true },
               depth: 0,
@@ -109,9 +108,11 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
           where: {
             user: { equals: userId },
             isCompleted: { equals: true },
+            verifiedBy: { equals: 'server' },
           },
           limit: 0, // только totalDocs
         }),
+        req.payload.find({ req, collection: 'streaks', where: { user: { equals: userId } }, depth: 0, limit: 1 }),
       ])
 
     const unlockedIds = new Set(
@@ -134,18 +135,25 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
     )
 
     const stats: UserStats = {
-      completedLessonCount: completedLessons.totalDocs,
-      completedCourseCount: courseBonuses.length,
-      completedRoadmapCount: roadmapBonuses.length,
+      completedLessonCount: new Set(completedLessons.map(progress => String(typeof progress.lesson === 'object' ? progress.lesson.id : progress.lesson))).size,
+      completedCourseCount: completedCourseEntityIds.size,
+      completedRoadmapCount: completedRoadmapEntityIds.size,
       completedTrainerTaskCount: trainerProgress.totalDocs,
       totalPoints: user.totalPoints ?? 0,
+      streakDays: streakView(streaks.docs[0]).days,
       completedCourseEntityIds,
       completedRoadmapEntityIds,
     }
 
     let pointsAwarded = 0
 
-    for (const achievement of achievementDocs) {
+    // Points goals run after activity rewards and in ascending threshold order.
+    const ordered = [...achievementDocs].sort((a, b) => {
+      if (a.criteriaType === 'total_points' && b.criteriaType !== 'total_points') return 1
+      if (b.criteriaType === 'total_points' && a.criteriaType !== 'total_points') return -1
+      return a.criteriaType === 'total_points' ? a.criteriaValue - b.criteriaValue : a.id - b.id
+    })
+    for (const achievement of ordered) {
       if (unlockedIds.has(String(achievement.id))) continue
 
       const met = checkCriteria(
@@ -158,21 +166,18 @@ export const checkAchievements: CollectionAfterChangeHook = async ({
       if (!met) continue
 
       // Выдаём достижение
-      try {
-        // Без skipHooks: хуки достижения шлют письмо и уведомление в колокольчик
-        await req.payload.create({
-          req,
-          collection: 'user-achievements',
-          data: {
-            user: userId,
-            achievement: achievement.id,
-            unlockedAt: new Date().toISOString(),
-          },
-        })
-      } catch {
-        // Дубль (race condition) — пропускаем
-        continue
-      }
+      // The owning user row is locked before any progress write. Propagate DB
+      // failures so progress, rewards and notifications roll back together.
+      // Без skipHooks: хуки достижения шлют письмо и уведомление в колокольчик
+      await req.payload.create({
+        req,
+        collection: 'user-achievements',
+        data: {
+          user: userId,
+          achievement: achievement.id,
+          unlockedAt: new Date().toISOString(),
+        },
+      })
 
       // Начисляем бонусные баллы за достижение
       if (achievement.pointsReward && achievement.pointsReward > 0) {
@@ -209,16 +214,18 @@ type UserStats = {
   completedRoadmapCount: number
   completedTrainerTaskCount: number
   totalPoints: number
+  streakDays: number
   completedCourseEntityIds: Set<string>
   completedRoadmapEntityIds: Set<string>
 }
 
-function checkCriteria(
+export function checkCriteria(
   criteriaType: string,
   criteriaValue: number,
   criteriaEntityId: string | null,
   stats: UserStats,
 ): boolean {
+  if (!Number.isFinite(criteriaValue) || criteriaValue < 1) return false
   switch (criteriaType) {
     case 'lesson_count':
       return stats.completedLessonCount >= criteriaValue
@@ -237,6 +244,9 @@ function checkCriteria(
 
     case 'total_points':
       return stats.totalPoints >= criteriaValue
+
+    case 'streak_days':
+      return stats.streakDays >= criteriaValue
 
     case 'trainer_task_count':
       return stats.completedTrainerTaskCount >= criteriaValue

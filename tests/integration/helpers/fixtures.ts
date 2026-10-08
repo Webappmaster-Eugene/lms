@@ -44,13 +44,17 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   'auth-session-revocations': (ctx) => ({ user: ctx.studentId, sessionHash: createHash('sha256').update(uid('session-fixture')).digest('hex'), expiresAt: new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString() }),
   'lesson-learning-states': (ctx) => ({ user: ctx.studentId, lesson: ctx.lessonId, lastViewedAt: new Date().toISOString() }),
   'user-progress': (ctx) => ({ user: ctx.studentId, lesson: ctx.lessonId }),
-  achievements: () => ({ title: 'Ачивка', description: 'Описание', criteriaType: 'lesson_count', criteriaValue: 1000000, isActive: false }),
+  achievements: () => ({ slug: uid('achievement-definition'), title: 'Ачивка', description: 'Описание', criteriaType: 'lesson_count', criteriaValue: 1000000, isActive: false }),
   'user-achievements': (ctx) => ({ user: ctx.studentId, achievement: ctx.achievementId, unlockedAt: new Date().toISOString() }),
   'points-transactions': (ctx) => ({ user: ctx.studentId, amount: 1, reason: 'admin_adjustment' }),
   notes: (ctx) => ({ user: ctx.studentId, lesson: ctx.lessonId, content: 'Заметка' }),
   bookmarks: (ctx) => ({ user: ctx.studentId, lesson: ctx.lessonId }),
   comments: (ctx) => ({ user: ctx.studentId, lesson: ctx.lessonId, content: 'Комментарий' }),
   notifications: (ctx) => ({ user: ctx.studentId, title: 'Заголовок', message: 'Текст' }),
+  'notification-preferences': (ctx) => ({ user: ctx.studentId, timezone: 'Europe/Moscow', reminderHour: 18 }),
+  'push-subscriptions': (ctx) => ({ user: ctx.studentId, endpointHash: createHash('sha256').update(uid('push')).digest('hex'), endpoint: 'https://fcm.googleapis.com/fcm/send/fixture', p256dh: 'fixture-public-key', auth: 'fixture-auth-key', sessionHash: createHash('sha256').update(uid('sid')).digest('hex') }),
+  'notification-deliveries': (ctx) => ({ user: ctx.studentId, notification: 0, subscription: 0, status: 'pending', attempts: 0, nextAttemptAt: new Date().toISOString() }),
+  'notification-job-state': () => ({ key: uid('job'), leaseUntil: new Date().toISOString(), claimToken: uid('claim') }),
   certificates: (ctx) => ({
     user: ctx.studentId, type: 'course', title: 'Курс', relatedEntity: String(ctx.courseId),
     issuedAt: new Date().toISOString(), certificateNumber: uid('MC'),
@@ -65,7 +69,7 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
 }
 
 /** Коллекции, где пользователь может владеть документом (поле user). */
-export const UNIQUE_PER_USER = new Set(['streaks', 'user-trainer-progress', 'learning-access-policies'])
+export const UNIQUE_PER_USER = new Set(['streaks', 'user-trainer-progress', 'learning-access-policies', 'notification-preferences'])
 
 export async function buildFixtureContext(payload: Payload): Promise<FixtureContext> {
   const admin = await createAdmin(payload)
@@ -110,6 +114,16 @@ export async function makeValid(payload: Payload, slug: string, ctx: FixtureCont
   if (slug === 'learning-access-policies' && owner === undefined) {
     // Users create their policy automatically; isolate raw schema checks on a fresh fixture owner.
     await payload.delete({ collection: 'learning-access-policies', where: { user: { equals: data.user } }, context: { syncLearningAccessPolicy: true } })
+  }
+  if (slug === 'user-achievements') {
+    data.achievement = (await payload.create({ collection: 'achievements', data: { title: uid('achievement'), description: 'Тестовое достижение', criteriaType: 'lesson_count', criteriaValue: 1000000, isActive: false } })).id
+  }
+  if (slug === 'certificates') data.relatedEntity = uid('certificate-entity')
+  if (slug === 'notification-deliveries') {
+    data.notification = (await payload.create({ collection: 'notifications', data: { user: Number(data.user), title: 'Фикстура', message: 'Не отправлять', type: 'info' }, context: { skipHooks: true } })).id
+    const subscription = VALID['push-subscriptions'](ctx)
+    subscription.user = data.user
+    data.subscription = (await payload.create({ collection: 'push-subscriptions', data: subscription as never })).id
   }
   return data
 }

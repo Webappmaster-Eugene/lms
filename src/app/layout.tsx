@@ -1,8 +1,11 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
+  manifest: '/manifest.webmanifest',
+  appleWebApp: { capable: true, title: 'MentorCareer', statusBarStyle: 'default' },
+  icons: { apple: '/images/pwa/icon-192.png' },
   title: {
     template: '%s — MentorCareer LMS',
     default: 'MentorCareer LMS',
@@ -16,6 +19,8 @@ export const metadata: Metadata = {
     description: 'Платформа обучения MentorCareer — курсы Frontend (React, TypeScript) и Backend (Node.js, NestJS) с тренажёром кода, геймификацией и сертификатами',
   },
 }
+
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover' }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return children

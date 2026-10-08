@@ -224,7 +224,7 @@ describe('POST /api/trainer/submit: вердикт', () => {
     find.mockImplementation(async ({ collection }: { collection: string }) =>
       collection === 'trainer-tasks'
         ? { docs: [TASK], totalDocs: 1 }
-        : { docs: [{ id: 5, isCompleted: true, attempts: 3, failedAttempts: 1 }], totalDocs: 1 },
+        : { docs: [{ id: 5, isCompleted: true, verifiedBy: 'server', attempts: 3, failedAttempts: 1 }], totalDocs: 1 },
     )
 
     const response = await POST(request({ taskId: '42', language: 'js', code: 'решение' }))
@@ -242,12 +242,26 @@ describe('POST /api/trainer/submit: вердикт', () => {
     find.mockImplementation(async ({ collection }: { collection: string }) =>
       collection === 'trainer-tasks'
         ? { docs: [TASK], totalDocs: 1 }
-        : { docs: [{ id: 5, isCompleted: true, attempts: 1, failedAttempts: 0 }], totalDocs: 1 },
+        : { docs: [{ id: 5, isCompleted: true, verifiedBy: 'server', attempts: 1, failedAttempts: 0 }], totalDocs: 1 },
     )
 
     await POST(request({ taskId: '42', language: 'js', code: 'плохое' }))
 
     expect(update.mock.calls[0][0].data.isCompleted).toBe(true)
+  })
+
+  it('старый клиентский зачёт не сохраняется после неудачного серверного прогона', async () => {
+    runSolution.mockResolvedValue(failed())
+    find.mockImplementation(async ({ collection }: { collection: string }) =>
+      collection === 'trainer-tasks'
+        ? { docs: [TASK], totalDocs: 1 }
+        : { docs: [{ id: 5, isCompleted: true, verifiedBy: 'client', attempts: 1, failedAttempts: 0 }], totalDocs: 1 },
+    )
+    const response = await POST(request({ taskId: '42', language: 'js', code: 'плохое' }))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ completed: false, awardedPoints: null })
+    expect(update.mock.calls[0][0].data.isCompleted).toBe(false)
+    expect(update.mock.calls[0][0].data.verifiedBy).toBeUndefined()
   })
 
   it('счётчики попыток растут', async () => {

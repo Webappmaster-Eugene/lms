@@ -88,6 +88,10 @@ export interface Config {
     bookmarks: Bookmark;
     comments: Comment;
     notifications: Notification;
+    'notification-preferences': NotificationPreference;
+    'push-subscriptions': PushSubscription;
+    'notification-deliveries': NotificationDelivery;
+    'notification-job-state': NotificationJobState;
     certificates: Certificate;
     streaks: Streak;
     'trainer-topics': TrainerTopic;
@@ -124,6 +128,10 @@ export interface Config {
     bookmarks: BookmarksSelect<false> | BookmarksSelect<true>;
     comments: CommentsSelect<false> | CommentsSelect<true>;
     notifications: NotificationsSelect<false> | NotificationsSelect<true>;
+    'notification-preferences': NotificationPreferencesSelect<false> | NotificationPreferencesSelect<true>;
+    'push-subscriptions': PushSubscriptionsSelect<false> | PushSubscriptionsSelect<true>;
+    'notification-deliveries': NotificationDeliveriesSelect<false> | NotificationDeliveriesSelect<true>;
+    'notification-job-state': NotificationJobStateSelect<false> | NotificationJobStateSelect<true>;
     certificates: CertificatesSelect<false> | CertificatesSelect<true>;
     streaks: StreaksSelect<false> | StreaksSelect<true>;
     'trainer-topics': TrainerTopicsSelect<false> | TrainerTopicsSelect<true>;
@@ -666,11 +674,21 @@ export interface AuthSessionRevocation {
  */
 export interface Achievement {
   id: number;
+  /**
+   * Ключ стандартного достижения. Изменение названия не создаёт новую награду.
+   */
+  slug?: string | null;
   title: string;
   description: string;
   icon?: (number | null) | Media;
   pointsReward?: number | null;
-  criteriaType: 'lesson_count' | 'course_completion' | 'roadmap_completion' | 'total_points' | 'trainer_task_count';
+  criteriaType:
+    | 'lesson_count'
+    | 'course_completion'
+    | 'roadmap_completion'
+    | 'total_points'
+    | 'trainer_task_count'
+    | 'streak_days';
   /**
    * Для lesson_count: кол-во уроков. Для total_points: кол-во баллов. Для completion: 1.
    */
@@ -944,9 +962,73 @@ export interface Notification {
     | 'roadmap_completed'
     | 'comment'
     | 'trainer_task'
-    | 'support_message';
+    | 'support_message'
+    | 'learning_reminder';
   link?: string | null;
   isRead?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notification-preferences".
+ */
+export interface NotificationPreference {
+  id: number;
+  user: number | User;
+  pushEnabled?: boolean | null;
+  remindersEnabled?: boolean | null;
+  timezone: string;
+  reminderHour: number;
+  lastLearningAt?: string | null;
+  reminderStage?: number | null;
+  lastReminderAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "push-subscriptions".
+ */
+export interface PushSubscription {
+  id: number;
+  user: number | User;
+  endpointHash: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  sessionHash: string;
+  enabled?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notification-deliveries".
+ */
+export interface NotificationDelivery {
+  id: number;
+  user: number | User;
+  notification: number | Notification;
+  subscription: number | PushSubscription;
+  status: 'pending' | 'processing' | 'sent' | 'failed' | 'cancelled';
+  attempts: number;
+  nextAttemptAt: string;
+  claimToken?: string | null;
+  lastStatusCode?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notification-job-state".
+ */
+export interface NotificationJobState {
+  id: number;
+  key: string;
+  leaseUntil: string;
+  claimToken: string;
+  userCursor?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1589,6 +1671,7 @@ export interface AuthSessionRevocationsSelect<T extends boolean = true> {
  * via the `definition` "achievements_select".
  */
 export interface AchievementsSelect<T extends boolean = true> {
+  slug?: T;
   title?: T;
   description?: T;
   icon?: T;
@@ -1670,6 +1753,65 @@ export interface NotificationsSelect<T extends boolean = true> {
   type?: T;
   link?: T;
   isRead?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notification-preferences_select".
+ */
+export interface NotificationPreferencesSelect<T extends boolean = true> {
+  user?: T;
+  pushEnabled?: T;
+  remindersEnabled?: T;
+  timezone?: T;
+  reminderHour?: T;
+  lastLearningAt?: T;
+  reminderStage?: T;
+  lastReminderAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "push-subscriptions_select".
+ */
+export interface PushSubscriptionsSelect<T extends boolean = true> {
+  user?: T;
+  endpointHash?: T;
+  endpoint?: T;
+  p256dh?: T;
+  auth?: T;
+  sessionHash?: T;
+  enabled?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notification-deliveries_select".
+ */
+export interface NotificationDeliveriesSelect<T extends boolean = true> {
+  user?: T;
+  notification?: T;
+  subscription?: T;
+  status?: T;
+  attempts?: T;
+  nextAttemptAt?: T;
+  claimToken?: T;
+  lastStatusCode?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notification-job-state_select".
+ */
+export interface NotificationJobStateSelect<T extends boolean = true> {
+  key?: T;
+  leaseUntil?: T;
+  claimToken?: T;
+  userCursor?: T;
   updatedAt?: T;
   createdAt?: T;
 }

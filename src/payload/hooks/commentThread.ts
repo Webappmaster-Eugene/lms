@@ -6,7 +6,6 @@ import {
 } from 'payload'
 
 import { collectAllPages } from '@/lib/paginate'
-import { skipHooksReq } from '@/lib/payload-req'
 import { relationId } from '@/lib/relation-id'
 import { logger, withSpan } from '@/lib/telemetry'
 
@@ -94,7 +93,7 @@ export const notifyCommentThread: CollectionAfterChangeHook = async ({ doc, oper
         // Своё уточнение в своей ветке — уведомлять некого.
         if (asker === author) return doc
         await req.payload.create({
-          req: skipHooksReq(req),
+          req,
           collection: 'notifications',
           data: {
             user: asker,
@@ -125,7 +124,7 @@ export const notifyCommentThread: CollectionAfterChangeHook = async ({ doc, oper
       )
       for (const admin of admins) {
         await req.payload.create({
-          req: skipHooksReq(req),
+          req,
           collection: 'notifications',
           data: {
             user: admin.id,

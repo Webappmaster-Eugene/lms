@@ -22,6 +22,13 @@ export const Achievements: CollectionConfig = {
   },
   fields: [
     {
+      name: 'slug',
+      type: 'text',
+      unique: true,
+      label: 'Стабильный ключ',
+      admin: { description: 'Ключ стандартного достижения. Изменение названия не создаёт новую награду.' },
+    },
+    {
       name: 'title',
       type: 'text',
       required: true,
@@ -61,6 +68,7 @@ export const Achievements: CollectionConfig = {
         { label: 'Завершение роадмапа', value: 'roadmap_completion' },
         { label: 'Общее количество баллов', value: 'total_points' },
         { label: 'Количество решённых задач тренажёра', value: 'trainer_task_count' },
+        { label: 'Серия учебных дней', value: 'streak_days' },
       ],
     },
     {
@@ -68,6 +76,7 @@ export const Achievements: CollectionConfig = {
       type: 'number',
       required: true,
       label: 'Значение критерия',
+      min: 1,
       admin: {
         description: 'Для lesson_count: кол-во уроков. Для total_points: кол-во баллов. Для completion: 1.',
       },

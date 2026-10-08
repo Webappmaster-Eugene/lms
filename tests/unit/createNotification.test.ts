@@ -4,8 +4,8 @@ import type { PayloadRequest } from 'payload'
 /**
  * Уведомления в интерфейсе — колокольчик в шапке.
  *
- * Отказ хука намеренно проглатывается, чтобы не откатывать транзакцию
- * с баллами, поэтому ошибка здесь невидима снаружи.
+ * Обязательное уведомление сохраняется в транзакции награды.
+ * Отказ записи откатывает составную операцию, чтобы уведомление не терялось.
  */
 
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
@@ -82,14 +82,14 @@ describe('уведомление о завершении', () => {
     req = makeReq(payload)
   })
 
-  it('за курс — уведомление со ссылкой в профиль', async () => {
+  it('за курс — уведомление со ссылкой на сертификаты', async () => {
     await run(transaction())
 
     expect(store.notifications[0]).toMatchObject({
       user: 3,
       title: 'Курс завершён!',
       type: 'course_completed',
-      link: '/profile',
+      link: '/certificates',
       isRead: false,
     })
   })
@@ -143,21 +143,21 @@ describe('уведомление о завершении', () => {
     expect(store.calls.every((call) => call.withReq)).toBe(true)
   })
 
-  it('уведомление не запускает хуки повторно', async () => {
+  it('уведомление сохраняет req и разрешает собственному hook поставить push в очередь', async () => {
     await run(transaction())
 
-    // skipHooks - на наследнике req, а не через context операции: тот Payload вмерживает в общий req
     const [args] = payload.create.mock.calls[0]
-    expect(args.req?.context?.skipHooks).toBe(true)
+    expect(args.req).toBe(req)
+    expect(args.req?.context?.skipHooks).toBeUndefined()
     expect(args.context).toBeUndefined()
     expect(req.context?.skipHooks).toBeUndefined()
   })
 
-  it('отказ записи не роняет начисление баллов', async () => {
+  it('отказ записи откатывает награду вместо потери уведомления', async () => {
     store.createFails = true
 
-    await expect(run(transaction())).resolves.toBeDefined()
-    expect(logger.error).toHaveBeenCalled()
+    await expect(run(transaction())).rejects.toThrow('БД недоступна')
+    expect(store.notifications).toHaveLength(0)
   })
 })
 
@@ -229,10 +229,10 @@ describe('уведомление о достижении', () => {
     expect(payload.create).not.toHaveBeenCalled()
   })
 
-  it('пропавшее достижение не роняет выдачу', async () => {
-    await expect(run(unlocked({ achievement: 404 }))).resolves.toBeDefined()
+  it('пропавшее достижение откатывает выдачу', async () => {
+    await expect(run(unlocked({ achievement: 404 }))).rejects.toThrow('достижение 404 не найдено')
 
     expect(payload.create).not.toHaveBeenCalled()
-    expect(logger.error).toHaveBeenCalled()
+
   })
 })

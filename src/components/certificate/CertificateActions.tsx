@@ -25,7 +25,7 @@ export function CertificateActions() {
       <button
         type="button"
         onClick={() => window.print()}
-        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        className="inline-flex items-center gap-2 rounded-lg bg-primary min-h-11 px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
       >
         <Download className="h-4 w-4" aria-hidden="true" />
         Скачать PDF
@@ -33,7 +33,7 @@ export function CertificateActions() {
       <button
         type="button"
         onClick={copyLink}
-        className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
+        className="inline-flex items-center gap-2 rounded-lg border border-border min-h-11 px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
       >
         {copied ? <Check className="h-4 w-4 text-success" aria-hidden="true" /> : <Link2 className="h-4 w-4" aria-hidden="true" />}
         {copied ? 'Ссылка скопирована' : 'Скопировать ссылку'}
@@ -44,7 +44,7 @@ export function CertificateActions() {
         </p>
       )}
       <p className="w-full text-xs text-muted-foreground">
-        В окне печати выберите «Сохранить как PDF».
+        В окне печати выберите «Сохранить как PDF». Страница доступна только вам после входа; для отправки другим сохраните PDF.
       </p>
     </div>
   )

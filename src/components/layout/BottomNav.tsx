@@ -22,26 +22,26 @@ const TABS: readonly Tab[] = [
 
 export function BottomNav() {
   const pathname = usePathname()
-  const { toggleMobile } = useSidebar()
+  const { mobileOpen, toggleMobile } = useSidebar()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur-md lg:hidden">
+    <nav aria-label="Основная навигация" className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur-md lg:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       <div
         className="mx-auto flex h-16 max-w-lg items-stretch justify-around"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         {TABS.map(({ href, label, icon: Icon, exact }) => {
-          const isActive = exact ? pathname === href : pathname.startsWith(href)
+          const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`) || (href === '/courses' && pathname.startsWith('/lessons/'))
           return (
             <Link
               key={href}
               href={href}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'flex min-w-[64px] flex-1 flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors',
+                'flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring',
                 isActive ? 'text-primary' : 'text-muted-foreground',
               )}
             >
-              <Icon className="h-5 w-5" />
+              <span className={cn('flex h-7 w-12 items-center justify-center rounded-full', isActive && 'bg-primary/10')}><Icon aria-hidden="true" className="h-5 w-5" /></span>
               <span>{label}</span>
             </Link>
           )
@@ -49,10 +49,14 @@ export function BottomNav() {
 
         {/* More button — opens sidebar */}
         <button
+          type="button"
           onClick={toggleMobile}
-          className="flex min-w-[64px] flex-1 flex-col items-center justify-center gap-1 text-[10px] font-medium text-muted-foreground transition-colors"
+          aria-expanded={mobileOpen}
+          aria-haspopup="dialog"
+          aria-controls={mobileOpen ? 'platform-mobile-menu' : undefined}
+          className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium text-muted-foreground transition-colors focus-visible:outline-2 focus-visible:outline-ring"
         >
-          <Menu className="h-5 w-5" />
+          <span className="flex h-7 w-12 items-center justify-center"><Menu aria-hidden="true" className="h-5 w-5" /></span>
           <span>Ещё</span>
         </button>
       </div>

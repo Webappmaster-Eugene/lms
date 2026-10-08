@@ -7,6 +7,7 @@ import { createAchievementNotification } from '@/payload/hooks/createNotificatio
 
 export const UserAchievements: CollectionConfig = {
   slug: 'user-achievements',
+  indexes: [{ fields: ['user', 'achievement'], unique: true }],
   admin: {
     defaultColumns: ['user', 'achievement', 'unlockedAt'],
     group: 'Геймификация',
