@@ -16,6 +16,7 @@ import { Courses } from '@/payload/collections/Courses'
 import { Sections } from '@/payload/collections/Sections'
 import { Lessons } from '@/payload/collections/Lessons'
 import { Media } from '@/payload/collections/Media'
+import { LessonLearningStates } from '@/payload/collections/LessonLearningStates'
 import { UserProgress } from '@/payload/collections/UserProgress'
 import { Achievements } from '@/payload/collections/Achievements'
 import { UserAchievements } from '@/payload/collections/UserAchievements'
@@ -68,6 +69,7 @@ export default buildConfig({
     Lessons,
     Media,
     UserProgress,
+    LessonLearningStates,
     Achievements,
     UserAchievements,
     PointsTransactions,

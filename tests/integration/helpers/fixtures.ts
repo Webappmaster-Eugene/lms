@@ -37,6 +37,7 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   courses: (ctx) => ({ title: `Курс ${uid()}`, roadmap: ctx.roadmapId }),
   sections: (ctx) => ({ title: `Секция ${uid()}`, course: ctx.courseId }),
   lessons: (ctx) => ({ title: `Урок ${uid()}`, course: ctx.courseId }),
+  'lesson-learning-states': (ctx) => ({ user: ctx.studentId, lesson: ctx.lessonId, lastViewedAt: new Date().toISOString() }),
   'user-progress': (ctx) => ({ user: ctx.studentId, lesson: ctx.lessonId }),
   achievements: () => ({ title: 'Ачивка', description: 'Описание', criteriaType: 'lesson_count', criteriaValue: 1000000, isActive: false }),
   'user-achievements': (ctx) => ({ user: ctx.studentId, achievement: ctx.achievementId, unlockedAt: new Date().toISOString() }),
@@ -50,6 +51,7 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
     issuedAt: new Date().toISOString(), certificateNumber: uid('MC'),
   }),
   streaks: (ctx) => ({ user: ctx.studentId }),
+  'interview-rooms': (ctx) => ({ token: uid('room'), owner: ctx.studentId, members: [ctx.studentId], title: 'Собеседование фикстуры' }),
   'trainer-topics': () => ({ title: `Тема ${uid()}` }),
   'trainer-tasks': (ctx) => ({ title: `Задача ${uid()}`, topic: ctx.topicId, starterCode: '// код' }),
   'user-trainer-progress': (ctx) => ({ user: ctx.studentId, task: ctx.taskId }),
@@ -87,9 +89,10 @@ export async function buildFixtureContext(payload: Payload): Promise<FixtureCont
 export async function makeValid(payload: Payload, slug: string, ctx: FixtureContext, owner?: number): Promise<Data> {
   const data = VALID[slug](ctx)
   // Закладка уникальна по паре «пользователь + урок» — каждой копии свой урок.
-  if (slug === 'bookmarks') {
+  if (slug === 'bookmarks' || slug === 'lesson-learning-states') {
     data.lesson = (await payload.create({ collection: 'lessons', data: { title: `Урок ${uid()}`, course: ctx.courseId } as never })).id
   }
+  if (slug === 'interview-rooms' && owner !== undefined) { data.owner = owner; data.members = [owner] }
   if ('user' in data) {
     if (owner !== undefined) data.user = owner
     else if (UNIQUE_PER_USER.has(slug)) data.user = (await createStudent(payload)).id

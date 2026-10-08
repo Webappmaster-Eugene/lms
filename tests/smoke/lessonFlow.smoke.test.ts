@@ -45,7 +45,7 @@ describe('id урока уходит на сервер числом', () => {
 
   it('страница урока передаёт id без приведения к строке', () => {
     expect(LESSON_PAGE).not.toContain('lessonId={String(')
-    expect(LESSON_PAGE.match(/lessonId=\{lesson\.id\}/g) ?? []).toHaveLength(3)
+    expect(LESSON_PAGE.match(/lessonId=\{lesson\.id\}/g) ?? []).toHaveLength(4)
   })
 })
 

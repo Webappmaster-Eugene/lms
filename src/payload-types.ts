@@ -76,6 +76,7 @@ export interface Config {
     lessons: Lesson;
     media: Media;
     'user-progress': UserProgress;
+    'lesson-learning-states': LessonLearningState;
     achievements: Achievement;
     'user-achievements': UserAchievement;
     'points-transactions': PointsTransaction;
@@ -107,6 +108,7 @@ export interface Config {
     lessons: LessonsSelect<false> | LessonsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     'user-progress': UserProgressSelect<false> | UserProgressSelect<true>;
+    'lesson-learning-states': LessonLearningStatesSelect<false> | LessonLearningStatesSelect<true>;
     achievements: AchievementsSelect<false> | AchievementsSelect<true>;
     'user-achievements': UserAchievementsSelect<false> | UserAchievementsSelect<true>;
     'points-transactions': PointsTransactionsSelect<false> | PointsTransactionsSelect<true>;
@@ -521,6 +523,28 @@ export interface UserProgress {
   isCompleted?: boolean | null;
   completedAt?: string | null;
   lastAccessedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "lesson-learning-states".
+ */
+export interface LessonLearningState {
+  id: number;
+  user: number | User;
+  lesson: number | Lesson;
+  lastViewedAt: string;
+  lastVideoId?: string | null;
+  positions?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1374,6 +1398,19 @@ export interface UserProgressSelect<T extends boolean = true> {
   isCompleted?: T;
   completedAt?: T;
   lastAccessedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "lesson-learning-states_select".
+ */
+export interface LessonLearningStatesSelect<T extends boolean = true> {
+  user?: T;
+  lesson?: T;
+  lastViewedAt?: T;
+  lastVideoId?: T;
+  positions?: T;
   updatedAt?: T;
   createdAt?: T;
 }

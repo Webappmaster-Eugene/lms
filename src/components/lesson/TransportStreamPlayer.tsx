@@ -39,7 +39,7 @@ type PlayerHandle = {
 function bufferedCovers(video: HTMLVideoElement, seconds: number): boolean {
   const { buffered } = video
   for (let i = 0; i < buffered.length; i++) {
-    if (buffered.start(i) <= seconds && seconds < buffered.end(i) - 0.5) return true
+    if (buffered.start(i) <= seconds && seconds <= buffered.end(i) - 0.001) return true
   }
   return false
 }
@@ -53,9 +53,13 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
   const [muted, setMuted] = useState(false)
   const [position, setPosition] = useState(0)
   const [buffered, setBuffered] = useState(0)
+  const [bufferAheadBudget, setBufferAheadBudget] = useState(30 * 60)
 
   const duration = durationMinutes ? durationMinutes * 60 : 0
   const memory = useVideoMemory(videoRef, memoryKey, { duration: duration || null, canSeek: bufferedCovers })
+  const requestedBudget = Math.max(30 * 60, (memory.waitingFrom ?? 0) + 60)
+  // Shrinking this budget after a successful resume would recreate the source at zero.
+  if (requestedBudget > bufferAheadBudget) setBufferAheadBudget(requestedBudget)
 
   useEffect(() => {
     const video = videoRef.current
@@ -88,11 +92,10 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
           {
             enableWorker: true,
             seekType: 'range',
-            // В MPEG-TS нет оглавления: прыгать можно только по уже прочитанной
-            // части файла, поэтому загружаем заметно вперёд — на типичный урок
-            // этого хватает целиком.
+            // Пока paused-видео стоит на нуле, загрузчик должен дойти до
+            // сохранённой позиции даже за пределами обычных 30 минут.
             lazyLoad: true,
-            lazyLoadMaxDuration: 30 * 60,
+            lazyLoadMaxDuration: bufferAheadBudget,
             lazyLoadRecoverDuration: 60,
             // Просмотренное из памяти вычищаем, но с запасом назад
             autoCleanupSourceBuffer: true,
@@ -127,7 +130,7 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
       playerRef.current?.destroy()
       playerRef.current = null
     }
-  }, [src, duration, onFailure])
+  }, [src, duration, onFailure, bufferAheadBudget])
 
   useEffect(() => {
     const video = videoRef.current
@@ -174,7 +177,7 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
 
     const first = video.buffered.start(0)
     const last = video.buffered.end(video.buffered.length - 1)
-    const target = Math.min(Math.max(seconds, first), Math.max(first, last - 0.5))
+    const target = Math.min(Math.max(seconds, first), Math.max(first, last - 0.001))
 
     video.currentTime = target
     setPosition(target)

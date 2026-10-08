@@ -9,6 +9,7 @@ import { TransportStreamPlayer } from './TransportStreamPlayer'
 import { VideoMemoryBar } from './VideoMemoryBar'
 
 type Props = {
+  memoryId?: string
   title: string
   videoUrl: string
   displayMode: 'embed' | 'link'
@@ -84,7 +85,7 @@ function isTransportStream(videoUrl: string): boolean {
  */
 type PlaybackMode = 'native' | 'stream' | 'link'
 
-export function VideoPlayer({ title, videoUrl, displayMode, description, durationMinutes }: Props) {
+export function VideoPlayer({ memoryId, title, videoUrl, displayMode, description, durationMinutes }: Props) {
   const [mode, setMode] = useState<PlaybackMode>(() =>
     isTransportStream(videoUrl) ? 'stream' : 'native',
   )
@@ -95,7 +96,7 @@ export function VideoPlayer({ title, videoUrl, displayMode, description, duratio
   const isYandexDisk = parsePublicResourceUrl(videoUrl) !== null
 
   if (isLessonSource(videoUrl)) {
-    return <LessonVideo key={videoUrl} title={title} videoUrl={videoUrl} description={description} durationMinutes={durationMinutes} />
+    return <LessonVideo memoryId={memoryId} key={videoUrl} title={title} videoUrl={videoUrl} description={description} durationMinutes={durationMinutes} />
   }
 
   if (displayMode === 'link') {
@@ -131,12 +132,12 @@ export function VideoPlayer({ title, videoUrl, displayMode, description, duratio
           <TransportStreamPlayer
             key={videoUrl}
             src={getProxyUrl(videoUrl)}
-            memoryKey={videoUrl}
+            memoryKey={memoryId ?? videoUrl}
             durationMinutes={durationMinutes}
             onFailure={handleStreamFailure}
           />
         ) : (
-          <NativeVideo key={videoUrl} videoUrl={videoUrl} onFailure={handleNativeFailure} />
+          <NativeVideo memoryId={memoryId} key={videoUrl} videoUrl={videoUrl} onFailure={handleNativeFailure} />
         )}
       </div>
     )
@@ -150,7 +151,7 @@ export function VideoPlayer({ title, videoUrl, displayMode, description, duratio
     return (
       <div className="space-y-3">
         <VideoHeading title={title} description={description} durationMinutes={durationMinutes} />
-        <NativeVideo key={videoUrl} videoUrl={videoUrl} direct onFailure={handleStreamFailure} />
+        <NativeVideo memoryId={memoryId} key={videoUrl} videoUrl={videoUrl} direct onFailure={handleStreamFailure} />
       </div>
     )
   }
@@ -172,7 +173,7 @@ export function VideoPlayer({ title, videoUrl, displayMode, description, duratio
   )
 }
 
-function LessonVideo({ title, videoUrl, description, durationMinutes }: Omit<Props, 'displayMode'>) {
+function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }: Omit<Props, 'displayMode'>) {
   const [mode, setMode] = useState<PlaybackMode>(() => isTransportStream(videoUrl) ? 'stream' : 'native')
   const isMedia = new URL(videoUrl, 'https://local.invalid').searchParams.get('source') === 'media'
   const handleStreamFailure = useCallback(() => setMode('link'), [])
@@ -187,20 +188,20 @@ function LessonVideo({ title, videoUrl, description, durationMinutes }: Omit<Pro
       ) : mode === 'stream' ? (
         <TransportStreamPlayer
           src={getProxyUrl(videoUrl)}
-          memoryKey={videoUrl}
+          memoryKey={memoryId ?? videoUrl}
           durationMinutes={durationMinutes}
           onFailure={handleStreamFailure}
         />
       ) : (
-        <NativeVideo videoUrl={videoUrl} direct onFailure={handleNativeFailure} />
+        <NativeVideo memoryId={memoryId} videoUrl={videoUrl} direct onFailure={handleNativeFailure} />
       )}
     </div>
   )
 }
 
-function NativeVideo({ videoUrl, direct = false, onFailure }: { videoUrl: string; direct?: boolean; onFailure: () => void }) {
+function NativeVideo({ memoryId, videoUrl, direct = false, onFailure }: { memoryId?: string; videoUrl: string; direct?: boolean; onFailure: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const memory = useVideoMemory(videoRef, videoUrl)
+  const memory = useVideoMemory(videoRef, memoryId ?? videoUrl)
 
   return (
     <>

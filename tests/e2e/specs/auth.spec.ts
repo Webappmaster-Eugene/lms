@@ -1,4 +1,7 @@
-import { expect, test } from '@playwright/test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { expect, test, type BrowserContext } from '@playwright/test'
 
 import { USERS } from '../fixtures/data'
 import { query, resetTokenOf } from '../fixtures/db'
@@ -59,7 +62,8 @@ test.describe('вход и выход через интерфейс', () => {
     await expect(page).toHaveURL(/\/login\?redirect=%2Fprofile/)
   })
 
-  test('cookie сессии: HttpOnly и SameSite=Lax', async ({ page, context }) => {
+  test('cookie сессии: HttpOnly, SameSite=Lax и срок 30 дней', async ({ page, context }) => {
+    const beforeLogin = Date.now() / 1000
     await page.goto('/login')
     await page.getByLabel('Email').fill(USERS.student.email)
     await page.getByLabel('Пароль').fill(USERS.student.password)
@@ -67,6 +71,47 @@ test.describe('вход и выход через интерфейс', () => {
     await expect(page).toHaveURL((url) => url.pathname === '/')
     const cookie = (await context.cookies()).find((c) => c.name === 'payload-token')
     expect(cookie).toMatchObject({ httpOnly: true, sameSite: 'Lax' })
+    expect(cookie?.expires).toBeGreaterThanOrEqual(beforeLogin + 30 * 24 * 60 * 60 - 1)
+    expect(cookie?.expires).toBeLessThanOrEqual(Date.now() / 1000 + 30 * 24 * 60 * 60)
+  })
+
+  test('вход сохраняется после перезагрузки и закрытия браузера, выход удаляет его', async ({ browser }, testInfo) => {
+    const profile = await mkdtemp(join(tmpdir(), 'lms-auth-session-'))
+    let context: BrowserContext | undefined
+    const openBrowser = () => browser.browserType().launchPersistentContext(profile, {
+      ...testInfo.project.use.launchOptions,
+      channel: testInfo.project.use.channel,
+      baseURL: APP_URL,
+      headless: true,
+    })
+    try {
+      context = await openBrowser()
+      const page = await context.newPage()
+      await page.goto('/login')
+      await expect(page.getByText(/Вход сохраняется на этом устройстве на 30 дней/)).toBeVisible()
+      await page.getByLabel('Email').fill(USERS.student.email)
+      await page.getByLabel('Пароль').fill(USERS.student.password)
+      await page.getByRole('button', { name: 'Войти' }).click()
+      await expect(page).toHaveURL((url) => url.pathname === '/')
+      await page.goto('/profile')
+      await page.reload()
+      await expect(page.getByRole('heading', { name: `${USERS.student.firstName} ${USERS.student.lastName}` })).toBeVisible()
+      await context.close()
+      context = undefined
+
+      context = await openBrowser()
+      const reopened = await context.newPage()
+      await reopened.goto('/profile')
+      await expect(reopened.getByRole('heading', { name: `${USERS.student.firstName} ${USERS.student.lastName}` })).toBeVisible()
+      await reopened.getByRole('button', { name: 'Выйти' }).first().click()
+      await expect(reopened).toHaveURL(/\/login/)
+      expect((await context.cookies()).some(({ name }) => name === 'payload-token')).toBe(false)
+      await reopened.goto('/profile')
+      await expect(reopened).toHaveURL(/\/login\?redirect=%2Fprofile/)
+    } finally {
+      await context?.close()
+      await rm(profile, { recursive: true, force: true })
+    }
   })
 
   test('redirect после входа не уводит на внешний сайт (open redirect)', async ({ page }) => {

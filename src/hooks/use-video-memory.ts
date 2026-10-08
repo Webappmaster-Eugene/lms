@@ -1,5 +1,8 @@
 'use client'
 
+import { learningStorageKey, readLocalLearningPosition, saveLocalLearningPosition, useLessonLearning } from '@/components/lesson/LessonLearningProvider'
+import { newerPosition, type VideoPosition } from '@/lib/learning-state'
+
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 
 import {
@@ -45,6 +48,19 @@ const nativeCanSeek = (video: HTMLVideoElement) => video.readyState >= HTMLMedia
  */
 export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key: string, options: Options = {}) {
   const { duration = null, canSeek = nativeCanSeek } = options
+  const learning = useLessonLearning()
+  const userId = learning?.userId
+  const lessonId = learning?.lessonId
+  const syncReady = learning?.ready ?? true
+  const syncPositions = learning?.positions
+  const syncSave = learning?.save
+  const storageKey = userId && lessonId ? learningStorageKey(userId, lessonId, key) : null
+  const interactedRef = useRef(false)
+  const restoringRef = useRef(false)
+  const observedRef = useRef<VideoPosition | undefined>(undefined)
+  const networkSavedAt = useRef(0)
+  const saveObservedRef = useRef<(seconds: number, ended?: boolean, keepalive?: boolean) => void>(() => undefined)
+  const [waitingFrom, setWaitingFrom] = useState<number | null>(null)
   const [resumedFrom, setResumedFrom] = useState<number | null>(null)
   const [rate, setRateState] = useState(1)
   const pendingRef = useRef<number | null>(null)
@@ -58,10 +74,28 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
     if (!video) return
 
     const href = window.location.href
+    const selectedVideo = new URL(href).searchParams.get('video')
     const fromLink =
-      consumedHref !== href && isPrimary(video) ? parseTimeParam(new URL(href).searchParams.get('t')) : null
-    if (fromLink !== null) consumedHref = href
-    pendingRef.current = fromLink ?? resumeTarget(readPosition(key), duration)
+      consumedHref !== href && (selectedVideo ? selectedVideo === key : isPrimary(video)) ? parseTimeParam(new URL(href).searchParams.get('t')) : null
+    const saved = storageKey ? newerPosition(syncPositions?.[key], readLocalLearningPosition(storageKey)) : undefined
+    pendingRef.current = fromLink ?? (interactedRef.current ? null : storageKey ? (saved && !saved.ended && saved.seconds > 0 ? saved.seconds : null) : resumeTarget(readPosition(key), duration))
+    if (saved && !observedRef.current) observedRef.current = saved
+    let alive = true
+    const persistObserved = (seconds: number, ended = false, keepalive = false) => {
+      if (!storageKey || !syncSave) { if (!ended) savePosition(key, seconds); return }
+      const previous = observedRef.current
+      // A late pause/pagehide from an idle tab keeps the timestamp of the real change.
+      const position = previous && previous.seconds === Math.floor(seconds) && previous.ended === ended
+        ? previous : { seconds: Math.floor(seconds), at: Date.now(), ended }
+      observedRef.current = position
+      saveLocalLearningPosition(storageKey, position)
+      syncSave(key, position, keepalive)
+      networkSavedAt.current = Date.now()
+    }
+    saveObservedRef.current = persistObserved
+    if (syncReady && storageKey && saved && (!syncPositions?.[key] || saved.at > syncPositions[key].at)) {
+      syncSave?.(key, saved)
+    }
     const initialRate = readRate()
     rateRef.current = initialRate
     setRateState(initialRate)
@@ -69,30 +103,58 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
 
     const tryResume = () => {
       const target = pendingRef.current
-      if (target === null || !canSeek(video, target)) return
+      if (!syncReady || target === null) return
+      if (!canSeek(video, target)) { setWaitingFrom(target); return }
+      setWaitingFrom(null)
       pendingRef.current = null
+      restoringRef.current = true
       video.currentTime = target
+      if (fromLink !== null) consumedHref = href
       if (announceRef.current) setResumedFrom(target)
     }
 
     const onTime = () => {
       if (pendingRef.current !== null) return
+      if (!storageKey) interactedRef.current = true
+      if (!interactedRef.current) return
       const t = video.currentTime
+      if (storageKey && (!observedRef.current || observedRef.current.seconds !== Math.floor(t))) {
+        observedRef.current = { seconds: Math.floor(t), at: Date.now(), ended: false }
+      }
       if (Math.abs(t - lastSavedRef.current) < SAVE_EVERY_SECONDS) return
       lastSavedRef.current = t
-      savePosition(key, t)
+      if (storageKey && Date.now() - networkSavedAt.current < 10_000) {
+        if (observedRef.current) saveLocalLearningPosition(storageKey, observedRef.current)
+      } else persistObserved(t)
     }
     const onPause = () => {
-      if (pendingRef.current === null && video.currentTime > 0) savePosition(key, video.currentTime)
+      if (pendingRef.current === null && interactedRef.current) persistObserved(video.currentTime)
     }
     let finished = false
     const onEnded = () => {
       finished = true
+      persistObserved(video.currentTime, true)
       clearPosition(key)
       window.dispatchEvent(new CustomEvent(VIDEO_ENDED_EVENT))
     }
     const onPlay = () => {
+      interactedRef.current = true
       finished = false
+      if (!syncReady) pendingRef.current = null
+    }
+    const onSeeked = () => {
+      if (restoringRef.current) { restoringRef.current = false; return }
+      interactedRef.current = true
+      if (pendingRef.current === null) persistObserved(video.currentTime)
+    }
+    const onPageHide = () => {
+      if (!finished && interactedRef.current && pendingRef.current === null) persistObserved(video.currentTime, false, true)
+    }
+    const onOnline = () => {
+      if (alive && storageKey) {
+        const local = readLocalLearningPosition(storageKey)
+        if (local) syncSave?.(key, local)
+      }
     }
     // Новый источник сбрасывает скорость на 1 — возвращаем выбранную.
     const onMetadata = () => {
@@ -117,6 +179,9 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
       video.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
     }
 
+    window.addEventListener('pagehide', onPageHide)
+    window.addEventListener('online', onOnline)
+    video.addEventListener('seeked', onSeeked)
     window.addEventListener(VIDEO_SEEK_EVENT, onSeek)
     video.addEventListener('loadedmetadata', onMetadata)
     video.addEventListener('progress', tryResume)
@@ -130,7 +195,11 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
 
     return () => {
       // Переход на другой урок посреди просмотра — паузы не будет, фиксируем здесь.
-      if (!finished) onPause()
+      alive = false
+      if (!finished) onPageHide()
+      window.removeEventListener('pagehide', onPageHide)
+      window.removeEventListener('online', onOnline)
+      video.removeEventListener('seeked', onSeeked)
       window.removeEventListener(VIDEO_SEEK_EVENT, onSeek)
       video.removeEventListener('loadedmetadata', onMetadata)
       video.removeEventListener('progress', tryResume)
@@ -141,7 +210,7 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
       video.removeEventListener('play', onPlay)
       video.removeEventListener('ratechange', onRate)
     }
-  }, [videoRef, key, duration, canSeek])
+  }, [videoRef, key, duration, canSeek, storageKey, syncReady, syncPositions, syncSave])
 
   const setRate = useCallback(
     (next: number) => {
@@ -155,11 +224,14 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
 
   const restart = useCallback(() => {
     pendingRef.current = null
+    setWaitingFrom(null)
     clearPosition(key)
     setResumedFrom(null)
     lastSavedRef.current = 0
+    interactedRef.current = true
     if (videoRef.current) videoRef.current.currentTime = 0
-  }, [videoRef, key])
+    if (storageKey) saveObservedRef.current(0)
+  }, [videoRef, key, storageKey])
 
-  return { resumedFrom, restart, rate, setRate }
+  return { resumedFrom, waitingFrom, restart, rate, setRate }
 }

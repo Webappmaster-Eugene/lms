@@ -7,6 +7,8 @@ import { collectAllPages } from '@/lib/paginate'
 import { pluralize } from '@/lib/utils'
 import { streakView } from '@/lib/streak'
 import { loadCourseLessons, relationKey } from '@/lib/course-lessons'
+import { latestLearningResume } from '@/server/learning-state'
+import { formatTime } from '@/lib/video-memory'
 import { nextLesson, recentCourseIds } from '@/lib/roadmap-next-step'
 
 export const metadata: Metadata = {
@@ -172,6 +174,7 @@ export default async function DashboardPage() {
   })
 
   // Продолжить — самый свежий из незаконченных курсов.
+  const exactResume = await latestLearningResume(payload, user)
   const resume = hasStarted ? coursesWithProgress.find((c) => c.next && c.completedCount < c.totalLessons) : undefined
 
   return (
@@ -195,16 +198,17 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {resume?.next && (
+      {(exactResume || resume?.next) && (
         <Link
-          href={`/lessons/${resume.next.slug}`}
+          href={exactResume?.href ?? `/lessons/${resume?.next?.slug}`}
           className="flex flex-col gap-3 rounded-xl border border-primary/40 bg-primary/5 p-4 transition-colors hover:bg-primary/10 sm:flex-row sm:items-center sm:p-5"
         >
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium uppercase tracking-wide text-primary">Продолжить с того места, где остановились</p>
-            <p className="mt-1 truncate font-semibold text-foreground">{resume.next.title}</p>
+            <p className="mt-1 truncate font-semibold text-foreground">{exactResume?.title ?? resume?.next?.title}</p>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {resume.title} · {resume.completedCount}/{resume.totalLessons} уроков
+              {exactResume ? exactResume.course : `${resume?.title} · ${resume?.completedCount}/${resume?.totalLessons} уроков`}
+              {exactResume?.videoTitle && <span className="block mt-1">{exactResume.videoTitle} · {exactResume.ended ? 'Видео досмотрено' : `Остановились на ${formatTime(exactResume.seconds ?? 0)}`}</span>}
             </p>
           </div>
           <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">

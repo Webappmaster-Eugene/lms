@@ -34,6 +34,7 @@ export const ADMIN_NAV_GROUPS = [
     label: 'Прогресс и награды',
     items: [
       { href: '/admin/collections/user-progress', label: 'Прогресс по урокам' },
+      { href: '/admin/collections/lesson-learning-states', label: 'Места остановки учеников' },
       { href: '/admin/collections/certificates', label: 'Сертификаты учеников' },
       { href: '/admin/collections/streaks', label: 'Серии активности' },
       { href: '/admin/collections/achievements', label: 'Достижения' },

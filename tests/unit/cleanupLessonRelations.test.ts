@@ -23,6 +23,7 @@ describe('удаление урока', () => {
     await run(847)
 
     expect(remove.mock.calls.map(([args]) => args.collection)).toEqual([
+      'lesson-learning-states',
       'user-progress',
       'notes',
       'comments',

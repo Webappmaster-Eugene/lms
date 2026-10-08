@@ -25,7 +25,10 @@ function buildResetPasswordEmail(args: ForgotPasswordArgs | undefined) {
 export const Users: CollectionConfig = {
   slug: 'users',
   auth: {
-    tokenExpiration: 60 * 60 * 24 * 7, // 7 дней
+    tokenExpiration: 60 * 60 * 24 * 30, // 30 дней для JWT, cookie и серверной сессии
+    cookies: {
+      secure: new URL(process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000').protocol === 'https:',
+    },
     forgotPassword: {
       // `expiration` не задаём намеренно — см. INVITE_TOKEN_TTL_MS в sendNotification.ts.
       generateEmailSubject: (args) => buildResetPasswordEmail(args).subject,

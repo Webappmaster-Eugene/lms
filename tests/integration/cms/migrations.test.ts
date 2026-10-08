@@ -137,6 +137,22 @@ describe('миграции на чистой базе', () => {
     expect(found.email).toBe('migrations@lms.test')
     await payload.delete({ collection: 'users', id: user.id })
   })
+
+  it('новая история просмотра откатывается и возвращается, сохраняя старые данные', async () => {
+    const latest = migrations.find((migration) => migration.name.endsWith('_lesson_learning_states'))
+    expect(latest).toBeDefined()
+    if (!latest) throw new Error('Миграция истории просмотра не зарегистрирована')
+    const user = await payload.create({ collection: 'users', data: { email: 'resume-migration@lms.test', password: 'Resume-Pass-1', firstName: 'Миграция', lastName: 'Истории', role: 'student' }, context: { skipHooks: true } })
+    const req = await createLocalReq({}, payload)
+    await latest.down({ db: db().drizzle, payload, req } as never)
+    expect(await publicTables()).not.toContain('lesson_learning_states')
+    expect((await payload.findByID({ collection: 'users', id: user.id })).email).toBe(user.email)
+    await latest.up({ db: db().drizzle, payload, req } as never)
+    expect(await publicTables()).toContain('lesson_learning_states')
+    expect(await drift()).toEqual([])
+    await payload.delete({ collection: 'users', id: user.id })
+  })
+
 })
 
 /**

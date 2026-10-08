@@ -121,6 +121,11 @@ export default function LoginPage() {
             'Войти'
           )}
         </button>
+
+        <p className="text-center text-sm text-muted-foreground">
+          Вход сохраняется на этом устройстве на 30 дней. На чужом устройстве
+          нажмите «Выйти» после обучения.
+        </p>
       </form>
     </div>
   )

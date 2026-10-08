@@ -58,7 +58,7 @@ describe('покрытие коллекций', () => {
   it('у каждой коллекции конфига есть фабрика валидных данных', () => {
     const slugs = payload.config.collections.map((c) => c.slug).filter((s) => !INTERNAL_COLLECTIONS.has(s) && !SKIP_COLLECTIONS.has(s))
     expect(slugs.filter((s) => !VALID[s])).toEqual([])
-    expect(slugs.length).toBe(22)
+    expect(slugs.sort()).toEqual(Object.keys(VALID).sort())
   })
 
   it('локализация не включена — у полей нет localized-вариантов', () => {

@@ -27,6 +27,7 @@ function cleanupDependents(
 
 /** Всё, что принадлежит пользователю: прогресс, баллы, достижения, заметки, уведомления */
 export const cleanupUserRelations = cleanupDependents('пользователь', [
+  { collection: 'lesson-learning-states', field: 'user' },
   { collection: 'user-progress', field: 'user' },
   { collection: 'user-trainer-progress', field: 'user' },
   { collection: 'points-transactions', field: 'user' },

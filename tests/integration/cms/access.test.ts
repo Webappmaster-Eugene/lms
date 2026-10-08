@@ -12,7 +12,7 @@ import { createAdmin, createStudent, createSumTask, getTestPayload, login, type 
  */
 type Who = 'anon' | 'owner' | 'other' | 'admin'
 // published — опубликованное видит любой вошедший, черновики — только админ
-type Rule = 'public' | 'auth' | 'published' | 'own' | 'admin' | 'nobody'
+type Rule = 'public' | 'auth' | 'published' | 'own' | 'admin' | 'nobody' | 'member'
 
 type Matrix = { create: Rule; read: Rule; update: Rule; delete: Rule }
 
@@ -28,9 +28,11 @@ const MATRIX: Record<string, Matrix> = {
   sections: PUBLISHABLE,
   lessons: PUBLISHABLE,
   achievements: CONTENT,
+  'interview-rooms': { create: 'nobody', read: 'member', update: 'nobody', delete: 'nobody' },
   'trainer-topics': PUBLISHABLE,
   'trainer-tasks': PUBLISHABLE,
   'faq-items': { create: 'admin', read: 'public', update: 'admin', delete: 'admin' },
+  'lesson-learning-states': { create: 'nobody', read: 'own', update: 'nobody', delete: 'nobody' },
   'user-progress': { create: 'auth', read: 'own', update: 'own', delete: 'admin' },
   'user-achievements': { create: 'admin', read: 'own', update: 'admin', delete: 'admin' },
   'points-transactions': { create: 'admin', read: 'own', update: 'nobody', delete: 'admin' },
@@ -55,9 +57,11 @@ const PATCH: Record<string, Record<string, unknown>> = {
   sections: { order: 7 },
   lessons: { order: 7 },
   achievements: { pointsReward: 7 },
+  'interview-rooms': { title: 'обновлено' },
   'trainer-topics': { order: 7 },
   'trainer-tasks': { order: 7 },
   'faq-items': { order: 7 },
+  'lesson-learning-states': { lastViewedAt: new Date().toISOString() },
   'user-progress': { lastAccessedAt: new Date().toISOString() },
   'user-achievements': { unlockedAt: new Date().toISOString() },
   'points-transactions': { description: 'обновлено' },
@@ -93,6 +97,8 @@ function allowed(rule: Rule, who: Who): boolean {
       return who === 'owner' || who === 'admin'
     case 'admin':
       return who === 'admin'
+    case 'member':
+      return who === 'owner'
     case 'nobody':
       return false
   }

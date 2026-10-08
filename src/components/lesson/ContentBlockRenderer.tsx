@@ -5,6 +5,7 @@ import { MiroEmbed } from './MiroEmbed'
 import { ExternalLinkBlock } from './ExternalLink'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { FileDown } from 'lucide-react'
+import type { LearningVideo } from '@/lib/learning-state'
 import type { Lesson } from '@/payload-types'
 
 type ContentBlock = {
@@ -15,13 +16,14 @@ type ContentBlock = {
 
 type Props = {
   blocks: Array<ContentBlock | NonNullable<Lesson['content']>[number]>
+  learningVideos?: LearningVideo[]
 }
 
 /**
  * Полиморфный рендерер для контент-блоков уроков.
  * Каждый blockType рендерится соответствующим компонентом.
  */
-export function ContentBlockRenderer({ blocks }: Props) {
+export function ContentBlockRenderer({ blocks, learningVideos = [] }: Props) {
   if (!blocks || blocks.length === 0) {
     return (
       <p className="text-center text-muted-foreground py-12">В этом уроке пока нет контента</p>
@@ -30,21 +32,24 @@ export function ContentBlockRenderer({ blocks }: Props) {
 
   return (
     <div className="space-y-6">
-      {blocks.map((block, index) => (
-        <div key={block.id ?? index}>
-          {renderBlock({ ...block })}
-        </div>
-      ))}
+      {blocks.map((block, index) => {
+        const memoryId = learningVideos.find((video) => video.index === index)?.id
+        return (
+          <div key={block.id ?? index} id={memoryId ? `video-${memoryId}` : undefined}>
+            {renderBlock({ ...block }, memoryId)}
+          </div>
+        )
+      })}
     </div>
   )
 }
 
-function renderBlock(block: ContentBlock) {
+function renderBlock(block: ContentBlock, memoryId?: string) {
   switch (block.blockType) {
     case 'text':
       return renderTextBlock(block)
     case 'video':
-      return renderVideoBlock(block)
+      return renderVideoBlock(block, memoryId)
     case 'image':
       return renderImageBlock(block)
     case 'link':
@@ -80,9 +85,10 @@ function renderTextBlock(block: ContentBlock) {
   return null
 }
 
-function renderVideoBlock(block: ContentBlock) {
+function renderVideoBlock(block: ContentBlock, memoryId?: string) {
   return (
     <VideoPlayer
+      memoryId={memoryId}
       title={block.title as string}
       videoUrl={block.videoUrl as string}
       displayMode={(block.displayMode as 'embed' | 'link') ?? 'embed'}

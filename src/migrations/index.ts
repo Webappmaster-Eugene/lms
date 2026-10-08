@@ -9,6 +9,7 @@ import * as migration_20260914_161713_trainer_leetcode from './20260914_161713_t
 import * as migration_20260914_170505_trainer_setup_types from './20260914_170505_trainer_setup_types';
 import * as migration_20260928_220510_bookmarks from './20260928_220510_bookmarks';
 import * as migration_20261005_213201_interview_rooms_and_contacts from './20261005_213201_interview_rooms_and_contacts';
+import * as migration_20261008_095919_lesson_learning_states from './20261008_095919_lesson_learning_states';
 
 export const migrations = [
   {
@@ -64,6 +65,11 @@ export const migrations = [
   {
     up: migration_20261005_213201_interview_rooms_and_contacts.up,
     down: migration_20261005_213201_interview_rooms_and_contacts.down,
-    name: '20261005_213201_interview_rooms_and_contacts'
+    name: '20261005_213201_interview_rooms_and_contacts',
+  },
+  {
+    up: migration_20261008_095919_lesson_learning_states.up,
+    down: migration_20261008_095919_lesson_learning_states.down,
+    name: '20261008_095919_lesson_learning_states'
   },
 ];

@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { formatTime, PLAYBACK_RATES } from '@/lib/video-memory'
 
 type Props = {
+  waitingFrom?: number | null
   resumedFrom: number | null
   restart: () => void
   rate: number
@@ -13,10 +14,11 @@ type Props = {
 }
 
 /** Под плеером: откуда продолжили и скорость — у встроенного плеера Safari и Firefox её нет. */
-export function VideoMemoryBar({ resumedFrom, restart, rate, setRate }: Props) {
+export function VideoMemoryBar({ waitingFrom, resumedFrom, restart, rate, setRate }: Props) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs text-muted-foreground">
       <div className="flex items-center gap-2" aria-live="polite">
+        {waitingFrom !== null && waitingFrom !== undefined && <span>Подготавливаем продолжение с {formatTime(waitingFrom)} — ожидаем загрузку видео</span>}
         {resumedFrom !== null && (
           <>
             <span>Продолжили с {formatTime(resumedFrom)}</span>

@@ -4,6 +4,8 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
+import { LessonLearningProvider } from '@/components/lesson/LessonLearningProvider'
+import { learningVideos } from '@/lib/learning-state'
 import { ContentBlockRenderer } from '@/components/lesson/ContentBlockRenderer'
 import { CompletionButton } from '@/components/lesson/CompletionButton'
 import { LessonNotes } from '@/components/lesson/LessonNotes'
@@ -265,7 +267,11 @@ export default async function LessonPage({ params }: Props) {
         </div>
 
         {/* Контент урока */}
-        <ContentBlockRenderer blocks={blocks} />
+        {user ? (
+          <LessonLearningProvider key={`${user.id}:${lesson.id}`} userId={user.id} lessonId={lesson.id}>
+            <ContentBlockRenderer blocks={blocks} learningVideos={learningVideos(lesson)} />
+          </LessonLearningProvider>
+        ) : <ContentBlockRenderer blocks={blocks} />}
 
         {/* Заметки */}
         <LessonNotes lessonId={lesson.id} />
