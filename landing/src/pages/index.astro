@@ -3,34 +3,51 @@ import Layout from '../layouts/Layout.astro'
 import GuideScreen from '../components/GuideScreen.astro'
 import { CHAPTERS } from '../data/guide'
 import { FAQ } from '../data/faq'
-import { LMS_URL } from '../config'
+import { AUTHOR_URL, LMS_URL } from '../config'
 ---
 <Layout>
   <header class="site-header">
-    <a class="brand" href="#top"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v14c-3-1-6-1-9 1-3-2-6-2-9-1zM12 6v14" /></svg><span>MentorCareer <span class="brand-detail">/ инструкция</span></span></a>
-    <a class="platform-link" href={LMS_URL}>Открыть платформу <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10" /></svg></a>
+    <a class="brand" href="#top"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v14c-3-1-6-1-9 1-3-2-6-2-9-1zM12 6v14" /></svg><span>MentorCareer <span class="brand-detail">Гид по платформе</span></span></a>
+    <nav class="header-links" aria-label="Внешние сайты"><a class="author-link" href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">nadtocheev.ru</a><a class="platform-link" href={LMS_URL} aria-label="Открыть платформу"><span class="platform-text">Открыть платформу</span><span class="platform-text-small" aria-hidden="true">В платформу</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10" /></svg></a></nav>
   </header>
   <div class="guide-layout" id="top">
     <aside class="contents">
       <details open>
-        <summary>В этой инструкции</summary>
-        <nav aria-label="Оглавление инструкции">
+        <summary><span>Оглавление</span><span class="current-section" data-current-section>Быстрый старт</span><svg class="contents-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary>
+        <div class="contents-panel">
+          <form class="toc-search" role="search" data-contents-search>
+          <label class="sr-only" for="contents-search">Найти раздел инструкции</label>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg>
+          <input id="contents-search" type="search" placeholder="Найти раздел" autocomplete="off" aria-controls="guide-contents" />
+          </form>
+          <p class="contents-empty" data-contents-empty role="status" hidden>Ничего не найдено. Попробуйте другое название.</p>
+        <nav id="guide-contents" aria-label="Оглавление инструкции">
           <a href="#overview" data-chapter-link>Быстрый старт</a>
-          {CHAPTERS.map((chapter, i) => <a href={`#${chapter.id}`} data-chapter-link><span aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>{chapter.nav}</a>)}
+          {CHAPTERS.map((chapter, i) => <a href={`#${chapter.id}`} data-chapter-link data-search={`${chapter.nav} ${chapter.title}`}><span aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>{chapter.nav}</a>)}
           <a href="#shortcuts" data-chapter-link>Горячие клавиши</a>
           <a href="#faq" data-chapter-link>Частые вопросы</a>
           <a href="#checklist" data-chapter-link>Чек-лист первого занятия</a>
         </nav>
+        </div>
       </details>
       <p class="contents-note">Читайте по порядку или сразу откройте нужный раздел.</p>
       <a href={LMS_URL} class="contents-platform">learn.mentorcareer.ru</a>
     </aside>
     <main id="main">
       <section class="intro" id="overview" data-chapter>
-        <p class="intro-label">Руководство по учебной платформе</p>
-        <h1>Откройте платформу.<br />Освойтесь.<br />Начните учиться.</h1>
-        <p class="intro-text">От первого входа до решения задач — весь путь на одной странице. С реальными экранами, подсказками и понятным объяснением каждого действия.</p>
-        <div class="actions"><a href="#start" class="button">Начать с первого входа</a><a href={LMS_URL} class="text-link">Перейти в платформу</a></div>
+        <div class="intro-layout">
+          <div class="intro-copy">
+            <h1>Как пользоваться<br />MentorCareer</h1>
+            <p class="intro-text">Освойтесь в платформе и начните первое занятие. Здесь весь путь: от входа в кабинет до отправки решения.</p>
+            <div class="actions"><a href="#start" class="button">Начать знакомство <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></a><a href="#trainer" class="text-link">Сразу к практике</a></div>
+            <a class="mobile-author" href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Сайт автора: nadtocheev.ru</a>
+          </div>
+          <figure class="intro-preview">
+            <div class="preview-toolbar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v14c-3-1-6-1-9 1-3-2-6-2-9-1zM12 6v14" /></svg><span>Ваш учебный кабинет</span></div>
+            <div class="preview-image"><img src="/guide/dashboard.webp" alt="Учебный кабинет с кнопкой продолжения урока и вашим прогрессом" width="1440" height="1000" fetchpriority="high" /></div>
+            <figcaption><span class="preview-check" aria-hidden="true">✓</span><span>Один следующий шаг — и вы снова в обучении.</span><a href="#navigation" aria-label="Узнать, как устроен учебный кабинет"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></a></figcaption>
+          </figure>
+        </div>
         <div class="quick-start">
           <div class="quick-heading"><h2>Ваше первое занятие</h2><p>Четыре действия, чтобы начать</p></div>
           <ol>
@@ -45,13 +62,13 @@ import { LMS_URL } from '../config'
       </section>
       {CHAPTERS.map((chapter, i) => (
         <section class="chapter" id={chapter.id} data-chapter>
-          <div class="chapter-heading"><span class="chapter-number" aria-label={`Раздел ${i + 1}`}>{String(i + 1).padStart(2, '0')}</span><div><h2>{chapter.title}</h2><p>{chapter.intro}</p></div></div>
+          <div class="chapter-heading"><span class="chapter-number" aria-label={`Раздел ${i + 1} из ${CHAPTERS.length}`}>{String(i + 1).padStart(2, '0')}</span><div><h2>{chapter.title}</h2><p>{chapter.intro}</p></div></div>
           <GuideScreen id={chapter.id} screen={chapter.screen} alt={chapter.alt} steps={chapter.steps} mobile={chapter.id === 'mobile'} />
           {chapter.id === 'courses' && <figure class="extra-screen"><img src="/guide/course.webp" alt="Программа курса «Основы веба» с разделом и тремя уроками" width="1440" height="728" loading="lazy" decoding="async" /><figcaption><span>Внутри курса: раскройте раздел, чтобы увидеть уроки, или начните с кнопки «Начать».</span><button type="button" class="static-zoom" data-zoom-static aria-haspopup="dialog">Увеличить</button></figcaption></figure>}
           {chapter.id === 'notes' && <div class="screen-pair"><figure><img src="/guide/notes.webp" alt="Раздел «Заметки» с конспектом к уроку и скачиванием в Markdown" width="1440" height="680" loading="lazy" decoding="async" /><figcaption><span>Все конспекты собраны в «Заметках».</span><button type="button" class="static-zoom" data-zoom-static aria-haspopup="dialog">Увеличить</button></figcaption></figure><figure><img src="/guide/saved.webp" alt="Раздел «Сохранённое» с закладкой урока «Что такое HTML»" width="1440" height="680" loading="lazy" decoding="async" /><figcaption><span>Закладки ждут вас в «Сохранённом».</span><button type="button" class="static-zoom" data-zoom-static aria-haspopup="dialog">Увеличить</button></figcaption></figure></div>}
           {chapter.id === 'trainer' && <div class="run-submit"><div><strong>Запустить</strong><p>Проверить публичные тесты и исправить ошибки</p><kbd>Ctrl / ⌘ + Enter</kbd></div><svg viewBox="0 0 40 24" aria-hidden="true"><path d="M2 12h34M27 3l9 9-9 9" /></svg><div><strong>Отправить</strong><p>Пройти серверную проверку и получить зачёт</p><kbd>Ctrl / ⌘ + Shift + Enter</kbd></div></div>}
           <aside class="tip"><span aria-hidden="true">i</span><p>{chapter.tip}</p></aside>
-          <div class="chapter-details">{chapter.details.map(detail => <div><h3>{detail.title}</h3><p>{detail.text}</p></div>)}</div>
+          <div class="chapter-details">{chapter.details.map(detail => <details><summary>{detail.title}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary><p>{detail.text}</p></details>)}</div>
           <a class="next-chapter" href={i < CHAPTERS.length - 1 ? `#${CHAPTERS[i + 1].id}` : '#shortcuts'}>Дальше: {i < CHAPTERS.length - 1 ? CHAPTERS[i + 1].nav.toLowerCase() : 'горячие клавиши'} <span aria-hidden="true">↓</span></a>
         </section>
       ))}
@@ -83,7 +100,7 @@ import { LMS_URL } from '../config'
         <p class="checklist-progress" role="status">Выполнено <span data-check-count>0</span> из 6</p>
         <a href={LMS_URL} class="button">Открыть платформу и начать</a>
       </section>
-      <footer class="site-footer"><span>MentorCareer · Инструкция по платформе</span><a href={LMS_URL}>learn.mentorcareer.ru</a><a href="#top">К началу страницы</a></footer>
+      <footer class="site-footer"><div><a class="footer-brand" href="#top">MentorCareer</a><p>Инструкция по учебной платформе</p></div><nav aria-label="Ссылки в подвале"><a href={LMS_URL}>Открыть платформу</a><a href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Сайт автора — nadtocheev.ru</a><a href="#top">К началу страницы</a></nav></footer>
     </main>
   </div>
   <dialog class="image-dialog" aria-labelledby="image-dialog-title">
