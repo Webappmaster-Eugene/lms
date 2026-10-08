@@ -1,5 +1,6 @@
 import type { CollectionConfig, PayloadRequest } from 'payload'
 import { validateStudentAvatar } from '@/payload/hooks/validateStudentAvatar'
+import { rejectForeignLoginOrigin } from '@/payload/hooks/rejectForeignLoginOrigin'
 
 import { isAdmin } from '@/payload/access/isAdmin'
 import { auditLearningAccessMode } from '@/payload/hooks/learningAccessMode'
@@ -52,7 +53,7 @@ export const Users: CollectionConfig = {
     group: 'Пользователи',
   },
   hooks: {
-    beforeOperation: [captureRawCollectionPatch, lockSdkAuthOperation],
+    beforeOperation: [rejectForeignLoginOrigin, captureRawCollectionPatch, lockSdkAuthOperation],
     beforeLogin: [normalizeLearningLoginIdentity],
     beforeChange: [lockLearningModeChange, validateStudentAvatar],
     afterChange: [createLearningAccessPolicy, sendInviteEmail, auditLearningAccessMode],

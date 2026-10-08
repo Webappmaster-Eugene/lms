@@ -112,4 +112,29 @@ describe('сохранение авторизации на 30 дней', () => {
     expect((await payload.auth({ headers: new Headers({ Cookie: `payload-token=${token}`, 'Sec-Fetch-Site': 'none' }) })).user?.id).toBe(student.id)
     expect((await payload.auth({ headers: new Headers({ Cookie: `payload-token=${token}`, 'Sec-Fetch-Site': 'cross-site' }) })).user).toBeNull()
   })
+
+  it('чужая multipart-форма не переключает браузер в другой аккаунт, собственная форма сохраняет вход', async () => {
+    const before = await payload.findByID({ collection: 'users', id: student.id })
+    const form = () => {
+      const body = new FormData()
+      body.set('_payload', JSON.stringify({ email: student.email, password: student.password }))
+      return body
+    }
+    const rejected = await handleEndpoints({
+      config,
+      request: new Request('http://lms.test/api/users/login', { method: 'POST', headers: { Origin: 'http://info.lms.test' }, body: form() }),
+    })
+    expect(rejected.status).toBe(403)
+    expect(rejected.headers.get('set-cookie')).toBeNull()
+    expect((await payload.findByID({ collection: 'users', id: student.id })).sessions).toEqual(before.sessions)
+
+    const accepted = await handleEndpoints({
+      config,
+      request: new Request('http://lms.test/api/users/login', { method: 'POST', headers: { Origin: 'http://lms.test' }, body: form() }),
+    })
+    expect(accepted.status).toBe(200)
+    expect(accepted.headers.get('set-cookie')).toContain('payload-token=')
+    const loggedIn = await accepted.json() as { token: string }
+    await handleEndpoints({ config, request: new Request('http://lms.test/api/users/logout', { method: 'POST', headers: { Authorization: `JWT ${loggedIn.token}` } }) })
+  })
 })

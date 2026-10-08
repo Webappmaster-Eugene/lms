@@ -46,5 +46,6 @@ describe('cookie входа: настоящий Payload config и cookie seriali
     expect(expired.includes('; Secure')).toBe(secure)
     expect(expired).toMatch(/^payload-token=;/)
     expect(Date.parse(/Expires=([^;]+)/.exec(expired)?.[1] ?? '')).toBeLessThan(Date.now())
-  })
+  // Cold loading the real CMS config includes all editors and collections; this is not a request-latency test.
+  }, 15000)
 })
