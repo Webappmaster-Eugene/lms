@@ -7,7 +7,7 @@ import { LANDING_URL } from '../fixtures/env'
  * robots.txt, sitemap.xml, 404, якоря меню. Сайт в индексе — ошибка здесь
  * стоит позиций в выдаче, поэтому проверяется то, что видит поисковик.
  */
-const SITE = 'https://promo.mentorcareer.ru'
+const SITE = 'https://info.mentorcareer.ru'
 
 test.use({ baseURL: LANDING_URL })
 
@@ -45,7 +45,7 @@ test('Open Graph и Twitter Card заполнены и указывают на �
   await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary_large_image')
 })
 
-test('JSON-LD валиден: организация, ментор, сайт, курсы и FAQ совпадает с вопросами на странице', async ({ page }) => {
+test('JSON-LD описывает инструкцию и FAQ совпадает с вопросами на странице', async ({ page }) => {
   await page.goto('/')
   const blocks = await page.locator('script[type="application/ld+json"]').allTextContents()
   expect(blocks.length).toBeGreaterThan(0)
@@ -54,7 +54,9 @@ test('JSON-LD валиден: организация, ментор, сайт, к
     return data['@graph'] ?? [data]
   })
   const types = graph.map((node) => node['@type'])
-  expect(types).toEqual(expect.arrayContaining(['EducationalOrganization', 'Person', 'WebSite', 'WebPage', 'Course', 'FAQPage']))
+  expect(types).toEqual(expect.arrayContaining(['WebSite', 'WebPage', 'FAQPage']))
+  expect(types).not.toContain('Person')
+  expect(types).not.toContain('Course')
   for (const node of graph) {
     if (typeof node['@id'] === 'string') expect(node['@id']).toMatch(new RegExp(`^${SITE}/`))
   }

@@ -1,32 +1,95 @@
 ---
 import Layout from '../layouts/Layout.astro'
-import Rail from '../components/Rail.astro'
-import Header from '../components/Header.astro'
-import Hero from '../components/Hero.astro'
-import Diagnosis from '../components/Diagnosis.astro'
-import Mentor from '../components/Mentor.astro'
-import Program from '../components/Program.astro'
-import HowItWorks from '../components/HowItWorks.astro'
-import Platform from '../components/Platform.astro'
-import ForMentors from '../components/ForMentors.astro'
-import Faq from '../components/Faq.astro'
-import ContactCTA from '../components/ContactCTA.astro'
-import Footer from '../components/Footer.astro'
+import GuideScreen from '../components/GuideScreen.astro'
+import { CHAPTERS } from '../data/guide'
+import { FAQ } from '../data/faq'
+import { LMS_URL } from '../config'
 ---
-
 <Layout>
-  <Rail />
-  <Header />
-  <main id="main">
-    <Hero />
-    <Diagnosis />
-    <Mentor />
-    <Program />
-    <HowItWorks />
-    <Platform />
-    <ForMentors />
-    <Faq />
-    <ContactCTA />
-  </main>
-  <Footer />
+  <header class="site-header">
+    <a class="brand" href="#top"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v14c-3-1-6-1-9 1-3-2-6-2-9-1zM12 6v14" /></svg><span>MentorCareer <span class="brand-detail">/ инструкция</span></span></a>
+    <a class="platform-link" href={LMS_URL}>Открыть платформу <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10" /></svg></a>
+  </header>
+  <div class="guide-layout" id="top">
+    <aside class="contents">
+      <details open>
+        <summary>В этой инструкции</summary>
+        <nav aria-label="Оглавление инструкции">
+          <a href="#overview" data-chapter-link>Быстрый старт</a>
+          {CHAPTERS.map((chapter, i) => <a href={`#${chapter.id}`} data-chapter-link><span aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>{chapter.nav}</a>)}
+          <a href="#shortcuts" data-chapter-link>Горячие клавиши</a>
+          <a href="#faq" data-chapter-link>Частые вопросы</a>
+          <a href="#checklist" data-chapter-link>Чек-лист первого занятия</a>
+        </nav>
+      </details>
+      <p class="contents-note">Читайте по порядку или сразу откройте нужный раздел.</p>
+      <a href={LMS_URL} class="contents-platform">learn.mentorcareer.ru</a>
+    </aside>
+    <main id="main">
+      <section class="intro" id="overview" data-chapter>
+        <p class="intro-label">Руководство по учебной платформе</p>
+        <h1>Откройте платформу.<br />Освойтесь.<br />Начните учиться.</h1>
+        <p class="intro-text">От первого входа до решения задач — весь путь на одной странице. С реальными экранами, подсказками и понятным объяснением каждого действия.</p>
+        <div class="actions"><a href="#start" class="button">Начать с первого входа</a><a href={LMS_URL} class="text-link">Перейти в платформу</a></div>
+        <div class="quick-start">
+          <div class="quick-heading"><h2>Ваше первое занятие</h2><p>Четыре действия, чтобы начать</p></div>
+          <ol>
+            <li><a href="#start"><span>1</span><strong>Войдите</strong><small>По приглашению администратора</small></a></li>
+            <li><a href="#roadmaps"><span>2</span><strong>Выберите маршрут</strong><small>Посмотрите следующий шаг</small></a></li>
+            <li><a href="#lessons"><span>3</span><strong>Пройдите урок</strong><small>Отметьте результат и сохраните заметку</small></a></li>
+            <li><a href="#trainer"><span>4</span><strong>Закрепите на практике</strong><small>Проверьте код и отправьте решение</small></a></li>
+          </ol>
+        </div>
+        <div class="reading-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 3 14 9-7 1-3 7z" /></svg><p><strong>Инструкцию можно нажимать.</strong> Выбирайте шаги под скриншотом или метки на нём. «Показать шаги» по очереди выделит нужные элементы. «Увеличить» поможет прочитать мелкие детали.</p></div>
+        <p class="sample-note">На скриншотах — демонстрационный аккаунт и учебные примеры. Названия ваших курсов и количество материалов могут отличаться.</p>
+      </section>
+      {CHAPTERS.map((chapter, i) => (
+        <section class="chapter" id={chapter.id} data-chapter>
+          <div class="chapter-heading"><span class="chapter-number" aria-label={`Раздел ${i + 1}`}>{String(i + 1).padStart(2, '0')}</span><div><h2>{chapter.title}</h2><p>{chapter.intro}</p></div></div>
+          <GuideScreen id={chapter.id} screen={chapter.screen} alt={chapter.alt} steps={chapter.steps} mobile={chapter.id === 'mobile'} />
+          {chapter.id === 'courses' && <figure class="extra-screen"><img src="/guide/course.webp" alt="Программа курса «Основы веба» с разделом и тремя уроками" width="1440" height="728" loading="lazy" decoding="async" /><figcaption><span>Внутри курса: раскройте раздел, чтобы увидеть уроки, или начните с кнопки «Начать».</span><button type="button" class="static-zoom" data-zoom-static aria-haspopup="dialog">Увеличить</button></figcaption></figure>}
+          {chapter.id === 'notes' && <div class="screen-pair"><figure><img src="/guide/notes.webp" alt="Раздел «Заметки» с конспектом к уроку и скачиванием в Markdown" width="1440" height="680" loading="lazy" decoding="async" /><figcaption><span>Все конспекты собраны в «Заметках».</span><button type="button" class="static-zoom" data-zoom-static aria-haspopup="dialog">Увеличить</button></figcaption></figure><figure><img src="/guide/saved.webp" alt="Раздел «Сохранённое» с закладкой урока «Что такое HTML»" width="1440" height="680" loading="lazy" decoding="async" /><figcaption><span>Закладки ждут вас в «Сохранённом».</span><button type="button" class="static-zoom" data-zoom-static aria-haspopup="dialog">Увеличить</button></figcaption></figure></div>}
+          {chapter.id === 'trainer' && <div class="run-submit"><div><strong>Запустить</strong><p>Проверить публичные тесты и исправить ошибки</p><kbd>Ctrl / ⌘ + Enter</kbd></div><svg viewBox="0 0 40 24" aria-hidden="true"><path d="M2 12h34M27 3l9 9-9 9" /></svg><div><strong>Отправить</strong><p>Пройти серверную проверку и получить зачёт</p><kbd>Ctrl / ⌘ + Shift + Enter</kbd></div></div>}
+          <aside class="tip"><span aria-hidden="true">i</span><p>{chapter.tip}</p></aside>
+          <div class="chapter-details">{chapter.details.map(detail => <div><h3>{detail.title}</h3><p>{detail.text}</p></div>)}</div>
+          <a class="next-chapter" href={i < CHAPTERS.length - 1 ? `#${CHAPTERS[i + 1].id}` : '#shortcuts'}>Дальше: {i < CHAPTERS.length - 1 ? CHAPTERS[i + 1].nav.toLowerCase() : 'горячие клавиши'} <span aria-hidden="true">↓</span></a>
+        </section>
+      ))}
+      <section class="chapter" id="shortcuts" data-chapter>
+        <h2>Меньше кликов, больше внимания к материалу</h2>
+        <p class="section-intro">На компьютере эти сочетания помогают быстрее искать, переходить между уроками и проверять код.</p>
+        <div class="shortcut-list">
+          <div><span>Открыть поиск</span><kbd>Ctrl / ⌘ + K</kbd></div>
+          <div><span>Выбрать результат поиска</span><kbd>↑ / ↓, затем Enter</kbd></div>
+          <div><span>Закрыть поиск или панель темы</span><kbd>Esc</kbd></div>
+          <div><span>Соседний урок, вне поля ввода</span><kbd>← / →</kbd></div>
+          <div><span>Сохранить заметку, внутри поля</span><kbd>Ctrl / ⌘ + Enter</kbd></div>
+          <div><span>Запустить тесты, в тренажёре</span><kbd>Ctrl / ⌘ + Enter</kbd></div>
+          <div><span>Отправить решение, в тренажёре</span><kbd>Ctrl / ⌘ + Shift + Enter</kbd></div>
+          <div><span>Открыть справку по клавишам</span><kbd>?</kbd></div>
+        </div>
+      </section>
+      <section class="chapter" id="faq" data-chapter>
+        <h2>Если что-то осталось непонятным</h2>
+        <p class="section-intro">Ответы на вопросы, которые чаще всего возникают в начале обучения.</p>
+        <div class="faq-list">{FAQ.map(({question, answer}) => <details><summary>{question}<span aria-hidden="true">+</span></summary><p>{answer}</p></details>)}</div>
+      </section>
+      <section class="chapter final-chapter" id="checklist" data-chapter>
+        <h2>Готовы к первому занятию?</h2>
+        <p class="section-intro">Отметьте действия, которые уже сделали. Этот список — ваша памятка в текущем браузере.</p>
+        <fieldset class="checklist"><legend class="sr-only">Чек-лист первого занятия</legend>
+          {['Войти в свой аккаунт', 'Открыть роадмап и найти следующий шаг', 'Изучить первый урок', 'Сохранить заметку с главными выводами', 'Нажать «Отметить пройденным»', 'Решить подходящую задачу и нажать «Отправить»'].map((label, i) => <label><input type="checkbox" data-check={i} /><span>{label}</span></label>)}
+        </fieldset>
+        <p class="checklist-progress" role="status">Выполнено <span data-check-count>0</span> из 6</p>
+        <a href={LMS_URL} class="button">Открыть платформу и начать</a>
+      </section>
+      <footer class="site-footer"><span>MentorCareer · Инструкция по платформе</span><a href={LMS_URL}>learn.mentorcareer.ru</a><a href="#top">К началу страницы</a></footer>
+    </main>
+  </div>
+  <dialog class="image-dialog" aria-labelledby="image-dialog-title">
+    <div class="dialog-toolbar"><h2 id="image-dialog-title">Скриншот платформы</h2><button type="button" data-close-dialog>Закрыть <span aria-hidden="true">×</span></button></div>
+    <div class="dialog-image-scroll"><img alt="" /></div>
+    <p data-dialog-description></p>
+  </dialog>
+  <script src="../scripts/guide.ts"></script>
 </Layout>

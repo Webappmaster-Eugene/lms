@@ -1,244 +1,58 @@
 ---
 import '../styles/global.css'
-import {
-  SITE_URL,
-  AUTHOR_URL,
-  TELEGRAM_URL,
-  CHAT_URL,
-  EMAIL,
-  YANDEX_VERIFICATION,
-  GOOGLE_VERIFICATION,
-} from '../config'
+import { SITE_URL } from '../config'
 import { FAQ } from '../data/faq'
 
 interface Props {
   title?: string
   description?: string
-  /** Служебные страницы (404) не должны попадать в индекс. */
   noindex?: boolean
 }
 
-// Title до ~65 символов, description до ~160: длиннее и Google, и Яндекс
-// обрезают сниппет, а ключевые слова должны остаться в видимой части.
 const {
-  title = 'Менторство по Frontend и Backend с трудоустройством | MentorCareer',
-  description = 'Индивидуальное менторство по Frontend (React, TypeScript, Next.js) и Backend (Node.js, NestJS): до оффера обычно за 4–5 месяцев, оплата после трудоустройства.',
+  title = 'Как пользоваться платформой обучения | MentorCareer',
+  description = 'Подробная инструкция MentorCareer: вход, роадмапы, курсы, уроки, заметки и тренажёр. Скриншоты с подсказками помогут пройти путь от первого входа до практики.',
   noindex = false,
 } = Astro.props
-
 const canonicalUrl = new URL(Astro.url.pathname, SITE_URL).href
 const ogImage = new URL('/og.png', SITE_URL).href
-const mentorImage = new URL('/mentor.jpg', SITE_URL).href
-const buildDate = new Date().toISOString().slice(0, 10)
-
-const ORG_ID = `${SITE_URL}/#organization`
-const PERSON_ID = `${SITE_URL}/#mentor`
-const WEBSITE_ID = `${SITE_URL}/#website`
-
-// Связанный граф с @id вместо разрозненных сущностей: так поисковики и
-// нейросети склеивают организацию, ментора и курсы в одну карточку знаний.
-const course = (name: string, description: string, teaches: string[]) => ({
-  '@type': 'Course',
-  name,
-  description,
-  teaches,
-  inLanguage: 'ru',
-  educationalLevel: 'Beginner',
-  provider: { '@id': ORG_ID },
-  hasCourseInstance: {
-    '@type': 'CourseInstance',
-    courseMode: 'online',
-    instructor: { '@id': PERSON_ID },
-  },
-})
-
 const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': [
-    {
-      '@type': 'EducationalOrganization',
-      '@id': ORG_ID,
-      name: 'MentorCareer',
-      url: SITE_URL,
-      description,
-      email: EMAIL,
-      founder: { '@id': PERSON_ID },
-      address: { '@type': 'PostalAddress', addressLocality: 'Москва', addressCountry: 'RU' },
-      areaServed: { '@type': 'Country', name: 'Россия' },
-      contactPoint: {
-        '@type': 'ContactPoint',
-        contactType: 'customer support',
-        email: EMAIL,
-        url: TELEGRAM_URL,
-        availableLanguage: 'ru',
-      },
-      sameAs: [CHAT_URL, AUTHOR_URL],
-    },
-    {
-      '@type': 'Person',
-      '@id': PERSON_ID,
-      name: 'Евгений Надточеев',
-      jobTitle: 'Fullstack-разработчик, ментор',
-      url: AUTHOR_URL,
-      image: mentorImage,
-      worksFor: { '@id': ORG_ID },
-      knowsAbout: [
-        'React', 'TypeScript', 'Next.js', 'Node.js', 'NestJS', 'Go',
-        'PostgreSQL', 'Redis', 'Kafka', 'Kubernetes', 'Docker',
-      ],
-      sameAs: [AUTHOR_URL, TELEGRAM_URL],
-    },
-    {
-      '@type': 'WebSite',
-      '@id': WEBSITE_ID,
-      name: 'MentorCareer',
-      url: SITE_URL,
-      inLanguage: 'ru',
-      publisher: { '@id': ORG_ID },
-    },
-    {
-      '@type': 'WebPage',
-      '@id': `${canonicalUrl}#webpage`,
-      url: canonicalUrl,
-      name: title,
-      description,
-      inLanguage: 'ru',
-      isPartOf: { '@id': WEBSITE_ID },
-      about: { '@id': ORG_ID },
-      primaryImageOfPage: { '@type': 'ImageObject', url: ogImage, width: 1200, height: 630 },
-      dateModified: buildDate,
-    },
-    course(
-      'Frontend-разработчик на React',
-      'Менторский трек Frontend-разработки: React, TypeScript, Next.js — от основ до production-уровня. Компоненты, хуки, SSR, тестирование.',
-      ['React', 'TypeScript', 'Next.js', 'Tailwind CSS', 'Jest'],
-    ),
-    course(
-      'Backend-разработчик на Node.js',
-      'Менторский трек Backend-разработки: Node.js, NestJS, PostgreSQL — серверная архитектура, API, базы данных, деплой и мониторинг.',
-      ['Node.js', 'NestJS', 'PostgreSQL', 'Docker', 'Kubernetes'],
-    ),
-    {
-      '@type': 'FAQPage',
-      '@id': `${canonicalUrl}#faq`,
-      isPartOf: { '@id': `${canonicalUrl}#webpage` },
-      mainEntity: FAQ.map((item) => ({
-        '@type': 'Question',
-        name: item.question,
-        acceptedAnswer: { '@type': 'Answer', text: item.answer },
-      })),
-    },
+    { '@type': 'WebSite', '@id': `${SITE_URL}/#website`, name: 'MentorCareer — инструкция', url: SITE_URL, inLanguage: 'ru' },
+    { '@type': 'WebPage', '@id': `${canonicalUrl}#webpage`, name: title, description, url: canonicalUrl, inLanguage: 'ru', isPartOf: { '@id': `${SITE_URL}/#website` } },
+    { '@type': 'FAQPage', '@id': `${SITE_URL}/#faq`, mainEntity: FAQ.map(({ question, answer }) => ({ '@type': 'Question', name: question, acceptedAnswer: { '@type': 'Answer', text: answer } })) },
   ],
 }
 ---
-
 <!doctype html>
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <meta
-      name="robots"
-      content={noindex ? 'noindex, follow' : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'}
-    />
-    <meta name="author" content="Евгений Надточеев" />
-    <meta name="theme-color" content="#0b0b0c" />
-    {YANDEX_VERIFICATION && <meta name="yandex-verification" content={YANDEX_VERIFICATION} />}
-    {GOOGLE_VERIFICATION && <meta name="google-site-verification" content={GOOGLE_VERIFICATION} />}
+    <meta name="robots" content={noindex ? 'noindex, follow' : 'index, follow'} />
+    <link rel="canonical" href={canonicalUrl} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    {!noindex && <link rel="canonical" href={canonicalUrl} />}
-
-    <!-- Шрифты самохостятся: ни одного запроса к внешним доменам -->
-    <link rel="preload" href="/fonts/golos-text-400-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/golos-text-800-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
-
-    <!-- Open Graph: превью в Telegram, VK и сниппетах Яндекса -->
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="ru_RU" />
-    <meta property="og:url" content={canonicalUrl} />
-    <meta property="og:site_name" content="MentorCareer" />
+    <meta property="og:site_name" content="MentorCareer — инструкция" />
     <meta property="og:image" content={ogImage} />
-    <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="MentorCareer — из нуля до оффера в IT за 6–7 месяцев" />
-
-    <!-- Twitter Card -->
+    <meta property="og:image:alt" content="Инструкция по платформе MentorCareer" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
-
-    <!-- Ставится до первой отрисовки: без JS класса нет и весь контент
-         виден сразу, с JS — включается появление при прокрутке. -->
-    <script is:inline>
-      document.documentElement.classList.add('js')
-    </script>
-
     {!noindex && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
   </head>
   <body>
-    <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:bg-accent focus:px-4 focus:py-2 focus:font-mono focus:text-xs focus:text-ground">
-      К содержимому
-    </a>
+    <a href="#main" class="skip-link">К содержимому</a>
     <slot />
-
-    <script>
-      // Единственный JS на странице: проявление блоков и подсветка рельса.
-      // Уважает prefers-reduced-motion и не ломает страницу без поддержки IO.
-      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-      const revealTargets = document.querySelectorAll<HTMLElement>('[data-reveal]')
-      if (reduced || !('IntersectionObserver' in window)) {
-        revealTargets.forEach((el) => el.classList.add('is-in'))
-      } else {
-        const revealObserver = new IntersectionObserver(
-          (entries) => {
-            for (const entry of entries) {
-              if (!entry.isIntersecting) continue
-              entry.target.classList.add('is-in')
-              revealObserver.unobserve(entry.target)
-            }
-          },
-          { rootMargin: '0px 0px -12% 0px', threshold: 0.08 },
-        )
-        revealTargets.forEach((el) => revealObserver.observe(el))
-      }
-
-      // Подсветка активной метки левого рельса по текущей секции.
-      const marks = document.querySelectorAll<HTMLAnchorElement>('[data-rail-mark]')
-      // Пустая строка в querySelector бросает SyntaxError, поэтому
-      // отсеиваем метки без href до запроса, а не после.
-      const sections = Array.from(marks)
-        .map((mark) => mark.getAttribute('href'))
-        .filter((href): href is string => href !== null && href.startsWith('#') && href.length > 1)
-        .map((href) => document.querySelector<HTMLElement>(href))
-        .filter((el): el is HTMLElement => el !== null)
-
-      if (sections.length > 0 && 'IntersectionObserver' in window) {
-        const setActive = (id: string) => {
-          marks.forEach((mark) => {
-            mark.dataset.active = String(mark.getAttribute('href') === `#${id}`)
-          })
-        }
-
-        const spy = new IntersectionObserver(
-          (entries) => {
-            // Берём самую верхнюю из видимых секций — иначе активными
-            // мигают сразу две на границе прокрутки.
-            const visible = entries
-              .filter((e) => e.isIntersecting)
-              .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
-            if (visible[0]) setActive(visible[0].target.id)
-          },
-          { rootMargin: '-45% 0px -45% 0px' },
-        )
-        sections.forEach((section) => spy.observe(section))
-      }
-    </script>
   </body>
 </html>

@@ -33,6 +33,13 @@ test('заголовки безопасности на месте', async ({ req
 })
 
 test('лендинг отвечает, несуществующая страница лендинга — 404', async ({ request }) => {
-  expect((await request.get('https://promo.mentorcareer.ru/')).status()).toBe(200)
-  expect((await request.get('https://promo.mentorcareer.ru/net-takoy-stranicy')).status()).toBe(404)
+  expect((await request.get('https://info.mentorcareer.ru/')).status()).toBe(200)
+  expect((await request.get('https://info.mentorcareer.ru/net-takoy-stranicy')).status()).toBe(404)
+})
+
+
+test('старый домен инструкции перенаправляет на новый с сохранением адреса', async ({ request }) => {
+  const response = await request.get('https://promo.mentorcareer.ru/example?from=old', { maxRedirects: 0 })
+  expect(response.status()).toBe(301)
+  expect(response.headers().location).toBe('https://info.mentorcareer.ru/example?from=old')
 })

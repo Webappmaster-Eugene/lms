@@ -1,0 +1,42 @@
+---
+import type { GuideStep } from '../data/guide'
+import screens from '../data/screens.json'
+
+interface Props {
+  id: string
+  screen: string
+  alt: string
+  steps: GuideStep[]
+  mobile?: boolean
+}
+const { id, screen, alt, steps, mobile = false } = Astro.props
+const size = Object.entries(screens).find(([name]) => name === screen)?.[1]
+if (!size) throw new Error(`Screenshot dimensions missing: ${screen}`)
+---
+<div class:list={['walkthrough', { 'walkthrough-mobile': mobile }]} data-walkthrough>
+  <div class="screen-toolbar">
+    <span>Показываем на экране</span>
+    <div class="screen-actions">
+      <button type="button" class="play-guide" data-play aria-pressed="false"><span aria-hidden="true">▷</span> Показать шаги</button>
+      <button type="button" class="zoom-guide" data-zoom aria-haspopup="dialog">Увеличить</button>
+    </div>
+  </div>
+  <div class="screen-image">
+    <img src={`/guide/${screen}.webp`} alt={alt} width={size.width} height={size.height} loading="lazy" decoding="async" />
+    {steps.map((step, i) => (
+      <button type="button" class="hotspot" data-hotspot={i} data-active={i === 0 ? 'true' : 'false'} style={`--x:${step.x}%;--y:${step.y}%`} aria-label={`Шаг ${i + 1}: ${step.title}`} aria-pressed={i === 0 ? 'true' : 'false'} aria-describedby={`${id}-step-${i}`}>
+        <span>{i + 1}</span>
+        <svg class="pointer-arrow" viewBox="0 0 50 52" aria-hidden="true"><path d="M4 3 Q39 3 39 37 M29 28 L39 39 L48 28" /></svg>
+      </button>
+    ))}
+  </div>
+  <ol class="screen-steps" aria-label="Пошаговое объяснение">
+    {steps.map((step, i) => (
+      <li data-step={i} data-active={i === 0 ? 'true' : 'false'}>
+        <button type="button" data-select={i} aria-pressed={i === 0 ? 'true' : 'false'}><span class="step-number" aria-hidden="true">{i + 1}</span>{step.title}</button>
+        <p id={`${id}-step-${i}`}>{step.text}</p>
+      </li>
+    ))}
+  </ol>
+  <p class="guide-status sr-only" role="status" aria-live="polite"></p>
+</div>

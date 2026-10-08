@@ -1,0 +1,54 @@
+{
+  "course": {
+    "width": 1440,
+    "height": 728
+  },
+  "courses": {
+    "width": 1440,
+    "height": 680
+  },
+  "dashboard": {
+    "width": 1440,
+    "height": 1000
+  },
+  "help": {
+    "width": 1440,
+    "height": 934
+  },
+  "lesson-notes": {
+    "width": 1440,
+    "height": 1000
+  },
+  "lesson": {
+    "width": 1440,
+    "height": 876
+  },
+  "login": {
+    "width": 1440,
+    "height": 1000
+  },
+  "mobile": {
+    "width": 390,
+    "height": 844
+  },
+  "notes": {
+    "width": 1440,
+    "height": 680
+  },
+  "profile": {
+    "width": 1440,
+    "height": 1000
+  },
+  "roadmap": {
+    "width": 1440,
+    "height": 1000
+  },
+  "saved": {
+    "width": 1440,
+    "height": 680
+  },
+  "trainer": {
+    "width": 1440,
+    "height": 1000
+  }
+}

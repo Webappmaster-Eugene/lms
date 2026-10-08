@@ -20,7 +20,7 @@ export async function Footer() {
   const external = [
     { href: contacts.telegramChannel, label: 'Telegram-канал', blank: true },
     { href: contacts.telegramGroup, label: 'Чат учеников', blank: true },
-    { href: PROMO_URL, label: 'О платформе', blank: true },
+    { href: PROMO_URL, label: 'Инструкция по платформе', blank: true },
     { href: contacts.website || AUTHOR_URL, label: 'Сайт автора', blank: true },
     ...(contacts.links ?? []).map((contact) => ({ href: contact.url, label: contact.title, blank: true })),
     // Почтовый клиент открывается на месте, новая вкладка останется пустой.
