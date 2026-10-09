@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
+vi.mock('next/navigation', () => ({ usePathname: () => window.location.pathname, useSearchParams: () => new URLSearchParams(window.location.search) }))
+
 vi.mock('react-markdown', async () => (await import('../helpers/component-mocks')).markdownMock())
 vi.mock('remark-gfm', () => ({ default: () => {} }))
 vi.mock('rehype-raw', () => ({ default: () => {} }))

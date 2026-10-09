@@ -20,6 +20,7 @@ import { collectAllPages } from '@/lib/paginate'
 import { relationKey } from '@/lib/course-lessons'
 import { lessonPosition, orderCourseLessons, type LessonPosition } from '@/lib/roadmap-next-step'
 import { protectLessonVideoSources } from '@/lib/lesson-video-source'
+import { ShareButton } from '@/components/ui/ShareButton'
 import { getLearningAccess } from '@/server/learning-access'
 import { recordLearningAccess } from '@/lib/learning-observability'
 
@@ -300,6 +301,7 @@ export default async function LessonPage({ params }: Props) {
         <div className="space-y-2">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <h1 className="text-xl font-bold text-foreground sm:text-2xl">{lesson.title}</h1>
+            <ShareButton title={lesson.title} />
             {user?.role === 'admin' && <Link href={`/manage/lessons/${lesson.id}`} className="inline-flex min-h-[44px] items-center rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">Редактировать урок</Link>}
             {user && <BookmarkButton target={{ lesson: lesson.id }} initialId={bookmarkId} />}
           </div>

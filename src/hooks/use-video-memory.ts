@@ -4,6 +4,8 @@ import { learningStorageKey, readLocalLearningPosition, saveLocalLearningPositio
 import { newerPosition, type VideoPosition } from '@/lib/learning-state'
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { sharedPlaybackRate, sharedVideoId } from '@/lib/shared-url'
 
 import {
   clearPosition,
@@ -16,13 +18,6 @@ import {
   VIDEO_ENDED_EVENT,
   VIDEO_SEEK_EVENT,
 } from '@/lib/video-memory'
-
-/**
- * Метку `?t=` забирает первое видео страницы, один раз на адрес: иначе
- * перерисовка плеера снова прыгала бы на метку, а переход по SPA к другой
- * метке — наоборот, игнорировался бы.
- */
-let consumedHref: string | null = null
 
 /** Основное видео урока — первое на странице: к нему относятся метки из заметок. */
 const isPrimary = (video: HTMLVideoElement) => document.querySelector('video') === video
@@ -48,6 +43,7 @@ const nativeCanSeek = (video: HTMLVideoElement) => video.readyState >= HTMLMedia
  */
 export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key: string, options: Options = {}) {
   const { duration = null, canSeek = nativeCanSeek } = options
+  const search = useSearchParams().toString()
   const learning = useLessonLearning()
   const userId = learning?.userId
   const lessonId = learning?.lessonId
@@ -64,6 +60,8 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
   const [resumedFrom, setResumedFrom] = useState<number | null>(null)
   const [rate, setRateState] = useState(1)
   const pendingRef = useRef<number | null>(null)
+  const linkRequestRef = useRef<{ token: string; applied: boolean } | null>(null)
+  const restoredRef = useRef(false)
   // «Продолжили с …» — только про возврат к месту остановки, не про переход по метке заметки.
   const announceRef = useRef(true)
   const lastSavedRef = useRef(0)
@@ -74,11 +72,18 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
     if (!video) return
 
     const href = window.location.href
-    const selectedVideo = new URL(href).searchParams.get('video')
-    const fromLink =
-      consumedHref !== href && (selectedVideo ? selectedVideo === key : isPrimary(video)) ? parseTimeParam(new URL(href).searchParams.get('t')) : null
+    const params = new URLSearchParams(search)
+    const selectedVideo = params.get('video')
+    const targetsThisVideo = selectedVideo ? selectedVideo === key : isPrimary(video)
+    const linkedTime = targetsThisVideo ? parseTimeParam(params.get('t')) : null
+    const token = `${new URL(href).pathname}:${key}:${linkedTime}`
+    if (linkedTime !== null && linkRequestRef.current?.token !== token) {
+      linkRequestRef.current = { token, applied: false }
+      announceRef.current = false
+    }
+    const fromLink = linkedTime !== null && !linkRequestRef.current?.applied ? linkedTime : null
     const saved = storageKey ? newerPosition(syncPositions?.[key], readLocalLearningPosition(storageKey)) : undefined
-    pendingRef.current = fromLink ?? (interactedRef.current ? null : storageKey ? (saved && !saved.ended && saved.seconds > 0 ? saved.seconds : null) : resumeTarget(readPosition(key), duration))
+    pendingRef.current = linkedTime !== null ? fromLink : (interactedRef.current || restoredRef.current ? null : storageKey ? (saved && !saved.ended && saved.seconds > 0 ? saved.seconds : null) : resumeTarget(readPosition(key), duration))
     if (saved && !observedRef.current) observedRef.current = saved
     let alive = true
     const persistObserved = (seconds: number, ended = false, keepalive = false) => {
@@ -96,20 +101,23 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
     if (syncReady && storageKey && saved && (!syncPositions?.[key] || saved.at > syncPositions[key].at)) {
       syncSave?.(key, saved)
     }
-    const initialRate = readRate()
+    const initialRate = (targetsThisVideo ? sharedPlaybackRate(params.get('rate')) : null) ?? readRate()
     rateRef.current = initialRate
     setRateState(initialRate)
     video.playbackRate = initialRate
 
     const tryResume = () => {
-      const target = pendingRef.current
-      if (!syncReady || target === null) return
+      const requested = pendingRef.current
+      if (!syncReady || requested === null) return
+      const length = duration ?? (Number.isFinite(video.duration) ? video.duration : null)
+      const target = length && length > 0 ? Math.min(requested, Math.max(0, length - 0.001)) : requested
       if (!canSeek(video, target)) { setWaitingFrom(target); return }
       setWaitingFrom(null)
       pendingRef.current = null
       restoringRef.current = true
+      restoredRef.current = true
       video.currentTime = target
-      if (fromLink !== null) consumedHref = href
+      if (fromLink !== null && linkRequestRef.current) linkRequestRef.current.applied = true
       if (announceRef.current) setResumedFrom(target)
     }
 
@@ -167,6 +175,15 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
       rateRef.current = video.playbackRate
       setRateState(video.playbackRate)
       saveRate(video.playbackRate)
+      const url = new URL(window.location.href)
+      const id = sharedVideoId(key)
+      const nextRate = sharedPlaybackRate(String(video.playbackRate))
+      if (nextRate !== null) {
+        if (id) url.searchParams.set('video', id)
+        else if (!isPrimary(video)) return
+        url.searchParams.set('rate', String(nextRate))
+        window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+      }
     }
 
     const onSeek = (event: Event) => {
@@ -210,7 +227,7 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
       video.removeEventListener('play', onPlay)
       video.removeEventListener('ratechange', onRate)
     }
-  }, [videoRef, key, duration, canSeek, storageKey, syncReady, syncPositions, syncSave])
+  }, [videoRef, key, duration, canSeek, storageKey, syncReady, syncPositions, syncSave, search])
 
   const setRate = useCallback(
     (next: number) => {
@@ -218,12 +235,21 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
       setRateState(next)
       saveRate(next)
       if (videoRef.current) videoRef.current.playbackRate = next
+      if (sharedPlaybackRate(String(next)) !== null) {
+        const url = new URL(window.location.href)
+        const id = sharedVideoId(key)
+        if (id) url.searchParams.set('video', id)
+        else if (!videoRef.current || !isPrimary(videoRef.current)) return
+        url.searchParams.set('rate', String(next))
+        window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+      }
     },
-    [videoRef],
+    [videoRef, key],
   )
 
   const restart = useCallback(() => {
     pendingRef.current = null
+    if (linkRequestRef.current) linkRequestRef.current.applied = true
     setWaitingFrom(null)
     clearPosition(key)
     setResumedFrom(null)

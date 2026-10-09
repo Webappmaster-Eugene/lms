@@ -7,6 +7,7 @@ import { updateStreak } from '@/payload/hooks/updateStreak'
 import { lockUserProgress } from '@/payload/hooks/lockUserProgress'
 import { awardTrainerPoints } from '@/payload/hooks/awardTrainerPoints'
 import { LANGUAGE_OPTIONS, TRAINER_LIMITS } from '@/lib/trainer/constants'
+import { lockStudentDomainOwner, recordStudentDomainEvent } from '@/server/student-analytics'
 
 export const UserTrainerProgress: CollectionConfig = {
   slug: 'user-trainer-progress',
@@ -33,8 +34,9 @@ export const UserTrainerProgress: CollectionConfig = {
         }
         return data
       },
+      lockStudentDomainOwner,
     ],
-    afterChange: [awardTrainerPoints, updateStreak, checkAchievements],
+    afterChange: [awardTrainerPoints, updateStreak, checkAchievements, recordStudentDomainEvent],
   },
   fields: [
     {

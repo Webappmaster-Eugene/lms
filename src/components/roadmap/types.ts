@@ -62,4 +62,8 @@ export type RoadmapGraphProps = {
   /** Тема со следующим шагом ученика — к ней ведёт кнопка «К моему шагу». */
   nextStepNodeId?: string | null
   managementRoadmapId?: number
+  selectedTopic?: string | null
+  onTopicChange?: (topic: string | null) => void
+  searchQuery?: string
+  onSearchQueryChange?: (query: string) => void
 }

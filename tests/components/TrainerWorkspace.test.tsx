@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createElement, type FunctionComponent } from 'react'
+import { navigationURL, setNavigationURL } from '../helpers/url-navigation'
 import userEvent from '@testing-library/user-event'
 
 const toast = vi.fn()
 const refresh = vi.fn()
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh, push: vi.fn() }) }))
+vi.mock('next/navigation', async () => { const mock = (await import('../helpers/url-navigation')).urlNavigationMock(); return { ...mock, useRouter: () => ({ ...mock.useRouter(), refresh }) } })
 vi.mock('@/components/ui/Toast', () => ({ useToast: () => ({ toast }) }))
 vi.mock('@monaco-editor/react', async () => (await import('../helpers/component-mocks')).monacoMock())
 vi.mock('react-markdown', async () => (await import('../helpers/component-mocks')).markdownMock())
@@ -92,6 +93,7 @@ describe('рабочее место тренажёра', () => {
   })
 
   beforeEach(() => {
+    setNavigationURL('/trainer/tasks/sum')
     vi.clearAllMocks()
     window.localStorage.clear()
     monacoCommands.clear()
@@ -127,6 +129,15 @@ describe('рабочее место тренажёра', () => {
   })
 
   describe('смена языка', () => {
+    it('явный lang из ссылки важнее прежнего языка, а решение не попадает в URL', async () => {
+      setNavigationURL('/trainer/tasks/sum?lang=ts&keep=ok')
+      render(<TrainerWorkspace task={task} progress={{ ...progress, savedCode: 'private js solution', savedLanguage: 'js' }} />)
+      expect(await screen.findByTestId('monaco')).toHaveValue(task.starters.ts)
+      await userEvent.click(screen.getByRole('button', { name: 'JavaScript' }))
+      expect(navigationURL()).toBe('/trainer/tasks/sum?lang=js&keep=ok')
+      expect(await screen.findByTestId('monaco')).toHaveValue('private js solution')
+      expect(navigationURL()).not.toContain('solution')
+    })
     it('предлагаются только языки задачи', () => {
       render(<TrainerWorkspace task={task} progress={progress} />)
 

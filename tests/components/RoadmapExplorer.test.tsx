@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+
+vi.mock('next/navigation', async () => (await import('../helpers/url-navigation')).urlNavigationMock())
 
 vi.mock('next/link', async () => (await import('../helpers/component-mocks')).linkMock())
 vi.mock('@xyflow/react', async () => (await import('../helpers/component-mocks')).xyflowMock())
@@ -10,6 +12,8 @@ const { RoadmapGraph } = await import('@/components/roadmap/RoadmapGraph')
 const { RoadmapNodePanel } = await import('@/components/roadmap/RoadmapNodePanel')
 const { RoadmapTopicList, groupTopicsByStage } = await import('@/components/roadmap/RoadmapTopicList')
 const { RoadmapExplorer } = await import('@/components/roadmap/RoadmapExplorer')
+
+import { navigationRouter, navigationURL, setNavigationURL } from '../helpers/url-navigation'
 
 import type { GraphNode, NodeCourse, RoadmapNodeData } from '@/components/roadmap/types'
 
@@ -59,6 +63,7 @@ function node(id: string, overrides: Partial<RoadmapNodeData> = {}, position = {
 beforeEach(() => {
   vi.clearAllMocks()
   window.localStorage.clear()
+  setNavigationURL('/roadmaps/frontend')
 })
 
 describe('панель темы', () => {
@@ -232,11 +237,12 @@ describe('переключение вида', () => {
     await userEvent.click(screen.getByRole('tab', { name: /Список по этапам/ }))
 
     expect(screen.queryByTestId('react-flow')).not.toBeInTheDocument()
-    expect(window.localStorage.getItem('roadmap-view')).toBe('list')
+    expect(navigationURL()).toContain('view=list')
   })
 
-  it('сохранённый вид открывается сразу', () => {
-    window.localStorage.setItem('roadmap-view', 'list')
+  it('вид из ссылки важнее прежнего выбора устройства', () => {
+    window.localStorage.setItem('roadmap-view', 'map')
+    setNavigationURL('/roadmaps/frontend?view=list')
     render(<RoadmapExplorer nodes={nodes} edges={[]} looseCourses={[]} nextStepNodeId={null} />)
 
     expect(screen.getByRole('tab', { name: /Список по этапам/ })).toHaveAttribute('aria-selected', 'true')
@@ -247,5 +253,20 @@ describe('переключение вида', () => {
 
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
     expect(screen.getByText('Курсы роадмапа')).toBeInTheDocument()
+  })
+
+  it('прямая ссылка раскрывает тему; назад восстанавливает список и тему', async () => {
+    setNavigationURL('/roadmaps/frontend?view=list&topic=react&q=hooks')
+    const view = render(<RoadmapExplorer nodes={nodes} edges={[]} looseCourses={[]} nextStepNodeId={null} />)
+    expect(screen.getByText('React').closest('details')).toHaveAttribute('open')
+    await userEvent.click(screen.getByRole('tab', { name: 'Карта' }))
+    expect(screen.getByRole('complementary', { name: 'Тема «React»' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Найти тему или курс на карте' })).toHaveValue('hooks')
+    act(() => navigationRouter().back())
+    expect(screen.getByRole('tab', { name: 'Список по этапам' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('React').closest('details')).toHaveAttribute('open')
+    view.unmount()
+    render(<RoadmapExplorer nodes={nodes} edges={[]} looseCourses={[]} nextStepNodeId={null} />)
+    expect(screen.getByText('React').closest('details')).toHaveAttribute('open')
   })
 })

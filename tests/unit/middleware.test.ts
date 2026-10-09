@@ -33,6 +33,13 @@ describe('закрытые страницы без авторизации', () =
 
     expect(location.searchParams.get('redirect')).toBe('/lessons/react-hooks')
   })
+
+  it.each(['/lessons/react-hooks?video=clip-2&t=373&rate=1.5', '/courses?q=Next.js&roadmap=frontend&status=active&page=2'])('сохраняет все параметры общей ссылки %s после входа', (path) => {
+    const response = middleware(request(path))
+    const location = new URL(response.headers.get('location') ?? '')
+    expect(location.searchParams.get('redirect')).toBe(path)
+    expect(location.origin).toBe(ORIGIN)
+  })
 })
 
 describe('публичные пути', () => {

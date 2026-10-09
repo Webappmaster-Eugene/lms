@@ -15,6 +15,7 @@ import { headers } from 'next/headers'
 import { getPayload } from '@/lib/payload'
 import { redirect } from 'next/navigation'
 import { PwaProvider } from '@/components/pwa/PwaProvider'
+import { StudentActivityBridge } from '@/components/analytics/StudentActivityBridge'
 
 const inter = Inter({
   subsets: ['cyrillic', 'latin'],
@@ -55,6 +56,7 @@ export default async function FrontendLayout({ children }: { children: React.Rea
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           <ToastProvider>
             <PwaProvider />
+            <Suspense fallback={null}><StudentActivityBridge userId={user.id} /></Suspense>
             <Suspense fallback={null}>
               <NavigationProgress />
               <KeyboardShortcuts />

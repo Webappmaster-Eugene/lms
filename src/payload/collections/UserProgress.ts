@@ -10,6 +10,7 @@ import { lockUserProgress } from '@/payload/hooks/lockUserProgress'
 import { assignOwner } from '@/payload/hooks/assignOwner'
 import { guardLearningLessonWrite } from '@/payload/hooks/learningLessonWrite'
 import { learningStateRead } from '@/payload/access/learningStateRead'
+import { lockStudentDomainOwner, recordStudentDomainEvent } from '@/server/student-analytics'
 
 export const UserProgress: CollectionConfig = {
   slug: 'user-progress',
@@ -24,8 +25,8 @@ export const UserProgress: CollectionConfig = {
     delete: isAdmin,
   },
   hooks: {
-    beforeChange: [assignOwner, guardLearningLessonWrite, lockUserProgress],
-    afterChange: [awardPoints, updateStreak, checkAchievements],
+    beforeChange: [assignOwner, guardLearningLessonWrite, lockStudentDomainOwner, lockUserProgress],
+    afterChange: [awardPoints, updateStreak, checkAchievements, recordStudentDomainEvent],
   },
   fields: [
     {

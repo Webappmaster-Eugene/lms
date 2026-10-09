@@ -1,10 +1,16 @@
-import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+
+vi.mock('next/navigation', async () => (await import('../helpers/url-navigation')).urlNavigationMock())
 
 vi.mock('next/link', async () => (await import('../helpers/component-mocks')).linkMock())
 
 const { CourseCatalog, courseStatus, filterCourses } = await import('@/components/course/CourseCatalog')
+import { navigationRouter, navigationURL, setNavigationURL } from '../helpers/url-navigation'
+
+beforeEach(() => setNavigationURL('/courses'))
+
 import type { CatalogCourse } from '@/components/course/CourseCatalog'
 
 /** Каталог из полусотни курсов: ученик должен быстро найти свои начатые и курсы своего роадмапа. */
@@ -86,6 +92,35 @@ describe('каталог', () => {
 
     await userEvent.type(screen.getByRole('searchbox', { name: /Найти курс/ }), 'кобол')
 
-    expect(screen.getByText(/попробуйте сбросить фильтры/)).toBeInTheDocument()
+    expect(await screen.findByText(/попробуйте сбросить фильтры/)).toBeInTheDocument()
+  })
+
+  it('восстанавливает фильтры из прямой ссылки и возвращает их при переходе назад', async () => {
+    setNavigationURL('/courses?roadmap=Backend&q=nest&assigned=1&sort=title&keep=ok')
+    render(<CourseCatalog courses={courses} />)
+    expect(screen.getByRole('searchbox')).toHaveValue('nest')
+    expect(screen.getByRole('link', { name: /NestJS/ })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /React/ })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Frontend' }))
+    expect(navigationURL()).toContain('keep=ok')
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    act(() => navigationRouter().back())
+    expect(screen.getByRole('link', { name: /NestJS/ })).toBeInTheDocument()
+    expect(screen.getByRole('searchbox')).toHaveValue('nest')
+  })
+
+  it('страница и сортировка восстанавливаются; фильтр сбрасывает страницу', async () => {
+    const many = Array.from({ length: 50 }, (_, index) => course(String(index + 1), { title: `Курс ${String(index + 1).padStart(2, '0')}` }))
+    setNavigationURL('/courses?page=2&sort=title')
+    const view = render(<CourseCatalog courses={many} />)
+    expect(screen.getByText('2 из 3')).toBeInTheDocument()
+    expect(screen.getAllByRole('link')).toHaveLength(24)
+    expect(screen.getByRole('link', { name: /Курс 25/ })).toBeInTheDocument()
+    view.unmount()
+    render(<CourseCatalog courses={many} />)
+    expect(screen.getByText('2 из 3')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Не начатые/ }))
+    await waitFor(() => expect(navigationURL()).not.toContain('page='))
+    expect(screen.getByText('1 из 3')).toBeInTheDocument()
   })
 })

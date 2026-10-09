@@ -60,7 +60,11 @@ afterAll(async () => {
   vi.unstubAllEnvs()
   for (const user of [student, other, admin]) if (user) await payload.delete({ collection: 'users', id: user.id })
 })
-afterEach(() => { vi.useRealTimers() })
+afterEach(async () => {
+  vi.useRealTimers()
+  // The synthetic reminder hour may be later than wall time. Restore its released lease before the next real-time dispatch.
+  await payload.update({ collection: 'notification-job-state', where: { key: { equals: 'notifications' } }, data: { leaseUntil: new Date(Date.now() - 1000).toISOString() } })
+})
 
 describe('реальные уведомления, подписки и scheduler в PostgreSQL', () => {
   it('requires authentication, rejects foreign Origin and keeps preference internals private', async () => {
@@ -164,6 +168,8 @@ describe('реальные уведомления, подписки и scheduler
     vi.mocked(sendEncryptedPush).mockResolvedValue(201)
     const runs = await Promise.all([runNotificationJobs(payload), runNotificationJobs(payload)])
     expect(runs.filter((run) => run.skipped)).toHaveLength(1)
+    // Other suites leave more than one bounded page of users; reach this owner through the real scheduler cursor.
+    for (let page = 0; page < 20 && (await payload.count({ collection: 'notifications', where: { user: { equals: student.id }, type: { equals: 'learning_reminder' } } })).totalDocs === 0; page += 1) await runNotificationJobs(payload)
     expect((await payload.count({ collection: 'notifications', where: { user: { equals: student.id }, type: { equals: 'learning_reminder' } } })).totalDocs).toBe(1)
     await runNotificationJobs(payload)
     expect((await payload.count({ collection: 'notifications', where: { user: { equals: student.id }, type: { equals: 'learning_reminder' } } })).totalDocs).toBe(1)

@@ -3,6 +3,7 @@ import type { CollectionConfig } from 'payload'
 import { isAdmin } from '@/payload/access/isAdmin'
 import { learningNodeRead } from '@/payload/access/learningCatalogRead'
 import { cleanupLearningTargetGrants } from '@/payload/hooks/learningAccessCleanup'
+import { protectRoadmapNodeSources } from '@/payload/hooks/protectCourseSources'
 
 export const RoadmapNodes: CollectionConfig = {
   slug: 'roadmap-nodes',
@@ -18,7 +19,7 @@ export const RoadmapNodes: CollectionConfig = {
     update: isAdmin,
     delete: isAdmin,
   },
-  hooks: { beforeDelete: [cleanupLearningTargetGrants('roadmap-nodes')] },
+  hooks: { beforeDelete: [cleanupLearningTargetGrants('roadmap-nodes')], afterRead: [protectRoadmapNodeSources] },
   fields: [
     {
       name: 'nodeId',

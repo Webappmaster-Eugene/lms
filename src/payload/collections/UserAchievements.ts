@@ -4,6 +4,7 @@ import { isAdmin } from '@/payload/access/isAdmin'
 import { isAdminOrSelf } from '@/payload/access/isAdminOrSelf'
 import { sendAchievementEmail } from '@/payload/hooks/sendNotification'
 import { createAchievementNotification } from '@/payload/hooks/createNotification'
+import { lockStudentDomainOwner, recordStudentDomainEvent } from '@/server/student-analytics'
 
 export const UserAchievements: CollectionConfig = {
   slug: 'user-achievements',
@@ -13,7 +14,8 @@ export const UserAchievements: CollectionConfig = {
     group: 'Геймификация',
   },
   hooks: {
-    afterChange: [sendAchievementEmail, createAchievementNotification],
+    beforeChange: [lockStudentDomainOwner],
+    afterChange: [sendAchievementEmail, createAchievementNotification, recordStudentDomainEvent],
   },
   access: {
     create: isAdmin,

@@ -21,6 +21,10 @@ function redactResourceText(value: string, replacements: Map<string, string> = n
   })
 }
 
+export function protectProgramText(value: string): string {
+  return redactResourceText(value)
+}
+
 function redactResourceTree(value: unknown, replacements: Map<string, string>, fallbackUrl: string): unknown {
   if (typeof value === 'string') return redactResourceText(value, replacements)
   if (Array.isArray(value)) return value.map((child) => redactResourceTree(child, replacements, fallbackUrl))

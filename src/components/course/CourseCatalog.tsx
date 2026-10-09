@@ -1,10 +1,13 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Clock, Lock, Search } from 'lucide-react'
 
 import { cn, pluralize } from '@/lib/utils'
+import { boundedQueryText, CATALOG_PAGE_SIZE, positiveQueryInteger, queryHref } from '@/lib/shared-url'
+import { ShareButton } from '@/components/ui/ShareButton'
 
 export type CatalogCourse = {
   id: string
@@ -68,10 +71,25 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 }
 
 export function CourseCatalog({ courses }: { courses: CatalogCourse[] }) {
-  const [roadmap, setRoadmap] = useState<string | null>(null)
-  const [status, setStatus] = useState<Status>('all')
-  const [query, setQuery] = useState('')
-  const [assignedOnly, setAssignedOnly] = useState(false)
+  const search = useSearchParams()
+  const pathname = usePathname()
+  const router = useRouter()
+  const queryFromURL = boundedQueryText(search.get('q'))
+  const [query, setQuery] = useState(queryFromURL)
+  const [syncedQuery, setSyncedQuery] = useState(queryFromURL)
+  if (queryFromURL !== syncedQuery) { setSyncedQuery(queryFromURL); setQuery(queryFromURL) }
+  const roadmap = boundedQueryText(search.get('roadmap')) || null
+  const rawStatus = search.get('status')
+  const status: Status = rawStatus === 'active' || rawStatus === 'new' || rawStatus === 'done' ? rawStatus : 'all'
+  const assignedOnly = search.get('assigned') === '1'
+  const sort = search.get('sort') === 'title' ? 'title' : search.get('sort') === 'progress' ? 'progress' : 'program'
+  const currentQuery = search.toString()
+  const apply = (changes: Record<string, string | null>) => router.push(queryHref(pathname, currentQuery, { q: query.trim(), page: null, ...changes }), { scroll: false })
+  useEffect(() => {
+    if (query === queryFromURL) return
+    const timer = setTimeout(() => router.replace(queryHref(pathname, currentQuery, { q: query.trim(), page: null }), { scroll: false }), 250)
+    return () => clearTimeout(timer)
+  }, [query, queryFromURL, currentQuery, pathname, router])
 
   const roadmaps = useMemo(
     () => [...new Set(courses.flatMap((c) => (c.roadmapTitle ? [c.roadmapTitle] : [])))],
@@ -82,7 +100,11 @@ export function CourseCatalog({ courses }: { courses: CatalogCourse[] }) {
     for (const c of courses) result[courseStatus(c)] += 1
     return result
   }, [courses])
-  const shown = filterCourses(courses, { roadmap, status, query, assignedOnly })
+  const shown = filterCourses(courses, { roadmap, status, query: queryFromURL, assignedOnly })
+  const sorted = sort === 'program' ? shown : [...shown].sort((a, b) => sort === 'title' ? a.title.localeCompare(b.title, 'ru') : b.progressPercent - a.progressPercent || a.title.localeCompare(b.title, 'ru'))
+  const pageCount = Math.max(1, Math.ceil(sorted.length / CATALOG_PAGE_SIZE))
+  const page = Math.min(pageCount, positiveQueryInteger(search.get('page')))
+  const pageCourses = sorted.slice((page - 1) * CATALOG_PAGE_SIZE, page * CATALOG_PAGE_SIZE)
 
   return (
     <div className="space-y-4">
@@ -92,7 +114,8 @@ export function CourseCatalog({ courses }: { courses: CatalogCourse[] }) {
           <input
             type="search"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => setQuery(e.target.value.slice(0, 160))}
+            maxLength={160}
             placeholder="Найти курс"
             aria-label="Найти курс по названию"
             className="h-10 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -100,29 +123,38 @@ export function CourseCatalog({ courses }: { courses: CatalogCourse[] }) {
         </div>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Статус курса">
           {(Object.keys(STATUS_LABELS) as Status[]).map((s) => (
-            <Chip key={s} active={status === s} onClick={() => setStatus(s)}>
+            <Chip key={s} active={status === s} onClick={() => apply({ status: s === 'all' ? null : s })}>
               {STATUS_LABELS[s]} <span className="tabular-nums">{counts[s]}</span>
             </Chip>
           ))}
         </div>
         {courses.some((course) => course.accessAllowed === false) && (
           <div className="flex flex-wrap gap-2" role="group" aria-label="Назначение доступа">
-            <Chip active={!assignedOnly} onClick={() => setAssignedOnly(false)}>Весь каталог</Chip>
-            <Chip active={assignedOnly} onClick={() => setAssignedOnly(true)}>Назначенные мне</Chip>
+            <Chip active={!assignedOnly} onClick={() => apply({ assigned: null })}>Весь каталог</Chip>
+            <Chip active={assignedOnly} onClick={() => apply({ assigned: '1' })}>Назначенные мне</Chip>
           </div>
         )}
         {roadmaps.length > 1 && (
           <div className="flex flex-wrap gap-2" role="group" aria-label="Роадмап">
-            <Chip active={roadmap === null} onClick={() => setRoadmap(null)}>
+            <Chip active={roadmap === null} onClick={() => apply({ roadmap: null })}>
               Все роадмапы
             </Chip>
             {roadmaps.map((r) => (
-              <Chip key={r} active={roadmap === r} onClick={() => setRoadmap(r)}>
+              <Chip key={r} active={roadmap === r} onClick={() => apply({ roadmap: r })}>
                 {r}
               </Chip>
             ))}
           </div>
         )}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">Порядок
+          <select aria-label="Порядок курсов" value={sort} onChange={(event) => apply({ sort: event.target.value === 'program' ? null : event.target.value })} className="min-h-[44px] rounded-lg border border-border bg-card px-3 text-sm text-foreground">
+            <option value="program">По программе</option><option value="title">По названию</option><option value="progress">По прогрессу</option>
+          </select>
+        </label>
+        <ShareButton getHref={() => queryHref(pathname, currentQuery, { q: query.trim() })} />
       </div>
 
       <p className="text-sm text-muted-foreground" aria-live="polite">
@@ -133,7 +165,7 @@ export function CourseCatalog({ courses }: { courses: CatalogCourse[] }) {
         <p className="py-12 text-center text-muted-foreground">Под эти условия курсов нет — попробуйте сбросить фильтры</p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {shown.map((course) => (
+          {pageCourses.map((course) => (
             <Link
               key={course.id}
               href={`/courses/${course.slug}`}
@@ -185,6 +217,11 @@ export function CourseCatalog({ courses }: { courses: CatalogCourse[] }) {
           ))}
         </div>
       )}
+      {pageCount > 1 && <nav aria-label="Страницы каталога курсов" className="flex items-center justify-center gap-3">
+        <button type="button" disabled={page === 1} onClick={() => apply({ page: page > 2 ? String(page - 1) : null })} className="min-h-[44px] rounded-lg border border-border px-3 text-sm disabled:opacity-50">Назад</button>
+        <span className="text-sm text-muted-foreground">{page} из {pageCount}</span>
+        <button type="button" disabled={page === pageCount} onClick={() => apply({ page: String(page + 1) })} className="min-h-[44px] rounded-lg border border-border px-3 text-sm disabled:opacity-50">Дальше</button>
+      </nav>}
     </div>
   )
 }

@@ -40,6 +40,16 @@ export async function lockLearningAccess(req: PayloadRequest, userId: number): P
   await db.execute(sql`select pg_advisory_xact_lock(7204, ${userId})`)
 }
 
+/** Parent deletion must precede child cleanup in the same order used by video and assignment writes. */
+export const lockLearningUserDelete: CollectionBeforeDeleteHook = async ({ req, id }) => {
+  const userId = learningRelationId(id)
+  if (userId === null) throw new APIError('Пользователь не найден', 404)
+  const db = await transactionDb(req)
+  await db.execute(sql`select pg_advisory_xact_lock(7203, ${userId})`)
+  await db.execute(sql`select pg_advisory_xact_lock(7204, ${userId})`)
+  await db.execute(sql`select id from users where id = ${userId} for update`)
+}
+
 export const lockLearningGrantChange: CollectionBeforeChangeHook = async ({ req, data, originalDoc, operation }) => {
   if (operation === 'update' && originalDoc) {
     const patch = consumeRawCollectionPatch(req, 'learning-access-grants', originalDoc.id)

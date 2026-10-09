@@ -69,6 +69,16 @@ test('другое устройство видит точный урок/рол�
     await otherTab.goto('/')
     await expect(otherTab.getByRole('link', { name: /Продолжить с того места/ })).toContainText('12:34')
 
+    // Shared navigation has priority over personal resume, without overwriting it on arrival.
+    const clipHref = `/lessons/${lesson.slug}?video=${encodeURIComponent(videoId)}&t=373&rate=1.5`
+    await phone.goto(clipHref)
+    await expect.poll(() => phone.locator('video').evaluate((element: HTMLVideoElement) => Math.floor(element.currentTime))).toBe(373)
+    await expect.poll(() => phone.locator('video').evaluate((element: HTMLVideoElement) => element.playbackRate)).toBe(1.5)
+    await phone.reload()
+    await expect.poll(() => phone.locator('video').evaluate((element: HTMLVideoElement) => Math.floor(element.currentTime))).toBe(373)
+    const personalPosition = await second.request.get(`${APP_URL}/api/learning-state?lessonId=${lesson.id}`)
+    expect((await personalPosition.json()).positions[videoId].seconds).toBe(754)
+
     const unrelated = await stranger.request.get(`${APP_URL}/api/learning-state?lessonId=${lesson.id}`)
     expect((await unrelated.json()).positions).toEqual({})
     expect((await stranger.request.post(`${APP_URL}/api/learning-state`, { data: { lessonId: lesson.id, expectedUserId: userId, at: Date.now() } })).status()).toBe(403)

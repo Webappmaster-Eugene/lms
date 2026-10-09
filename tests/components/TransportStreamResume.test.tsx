@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(window.location.search) }))
+
 const players = vi.hoisted(() => ({ create: vi.fn(), destroy: vi.fn() }))
 vi.mock('mpegts.js', () => ({
   default: {

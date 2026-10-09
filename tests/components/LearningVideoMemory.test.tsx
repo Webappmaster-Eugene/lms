@@ -1,6 +1,8 @@
 import { StrictMode } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(window.location.search) }))
 import { LessonLearningProvider, learningStorageKey } from '@/components/lesson/LessonLearningProvider'
 import { VideoPlayer } from '@/components/lesson/VideoPlayer'
 import type { LearningState } from '@/lib/learning-state'
@@ -42,6 +44,41 @@ beforeEach(() => {
 })
 
 describe('синхронизация места остановки', () => {
+  it('явная ссылка выбирает только своё видео и скорость; смена rate не повторяет перемотку', async () => {
+    const otherId = 'second:456'
+    server.positions[videoId] = { seconds: 12, at: 100, ended: false }
+    server.positions[otherId] = { seconds: 300, at: 100, ended: false }
+    window.history.replaceState(null, '', `/lessons/demo?video=${otherId}&t=90&rate=1.75`)
+    const view = render(<LessonLearningProvider lessonId={10} userId={1}>
+      <VideoPlayer title="Первая запись" videoUrl="/api/media/file/first.mp4" memoryId={videoId} displayMode="embed" />
+      <VideoPlayer title="Вторая запись" videoUrl="/api/media/file/second.mp4" memoryId={otherId} displayMode="embed" />
+    </LessonLearningProvider>)
+    const videos = view.container.querySelectorAll('video')
+    metadata(videos[0]); metadata(videos[1])
+    await waitFor(() => expect(videos[1].currentTime).toBe(90))
+    expect(videos[0].currentTime).toBe(12)
+    expect(videos[0].playbackRate).toBe(1)
+    expect(videos[1].playbackRate).toBe(1.75)
+    videos[1].currentTime = 110
+    videos[1].playbackRate = 1.5
+    fireEvent.rateChange(videos[1])
+    await waitFor(() => expect(window.location.search).toContain('rate=1.5'))
+    expect(videos[1].currentTime).toBe(110)
+  })
+
+  it('SPA-переход между явными метками возвращает точное место, сохраняя личный прогресс', async () => {
+    server.positions[videoId] = { seconds: 300, at: 100, ended: false }
+    window.history.replaceState(null, '', '/lessons/demo?t=373&rate=1.5')
+    const view = player()
+    metadata(video(view.container))
+    await waitFor(() => expect(video(view.container).currentTime).toBe(373))
+    expect(video(view.container).playbackRate).toBe(1.5)
+    window.history.replaceState(null, '', '/lessons/demo?t=90&rate=2')
+    view.rerender(<LessonLearningProvider key={1} lessonId={10} userId={1}><VideoPlayer title="Запись" videoUrl="/api/media/file/demo.mp4" memoryId={videoId} displayMode="embed" /></LessonLearningProvider>)
+    await waitFor(() => expect(video(view.container).currentTime).toBe(90))
+    expect(video(view.container).playbackRate).toBe(2)
+    expect(writes.some((write) => write.videoId === videoId)).toBe(false)
+  })
   it.each([7, 594])('восстанавливает точную серверную позицию %s секунд, включая края ролика', async (seconds) => {
     server.positions[videoId] = { seconds, at: 100, ended: false }
     const { container } = player()

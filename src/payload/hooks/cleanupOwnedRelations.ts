@@ -16,11 +16,11 @@ function cleanupDependents(
   return async ({ req, id }) => {
     for (const { collection, field } of dependents) {
       try {
-        const capability = collection === 'learning-access-policies' ? 'syncLearningAccessPolicy' : collection === 'auth-session-revocations' ? 'syncAuthSessionRevocations' : null
+        const capability = collection === 'learning-access-policies' ? 'syncLearningAccessPolicy' : collection === 'auth-session-revocations' ? 'syncAuthSessionRevocations' : collection === 'student-session-telemetry' || collection === 'student-learning-events' ? 'syncStudentAnalytics' : collection === 'web-vitals-reports' ? 'syncWebVitals' : null
         const previousCapability = capability ? req.context[capability] : undefined
         if (capability) req.context[capability] = true
         try {
-          await req.payload.delete({ req, collection, where: { [field]: { equals: id } } })
+          await req.payload.delete({ req, collection, where: { [field]: { equals: id } }, overrideAccess: true })
         } finally {
           if (capability) {
             if (previousCapability === undefined) delete req.context[capability]
@@ -37,6 +37,9 @@ function cleanupDependents(
 
 /** Всё, что принадлежит пользователю: прогресс, баллы, достижения, заметки, уведомления */
 export const cleanupUserRelations = cleanupDependents('пользователь', [
+  { collection: 'web-vitals-reports', field: 'user' },
+  { collection: 'student-learning-events', field: 'user' },
+  { collection: 'student-session-telemetry', field: 'user' },
   { collection: 'auth-session-revocations', field: 'user' },
   { collection: 'learning-access-policies', field: 'user' },
   { collection: 'learning-access-grants', field: 'user' },

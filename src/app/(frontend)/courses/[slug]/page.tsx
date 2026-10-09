@@ -5,6 +5,7 @@ import { notFound, redirect } from 'next/navigation'
 import { createLocalReq } from 'payload'
 import { getLearningAccess } from '@/server/learning-access'
 import { CourseLessonItem } from '@/components/course/CourseLessonItem'
+import { ShareButton } from '@/components/ui/ShareButton'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, ChevronDown, Clock, Lock, PartyPopper } from 'lucide-react'
 import { collectAllPages } from '@/lib/paginate'
@@ -187,6 +188,7 @@ export default async function CourseDetailPage({ params }: Props) {
       {/* Заголовок */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">{course.title}</h1>
+        <div className="mt-3"><ShareButton title={course.title} /></div>
         <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
           <span>{pluralize(totalLessons, 'урок', 'урока', 'уроков')}</span>
           {sectionDocs.length > 0 && (

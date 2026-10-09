@@ -6,6 +6,7 @@ import { Loader2, Maximize2, Pause, Play, Volume2, VolumeX } from 'lucide-react'
 import { useVideoMemory } from '@/hooks/use-video-memory'
 import { formatTime } from '@/lib/video-memory'
 import { VideoMemoryBar } from './VideoMemoryBar'
+import { VideoShareButton } from './VideoShareButton'
 
 type Props = {
   /** Адрес нашего прокси: mpegts.js читает файл запросами из JS. */
@@ -278,6 +279,7 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
         </div>
       </div>
       <VideoMemoryBar {...memory} />
+      <VideoShareButton videoRef={videoRef} videoId={memoryKey} />
     </div>
   )
 }

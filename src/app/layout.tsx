@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
+  robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
   manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, title: 'MentorCareer', statusBarStyle: 'default' },
   icons: { apple: '/images/pwa/icon-192.png' },

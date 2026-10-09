@@ -92,6 +92,9 @@ export interface Config {
     'push-subscriptions': PushSubscription;
     'notification-deliveries': NotificationDelivery;
     'notification-job-state': NotificationJobState;
+    'student-session-telemetry': StudentSessionTelemetry;
+    'student-learning-events': StudentLearningEvent;
+    'web-vitals-reports': WebVitalsReport;
     certificates: Certificate;
     streaks: Streak;
     'trainer-topics': TrainerTopic;
@@ -132,6 +135,9 @@ export interface Config {
     'push-subscriptions': PushSubscriptionsSelect<false> | PushSubscriptionsSelect<true>;
     'notification-deliveries': NotificationDeliveriesSelect<false> | NotificationDeliveriesSelect<true>;
     'notification-job-state': NotificationJobStateSelect<false> | NotificationJobStateSelect<true>;
+    'student-session-telemetry': StudentSessionTelemetrySelect<false> | StudentSessionTelemetrySelect<true>;
+    'student-learning-events': StudentLearningEventsSelect<false> | StudentLearningEventsSelect<true>;
+    'web-vitals-reports': WebVitalsReportsSelect<false> | WebVitalsReportsSelect<true>;
     certificates: CertificatesSelect<false> | CertificatesSelect<true>;
     streaks: StreaksSelect<false> | StreaksSelect<true>;
     'trainer-topics': TrainerTopicsSelect<false> | TrainerTopicsSelect<true>;
@@ -1034,6 +1040,87 @@ export interface NotificationJobState {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "student-session-telemetry".
+ */
+export interface StudentSessionTelemetry {
+  id: number;
+  user: number | User;
+  sessionHash: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  endedAt?: string | null;
+  device: string;
+  browser: string;
+  os: string;
+  ip?: string | null;
+  ipExpiresAt?: string | null;
+  countryCode?: string | null;
+  country?: string | null;
+  region?: string | null;
+  city?: string | null;
+  geoSource: 'local-mmdb' | 'unknown';
+  timezone?: string | null;
+  standalone?: boolean | null;
+  path?: string | null;
+  course?: (number | null) | Course;
+  lesson?: (number | null) | Lesson;
+  lastEventAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "student-learning-events".
+ */
+export interface StudentLearningEvent {
+  id: number;
+  user: number | User;
+  eventKey: string;
+  type:
+    | 'login'
+    | 'logout'
+    | 'page_view'
+    | 'lesson_view'
+    | 'lesson_completed'
+    | 'trainer_completed'
+    | 'achievement_unlocked'
+    | 'certificate_issued';
+  source: 'server' | 'observed';
+  at: string;
+  session?: (number | null) | StudentSessionTelemetry;
+  course?: (number | null) | Course;
+  lesson?: (number | null) | Lesson;
+  taskId?: number | null;
+  achievementId?: number | null;
+  certificateId?: number | null;
+  path?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "web-vitals-reports".
+ */
+export interface WebVitalsReport {
+  id: number;
+  user: number | User;
+  reportKey: string;
+  sessionHash: string;
+  name: 'LCP' | 'INP' | 'CLS';
+  value: number;
+  routeTemplate: string;
+  navigationType?:
+    | ('navigate' | 'reload' | 'back-forward' | 'back-forward-cache' | 'prerender' | 'restore' | 'soft-navigation')
+    | null;
+  reportedAt: string;
+  quotaWindowStartedAt?: string | null;
+  quotaReportCount?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "certificates".
  */
 export interface Certificate {
@@ -1812,6 +1899,74 @@ export interface NotificationJobStateSelect<T extends boolean = true> {
   leaseUntil?: T;
   claimToken?: T;
   userCursor?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "student-session-telemetry_select".
+ */
+export interface StudentSessionTelemetrySelect<T extends boolean = true> {
+  user?: T;
+  sessionHash?: T;
+  firstSeenAt?: T;
+  lastSeenAt?: T;
+  expiresAt?: T;
+  endedAt?: T;
+  device?: T;
+  browser?: T;
+  os?: T;
+  ip?: T;
+  ipExpiresAt?: T;
+  countryCode?: T;
+  country?: T;
+  region?: T;
+  city?: T;
+  geoSource?: T;
+  timezone?: T;
+  standalone?: T;
+  path?: T;
+  course?: T;
+  lesson?: T;
+  lastEventAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "student-learning-events_select".
+ */
+export interface StudentLearningEventsSelect<T extends boolean = true> {
+  user?: T;
+  eventKey?: T;
+  type?: T;
+  source?: T;
+  at?: T;
+  session?: T;
+  course?: T;
+  lesson?: T;
+  taskId?: T;
+  achievementId?: T;
+  certificateId?: T;
+  path?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "web-vitals-reports_select".
+ */
+export interface WebVitalsReportsSelect<T extends boolean = true> {
+  user?: T;
+  reportKey?: T;
+  sessionHash?: T;
+  name?: T;
+  value?: T;
+  routeTemplate?: T;
+  navigationType?: T;
+  reportedAt?: T;
+  quotaWindowStartedAt?: T;
+  quotaReportCount?: T;
   updatedAt?: T;
   createdAt?: T;
 }

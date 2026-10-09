@@ -34,7 +34,7 @@ async function makeValidDoc(slug: string): Promise<Data> {
 }
 
 async function createAs<T extends object = Data & { id: number }>(slug: string, data: Data): Promise<T> {
-  const doc = await payload.create({ collection: slug as CollectionSlug, data: data as never, ...(slug === 'learning-access-grants' ? { user: admin } : {}), context: { skipHooks: true, ...(slug === 'learning-access-policies' ? { syncLearningAccessPolicy: true } : {}), ...(slug === 'auth-session-revocations' ? { syncAuthSessionRevocations: true } : {}) } })
+  const doc = await payload.create({ collection: slug as CollectionSlug, data: data as never, ...(slug === 'learning-access-grants' ? { user: admin } : {}), context: { skipHooks: true, ...(slug === 'learning-access-policies' ? { syncLearningAccessPolicy: true } : {}), ...(slug === 'auth-session-revocations' ? { syncAuthSessionRevocations: true } : {}), ...(['student-session-telemetry', 'student-learning-events'].includes(slug) ? { syncStudentAnalytics: true } : {}), ...(slug === 'web-vitals-reports' ? { syncWebVitals: true } : {}) } })
   return doc as unknown as T
 }
 

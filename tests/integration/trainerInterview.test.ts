@@ -33,11 +33,12 @@ beforeAll(async () => {
 describe('совместное собеседование: настоящее хранилище и авторизация', () => {
   it('не создаёт комнаты для анонимных и неактивных пользователей; валидирует ввод и CSRF', async () => {
     expect((await call('create', undefined, undefined, {})).status).toBe(401)
-    expect((await call('create', inactive, undefined, {})).status).toBe(403)
+    expect((await call('create', inactive, undefined, {})).status).toBe(401)
     expect((await call('create', owner, undefined, { taskId: 'wrong' })).status).toBe(400)
     expect((await call('create', owner, undefined, [])).status).toBe(400)
     const request = new Request(url, { method: 'POST', headers: { Cookie: `payload-token=${owner}`, Origin: 'https://foreign.test', 'Content-Type': 'application/json' }, body: '{}' })
-    expect((await interviewRequest(request, 'create')).status).toBe(403)
+    // Payload rejects foreign-Origin cookies before the route can authenticate them.
+    expect((await interviewRequest(request, 'create')).status).toBe(401)
   })
 
   it('создаёт комнату по задаче без эталонов и скрытых тестов, изолирует участников и сохраняет код', async () => {

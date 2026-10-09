@@ -2,9 +2,11 @@ import type { CollectionConfig } from 'payload'
 
 import { isAdminOrSelf } from '@/payload/access/isAdminOrSelf'
 import { isAdmin } from '@/payload/access/isAdmin'
+import { lockStudentDomainOwner, recordStudentDomainEvent } from '@/server/student-analytics'
 
 export const Certificates: CollectionConfig = {
   slug: 'certificates',
+  hooks: { beforeChange: [lockStudentDomainOwner], afterChange: [recordStudentDomainEvent] },
   indexes: [{ fields: ['user', 'type', 'relatedEntity'], unique: true }],
   admin: {
     defaultColumns: ['user', 'type', 'title', 'issuedAt'],

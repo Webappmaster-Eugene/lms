@@ -7,6 +7,7 @@ import { useVideoMemory } from '@/hooks/use-video-memory'
 import { parsePublicResourceUrl } from '@/lib/yandex-disk-url'
 import { TransportStreamPlayer } from './TransportStreamPlayer'
 import { VideoMemoryBar } from './VideoMemoryBar'
+import { VideoShareButton } from './VideoShareButton'
 
 type Props = {
   memoryId?: string
@@ -220,6 +221,7 @@ function NativeVideo({ memoryId, videoUrl, direct = false, onFailure }: { memory
         />
       </div>
       <VideoMemoryBar {...memory} />
+      <VideoShareButton videoRef={videoRef} videoId={memoryId ?? videoUrl} />
     </>
   )
 }

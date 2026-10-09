@@ -31,6 +31,8 @@ import { Comments } from '@/payload/collections/Comments'
 import { Notifications } from '@/payload/collections/Notifications'
 import { NotificationPreferences, PushSubscriptions, NotificationDeliveries, NotificationJobState } from '@/payload/collections/NotificationInfrastructure'
 import { bootstrapDefaultAchievements } from '@/lib/default-achievements'
+import { StudentSessionTelemetry, StudentLearningEvents } from '@/payload/collections/StudentAnalytics'
+import { WebVitalsReports } from '@/payload/collections/WebVitalsReports'
 import { Certificates } from '@/payload/collections/Certificates'
 import { Streaks } from '@/payload/collections/Streaks'
 import { TrainerTopics } from '@/payload/collections/TrainerTopics'
@@ -59,8 +61,13 @@ export default buildConfig({
       icons: [{ url: '/icon.svg', type: 'image/svg+xml' }],
     },
     components: {
+      providers: ['/components/analytics/AdminActivityProvider#AdminActivityProvider'],
       beforeNavLinks: ['/components/roadmap-editor/NavLink#RoadmapEditorNavLink'],
       views: {
+        studentAnalytics: {
+          Component: '/components/student-analytics/StudentAnalyticsView#StudentAnalyticsView',
+          path: '/student-analytics',
+        },
         learningAccess: {
           Component: '/components/learning-access/LearningAccessView#LearningAccessView',
           path: '/learning-access',
@@ -99,6 +106,9 @@ export default buildConfig({
     PushSubscriptions,
     NotificationDeliveries,
     NotificationJobState,
+    StudentSessionTelemetry,
+    StudentLearningEvents,
+    WebVitalsReports,
     Certificates,
     Streaks,
     TrainerTopics,

@@ -9,8 +9,9 @@ function slugs(directory: string) {
     const source = readFileSync(`${path}/${name}`, 'utf8')
     const slug = source.match(/slug:\s*'([^']+)'/)?.[1]
     expect(slug, `нет slug в ${name}`).toBeDefined()
-    if (slug === 'auth-session-revocations' || slug === 'learning-access-policies' || source.includes('admin: infrastructure')) {
+    if (slug === 'auth-session-revocations' || slug === 'learning-access-policies' || source.includes('admin: infrastructure') || /admin:\s*\{\s*hidden:\s*true/.test(source.split('fields:')[0])) {
       expect(source).toMatch(/hidden:\s*true/)
+      if (slug !== 'learning-access-policies') expect(source).toMatch(/(?:read:\s*\(\)\s*=>\s*false|access:\s*closed)/)
       return undefined
     }
     return slug

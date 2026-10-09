@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Payload } from 'payload'
 
 import { resolveLessonVideoSource } from '@/server/lesson-video-access'
-import { protectCourseSourceLinks, protectLessonVideoSources } from '@/lib/lesson-video-source'
+import { protectCourseSourceLinks, protectLessonVideoSources, protectProgramText } from '@/lib/lesson-video-source'
 import type { Lesson } from '@/payload-types'
 
 const ROOT = 'https://disk.yandex.com/d/library'
@@ -27,6 +27,12 @@ beforeEach(() => {
 })
 
 describe('источник только из опубликованного урока', () => {
+  it('тексты темы не раскрывают прямые источники, сохраняют обычные учебные ссылки', () => {
+    const protectedText = protectProgramText(`Материал ${ROOT}/nextjs ${VIDEO} https://nextjs.org/docs`)
+    expect(protectedText).not.toContain('disk.yandex')
+    expect(protectedText).not.toContain('lesson.mp4')
+    expect(protectedText).toContain('https://nextjs.org/docs')
+  })
   it('сохраняет публичный ключ только на сервере', async () => {
     expect(await resolveLessonVideoSource(payload, student, params())).toEqual({ kind: 'yandex', ref: { publicKey: ROOT, path: '/course/lesson.mp4' } })
     expect(findByID).toHaveBeenCalledWith({ collection: 'lessons', id: 42, depth: 1, overrideAccess: true })

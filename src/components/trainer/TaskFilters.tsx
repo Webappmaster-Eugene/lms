@@ -11,6 +11,7 @@ import {
   TAG_OPTIONS,
 } from '@/lib/trainer/constants'
 import { cn } from '@/lib/utils'
+import { ShareButton } from '@/components/ui/ShareButton'
 
 /**
  * Панель фильтров каталога задач.
@@ -153,7 +154,11 @@ export function TaskFilters({ values, topics, total }: TaskFiltersProps) {
         {hasFilters && (
           <button
             type="button"
-            onClick={() => startTransition(() => router.replace(pathname, { scroll: false }))}
+            onClick={() => {
+              const next = new URLSearchParams(searchParams.toString())
+              for (const key of Object.keys(values)) next.delete(key)
+              startTransition(() => router.replace(next.size ? `${pathname}?${next}` : pathname, { scroll: false }))
+            }}
             className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
@@ -164,6 +169,7 @@ export function TaskFilters({ values, topics, total }: TaskFiltersProps) {
         <span className={cn('ml-auto text-xs text-muted-foreground', isPending && 'opacity-50')}>
           Найдено задач: {total}
         </span>
+        <ShareButton />
       </div>
     </div>
   )

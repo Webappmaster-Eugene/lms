@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowRight, Play, RotateCcw, Send, Trophy } from 'lucide-react'
 
@@ -14,6 +14,8 @@ import { failureResult } from '@/lib/trainer/result'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/components/ui/Toast'
 import { useHydrated } from '@/hooks/use-hydrated'
+import { queryHref } from '@/lib/shared-url'
+import { ShareButton } from '@/components/ui/ShareButton'
 import type { ClientProgress, ClientTaskSpec, SubmitResponse } from '@/lib/trainer/api'
 import type { TrainerCaseSpec, TrainerDiagnostic, TrainerLanguage, TrainerRunResult } from '@/lib/trainer/types'
 
@@ -71,17 +73,20 @@ function writeDraft(taskId: string, language: TrainerLanguage, code: string): vo
 
 export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }: TrainerWorkspaceProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const search = useSearchParams()
   const { toast: showToast } = useToast()
   const runner = useCodeRunner()
 
-  const initialLanguage: TrainerLanguage =
+  const savedLanguage: TrainerLanguage =
     progress.savedLanguage && task.languages.includes(progress.savedLanguage)
       ? progress.savedLanguage
       : (task.languages[0] ?? 'js')
 
-  const [language, setLanguage] = useState<TrainerLanguage>(initialLanguage)
+  const requestedLanguage = search.get('lang')
+  const language: TrainerLanguage = (requestedLanguage === 'js' || requestedLanguage === 'ts') && task.languages.includes(requestedLanguage) ? requestedLanguage : savedLanguage
   const [code, setCode] = useState<string>(
-    () => progress.savedCode ?? task.starters[initialLanguage] ?? '',
+    () => (language === progress.savedLanguage ? progress.savedCode : null) ?? task.starters[language] ?? '',
   )
   const [result, setResult] = useState<TrainerRunResult | null>(null)
   const [origin, setOrigin] = useState<'client' | 'server' | null>(null)
@@ -110,7 +115,7 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
   if (hydrated && loadedSlot !== draftSlot) {
     setLoadedSlot(draftSlot)
     const draft = readDraft(task.id, language)
-    const restored = draft ?? (loadedSlot === null ? progress.savedCode : null)
+    const restored = draft ?? (language === progress.savedLanguage ? progress.savedCode : null)
     setCode(restored ?? task.starters[language] ?? '')
     setResult(null)
     setOrigin(null)
@@ -138,8 +143,8 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
     if (!ready || busy || next === language) return
     // Смена языка может произойти раньше отложенной записи черновика.
     writeDraft(task.id, language, code)
-    setLanguage(next)
-  }, [busy, code, language, ready, task.id])
+    router.push(queryHref(pathname, search.toString(), { lang: next }), { scroll: false })
+  }, [busy, code, language, ready, task.id, router, pathname, search])
 
   /**
    * Готовит исполняемый JavaScript. Для TypeScript это делает сервер: тащить в
@@ -336,6 +341,8 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
             ))}
           </div>
         )}
+
+        <ShareButton title={task.title} getHref={() => queryHref(pathname, search.toString(), { lang: language })} />
 
         <button
           type="button"

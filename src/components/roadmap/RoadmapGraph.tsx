@@ -80,7 +80,7 @@ export function RoadmapGraph(props: RoadmapGraphProps) {
   )
 }
 
-function RoadmapCanvas({ nodes, edges, nextStepNodeId = null, managementRoadmapId }: RoadmapGraphProps) {
+function RoadmapCanvas({ nodes, edges, nextStepNodeId = null, managementRoadmapId, selectedTopic, onTopicChange, searchQuery, onSearchQueryChange }: RoadmapGraphProps) {
   const { resolvedTheme } = useTheme()
   const flow = useReactFlow()
   const model = useRoadmapLayout(nodes, edges)
@@ -112,8 +112,14 @@ function RoadmapCanvas({ nodes, edges, nextStepNodeId = null, managementRoadmapI
     } catch { setViewportError('Браузер не разрешил полный экран. Используйте масштабирование карты.') }
   }
   const identity = model.content.map((node) => node.id).join('|')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [query, setQuery] = useState('')
+  const [localSelectedId, setLocalSelectedId] = useState<string | null>(null)
+  const selectedId = selectedTopic === undefined ? localSelectedId : selectedTopic
+  const setSelectedId = useCallback((id: string | null) => { if (onTopicChange) onTopicChange(id); else setLocalSelectedId(id) }, [onTopicChange])
+  const [localQuery, setLocalQuery] = useState(searchQuery ?? '')
+  const [syncedQuery, setSyncedQuery] = useState(searchQuery)
+  if (searchQuery !== undefined && searchQuery !== syncedQuery) { setSyncedQuery(searchQuery); setLocalQuery(searchQuery) }
+  const query = localQuery
+  const setQuery = (next: string) => { setLocalQuery(next); onSearchQueryChange?.(next) }
   const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
@@ -142,12 +148,12 @@ function RoadmapCanvas({ nodes, edges, nextStepNodeId = null, managementRoadmapI
       })
       setSelectedId(id)
     },
-    [flow],
+    [flow, setSelectedId],
   )
 
   const onNodeClick: NodeMouseHandler<AnyRoadmapNode> = useCallback((_event, node) => {
     if (isTopicNode(node)) setSelectedId(node.id)
-  }, [])
+  }, [setSelectedId])
 
   const onSearch = (event: FormEvent) => {
     event.preventDefault()
@@ -167,7 +173,15 @@ function RoadmapCanvas({ nodes, edges, nextStepNodeId = null, managementRoadmapI
       const nodes = canvasRef.current?.querySelectorAll<HTMLElement>('.react-flow__node')
       Array.from(nodes ?? []).find((node) => node.getAttribute('data-id') === selectedId)?.focus()
     })
-  }, [selectedId])
+  }, [selectedId, setSelectedId])
+  useEffect(() => {
+    if (!model.ready || !selectedTopic) return
+    const frame = requestAnimationFrame(() => {
+      const node = flow.getNode(selectedTopic)
+      if (node) void flow.setCenter(node.position.x + (node.measured?.width ?? 280) / 2, node.position.y + (node.measured?.height ?? 120) / 2, { zoom: FOCUS_ZOOM, duration: viewportDuration() })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [selectedTopic, model.ready, flow])
   const colorMode = resolvedTheme === 'dark' ? 'dark' : 'light'
 
   return (

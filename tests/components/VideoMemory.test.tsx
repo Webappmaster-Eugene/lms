@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
+vi.mock('next/navigation', () => ({ usePathname: () => window.location.pathname, useSearchParams: () => new URLSearchParams(window.location.search) }))
+
 vi.mock('mpegts.js', () => ({
   default: {
     Events: { ERROR: 'error' },
@@ -180,10 +182,15 @@ describe('память видео', () => {
     play(video(container), 200)
     unmount()
 
-    // Повторная отрисовка на том же адресе метку не применяет — работает память.
+    // Общая ссылка остаётся явным запросом при повторном открытии и на другом устройстве.
     const again = renderPlayer()
     loadMetadata(video(again.container))
-    expect(video(again.container).currentTime).toBe(200)
+    expect(video(again.container).currentTime).toBe(90)
+    again.unmount()
+    window.history.replaceState(null, '', '/lessons/a')
+    const personal = renderPlayer()
+    loadMetadata(video(personal.container))
+    expect(video(personal.container).currentTime).toBe(200)
     window.history.replaceState(null, '', '/')
   })
 })

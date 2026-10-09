@@ -4,7 +4,7 @@ import { rejectForeignLoginOrigin } from '@/payload/hooks/rejectForeignLoginOrig
 
 import { isAdmin } from '@/payload/access/isAdmin'
 import { auditLearningAccessMode } from '@/payload/hooks/learningAccessMode'
-import { lockLearningModeChange } from '@/payload/hooks/learningAccessLock'
+import { lockLearningModeChange, lockLearningUserDelete } from '@/payload/hooks/learningAccessLock'
 import { captureRawCollectionPatch } from '@/payload/hooks/rawCollectionPatch'
 import { createLearningAccessPolicy, normalizeLearningLoginIdentity, reflectLearningAccessPolicy } from '@/payload/hooks/learningAccessPolicy'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
@@ -13,6 +13,7 @@ import { lockSdkAuthOperation } from '@/payload/hooks/lockSdkAuthOperation'
 import { resetPasswordEmail } from '@/payload/emails/templates'
 import { sendInviteEmail } from '@/payload/hooks/sendNotification'
 import { cleanupUserRelations } from '@/payload/hooks/cleanupOwnedRelations'
+import { recordStudentLogin, recordStudentLogout } from '@/server/student-analytics'
 
 type ForgotPasswordArgs = {
   token?: string
@@ -55,11 +56,12 @@ export const Users: CollectionConfig = {
   hooks: {
     beforeOperation: [rejectForeignLoginOrigin, captureRawCollectionPatch, lockSdkAuthOperation],
     beforeLogin: [normalizeLearningLoginIdentity],
+    afterLogin: [recordStudentLogin],
     beforeChange: [lockLearningModeChange, validateStudentAvatar],
     afterChange: [createLearningAccessPolicy, sendInviteEmail, auditLearningAccessMode],
     afterRead: [reflectLearningAccessPolicy, filterRevokedAuthSessions],
-    afterLogout: [revokeAuthenticatedSessions],
-    beforeDelete: [cleanupUserRelations],
+    afterLogout: [revokeAuthenticatedSessions, recordStudentLogout],
+    beforeDelete: [lockLearningUserDelete, cleanupUserRelations],
   },
   access: {
     create: isAdmin,
@@ -80,6 +82,7 @@ export const Users: CollectionConfig = {
   },
   fields: [
     { name: 'learningAccessAssignments', type: 'ui', admin: { components: { Field: '/components/learning-access/UserLearningAccessLink#UserLearningAccessLink' } } },
+    { name: 'studentAnalytics', type: 'ui', admin: { components: { Field: '/components/student-analytics/UserStudentAnalyticsLink#UserStudentAnalyticsLink' } } },
     {
       name: 'learningAccessMode', type: 'select', defaultValue: 'assigned', label: 'Доступ к обучению',
       options: [{ label: 'Все опубликованные курсы', value: 'all' }, { label: 'Только назначенные материалы', value: 'assigned' }],

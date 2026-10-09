@@ -191,6 +191,13 @@ describe('фильтры каталога задач', () => {
     expect(String(push.mock.calls[0][0])).toContain('topic=react')
   })
 
+  it('сброс фильтров сохраняет несвязанный параметр ссылки', async () => {
+    searchParams.current = new URLSearchParams('q=node&topic=react&keep=ok')
+    render(<TaskFilters values={{ ...values, q: 'node', topic: 'react' }} topics={topics} total={10} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Сбросить' }))
+    expect(push).toHaveBeenCalledWith('/trainer/tasks?keep=ok', { scroll: false })
+  })
+
   it('статусы решения предлагаются все три', () => {
     render(<TaskFilters values={values} topics={topics} total={10} />)
 

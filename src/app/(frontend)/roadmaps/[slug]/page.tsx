@@ -15,6 +15,7 @@ import {
 } from '@/lib/roadmap-next-step'
 import { collectAllPages } from '@/lib/paginate'
 import { pluralize } from '@/lib/utils'
+import { protectProgramText } from '@/lib/lesson-video-source'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, PartyPopper, Pencil, Settings } from 'lucide-react'
 import { RoadmapExplorer } from '@/components/roadmap/RoadmapExplorer'
@@ -502,14 +503,14 @@ function buildGraphData(
         courses: comingSoon ? [] : fullCourses.map(toNodeCourse),
         comingSoon,
         icon: n.icon ?? null,
-        description: n.description ?? null,
+        description: n.description ? (canManage ? n.description : protectProgramText(n.description)) : null,
         status,
         progressPercent,
         totalLessons,
         completedLessons,
         stage: n.stage ?? null,
         color: n.color ?? null,
-        bullets,
+        bullets: canManage ? bullets : bullets.map(protectProgramText),
         isNextStep:
           n.nodeType !== 'category' && nextStepCourseId !== null && fullCourses.some((c) => c.id === nextStepCourseId),
       },

@@ -42,15 +42,15 @@ export function groupTopicsByStage(nodes: GraphNode[]): StageGroup[] {
   return groups
 }
 
-function TopicRow({ data, nodeId, managementRoadmapId }: { data: RoadmapNodeData; nodeId?: number; managementRoadmapId?: number }) {
+function TopicRow({ data, nodeId, managementRoadmapId, selected, onSelect }: { data: RoadmapNodeData; nodeId?: number; managementRoadmapId?: number; selected?: boolean; onSelect?: () => void }) {
   const Icon = STATUS_ICON[data.status]
 
   return (
     <details
-      open={data.isNextStep}
+      open={selected ?? data.isNextStep}
       className="group rounded-lg border border-border bg-background open:border-primary/40"
     >
-      <summary className="flex cursor-pointer list-none items-center gap-3 p-3 [&::-webkit-details-marker]:hidden">
+      <summary onClick={onSelect ? (event) => { event.preventDefault(); onSelect() } : undefined} className="flex cursor-pointer list-none items-center gap-3 p-3 [&::-webkit-details-marker]:hidden">
         <Icon className={`h-4 w-4 shrink-0 ${STATUS_COLOR[data.status]}`} aria-hidden="true" />
         <span className="flex-1 text-sm font-medium text-foreground">{data.label}</span>
         {data.isNextStep && (
@@ -85,7 +85,7 @@ function TopicRow({ data, nodeId, managementRoadmapId }: { data: RoadmapNodeData
  * Карта в виде списка: читается на телефоне, проходится с клавиатуры и
  * скринридером. Карта остаётся основным видом на широком экране.
  */
-export function RoadmapTopicList({ nodes, looseCourses, managementRoadmapId }: { nodes: GraphNode[]; looseCourses: NodeCourse[]; managementRoadmapId?: number }) {
+export function RoadmapTopicList({ nodes, looseCourses, managementRoadmapId, selectedTopic, onTopicChange }: { nodes: GraphNode[]; looseCourses: NodeCourse[]; managementRoadmapId?: number; selectedTopic?: string | null; onTopicChange?: (topic: string | null) => void }) {
   const groups = groupTopicsByStage(nodes)
 
   return (
@@ -95,7 +95,7 @@ export function RoadmapTopicList({ nodes, looseCourses, managementRoadmapId }: {
           <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{group.title}</h3>
           <div className="space-y-2">
             {group.nodes.map((node) => (
-              <TopicRow key={node.id} data={node.data} nodeId={node.data.managementNodeId} managementRoadmapId={managementRoadmapId} />
+              <TopicRow key={node.id} data={node.data} nodeId={node.data.managementNodeId} managementRoadmapId={managementRoadmapId} selected={onTopicChange ? selectedTopic === node.id : undefined} onSelect={onTopicChange ? () => onTopicChange(selectedTopic === node.id ? null : node.id) : undefined} />
             ))}
           </div>
         </section>
