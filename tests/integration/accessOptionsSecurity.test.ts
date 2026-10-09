@@ -55,3 +55,18 @@ describe('защита персональных назначений и сохр
     expect(await notificationLinkIsVisible(payload, student.id, note.link)).toBe(true)
   })
 })
+
+describe('уведомления о комнатах собеседования', () => {
+  it('не раскрывает неизвестный источник и отозванную задачу даже при общем доступе к тренажёру', async () => {
+    const student = await createStudent(payload, { learningCatalogVisibility: 'assigned', trainerAccessMode: 'all' })
+    const task = await createSumTask(payload)
+    const legacy = await payload.create({ collection: 'interview-rooms', data: { token: crypto.randomUUID(), owner: student.id, members: [student.id], title: 'Неизвестный источник', language: 'js', version: 1 } })
+    expect(await notificationLinkIsVisible(payload, student.id, `/trainer/interview/${legacy.token}`)).toBe(false)
+    const room = await payload.create({ collection: 'interview-rooms', data: { token: crypto.randomUUID(), sourceTaskKnown: true, sourceTaskId: task.id, owner: student.id, members: [student.id], title: 'Известный источник', language: 'js', version: 1 } })
+    expect(await notificationLinkIsVisible(payload, student.id, `/trainer/interview/${room.token}`)).toBe(true)
+    await payload.create({ collection: 'learning-access-grants', req: await adminReq(), data: { user: student.id, target: { relationTo: 'trainer-tasks', value: task.id }, effect: 'deny', ruleKey: 'server-generated' } })
+    expect(await notificationLinkIsVisible(payload, student.id, `/trainer/interview/${room.token}`)).toBe(false)
+    const other = await createStudent(payload)
+    expect(await notificationLinkIsVisible(payload, other.id, `/trainer/interview/${room.token}`)).toBe(false)
+  })
+})

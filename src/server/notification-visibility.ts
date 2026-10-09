@@ -1,4 +1,5 @@
 import type { Payload, PayloadRequest } from 'payload'
+import { learningRelationId } from '@/lib/learning-access'
 
 import { getLearningAccess } from '@/server/learning-access'
 import { getTrainerAccess } from '@/server/trainer-access'
@@ -15,7 +16,12 @@ export async function notificationLinkIsVisible(payload: Payload, userId: number
   if (parts[0] === 'trainer') {
     const scope = await getTrainerAccess(payload, user, req)
     if (!scope.hasAccess) return false
-    if (parts[1] === 'interview') return scope.mode === 'all'
+    if (parts[1] === 'interview') {
+      if (!parts[2] || parts[2] === 'new') return true
+      const result = await payload.find({ collection: 'interview-rooms', where: { token: { equals: parts[2] } }, select: { members: true, sourceTaskKnown: true, sourceTaskId: true }, limit: 1, depth: 0, overrideAccess: true, req })
+      const room = result.docs[0]
+      return Boolean(room?.sourceTaskKnown && room.members?.some(member => learningRelationId(member) === userId) && (room.sourceTaskId == null || scope.canAccessTask(room.sourceTaskId)))
+    }
     if (parts.length === 1 || parts[1] === 'tasks') return true
     if (parts.length === 2) {
       const result = await payload.find({ collection: 'trainer-topics', where: { slug: { equals: parts[1] } }, select: { slug: true }, limit: 1, depth: 0, overrideAccess: true, req })

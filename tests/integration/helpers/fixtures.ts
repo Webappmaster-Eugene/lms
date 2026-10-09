@@ -63,7 +63,7 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
     issuedAt: new Date().toISOString(), certificateNumber: uid('MC'),
   }),
   streaks: (ctx) => ({ user: ctx.studentId }),
-  'interview-rooms': (ctx) => ({ token: uid('room'), owner: ctx.studentId, members: [ctx.studentId], title: 'Собеседование фикстуры' }),
+  'interview-rooms': (ctx) => ({ token: uid('room'), sourceTaskKnown: true, owner: ctx.studentId, members: [ctx.studentId], title: 'Собеседование фикстуры' }),
   'trainer-topics': () => ({ title: `Тема ${uid()}` }),
   'trainer-tasks': (ctx) => ({ title: `Задача ${uid()}`, topic: ctx.topicId, starterCode: '// код' }),
   'user-trainer-progress': (ctx) => ({ user: ctx.studentId, task: ctx.taskId }),

@@ -18,10 +18,7 @@ export const InterviewRooms: CollectionConfig = {
       const scope = await getTrainerAccess(req.payload, req.user, req)
       if (!scope.hasAccess) return false
       const origin: Where = { and: [
-        { or: [
-          { sourceTaskKnown: { equals: true } },
-          ...(scope.mode === 'all' ? [{ sourceTaskKnown: { equals: false } }, { sourceTaskKnown: { exists: false } }] : []),
-        ] },
+        { sourceTaskKnown: { equals: true } },
         { or: [{ sourceTaskId: { exists: false } }, { sourceTaskId: { in: scope.accessibleTaskIds.length ? scope.accessibleTaskIds : [-1] } }] },
       ] }
       const where: Where = { and: [{ members: { contains: req.user.id } }, ...(scope.admin ? [] : [origin])] }

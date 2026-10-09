@@ -89,14 +89,17 @@ describe('персональный тренажёр: PostgreSQL, REST, марш�
     expect((await payload.findByID({ collection: 'users', id: user.id })).totalPoints).toBe(0)
   })
 
-  it('direct admin PATCH сериализует отзыв перед ожидающим серверным вердиктом', async () => {
+  it.each([
+    { name: 'отзыв доступа', data: { trainerAccessMode: 'disabled' as const } },
+    { name: 'блокировка аккаунта', data: { isActive: false } },
+  ])('$name: прямой PATCH сериализуется с проверенным решением до начисления XP', async ({ data }) => {
     const user = await createStudent(payload, { trainerAccessMode: 'all' })
     const task = await createSumTask(payload, { pointsReward: 31 })
     const req = await createLocalReq({ user: admin }, payload)
     let verdict: ReturnType<typeof saveTrainerProgress> | undefined
     try {
       expect(await initTransaction(req)).toBe(true)
-      await payload.update({ collection: 'users', id: user.id, data: { trainerAccessMode: 'disabled' }, req })
+      await payload.update({ collection: 'users', id: user.id, data, req })
       verdict = saveTrainerProgress({ payload, user, task, language: 'js', code: 'previously checked', result: passed })
       // Consume rejection immediately; the original promise remains available for the assertion.
       void verdict.catch(() => undefined)
@@ -158,12 +161,16 @@ describe('персональный тренажёр: PostgreSQL, REST, марш�
     expect((await roomCall('read', ownerToken, roomToken)).status).toBe(403)
   })
 
-  it('старые комнаты с неизвестным источником закрыты assigned, новые custom разрешены при наличии назначений', async () => {
+  it('неизвестный источник старой комнаты закрыт даже при all, новые custom разрешены при наличии назначений', async () => {
     const user = await createStudent(payload, { trainerAccessMode: 'assigned' })
     const task = await createSumTask(payload)
-    await grant(user.id, 'trainer-tasks', task.id)
+    const assignment = await grant(user.id, 'trainer-tasks', task.id)
     const token = await login(payload, user)
     const legacy = await payload.create({ collection: 'interview-rooms', data: { token: crypto.randomUUID(), owner: user.id, members: [user.id], title: 'Legacy', descriptionMd: 'Legacy source', language: 'js', version: 1 } })
+    expect((await roomCall('read', token, legacy.token)).status).toBe(403)
+    expect((await rest('GET', `/interview-rooms/${legacy.id}`, { token })).status).toBe(404)
+    await payload.update({ collection: 'users', id: user.id, req: await createLocalReq({ user: admin }, payload), data: { trainerAccessMode: 'all' } })
+    await payload.update({ collection: 'learning-access-grants', id: assignment.id, req: await createLocalReq({ user: admin }, payload), data: { effect: 'deny' } })
     expect((await roomCall('read', token, legacy.token)).status).toBe(403)
     expect((await rest('GET', `/interview-rooms/${legacy.id}`, { token })).status).toBe(404)
     const custom = await roomCall('create', token, undefined, {})

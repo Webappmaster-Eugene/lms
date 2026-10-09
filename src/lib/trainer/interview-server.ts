@@ -49,7 +49,8 @@ function clientRoom(room: RoomDocument): InterviewRoom {
 
 function canReadRoomOrigin(room: RoomDocument, scope: TrainerAccessSnapshot): boolean {
   if (scope.admin) return true
-  if (room.sourceTaskKnown !== true && scope.mode !== 'all') return false
+  // An unknown legacy origin cannot prove that copied material is still entitled.
+  if (room.sourceTaskKnown !== true) return false
   return room.sourceTaskId == null || scope.canAccessTask(room.sourceTaskId)
 }
 

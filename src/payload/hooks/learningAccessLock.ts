@@ -95,7 +95,7 @@ export const lockLearningModeChange: CollectionBeforeChangeHook = async ({ req, 
   const db = await transactionDb(req)
   // Policy changes serialize with task verdicts before either takes the users row.
   // Ordinary XP/profile updates may already hold that row, so must not acquire 7204 here.
-  if (['learningAccessMode', 'role', 'learningCatalogVisibility', 'trainerAccessMode'].some((key) => patch.keys.has(key))) {
+  if (['learningAccessMode', 'role', 'learningCatalogVisibility', 'trainerAccessMode', 'isActive'].some((key) => patch.keys.has(key))) {
     await lockLearningAccess(req, Number(originalDoc.id))
   }
   await db.execute(sql`select id from users where id = ${originalDoc.id} for update`)
