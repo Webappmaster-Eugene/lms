@@ -196,9 +196,17 @@ export interface UserAuthOperations {
 export interface User {
   id: number;
   /**
-   * Назначения и исключения задаются в разделе «Доступ к обучению». Каталог и карты доступны для просмотра.
+   * Назначения и исключения задаются в разделе «Доступ к обучению». Видимость каталога настраивается отдельно.
    */
   learningAccessMode?: ('all' | 'assigned') | null;
+  /**
+   * Скрывает неназначенные материалы, в том числе из поиска и прямых ссылок.
+   */
+  learningCatalogVisibility?: ('assigned' | 'catalog') | null;
+  /**
+   * Точечные назначения задаются в разделе «Доступ к обучению».
+   */
+  trainerAccessMode?: ('assigned' | 'all' | 'disabled') | null;
   firstName: string;
   lastName: string;
   role: 'admin' | 'student';
@@ -607,6 +615,14 @@ export interface LearningAccessGrant {
     | {
         relationTo: 'lessons';
         value: number | Lesson;
+      }
+    | {
+        relationTo: 'trainer-topics';
+        value: number | TrainerTopic;
+      }
+    | {
+        relationTo: 'trainer-tasks';
+        value: number | TrainerTask;
       };
   effect: 'allow' | 'deny';
   startsAt?: string | null;
@@ -618,151 +634,26 @@ export interface LearningAccessGrant {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "learning-access-audit".
+ * via the `definition` "trainer-topics".
  */
-export interface LearningAccessAudit {
+export interface TrainerTopic {
   id: number;
-  actorId: number;
-  userId: number;
-  grantId?: number | null;
-  operation: 'create' | 'update' | 'delete' | 'mode';
-  targetType: string;
-  targetId: number;
-  effect: 'allow' | 'deny';
-  previous?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  current?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "learning-access-policies".
- */
-export interface LearningAccessPolicy {
-  id: number;
-  user: number | User;
-  mode: 'all' | 'assigned';
-  role: 'admin' | 'student';
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "auth-session-revocations".
- */
-export interface AuthSessionRevocation {
-  id: number;
-  user: number | User;
-  sessionHash: string;
-  expiresAt: string;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "achievements".
- */
-export interface Achievement {
-  id: number;
-  /**
-   * Ключ стандартного достижения. Изменение названия не создаёт новую награду.
-   */
-  slug?: string | null;
   title: string;
-  description: string;
-  icon?: (number | null) | Media;
-  pointsReward?: number | null;
-  criteriaType:
-    | 'lesson_count'
-    | 'course_completion'
-    | 'roadmap_completion'
-    | 'total_points'
-    | 'trainer_task_count'
-    | 'streak_days';
   /**
-   * Для lesson_count: кол-во уроков. Для total_points: кол-во баллов. Для completion: 1.
+   * Генерируется автоматически из названия
    */
-  criteriaValue: number;
-  /**
-   * Оставьте пустым для любого курса/роадмапа, или укажите конкретный ID
-   */
-  criteriaEntityId?: string | null;
-  isActive?: boolean | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "user-achievements".
- */
-export interface UserAchievement {
-  id: number;
-  user: number | User;
-  achievement: number | Achievement;
-  unlockedAt: string;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "points-transactions".
- */
-export interface PointsTransaction {
-  id: number;
-  user: number | User;
-  amount: number;
-  reason:
-    | 'lesson_completed'
-    | 'course_completed'
-    | 'roadmap_completed'
-    | 'achievement_unlocked'
-    | 'admin_adjustment'
-    | 'trainer_task_completed';
-  /**
-   * ID урока, курса, роадмапа или достижения
-   */
-  relatedEntity?: string | null;
+  slug: string;
   description?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "notes".
- */
-export interface Note {
-  id: number;
-  user: number | User;
-  lesson: number | Lesson;
-  content: string;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "bookmarks".
- */
-export interface Bookmark {
-  id: number;
-  user: number | User;
-  lesson?: (number | null) | Lesson;
-  task?: (number | null) | TrainerTask;
+  /**
+   * Используется для группировки и фильтров в каталоге задач.
+   */
+  category: 'javascript' | 'typescript' | 'algorithms' | 'leetcode' | 'companies' | 'patterns' | 'webapi';
+  /**
+   * Emoji или имя иконки lucide (например: "code", "braces", "terminal")
+   */
+  icon?: string | null;
+  order?: number | null;
+  isPublished?: boolean | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -912,26 +803,153 @@ export interface TrainerTask {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "trainer-topics".
+ * via the `definition` "learning-access-audit".
  */
-export interface TrainerTopic {
+export interface LearningAccessAudit {
   id: number;
+  actorId: number;
+  userId: number;
+  grantId?: number | null;
+  operation: 'create' | 'update' | 'delete' | 'mode';
+  targetType: string;
+  targetId: number;
+  effect: 'allow' | 'deny';
+  previous?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  current?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "learning-access-policies".
+ */
+export interface LearningAccessPolicy {
+  id: number;
+  user: number | User;
+  mode: 'all' | 'assigned';
+  catalogVisibility?: ('catalog' | 'assigned') | null;
+  trainerMode?: ('all' | 'assigned' | 'disabled') | null;
+  role: 'admin' | 'student';
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "auth-session-revocations".
+ */
+export interface AuthSessionRevocation {
+  id: number;
+  user: number | User;
+  sessionHash: string;
+  expiresAt: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "achievements".
+ */
+export interface Achievement {
+  id: number;
+  /**
+   * Ключ стандартного достижения. Изменение названия не создаёт новую награду.
+   */
+  slug?: string | null;
   title: string;
+  description: string;
+  icon?: (number | null) | Media;
+  pointsReward?: number | null;
+  criteriaType:
+    | 'lesson_count'
+    | 'course_completion'
+    | 'roadmap_completion'
+    | 'total_points'
+    | 'trainer_task_count'
+    | 'streak_days';
   /**
-   * Генерируется автоматически из названия
+   * Для lesson_count: кол-во уроков. Для total_points: кол-во баллов. Для completion: 1.
    */
-  slug: string;
+  criteriaValue: number;
+  /**
+   * Оставьте пустым для любого курса/роадмапа, или укажите конкретный ID
+   */
+  criteriaEntityId?: string | null;
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user-achievements".
+ */
+export interface UserAchievement {
+  id: number;
+  user: number | User;
+  achievement: number | Achievement;
+  unlockedAt: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "points-transactions".
+ */
+export interface PointsTransaction {
+  id: number;
+  user: number | User;
+  amount: number;
+  reason:
+    | 'lesson_completed'
+    | 'course_completed'
+    | 'roadmap_completed'
+    | 'achievement_unlocked'
+    | 'admin_adjustment'
+    | 'trainer_task_completed';
+  /**
+   * ID урока, курса, роадмапа или достижения
+   */
+  relatedEntity?: string | null;
   description?: string | null;
-  /**
-   * Используется для группировки и фильтров в каталоге задач.
-   */
-  category: 'javascript' | 'typescript' | 'algorithms' | 'leetcode' | 'companies' | 'patterns' | 'webapi';
-  /**
-   * Emoji или имя иконки lucide (например: "code", "braces", "terminal")
-   */
-  icon?: string | null;
-  order?: number | null;
-  isPublished?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notes".
+ */
+export interface Note {
+  id: number;
+  user: number | User;
+  lesson: number | Lesson;
+  content: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bookmarks".
+ */
+export interface Bookmark {
+  id: number;
+  user: number | User;
+  lesson?: (number | null) | Lesson;
+  task?: (number | null) | TrainerTask;
   updatedAt: string;
   createdAt: string;
 }
@@ -1191,6 +1209,11 @@ export interface UserTrainerProgress {
 export interface InterviewRoom {
   id: number;
   token: string;
+  /**
+   * Неизменяемый ID задачи сохраняется после её удаления.
+   */
+  sourceTaskId?: number | null;
+  sourceTaskKnown?: boolean | null;
   owner: number | User;
   members: (number | User)[];
   presence?:
@@ -1424,6 +1447,8 @@ export interface PayloadMigration {
  */
 export interface UsersSelect<T extends boolean = true> {
   learningAccessMode?: T;
+  learningCatalogVisibility?: T;
+  trainerAccessMode?: T;
   firstName?: T;
   lastName?: T;
   role?: T;
@@ -1738,6 +1763,8 @@ export interface LearningAccessAuditSelect<T extends boolean = true> {
 export interface LearningAccessPoliciesSelect<T extends boolean = true> {
   user?: T;
   mode?: T;
+  catalogVisibility?: T;
+  trainerMode?: T;
   role?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -2087,6 +2114,8 @@ export interface UserTrainerProgressSelect<T extends boolean = true> {
  */
 export interface InterviewRoomsSelect<T extends boolean = true> {
   token?: T;
+  sourceTaskId?: T;
+  sourceTaskKnown?: T;
   owner?: T;
   members?: T;
   presence?: T;

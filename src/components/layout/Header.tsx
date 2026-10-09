@@ -6,7 +6,7 @@ import { SearchBar } from './SearchBar'
 import { MobileSearchOverlay } from './MobileSearchOverlay'
 import { streakView } from '@/lib/streak'
 
-export async function Header() {
+export async function Header({ trainerEnabled = true }: { trainerEnabled?: boolean } = {}) {
   const payload = await getPayload()
   const headersList = await headers()
 
@@ -45,9 +45,9 @@ export async function Header() {
     <header className="sticky top-0 z-30 flex h-[calc(4rem+env(safe-area-inset-top,0px))] shrink-0 items-center gap-3 border-b border-border bg-card/80 pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] pt-[env(safe-area-inset-top,0px)] backdrop-blur-sm lg:h-16 lg:px-8 lg:pt-0">
       {/* Search — desktop inline, mobile icon+overlay */}
       <div className="hidden flex-1 lg:block lg:max-w-md">
-        <SearchBar hotkey />
+        <SearchBar hotkey trainerEnabled={trainerEnabled} />
       </div>
-      <MobileSearchOverlay />
+      <MobileSearchOverlay trainerEnabled={trainerEnabled} />
 
       {/* Spacer on mobile to push items right */}
       <div className="flex-1 lg:hidden" />

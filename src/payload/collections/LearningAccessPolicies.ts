@@ -19,6 +19,8 @@ export const LearningAccessPolicies: CollectionConfig = {
   fields: [
     { name: 'user', type: 'relationship', relationTo: 'users', required: true, unique: true, label: 'Ученик' },
     { name: 'mode', type: 'select', required: true, options: ['all', 'assigned'], label: 'Режим доступа' },
+    { name: 'catalogVisibility', type: 'select', options: ['catalog', 'assigned'], label: 'Видимость каталога' },
+    { name: 'trainerMode', type: 'select', options: ['all', 'assigned', 'disabled'], label: 'Доступ к тренажёру' },
     { name: 'role', type: 'select', required: true, options: ['admin', 'student'], label: 'Роль аккаунта' },
   ],
 }

@@ -28,7 +28,7 @@ export default async function CoursesListPage() {
         sort: ['order', 'id'],
         select: { title: true, slug: true, estimatedHours: true, roadmap: true },
         depth: 0,
-        overrideAccess: true,
+        overrideAccess: false,
         req,
         page,
         limit,
@@ -46,8 +46,7 @@ export default async function CoursesListPage() {
             payload.find({
               collection: 'lessons',
               where: {
-                course: { in: courseIds },
-                isPublished: { equals: true },
+                and: [{ course: { in: courseIds }, isPublished: { equals: true } }, access.browseLessonWhere],
               },
               select: { course: true, section: true, isPublished: true },
               overrideAccess: true,
@@ -80,7 +79,7 @@ export default async function CoursesListPage() {
           { label: `прогресс пользователя ${user.id}` },
         )
       : [],
-    collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmaps', where: { isPublished: { equals: true } }, select: { title: true }, depth: 0, page, limit, overrideAccess: true, req }), { label: 'названия роадмапов каталога' }),
+    collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmaps', where: { isPublished: { equals: true } }, select: { title: true }, depth: 0, page, limit, overrideAccess: false, req }), { label: 'названия роадмапов каталога' }),
   ])
 
   // Группируем уроки по курсу
@@ -113,7 +112,7 @@ export default async function CoursesListPage() {
       id: cId,
       title: course.title,
       slug: course.slug,
-      estimatedHours: course.estimatedHours,
+      estimatedHours: access.catalogVisibility === 'catalog' ? course.estimatedHours : null,
       roadmapTitle: roadmap?.title ?? null,
       totalLessons,
       completedCount,
@@ -131,7 +130,7 @@ export default async function CoursesListPage() {
       </div>
 
       {coursesWithProgress.length === 0 ? (
-        <p className="text-center text-muted-foreground py-12">Курсы скоро появятся</p>
+        <p className="text-center text-muted-foreground py-12">Администратор ещё не назначил обучение</p>
       ) : (
         <CourseCatalog courses={coursesWithProgress} />
       )}

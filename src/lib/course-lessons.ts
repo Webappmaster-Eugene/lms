@@ -1,11 +1,11 @@
-import type { Payload } from 'payload'
+import type { Payload, PayloadRequest } from 'payload'
 
 import { collectAllPages } from '@/lib/paginate'
 import { orderCourseLessons, type LessonRef } from '@/lib/roadmap-next-step'
 import type { Lesson } from '@/payload-types'
 
 export type CourseLessons = {
-  /** Все опубликованные уроки курса — по ним считается процент, как и в сертификатах. */
+  /** Уроки видимой программы: при request учитываются персональные права ученика. */
   allIds: Map<string, string[]>
   /** Уроки в порядке страницы курса — для «Продолжить» и навигации между уроками. */
   ordered: Map<string, LessonRef[]>
@@ -27,6 +27,7 @@ export async function loadCourseLessons(
   courseIds: (string | number)[],
   label: string,
   canOpen?: (lesson: Pick<Lesson, 'id' | 'course' | 'section' | 'isPublished'>) => boolean,
+  request?: PayloadRequest,
 ): Promise<CourseLessons> {
   if (courseIds.length === 0) return { allIds: new Map(), ordered: new Map() }
   const ids = courseIds.map(String)
@@ -36,6 +37,7 @@ export async function loadCourseLessons(
       ({ page, limit }) =>
         payload.find({
           collection: 'lessons',
+          ...(request ? { overrideAccess: false, req: request } : {}),
           where: { course: { in: ids }, isPublished: { equals: true } },
           select: { course: true, section: true, order: true, slug: true, title: true, isPublished: true },
           depth: 0,
@@ -49,6 +51,7 @@ export async function loadCourseLessons(
       ({ page, limit }) =>
         payload.find({
           collection: 'sections',
+          ...(request ? { overrideAccess: false, req: request } : {}),
           where: { course: { in: ids }, isPublished: { equals: true } },
           select: { order: true },
           depth: 0,

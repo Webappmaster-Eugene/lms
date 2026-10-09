@@ -3,6 +3,9 @@ import 'server-only'
 import { sql } from '@payloadcms/db-postgres'
 import { commitTransaction, createLocalReq, initTransaction, killTransaction, type Payload } from 'payload'
 
+import { lockLearningAccess } from '@/payload/hooks/learningAccessLock'
+import { invalidateTrainerAccess, requireTrainerTaskAccess } from '@/server/trainer-access'
+
 import type { TrainerTask, User } from '@/payload-types'
 import type { TrainerLanguage, TrainerRunResult } from '@/lib/trainer/types'
 
@@ -25,6 +28,9 @@ export async function saveTrainerProgress(input: {
     const adapter = payload.db as unknown as SessionsAdapter
     const db = transactionId === undefined ? undefined : adapter.sessions[transactionId]?.db
     if (!db) throw new Error('Прогресс требует транзакцию')
+    await lockLearningAccess(req, user.id)
+    invalidateTrainerAccess(req)
+    await requireTrainerTaskAccess(payload, user, task.id, req)
     // Один замок охватывает первое создание, счётчики и пересчёт XP разных задач.
     await db.execute(sql`select id from users where id = ${user.id} for update`)
     const existing = await payload.find({

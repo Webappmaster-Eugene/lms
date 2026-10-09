@@ -42,6 +42,13 @@ describe('подвал платформы', () => {
     )
   })
 
+  it('закрытый тренажёр не остаётся ссылкой в настольном подвале', async () => {
+    render(await Footer({ trainerEnabled: false }))
+    expect(screen.queryByRole('link', { name: 'Тренажёр' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Курсы' })).toHaveAttribute('href', '/courses')
+    expect(screen.getByText(/персональные курсы, роадмапы и сертификаты/)).toBeInTheDocument()
+  })
+
   it('берёт контакты из CMS, а не из вёрстки', async () => {
     render(await Footer())
 

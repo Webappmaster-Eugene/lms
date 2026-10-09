@@ -17,7 +17,7 @@ test('другое устройство видит точный урок/рол�
   const email = `resume-${Date.now()}@lms.test`
   const password = 'Resume-Test-Pass-1'
   try {
-    const createdUser = await admin.request.post(`${APP_URL}/api/users`, { data: { email, password, firstName: 'Продолжение', lastName: 'Урока', role: 'student', learningAccessMode: 'all' } })
+    const createdUser = await admin.request.post(`${APP_URL}/api/users`, { data: { email, password, firstName: 'Продолжение', lastName: 'Урока', role: 'student', learningCatalogVisibility: 'catalog', trainerAccessMode: 'all', learningAccessMode: 'all' } })
     expect(createdUser.status()).toBe(201)
     userId = (await createdUser.json()).doc.id as number
     for (const context of [first, second]) {

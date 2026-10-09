@@ -33,6 +33,14 @@ describe('мобильные панели', () => {
     document.body.style.overflow = ''
   })
 
+  it('закрытый тренажёр скрыт и в боковом меню, и в нижних вкладках', async () => {
+    render(<SidebarProvider><Sidebar trainerEnabled={false} /><BottomNav trainerEnabled={false} /></SidebarProvider>)
+    expect(screen.queryByRole('link', { name: /Тренажёр/ })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Ещё' }))
+    expect(within(screen.getByRole('dialog')).queryByRole('link', { name: /Тренажёр/ })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('dialog')).getByRole('link', { name: /Курсы/ })).toBeInTheDocument()
+  })
+
   it('закрытие по Escape восстанавливает фокус на кнопку и прежний scroll lock', async () => {
     const user = userEvent.setup()
     document.body.style.overflow = 'auto'

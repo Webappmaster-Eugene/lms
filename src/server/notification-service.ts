@@ -8,6 +8,8 @@ import { childReq } from '@/lib/payload-req'
 import { logger } from '@/lib/telemetry'
 import { dueReminderStage, safeNotificationLink } from '@/lib/notification-policy'
 import { authSessionHash } from '@/payload/hooks/authSessionRevocations'
+import { notificationLinkIsVisible } from '@/server/notification-visibility'
+import { getTrainerAccess } from '@/server/trainer-access'
 import { getLearningAccess } from '@/server/learning-access'
 import { deliveryOutcome } from '@/lib/notification-policy'
 import { sendEncryptedPush, vapidConfiguration } from '@/server/push-transport'
@@ -168,11 +170,12 @@ export async function runNotificationJobs(payload: Payload): Promise<{ skipped: 
         if (stage === null) return
         const policy = await getLearningAccess(payload, user, req)
         const accessible = await payload.count({ collection: 'lessons', where: policy.lessonWhere, req, overrideAccess: true })
-        if (!accessible.totalDocs) return
         const viewerReq = childReq(req, {})
         viewerReq.user = { ...user, collection: 'users' }
         const completed = await payload.count({ collection: 'user-progress', where: { isCompleted: { equals: true } }, req: viewerReq, overrideAccess: false })
-        if (completed.totalDocs >= accessible.totalDocs) return
+        const trainer = await getTrainerAccess(payload, user, req)
+        const completedTasks = trainer.hasAccess ? await payload.count({ collection: 'user-trainer-progress', where: { and: [{ user: { equals: user.id } }, { task: { in: trainer.accessibleTaskIds } }, { isCompleted: { equals: true } }] }, req, overrideAccess: true }) : { totalDocs: 0 }
+        if (completed.totalDocs >= accessible.totalDocs && completedTasks.totalDocs >= trainer.accessibleTaskIds.length) return
         await payload.create({ collection: 'notifications', data: { user: user.id, title: 'Продолжим обучение?', message: 'Небольшой шаг тоже помогает двигаться вперёд. Вернитесь к последнему уроку, когда вам удобно.', type: 'learning_reminder', link: '/' }, req, overrideAccess: true, depth: 0 })
         await payload.update({ collection: 'notification-preferences', id: prefs.id, data: { reminderStage: stage, lastReminderAt: new Date().toISOString() }, req, overrideAccess: true, depth: 0 })
         reminders += 1
@@ -200,7 +203,8 @@ export async function runNotificationJobs(payload: Payload): Promise<{ skipped: 
       const reminder = notification.type === 'learning_reminder'
       const staleReminder = reminder && (preference?.remindersEnabled === false || Date.parse(preference?.lastLearningAt ?? '') >= Date.parse(notification.createdAt) || Date.now() - Date.parse(notification.createdAt) > 86_400_000)
       const sessionValid = await validSubscriptionSession(payload, subscription)
-      const cancelled = !subscription.enabled || !preference?.pushEnabled || staleReminder || !sessionValid || relationId(subscription.user) !== relationId(delivery.user) || relationId(notification.user) !== relationId(delivery.user)
+      const materialVisible = await notificationLinkIsVisible(payload, relationId(delivery.user), notification.link)
+      const cancelled = !materialVisible || !subscription.enabled || !preference?.pushEnabled || staleReminder || !sessionValid || relationId(subscription.user) !== relationId(delivery.user) || relationId(notification.user) !== relationId(delivery.user)
       const localHour = preference ? Number(new Intl.DateTimeFormat('en', { timeZone: preference.timezone, hour: 'numeric', hourCycle: 'h23' }).format(new Date())) : null
       if (!cancelled && reminder && localHour !== preference?.reminderHour) {
         await payload.update({ collection: 'notification-deliveries', where: { and: [{ id: { equals: delivery.id } }, { claimToken: { equals: token } }] }, data: { status: 'pending', attempts: delivery.attempts - 1, claimToken: null, nextAttemptAt: new Date(Date.now() + 1_800_000).toISOString() }, overrideAccess: true, depth: 0 })

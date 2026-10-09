@@ -74,6 +74,20 @@ describe('строка поиска', () => {
       await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(4))
     })
 
+    it('при закрытом тренажёре поиск курсов работает без запроса задач и их заголовков', async () => {
+      mockApi({ courses: [{ id: '1', title: 'Доступный курс', slug: 'allowed' }], tasks: [{ id: '2', title: 'Закрытая задача', slug: 'private', topic: { slug: 'private' } }] })
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      render(<SearchBar trainerEnabled={false} />)
+
+      await type(user, 'курс')
+
+      expect(await screen.findByRole('option', { name: /Доступный курс/ })).toBeInTheDocument()
+      expect(screen.queryByText('Закрытая задача')).not.toBeInTheDocument()
+      expect(global.fetch).toHaveBeenCalledTimes(3)
+      expect(vi.mocked(global.fetch).mock.calls.every(([url]) => !String(url).includes('trainer-tasks'))).toBe(true)
+      expect(input()).toHaveAccessibleName('Поиск по курсам и урокам')
+    })
+
     it('ищем только по опубликованному — черновики ученику не нужны', async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
       render(<SearchBar />)

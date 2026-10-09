@@ -10,7 +10,7 @@ test('администратор назначает роадмап с исклю
   try {
     const email = `assignment-${Date.now()}@lms.test`
     const password = 'Assignment-Test-Pass-1'
-    const created = await admin.request.post(`${APP_URL}/api/users`, { data: { email, password, firstName: 'Александр', lastName: 'Назначенный', role: 'student', learningAccessMode: 'assigned' } })
+    const created = await admin.request.post(`${APP_URL}/api/users`, { data: { email, password, firstName: 'Александр', lastName: 'Назначенный', role: 'student', learningCatalogVisibility: 'catalog', trainerAccessMode: 'all', learningAccessMode: 'assigned' } })
     expect(created.status()).toBe(201)
     userId = (await created.json()).doc.id as number
     expect((await learner.request.post(`${APP_URL}/api/users/login`, { data: { email, password } })).status()).toBe(200)

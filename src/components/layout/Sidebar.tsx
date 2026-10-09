@@ -45,7 +45,7 @@ const NAV_ITEMS = [
   { href: '/help', label: 'Помощь', icon: HelpCircle },
 ] as const
 
-export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
+export function Sidebar({ isAdmin = false, trainerEnabled = true }: { isAdmin?: boolean; trainerEnabled?: boolean }) {
   const pathname = usePathname()
   const { mobileOpen, setMobileOpen } = useSidebar()
 
@@ -72,7 +72,7 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
 
       {/* Navigation */}
       <nav aria-label="Меню платформы" className={cn('flex-1 overflow-y-auto px-3 py-4', mobile ? 'grid grid-cols-1 gap-2 min-[360px]:grid-cols-2' : 'space-y-1')}>
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {NAV_ITEMS.filter((item) => trainerEnabled || item.href !== '/trainer').map(({ href, label, icon: Icon }) => {
           const isActive = href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)
           return (
             <Link

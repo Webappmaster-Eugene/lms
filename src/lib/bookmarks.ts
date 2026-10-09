@@ -37,6 +37,7 @@ export async function loadSaved(payload: Payload, userId: number | string, viewe
     ({ page, limit }) =>
       payload.find({
         collection: 'bookmarks',
+        ...(viewer ? { overrideAccess: false, user: viewer } : {}),
         where: { user: { equals: userId } },
         depth: 0,
         sort: ['-createdAt', 'id'],
@@ -75,6 +76,7 @@ export async function loadSaved(payload: Payload, userId: number | string, viewe
           ({ page, limit }) =>
             payload.find({
               collection: 'trainer-tasks',
+              ...(viewer ? { overrideAccess: false, user: viewer } : {}),
               where: { id: { in: taskIds }, isPublished: { equals: true } },
               select: { title: true, slug: true, topic: true },
               populate: { 'trainer-topics': { title: true, slug: true } },

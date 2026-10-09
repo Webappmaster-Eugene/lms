@@ -6,6 +6,7 @@ import { TRAINER_LIMITS } from '@/lib/trainer/constants'
 import { supportsLanguage } from '@/lib/trainer/spec'
 import type { TrainerDiagnostic } from '@/lib/trainer/types'
 import { parseTaskId } from '@/lib/trainer/task-id'
+import { getTrainerAccess } from '@/server/trainer-access'
 import { compileTypeScript, TrainerRunnerError } from '@/server/trainer/sandbox'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
 import { logger } from '@/lib/telemetry'
@@ -65,6 +66,10 @@ export async function POST(request: Request): Promise<Response> {
 
   if (!rateLimiter.take(String(user.id))) {
     return NextResponse.json({ error: 'Слишком много запросов. Подождите минуту.' }, { status: 429 })
+  }
+
+  if (!(await getTrainerAccess(payload, user)).canAccessTask(taskId)) {
+    return NextResponse.json({ error: 'Доступ к этой задаче не назначен' }, { status: 403 })
   }
 
   const tasks = await payload.find({

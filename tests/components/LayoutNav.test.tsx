@@ -44,6 +44,14 @@ describe('нижняя навигация', () => {
     }
   })
 
+  it('закрытый тренажёр отсутствует в мобильной навигации, остальные разделы доступны', () => {
+    render(<BottomNav trainerEnabled={false} />)
+
+    expect(screen.queryByRole('link', { name: /Тренажёр/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Курсы/ })).toHaveAttribute('href', '/courses')
+    expect(screen.getByRole('button', { name: /Ещё/ })).toBeInTheDocument()
+  })
+
   it('ссылки ведут по своим адресам', () => {
     render(<BottomNav />)
 

@@ -13,7 +13,7 @@ const SECTIONS = [
 
 const linkClass = 'text-muted-foreground transition-colors hover:text-primary'
 
-export async function Footer() {
+export async function Footer({ trainerEnabled = true }: { trainerEnabled?: boolean } = {}) {
   const contacts = await readSiteContacts()
   const year = new Date().getFullYear()
 
@@ -35,15 +35,14 @@ export async function Footer() {
         <div className="space-y-2">
           <p className="font-semibold text-foreground">MentorCareer</p>
           <p className="max-w-xs text-muted-foreground">
-            Платформа обучения разработке: курсы Frontend и Backend, роадмапы, тренажёр кода
-            с проверкой решений и сертификаты.
+            {trainerEnabled ? 'Платформа обучения разработке: курсы Frontend и Backend, роадмапы, тренажёр кода с проверкой решений и сертификаты.' : 'Платформа обучения разработке: персональные курсы, роадмапы и сертификаты.'}
           </p>
         </div>
 
         <nav aria-label="Разделы платформы" className="space-y-2">
           <p className="font-semibold text-foreground">Разделы</p>
           <ul className="space-y-1.5">
-            {SECTIONS.map(({ href, label }) => (
+            {SECTIONS.filter((item) => trainerEnabled || item.href !== '/trainer').map(({ href, label }) => (
               <li key={href}>
                 <Link href={href} className={linkClass}>
                   {label}

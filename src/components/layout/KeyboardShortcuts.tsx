@@ -46,7 +46,7 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 /** Список горячих клавиш платформы по «?» — их стало много, и помнить их не нужно. */
-export function KeyboardShortcuts() {
+export function KeyboardShortcuts({ trainerEnabled = true }: { trainerEnabled?: boolean } = {}) {
   const [open, setOpen] = useState(false)
   const closeRef = useRef<HTMLButtonElement>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
@@ -106,13 +106,13 @@ export function KeyboardShortcuts() {
           </button>
         </div>
         <div className="space-y-4">
-          {GROUPS.map((group) => (
+          {GROUPS.filter((group) => trainerEnabled || group.title !== 'Тренажёр').map((group) => (
             <section key={group.title}>
               <h3 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">{group.title}</h3>
               <dl className="space-y-1.5">
                 {group.keys.map(([keys, action]) => (
                   <div key={keys} className="flex items-center justify-between gap-4 text-sm">
-                    <dt className="text-foreground">{action}</dt>
+                    <dt className="text-foreground">{!trainerEnabled && keys === '/' ? 'Поиск по курсам и урокам' : action}</dt>
                     <dd>
                       <kbd className="whitespace-nowrap rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
                         {keys}

@@ -3,6 +3,7 @@ import type { CollectionConfig, FieldAccess } from 'payload'
 import { isAdminOrSelf } from '@/payload/access/isAdminOrSelf'
 import { isAdmin } from '@/payload/access/isAdmin'
 import { queueNotificationPush } from '@/server/notification-service'
+import { notificationLinkIsVisible } from '@/server/notification-visibility'
 import { safeNotificationLink } from '@/lib/notification-policy'
 
 const editNotification: FieldAccess = async ({ req }) => (await isAdmin({ req })) === true
@@ -26,6 +27,10 @@ export const Notifications: CollectionConfig = {
       return data
     }],
     afterChange: [queueNotificationPush],
+    afterRead: [async ({ doc, req }) => {
+      if (req.user && !(await notificationLinkIsVisible(req.payload, req.user.id, doc.link, req))) return { ...doc, title: 'Учебное уведомление', message: 'Доступ к этому материалу изменился. Обратитесь к преподавателю.', link: null }
+      return doc
+    }],
     beforeDelete: [async ({ id, req }) => { await req.payload.delete({ collection: 'notification-deliveries', where: { notification: { equals: id } }, req, overrideAccess: true }) }],
   },
   fields: [

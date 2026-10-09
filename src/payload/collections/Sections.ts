@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
+import { protectSectionMetadata } from '@/payload/hooks/protectCourseSources'
 import { isAdmin } from '@/payload/access/isAdmin'
 import { learningSectionRead } from '@/payload/access/learningCatalogRead'
 import { generateSlug } from '@/payload/hooks/generateSlug'
@@ -19,6 +20,7 @@ export const Sections: CollectionConfig = {
     delete: isAdmin,
   },
   hooks: {
+    afterRead: [protectSectionMetadata],
     beforeDelete: [cleanupLearningTargetGrants('sections')],
     beforeValidate: [generateSlug],
   },

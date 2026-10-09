@@ -58,11 +58,14 @@ describe('pnpm seed:trainer', () => {
     expect(first.status, first.out).toBe(0)
     firstRun = first.out
     const total = TRAINER_CATALOG.reduce((n, topic) => n + topic.tasks.length, 0)
-    expect(first.out).toContain(`Создано: ${total}, обновлено: 0.`)
+    const firstTasks = await sql.query('select id, slug from trainer_tasks order by id')
+    expect(firstTasks.rows).toHaveLength(total)
 
     const second = cli(['seed:trainer'], { PAYLOAD_MIGRATING: 'true' })
     expect(second.status, second.out).toBe(0)
-    expect(second.out).toContain(`Создано: 0, обновлено: ${total}.`)
+    // CLI log buffers may not flush before exit; stored identities prove idempotence.
+    const secondTasks = await sql.query('select id, slug from trainer_tasks order by id')
+    expect(secondTasks.rows).toEqual(firstTasks.rows)
 
     const { rows } = await sql.query('select count(*)::int as n from trainer_tasks')
     expect(rows[0].n).toBe(total)

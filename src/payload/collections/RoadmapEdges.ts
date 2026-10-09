@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
-import { isAuthenticated } from '@/payload/access/isAuthenticated'
+import { learningEdgeRead } from '@/payload/access/learningCatalogRead'
 
 export const RoadmapEdges: CollectionConfig = {
   slug: 'roadmap-edges',
@@ -13,7 +13,7 @@ export const RoadmapEdges: CollectionConfig = {
   },
   access: {
     create: isAdmin,
-    read: isAuthenticated,
+    read: learningEdgeRead,
     update: isAdmin,
     delete: isAdmin,
   },

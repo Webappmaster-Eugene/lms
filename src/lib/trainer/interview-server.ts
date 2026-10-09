@@ -7,6 +7,9 @@ import config from '@payload-config'
 
 import type { InterviewRoom as RoomDocument, User } from '@/payload-types'
 import { relationId } from '@/lib/relation-id'
+import { getTrainerAccess, invalidateTrainerAccess } from '@/server/trainer-access'
+import type { TrainerAccessSnapshot } from '@/lib/trainer-access'
+import { lockLearningAccess } from '@/payload/hooks/learningAccessLock'
 import { lexicalToMarkdown } from '@/lib/lexical'
 import { starterCodeFor, taskLanguages } from '@/lib/trainer/spec'
 import { parseTaskId } from '@/lib/trainer/task-id'
@@ -42,6 +45,12 @@ function clientRoom(room: RoomDocument): InterviewRoom {
     createdAt: room.createdAt, endedAt: room.endedAt ?? null,
     participants: presence(room).filter((member) => memberIds(room).includes(member.id)),
   }
+}
+
+function canReadRoomOrigin(room: RoomDocument, scope: TrainerAccessSnapshot): boolean {
+  if (scope.admin) return true
+  if (room.sourceTaskKnown !== true && scope.mode !== 'all') return false
+  return room.sourceTaskId == null || scope.canAccessTask(room.sourceTaskId)
 }
 
 function assertMember(room: RoomDocument, user: User): void {
@@ -127,6 +136,8 @@ async function executeInterviewRequest(request: Request, action: Action, token?:
     const { user } = await payload.auth({ headers: authHeaders })
     if (!user) throw new InterviewError('Требуется авторизация', 401)
     if (user.isActive !== true) throw new InterviewError('Аккаунт неактивен', 403)
+    const trainerScope = await getTrainerAccess(payload, user)
+    if (!trainerScope.hasAccess) throw new InterviewError('Доступ к тренажёру не назначен', 403)
     if (action !== 'read') assertOrigin(request)
     const input = action === 'read' ? {} : await body(request)
     if (action === 'create') {
@@ -142,6 +153,7 @@ async function executeInterviewRequest(request: Request, action: Action, token?:
       let code = '// Обсудите условие и напишите решение\nconsole.log("Готов к собеседованию")\n'
       let language: 'js' | 'ts' = 'js'
       if (taskId !== null) {
+        if (!trainerScope.canAccessTask(taskId)) throw new InterviewError('Доступ к задаче не назначен', 403)
         const found = await payload.find({ collection: 'trainer-tasks', where: { id: { equals: taskId }, isPublished: { equals: true } }, limit: 1, depth: 0, overrideAccess: false, user })
         const task = found.docs[0]
         if (!task) throw new InterviewError('Задача не найдена', 404)
@@ -154,17 +166,26 @@ async function executeInterviewRequest(request: Request, action: Action, token?:
         setupCode = task.setupCode ?? ''
         setupTypes = task.setupTypes ?? ''
       }
-      const room = await payload.create({ collection: 'interview-rooms', overrideAccess: true, depth: 0, data: {
-        token: randomUUID(), owner: user.id, members: [user.id], title, descriptionMd, setupCode, setupTypes,
+      req = await createLocalReq({ user }, payload)
+      if (!await initTransaction(req)) throw new Error('Could not start interview transaction')
+      await lockLearningAccess(req, user.id)
+      invalidateTrainerAccess(req)
+      const currentScope = await getTrainerAccess(payload, user, req)
+      if (!currentScope.hasAccess || (taskId !== null && !currentScope.canAccessTask(taskId))) throw new InterviewError('Доступ к задаче отозван', 403)
+      const room = await payload.create({ collection: 'interview-rooms', req, overrideAccess: true, depth: 0, data: {
+        sourceTaskId: taskId, sourceTaskKnown: true, token: randomUUID(), owner: user.id, members: [user.id], title, descriptionMd, setupCode, setupTypes,
         code, language, version: 1,
         presence: [{ id: user.id, name: [user.firstName, user.lastName].filter(Boolean).join(' ') || 'Участник', lastSeen: new Date().toISOString() }],
       } })
+      await commitTransaction(req)
+      req = undefined
       return Response.json({ room: clientRoom(room), userId: user.id }, { status: 201, headers: { 'Cache-Control': 'no-store' } })
     }
     if (!token || !validRoomToken(token)) throw new InterviewError('Комната не найдена', 404)
     const found = await payload.find({ collection: 'interview-rooms', where: { token: { equals: token } }, limit: 1, depth: 0, overrideAccess: true })
     let room = found.docs[0]
     if (!room) throw new InterviewError('Комната не найдена', 404)
+    if (!canReadRoomOrigin(room, trainerScope)) throw new InterviewError('Доступ к задаче этой комнаты не назначен', 403)
     if (action === 'read') {
       assertMember(room, user)
       return Response.json({ room: clientRoom(room), userId: user.id }, { headers: { 'Cache-Control': 'no-store' } })
@@ -180,6 +201,10 @@ async function executeInterviewRequest(request: Request, action: Action, token?:
     if (!writes.take(String(user.id))) throw new InterviewError('Слишком много изменений. Подождите минуту', 429)
     req = await createLocalReq({ user }, payload)
     if (!await initTransaction(req)) throw new Error('Could not start interview transaction')
+    await lockLearningAccess(req, user.id)
+    invalidateTrainerAccess(req)
+    const currentScope = await getTrainerAccess(payload, user, req)
+    if (!currentScope.hasAccess || !canReadRoomOrigin(room, currentScope)) throw new InterviewError('Доступ к задаче этой комнаты отозван', 403)
     await lockRoom(req, room.id)
     room = await payload.findByID({ collection: 'interview-rooms', id: room.id, req, depth: 0, overrideAccess: true })
     if (action === 'join') {

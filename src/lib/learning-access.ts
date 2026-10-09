@@ -1,9 +1,9 @@
 import type { Where } from 'payload'
 
-export const learningTargetCollections = ['roadmaps', 'roadmap-nodes', 'courses', 'sections', 'lessons'] as const
+export const learningTargetCollections = ['roadmaps', 'roadmap-nodes', 'courses', 'sections', 'lessons', 'trainer-topics', 'trainer-tasks'] as const
 export type LearningTargetCollection = (typeof learningTargetCollections)[number]
 export type LearningEffect = 'allow' | 'deny'
-export type LearningAccessUser = { id: number; role?: string | null; learningAccessMode?: 'all' | 'assigned' | null }
+export type LearningAccessUser = { id: number; role?: string | null; learningAccessMode?: 'all' | 'assigned' | null; learningCatalogVisibility?: 'catalog' | 'assigned' | null }
 export type LearningGrant = {
   target: { relationTo: LearningTargetCollection; value: unknown }
   effect: LearningEffect
@@ -41,6 +41,14 @@ export function learningGrantIsActive(grant: LearningGrant, now: number): boolea
 export type LearningAccessSnapshot = {
   admin: boolean
   mode: 'all' | 'assigned'
+  catalogVisibility: 'catalog' | 'assigned'
+  browseLessonWhere: Where
+  browseRoadmapIds: number[]
+  browseNodeIds: number[]
+  browseSectionIds: number[]
+  canBrowseRoadmap: (id: number) => boolean
+  canBrowseNode: (id: number) => boolean
+  canBrowseSection: (id: number) => boolean
   lessonWhere: Where
   accessibleCourseIds: number[]
   browseCourseIds: number[]
@@ -59,6 +67,7 @@ export function buildLearningAccess(
 ): LearningAccessSnapshot {
   const admin = user?.role === 'admin'
   const mode = user?.learningAccessMode === 'all' ? 'all' : 'assigned'
+  const catalogVisibility = user?.learningCatalogVisibility === 'assigned' ? 'assigned' : 'catalog'
   const invalidLessonIds = new Set(metadata.invalidLessonIds ?? [])
   const rules = new Map<string, LearningEffect>()
   for (const grant of grants) {
@@ -115,7 +124,7 @@ export function buildLearningAccess(
     const decision = effect('sections', section.id)
     return decision ? decision === 'allow' : Boolean(courseEffects.get(learningRelationId(section.course) ?? -1))
   }
-  const canBrowseLessonMetadata = (lesson: LearningLessonMetadata) => {
+  const isPublishedLesson = (lesson: LearningLessonMetadata) => {
     if (admin) return true
     if (!user || !lesson.isPublished || invalidLessonIds.has(lesson.id)) return false
     const courseId = learningRelationId(lesson.course)
@@ -127,7 +136,7 @@ export function buildLearningAccess(
   }
   const canAccessLessonMetadata = (lesson: LearningLessonMetadata) => {
     if (admin) return true
-    if (!canBrowseLessonMetadata(lesson)) return false
+    if (!isPublishedLesson(lesson)) return false
     const courseId = learningRelationId(lesson.course) ?? -1
     const sectionId = learningRelationId(lesson.section)
     const section = sectionId === null ? null : sections.get(sectionId)
@@ -154,7 +163,7 @@ export function buildLearningAccess(
   const allowedLessons: number[] = []
   const deniedLessons = new Set(invalidLessonIds)
   for (const lesson of metadata.lessons) {
-    if (!canBrowseLessonMetadata(lesson)) { deniedLessons.add(lesson.id); continue }
+    if (!isPublishedLesson(lesson)) { deniedLessons.add(lesson.id); continue }
     if (effect('lessons', lesson.id) === undefined) continue
     if (canAccessLessonMetadata(lesson)) {
       allowedLessons.push(lesson.id)
@@ -170,5 +179,50 @@ export function buildLearningAccess(
       ...(deniedLessons.size ? [{ id: { not_in: [...deniedLessons] } }] : []),
     ],
   }
-  return { admin, mode, lessonWhere, accessibleCourseIds: [...accessible], browseCourseIds: user ? [...courses.keys()] : [], canBrowseCourse: (id) => admin || (Boolean(user) && courses.has(id)), canBrowseLessonMetadata, canAccessCourse: (id) => admin || accessible.has(id), canAccessLessonMetadata }
+  const browseCourses = new Set(user ? catalogVisibility === 'catalog' ? courses.keys() : accessible : [])
+  const browseSections = new Set<number>()
+  for (const section of sections.values()) {
+    if (user && (catalogVisibility === 'catalog' || sectionAllowed(section))) browseSections.add(section.id)
+  }
+  for (const lesson of metadata.lessons) {
+    if (canAccessLessonMetadata(lesson)) {
+      const sectionId = learningRelationId(lesson.section)
+      if (sectionId !== null) browseSections.add(sectionId)
+    }
+  }
+  const browseRoadmaps = new Set<number>(user && catalogVisibility === 'catalog' ? roadmaps : [])
+  const browseNodes = new Set<number>()
+  for (const courseId of browseCourses) {
+    const course = courses.get(courseId)
+    const roadmapId = learningRelationId(course?.roadmap)
+    const nodeId = learningRelationId(course?.roadmapNode)
+    if (roadmapId !== null) browseRoadmaps.add(roadmapId)
+    if (nodeId !== null) browseNodes.add(nodeId)
+  }
+  for (const roadmapId of roadmaps) if (user && effect('roadmaps', roadmapId) === 'allow') browseRoadmaps.add(roadmapId)
+  for (const node of nodes.values()) {
+    const roadmapId = learningRelationId(node.roadmap)
+    if (!user || roadmapId === null || !roadmaps.has(roadmapId)) continue
+    const courseId = learningRelationId(node.course)
+    if (catalogVisibility === 'catalog' || (courseId !== null && browseCourses.has(courseId)) || effect('roadmap-nodes', node.id) === 'allow' || (courseId === null && effect('roadmaps', roadmapId) === 'allow' && effect('roadmap-nodes', node.id) !== 'deny')) {
+      browseNodes.add(node.id)
+      browseRoadmaps.add(roadmapId)
+    }
+  }
+  const publishedWhere: Where = { and: [
+    { isPublished: { equals: true } }, { course: { in: [...courses.keys()] } },
+    { or: [{ section: { exists: false } }, { section: { in: [...sections.keys()] } }] },
+    ...(invalidLessonIds.size ? [{ id: { not_in: [...invalidLessonIds] } }] : []),
+  ] }
+  return { admin, mode, catalogVisibility, lessonWhere,
+    browseLessonWhere: admin ? {} : catalogVisibility === 'assigned' ? lessonWhere : publishedWhere,
+    accessibleCourseIds: [...accessible], browseCourseIds: [...browseCourses],
+    browseSectionIds: [...browseSections], browseRoadmapIds: [...browseRoadmaps], browseNodeIds: [...browseNodes],
+    canBrowseCourse: id => admin || browseCourses.has(id),
+    canBrowseSection: id => admin || browseSections.has(id),
+    canBrowseRoadmap: id => admin || browseRoadmaps.has(id),
+    canBrowseNode: id => admin || browseNodes.has(id),
+    canBrowseLessonMetadata: lesson => isPublishedLesson(lesson) && (catalogVisibility === 'catalog' || canAccessLessonMetadata(lesson)),
+    canAccessCourse: id => admin || accessible.has(id), canAccessLessonMetadata }
+
 }

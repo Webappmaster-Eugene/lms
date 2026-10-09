@@ -45,7 +45,8 @@
   &__rule-heading > div, &__preview li > span { min-width: 0; overflow-wrap: anywhere; }
   &__preview { margin: 30px 0; padding-top: 24px; border-top: 1px solid var(--theme-elevation-250); }
   &__preview strong { flex-shrink: 0; font-size: 13px; }
-  &__preview [data-access='closed'] { color: var(--theme-elevation-650); }
+  &__preview [data-access='closed'], &__preview [data-access='hidden'] { color: var(--theme-elevation-650); }
+  &__trainer-preview { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--theme-elevation-200); }
   &__save { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; position: sticky; bottom: 0; padding: 16px 0; background: var(--theme-elevation-0); border-top: 1px solid var(--theme-elevation-250); }
   &__save > span { font-size: 13px; margin-right: auto; }
   button.learning-access__primary { color: var(--theme-elevation-0); background: var(--theme-text); border-color: var(--theme-text); }

@@ -4,6 +4,7 @@ import { isAuthenticated } from '@/payload/access/isAuthenticated'
 import { isAdminOrSelf } from '@/payload/access/isAdminOrSelf'
 import { assignOwner } from '@/payload/hooks/assignOwner'
 import { guardLearningLessonWrite } from '@/payload/hooks/learningLessonWrite'
+import { guardTrainerTaskBookmark } from '@/payload/hooks/trainerTaskBookmark'
 import { learningStateRead } from '@/payload/access/learningStateRead'
 
 /** Закладка ведёт ровно на одно: урок или задачу тренажёра. */
@@ -34,7 +35,7 @@ export const Bookmarks: CollectionConfig = {
   },
   hooks: {
     beforeValidate: [oneTarget],
-    beforeChange: [assignOwner, guardLearningLessonWrite],
+    beforeChange: [assignOwner, guardLearningLessonWrite, guardTrainerTaskBookmark],
   },
   // Повторное «сохранить» не плодит дубли. NULL в Postgres уникальности не мешает,
   // поэтому закладки на урок и на задачу живут в одной таблице.

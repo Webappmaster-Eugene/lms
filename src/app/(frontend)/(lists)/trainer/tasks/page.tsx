@@ -9,6 +9,8 @@ import { TaskFilters, type TaskFilterValues } from '@/components/trainer/TaskFil
 import { COMPANY_LABELS, DIFFICULTY_LABELS, TAG_LABELS } from '@/lib/trainer/constants'
 import { taskLanguages } from '@/lib/trainer/spec'
 import { cn } from '@/lib/utils'
+import { TrainerCatalogLink } from '@/components/trainer/TrainerCatalogLink'
+import { getTrainerAccess } from '@/server/trainer-access'
 import { collectAllPages } from '@/lib/paginate'
 import type { TrainerCompany, TrainerTag } from '@/lib/trainer/constants'
 import type { TrainerDifficulty } from '@/lib/trainer/types'
@@ -51,12 +53,13 @@ export default async function AllTasksPage({ searchParams }: Props) {
   const payload = await getPayload()
   const headersList = await headers()
   const { user } = await payload.auth({ headers: headersList })
+  const scope = await getTrainerAccess(payload, user)
 
   const topics = await collectAllPages(
     ({ page, limit }) =>
       payload.find({
         collection: 'trainer-topics',
-        where: { isPublished: { equals: true } },
+        where: { isPublished: { equals: true }, ...(scope.admin ? {} : { id: { in: scope.browseTopicIds.length ? scope.browseTopicIds : [-1] } }) },
         sort: ['order', 'id'],
         select: { slug: true, title: true },
         page,
@@ -68,7 +71,7 @@ export default async function AllTasksPage({ searchParams }: Props) {
   const topicBySlug = new Map(topics.map((topic) => [topic.slug, topic]))
   const topicById = new Map(topics.map((topic) => [String(topic.id), topic]))
 
-  const conditions: Where[] = [{ isPublished: { equals: true } }]
+  const conditions: Where[] = [{ isPublished: { equals: true } }, ...(scope.admin ? [] : [{ id: { in: scope.browseTaskIds.length ? scope.browseTaskIds : [-1] } }])]
   if (filters.q) conditions.push({ title: { like: filters.q } })
   if (filters.difficulty) conditions.push({ difficulty: { equals: filters.difficulty } })
   if (filters.language) conditions.push({ languages: { contains: filters.language } })
@@ -83,6 +86,8 @@ export default async function AllTasksPage({ searchParams }: Props) {
       payload.find({
         collection: 'trainer-tasks',
         where: { and: conditions },
+        select: { title: true, slug: true, topic: true, difficulty: true, tags: true, companies: true, languages: true },
+        depth: 0,
         sort: ['topic', 'order', 'id'],
         page,
         limit,
@@ -152,6 +157,7 @@ export default async function AllTasksPage({ searchParams }: Props) {
         <div className="overflow-hidden rounded-xl border border-border bg-card">
           <ul>
             {visible.map((task, index) => {
+              const allowed = scope.canAccessTask(task.id)
               const isCompleted = completedIds.has(String(task.id))
               const difficulty = (task.difficulty ?? 'easy') as TrainerDifficulty
               const topicId = typeof task.topic === 'object' && task.topic !== null
@@ -165,7 +171,8 @@ export default async function AllTasksPage({ searchParams }: Props) {
 
               return (
                 <li key={task.id} className="border-b border-border last:border-b-0">
-                  <Link
+                  <TrainerCatalogLink
+                    allowed={allowed}
                     href={`/trainer/${topic.slug}/${task.slug}`}
                     className="group flex min-h-[52px] flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 transition-colors hover:bg-accent/50"
                   >
@@ -178,7 +185,7 @@ export default async function AllTasksPage({ searchParams }: Props) {
                     )}
 
                     <span className="min-w-[140px] flex-1 truncate text-sm font-medium text-foreground transition-colors group-hover:text-primary">
-                      {task.title}
+                      {task.title}{!allowed && <span className="ml-2 text-xs text-muted-foreground">Доступ не назначен</span>}
                     </span>
 
                     <span className="hidden text-xs text-muted-foreground sm:inline">
@@ -220,7 +227,7 @@ export default async function AllTasksPage({ searchParams }: Props) {
                     >
                       {DIFFICULTY_LABELS[difficulty]}
                     </span>
-                  </Link>
+                  </TrainerCatalogLink>
                 </li>
               )
             })}

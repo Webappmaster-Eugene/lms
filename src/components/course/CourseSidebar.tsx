@@ -15,9 +15,10 @@ type CourseSidebarProps = {
   currentLessonId?: string
   totalLessons: number
   totalCompleted: number
+  assignedOnly?: boolean
 }
 
-export function CourseSidebar({ courseTitle, sections, completedLessonIds, currentLessonId, totalLessons, totalCompleted }: CourseSidebarProps) {
+export function CourseSidebar({ courseTitle, sections, completedLessonIds, currentLessonId, totalLessons, totalCompleted, assignedOnly = false }: CourseSidebarProps) {
   const [isOpen, setIsOpen] = useState(false)
   const panelId = useId()
   const currentSectionId = sections.find((section) => section.lessons.some((lesson) => lesson.id === currentLessonId))?.id
@@ -41,7 +42,7 @@ export function CourseSidebar({ courseTitle, sections, completedLessonIds, curre
           <span className="font-medium text-primary">{progress}%</span>
           <span className="text-muted-foreground">{totalCompleted}/{totalLessons} уроков</span>
         </div>
-        <div role="progressbar" aria-label="Прогресс курса" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} className="h-1.5 overflow-hidden rounded-full bg-muted">
+        <div role="progressbar" aria-label={assignedOnly ? 'Прогресс назначенных уроков' : 'Прогресс курса'} aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} className="h-1.5 overflow-hidden rounded-full bg-muted">
           <div className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
         </div>
       </div>
@@ -103,7 +104,7 @@ export function CourseSidebar({ courseTitle, sections, completedLessonIds, curre
         className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring lg:hidden"
       >
         <BookOpen aria-hidden="true" className="h-5 w-5 shrink-0" />
-        <span className="min-w-0 flex-1">Содержание курса</span>
+        <span className="min-w-0 flex-1">{assignedOnly ? 'Назначенные уроки' : 'Содержание курса'}</span>
         <span className="shrink-0 text-xs text-muted-foreground">{totalCompleted}/{totalLessons}</span>
         <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
       </button>

@@ -93,18 +93,22 @@ export const lockLearningModeChange: CollectionBeforeChangeHook = async ({ req, 
   const patch = consumeRawCollectionPatch(req, 'users', originalDoc.id)
   if (!patch) throw new APIError('Исходные поля профиля не определены', 409)
   const db = await transactionDb(req)
-  // Never take 7204 here: trainer transactions already hold this users row; manager uses 7204 -> row.
+  // Policy changes serialize with task verdicts before either takes the users row.
+  // Ordinary XP/profile updates may already hold that row, so must not acquire 7204 here.
+  if (['learningAccessMode', 'role', 'learningCatalogVisibility', 'trainerAccessMode'].some((key) => patch.keys.has(key))) {
+    await lockLearningAccess(req, Number(originalDoc.id))
+  }
   await db.execute(sql`select id from users where id = ${originalDoc.id} for update`)
   invalidateLearningAccess(req)
   const current = await req.payload.db.findOne({ collection: 'users', where: { id: { equals: originalDoc.id } }, req })
   if (!current) throw new APIError('Пользователь удалён; обновите страницу', 409)
   const actualPolicy = await getAuthoritativeLearningPolicy(req.payload, Number(originalDoc.id), req)
-  const currentWithMode = { ...current, learningAccessMode: actualPolicy.mode, role: actualPolicy.role }
+  const currentWithMode = { ...current, learningAccessMode: actualPolicy.mode, role: actualPolicy.role, learningCatalogVisibility: actualPolicy.catalogVisibility, trainerAccessMode: actualPolicy.trainerMode }
   const keys = new Set(patch.keys)
   // System XP/password updates may bypass field access; they still cannot reassign learning access.
   const actorRole = req.user ? (await getAuthoritativeLearningPolicy(req.payload, req.user.id, req)).role : 'student'
   if (!patch.overrideAccess && req.user && actorRole !== 'admin' && req.user.id !== Number(originalDoc.id)) throw new Forbidden(req.t)
-  if (actorRole !== 'admin') { keys.delete('learningAccessMode'); keys.delete('role') }
+  if (actorRole !== 'admin') { keys.delete('learningAccessMode'); keys.delete('role'); keys.delete('learningCatalogVisibility'); keys.delete('trainerAccessMode') }
   if (!patch.overrideAccess) {
     for (const field of req.payload.collections.users.config.fields) {
       if (!('name' in field) || !keys.has(field.name) || !('access' in field) || !field.access?.update) continue
@@ -113,8 +117,8 @@ export const lockLearningModeChange: CollectionBeforeChangeHook = async ({ req, 
     }
   }
   const merged = mergeActualPatch(currentWithMode, data, keys)
-  if (keys.has('learningAccessMode') || keys.has('role')) {
-    await persistLearningAccessPolicy(req, Number(originalDoc.id), { mode: merged.learningAccessMode === 'all' ? 'all' : 'assigned', role: merged.role === 'admin' ? 'admin' : 'student' })
+  if (keys.has('learningAccessMode') || keys.has('role') || keys.has('learningCatalogVisibility') || keys.has('trainerAccessMode')) {
+    await persistLearningAccessPolicy(req, Number(originalDoc.id), { mode: merged.learningAccessMode === 'all' ? 'all' : 'assigned', role: merged.role === 'admin' ? 'admin' : 'student', catalogVisibility: merged.learningCatalogVisibility === 'catalog' ? 'catalog' : 'assigned', trainerMode: merged.trainerAccessMode === 'all' || merged.trainerAccessMode === 'disabled' ? merged.trainerAccessMode : 'assigned' })
     if (req.user && actorRole === 'admin') markLearningAccessAuditActor(req, Number(originalDoc.id), req.user.id)
   }
   refreshOriginal(originalDoc, currentWithMode)

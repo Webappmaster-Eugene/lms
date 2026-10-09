@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import { Code2, ArrowRight, ListFilter } from 'lucide-react'
+import { getTrainerAccess } from '@/server/trainer-access'
 import { collectAllPages } from '@/lib/paginate'
 
 export const metadata: Metadata = {
@@ -13,12 +14,13 @@ export default async function TrainerPage() {
   const payload = await getPayload()
   const headersList = await headers()
   const { user } = await payload.auth({ headers: headersList })
+  const scope = await getTrainerAccess(payload, user)
 
   const topics = await collectAllPages(
     ({ page, limit }) =>
       payload.find({
         collection: 'trainer-topics',
-        where: { isPublished: { equals: true } },
+        where: { isPublished: { equals: true }, ...(scope.admin ? {} : { id: { in: scope.browseTopicIds.length ? scope.browseTopicIds : [-1] } }) },
         sort: ['order', 'id'],
         page,
         limit,
@@ -35,7 +37,7 @@ export default async function TrainerPage() {
           ({ page, limit }) =>
             payload.find({
               collection: 'trainer-tasks',
-              where: { topic: { in: topicIds }, isPublished: { equals: true } },
+              where: { topic: { in: topicIds }, isPublished: { equals: true }, ...(scope.admin ? {} : { id: { in: scope.browseTaskIds.length ? scope.browseTaskIds : [-1] } }) },
               select: { topic: true },
               depth: 0,
               sort: 'id',
@@ -104,7 +106,7 @@ export default async function TrainerPage() {
         за каждую решённую задачу начисляются баллы.
       </p>
 
-      <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card p-4">
+      {scope.hasAccess && <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card p-4">
         <div className="max-w-xl">
           <h2 className="font-semibold text-foreground">Режим собеседования</h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -116,11 +118,11 @@ export default async function TrainerPage() {
           className="inline-flex min-h-[38px] items-center rounded-lg border border-border px-3 text-sm font-medium hover:bg-accent">
           Создать комнату
         </Link>
-      </section>
+      </section>}
 
       {topicsWithStats.length === 0 ? (
         <p className="text-center text-muted-foreground py-12">
-          Задачи скоро появятся
+          {scope.mode === 'disabled' || !scope.hasAccess ? 'Доступ к тренажёру не назначен. Обратитесь к наставнику.' : 'Задачи скоро появятся'}
         </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -140,7 +142,7 @@ export default async function TrainerPage() {
                     <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
                       {topic.title}
                     </h3>
-                    {topic.description && (
+                    {scope.catalogVisibility === 'catalog' && topic.description && (
                       <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
                         {topic.description}
                       </p>

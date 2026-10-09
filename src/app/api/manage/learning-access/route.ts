@@ -3,8 +3,9 @@ import { sql } from '@payloadcms/db-postgres'
 import { commitTransaction, createLocalReq, getPayload, initTransaction, killTransaction, type Payload, type PayloadRequest, type Where } from 'payload'
 import config from '@payload-config'
 
-import { AssignmentInputError, assignmentId, validateAssignmentInput, type AssignmentInput, type AssignmentRule, type AssignmentSnapshot } from '@/components/learning-access/contracts'
+import { AssignmentInputError, assignmentId, storedAssignmentTarget, validateAssignmentInput, type AssignmentInput, type AssignmentRule, type AssignmentSnapshot } from '@/components/learning-access/contracts'
 import { buildLearningAccess, learningGrantIsActive, learningRelationId, learningTargetCollections, type LearningTargetCollection } from '@/lib/learning-access'
+import { buildTrainerAccess } from '@/lib/trainer-access'
 import { collectAllPages } from '@/lib/paginate'
 import { lockLearningAccess } from '@/payload/hooks/learningAccessLock'
 
@@ -49,18 +50,20 @@ function queryPage(raw: string | null): number {
   return page
 }
 
-function revision(userId: number, mode: 'all' | 'assigned', updatedAt: string, rules: AssignmentRule[]) {
+function revision(userId: number, mode: 'all' | 'assigned', catalogVisibility: 'catalog' | 'assigned', trainerMode: 'all' | 'assigned' | 'disabled', updatedAt: string, rules: AssignmentRule[]) {
   const stable = rules.map(({ id, target, effect, startsAt, expiresAt, note }) => ({ id, target, effect, startsAt, expiresAt, note })).sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
-  return createHash('sha256').update(JSON.stringify({ userId, mode, updatedAt, rules: stable })).digest('hex')
+  return createHash('sha256').update(JSON.stringify({ userId, mode, catalogVisibility, trainerMode, updatedAt, rules: stable })).digest('hex')
 }
 
 async function snapshot(payload: Payload, userId: number, req: PayloadRequest): Promise<AssignmentSnapshot> {
-  const student = await payload.findByID({ collection: 'users', id: userId, depth: 0, select: { firstName: true, lastName: true, role: true, learningAccessMode: true, updatedAt: true }, overrideAccess: false, req })
+  const student = await payload.findByID({ collection: 'users', id: userId, depth: 0, select: { firstName: true, lastName: true, role: true, learningAccessMode: true, learningCatalogVisibility: true, trainerAccessMode: true, updatedAt: true }, overrideAccess: false, req })
   if (student.role !== 'student') throw new AssignmentInputError('Назначения доступны для аккаунтов учеников', 400)
   const grants = await collectAllPages(({ page, limit }) => payload.find({ collection: 'learning-access-grants', where: { user: { equals: userId } }, page, limit, sort: 'id', depth: 0, overrideAccess: false, req }), { label: 'Назначения ученика' })
-  const rules: AssignmentRule[] = grants.map((grant) => ({ id: grant.id, target: { relationTo: grant.target.relationTo, value: assignmentId(learningRelationId(grant.target.value)) }, effect: grant.effect, startsAt: grant.startsAt ?? null, expiresAt: grant.expiresAt ?? null, note: grant.note ?? '' }))
+  const rules: AssignmentRule[] = grants.map((grant) => ({ id: grant.id, target: storedAssignmentTarget(grant.target, grant.id), effect: grant.effect, startsAt: grant.startsAt ?? null, expiresAt: grant.expiresAt ?? null, note: grant.note ?? '' }))
   const mode = student.learningAccessMode === 'all' ? 'all' : 'assigned'
-  return { userId, mode, revision: revision(userId, mode, student.updatedAt, rules), rules, student: { id: student.id, title: `${student.firstName} ${student.lastName}` } }
+  const catalogVisibility = student.learningCatalogVisibility === 'assigned' ? 'assigned' : 'catalog'
+  const trainerMode = student.trainerAccessMode === 'assigned' || student.trainerAccessMode === 'disabled' ? student.trainerAccessMode : 'all'
+  return { userId, mode, catalogVisibility, trainerMode, revision: revision(userId, mode, catalogVisibility, trainerMode, student.updatedAt, rules), rules, student: { id: student.id, title: `${student.firstName} ${student.lastName}` } }
 }
 
 async function ruleTitles(payload: Payload, rules: AssignmentRule[], req: PayloadRequest) {
@@ -107,16 +110,18 @@ async function readInput(request: Request) {
   catch { throw new AssignmentInputError('Не удалось прочитать назначения') }
 }
 
-async function preview(payload: Payload, input: AssignmentInput, req: PayloadRequest, page: number) {
-  const [courses, sections, roadmaps, nodes] = await Promise.all([
+async function preview(payload: Payload, input: AssignmentInput, req: PayloadRequest, page: number, trainerPage: number) {
+  const [courses, sections, roadmaps, nodes, trainerTopics, trainerTasks] = await Promise.all([
     collectAllPages(({ page, limit }) => payload.find({ collection: 'courses', page, limit, sort: 'id', depth: 0, select: { title: true, roadmap: true, roadmapNode: true, isPublished: true }, overrideAccess: false, req })),
     collectAllPages(({ page, limit }) => payload.find({ collection: 'sections', page, limit, sort: 'id', depth: 0, select: { course: true, isPublished: true }, overrideAccess: false, req })),
     collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmaps', page, limit, sort: 'id', depth: 0, select: { isPublished: true }, overrideAccess: false, req })),
     collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmap-nodes', page, limit, sort: 'id', depth: 0, select: { roadmap: true, course: true }, overrideAccess: false, req })),
+    collectAllPages(({ page, limit }) => payload.find({ collection: 'trainer-topics', page, limit, sort: 'id', depth: 0, select: { title: true, isPublished: true }, overrideAccess: false, req })),
+    collectAllPages(({ page, limit }) => payload.find({ collection: 'trainer-tasks', page, limit, sort: 'id', depth: 0, select: { title: true, topic: true, isPublished: true }, overrideAccess: false, req })),
   ])
   const lessonIds = input.rules.filter((rule) => rule.target.relationTo === 'lessons').map((rule) => rule.target.value)
   const lessons = lessonIds.length ? await collectAllPages(({ page, limit }) => payload.find({ collection: 'lessons', where: { id: { in: lessonIds } }, page, limit, sort: 'id', depth: 0, select: { course: true, section: true, isPublished: true }, overrideAccess: false, req })) : []
-  const user = { id: input.userId, role: 'student', learningAccessMode: input.mode }
+  const user = { id: input.userId, role: 'student', learningAccessMode: input.mode, learningCatalogVisibility: input.catalogVisibility, trainerAccessMode: input.trainerMode }
   const metadata = { courses, sections, roadmaps, nodes, lessons }
   const now = Date.now()
   const policy = buildLearningAccess(user, input.rules, metadata, now)
@@ -132,14 +137,17 @@ async function preview(payload: Payload, input: AssignmentInput, req: PayloadReq
   }
   const liveRoadmaps = new Set(roadmaps.filter((roadmap) => roadmap.isPublished).map((roadmap) => roadmap.id))
   const visible = courses.filter((course) => course.isPublished && liveRoadmaps.has(learningRelationId(course.roadmap) ?? -1))
+  const trainerPolicy = buildTrainerAccess(user, input.rules, { topics: trainerTopics, tasks: trainerTasks }, now)
+  const liveTopics = new Set(trainerTopics.filter((topic) => topic.isPublished).map((topic) => topic.id))
+  const publishedTasks = trainerTasks.filter((task) => task.isPublished && liveTopics.has(learningRelationId(task.topic) ?? -1))
   const docs = visible.slice((page - 1) * pageSize, page * pageSize).map((course) => {
-    return { id: course.id, title: course.title, access: !policy.canAccessCourse(course.id) ? 'closed' : base.canAccessCourse(course.id) && !deniedDescendants.has(course.id) ? 'full' : 'partial' }
+    return { id: course.id, title: course.title, visible: policy.canBrowseCourse(course.id), access: !policy.canAccessCourse(course.id) ? 'closed' : base.canAccessCourse(course.id) && !deniedDescendants.has(course.id) ? 'full' : 'partial' }
   })
-  return { courses: docs, page, hasNextPage: page * pageSize < visible.length, availableCount: visible.filter((course) => policy.canAccessCourse(course.id)).length, totalCount: visible.length }
+  return { courses: docs, page, hasNextPage: page * pageSize < visible.length, availableCount: visible.filter((course) => policy.canAccessCourse(course.id)).length, totalCount: visible.length, hiddenCount: visible.filter((course) => !policy.canBrowseCourse(course.id)).length, trainer: { tasks: publishedTasks.slice((trainerPage - 1) * pageSize, trainerPage * pageSize).map((task) => ({ id: task.id, title: task.title, visible: trainerPolicy.canBrowseTask(task.id), access: trainerPolicy.canAccessTask(task.id) ? 'open' : 'closed' })), page: trainerPage, hasNextPage: trainerPage * pageSize < publishedTasks.length, availableCount: trainerPolicy.accessibleTaskIds.length, totalCount: publishedTasks.length } }
 }
 
 function failure(error: unknown) {
-  if (error instanceof AssignmentInputError) return response({ error: error.message }, error.status)
+  if (error instanceof AssignmentInputError) return response({ error: error.message, ...(error.code ? { code: error.code } : {}) }, error.status)
   const status = error instanceof Error && 'status' in error && typeof error.status === 'number' ? error.status : 500
   return response({ error: status === 404 ? 'Ученик или материал не найден' : status < 500 ? 'Проверьте поля назначений и повторите сохранение' : 'Не удалось загрузить или сохранить назначения. Повторите попытку' }, status)
 }
@@ -165,8 +173,8 @@ export async function GET(request: Request) {
       const clauses: Where[] = search ? [{ [titles(collection)]: { contains: search } }] : []
       const parent = url.searchParams.get('parent')
       if (parent) {
-        const field = collection === 'courses' || collection === 'roadmap-nodes' ? 'roadmap' : collection === 'sections' || collection === 'lessons' ? 'course' : undefined
-        if (!field) throw new AssignmentInputError('У роадмапа нет родительского материала')
+        const field = collection === 'courses' || collection === 'roadmap-nodes' ? 'roadmap' : collection === 'sections' || collection === 'lessons' ? 'course' : collection === 'trainer-tasks' ? 'topic' : undefined
+        if (!field) throw new AssignmentInputError('У выбранного типа нет родительского материала')
         clauses.push({ [field]: { equals: queryId(parent) } })
       }
       const result = await payload.find({ collection, where: clauses.length ? { and: clauses } : {}, page, limit: pageSize, sort: 'id', depth: 0, select: collection === 'roadmap-nodes' ? { label: true, roadmap: true } : { title: true, isPublished: true }, overrideAccess: false, req })
@@ -200,6 +208,8 @@ async function mutate(request: Request, save: boolean) {
     }
     const current = await snapshot(payload, input.userId, req)
     if (current.revision !== input.revision) throw new AssignmentInputError('Другой администратор уже изменил назначения. Обновите данные перед сохранением', 409)
+    input.catalogVisibility ??= current.catalogVisibility
+    input.trainerMode ??= current.trainerMode
     const currentById = new Map(current.rules.map((rule) => [rule.id, rule]))
     for (const rule of input.rules) {
       if (rule.id !== undefined && !currentById.has(rule.id)) throw new AssignmentInputError('Назначение не принадлежит выбранному ученику', 403)
@@ -207,7 +217,10 @@ async function mutate(request: Request, save: boolean) {
       if (original && (original.target.relationTo !== rule.target.relationTo || original.target.value !== rule.target.value)) throw new AssignmentInputError('Чтобы сменить материал, удалите назначение и добавьте новое')
     }
     await validateTargets(payload, input, req)
-    if (!save) return response(await preview(payload, input, req, queryPage(new URL(request.url).searchParams.get('page'))))
+    if (!save) {
+      const params = new URL(request.url).searchParams
+      return response(await preview(payload, input, req, queryPage(params.get('page')), queryPage(params.get('trainerPage'))))
+    }
     const keep = new Set(input.rules.map((rule) => rule.id).filter((id): id is number => id !== undefined))
     for (const rule of current.rules) if (rule.id !== undefined && !keep.has(rule.id)) await payload.delete({ collection: 'learning-access-grants', id: rule.id, overrideAccess: false, req })
     for (const rule of input.rules) {
@@ -217,7 +230,7 @@ async function mutate(request: Request, save: boolean) {
         if (original.effect !== rule.effect || original.startsAt !== rule.startsAt || original.expiresAt !== rule.expiresAt || original.note !== rule.note) await payload.update({ collection: 'learning-access-grants', id: rule.id, data, overrideAccess: false, req })
       } else await payload.create({ collection: 'learning-access-grants', data: { ...data, ruleKey: `${input.userId}:${rule.target.relationTo}:${rule.target.value}` }, overrideAccess: false, req })
     }
-    if (current.mode !== input.mode) await payload.update({ collection: 'users', id: input.userId, data: { learningAccessMode: input.mode }, overrideAccess: false, req })
+    if (current.mode !== input.mode || current.catalogVisibility !== input.catalogVisibility || current.trainerMode !== input.trainerMode) await payload.update({ collection: 'users', id: input.userId, data: { learningAccessMode: input.mode, learningCatalogVisibility: input.catalogVisibility, trainerAccessMode: input.trainerMode }, overrideAccess: false, req })
     const next = await snapshot(payload, input.userId, req)
     const rules = await ruleTitles(payload, next.rules, req)
     await commitTransaction(req)

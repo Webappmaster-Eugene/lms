@@ -20,7 +20,7 @@ const TABS: readonly Tab[] = [
   { href: '/leaderboard', label: 'Рейтинг', icon: Trophy },
 ]
 
-export function BottomNav() {
+export function BottomNav({ trainerEnabled = true }: { trainerEnabled?: boolean } = {}) {
   const pathname = usePathname()
   const { mobileOpen, toggleMobile } = useSidebar()
 
@@ -29,7 +29,7 @@ export function BottomNav() {
       <div
         className="mx-auto flex h-16 max-w-lg items-stretch justify-around"
       >
-        {TABS.map(({ href, label, icon: Icon, exact }) => {
+        {TABS.filter((item) => trainerEnabled || item.href !== '/trainer').map(({ href, label, icon: Icon, exact }) => {
           const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`) || (href === '/courses' && pathname.startsWith('/lessons/'))
           return (
             <Link

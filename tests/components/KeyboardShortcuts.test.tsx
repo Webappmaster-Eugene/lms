@@ -5,6 +5,15 @@ import userEvent from '@testing-library/user-event'
 import { KeyboardShortcuts, SHORTCUTS_OPEN_EVENT } from '@/components/layout/KeyboardShortcuts'
 
 describe('подсказка по горячим клавишам', () => {
+  it('не предлагает команды закрытого тренажёра', async () => {
+    render(<KeyboardShortcuts trainerEnabled={false} />)
+    await userEvent.keyboard('?')
+    const dialog = screen.getByRole('dialog', { name: 'Горячие клавиши' })
+    expect(dialog).toHaveTextContent('Поиск по курсам и урокам')
+    expect(dialog).not.toHaveTextContent('Тренажёр')
+    expect(dialog).not.toHaveTextContent('Отправить на проверку')
+  })
+
   it('«?» открывает список, Esc закрывает', async () => {
     const user = userEvent.setup()
     render(<KeyboardShortcuts />)

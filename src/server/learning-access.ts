@@ -1,6 +1,7 @@
 import { APIError, type Access, type Payload, type PayloadRequest } from 'payload'
 import { sql } from '@payloadcms/db-postgres'
 
+import { invalidateTrainerAccess } from '@/server/trainer-access'
 import { collectAllPages } from '@/lib/paginate'
 import { recordLearningAccess, withLearningSpan } from '@/lib/learning-observability'
 import { clearAuthoritativeLearningMode, getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
@@ -24,6 +25,7 @@ export function invalidateLearningAccess(req: PayloadRequest) {
   requestLessonPolicies.delete(req)
   requestUsers.delete(req)
   clearAuthoritativeLearningMode(req)
+  invalidateTrainerAccess(req)
 }
 
 /** A partial producer DTO must not turn a missing mode into unrestricted access. */
@@ -33,7 +35,7 @@ async function resolveAccessUser(payload: Payload, user: LearningAccessUser | nu
   const readUser = async (): Promise<LearningAccessUser | null> => {
     try {
       const actual = await getAuthoritativeLearningPolicy(payload, id, req)
-      return { id, role: actual.role, learningAccessMode: actual.mode }
+      return { id, role: actual.role, learningAccessMode: actual.mode, learningCatalogVisibility: actual.catalogVisibility }
     } catch (error) {
       if (error instanceof APIError && error.status === 404) return null
       throw error
@@ -99,7 +101,7 @@ async function loadPolicy(payload: Payload, user: LearningAccessUser | null | un
     collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmaps', select: { isPublished: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'публикация роадмапов' }),
     collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmap-nodes', select: { roadmap: true, course: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'метаданные доступа тем' }),
   ])
-  const lessonIds = grants.filter((grant) => grant.target.relationTo === 'lessons').map((grant) => learningRelationId(grant.target.value)).filter((id): id is number => id !== null)
+  const lessonIds = grants.filter((grant) => grant.target?.relationTo === 'lessons').map((grant) => learningRelationId(grant.target?.value)).filter((id): id is number => id !== null)
   const lessons = lessonIds.length ? await collectAllPages(({ page, limit }) => payload.find({ collection: 'lessons', where: { id: { in: lessonIds } }, select: { course: true, section: true, isPublished: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'явные исключения доступа уроков' }) : []
   const invalidLessonIds = await inconsistentLearningLessonIds(payload, req)
   return buildLearningAccess(user, grants as LearningGrant[], { courses, sections, roadmaps, nodes, lessons, invalidLessonIds })

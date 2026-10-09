@@ -87,7 +87,19 @@ export const Users: CollectionConfig = {
       name: 'learningAccessMode', type: 'select', defaultValue: 'assigned', label: 'Доступ к обучению',
       options: [{ label: 'Все опубликованные курсы', value: 'all' }, { label: 'Только назначенные материалы', value: 'assigned' }],
       access: { create: canAdministerUsers, update: canAdministerUsers },
-      admin: { position: 'sidebar', description: 'Назначения и исключения задаются в разделе «Доступ к обучению». Каталог и карты доступны для просмотра.' },
+      admin: { position: 'sidebar', description: 'Назначения и исключения задаются в разделе «Доступ к обучению». Видимость каталога настраивается отдельно.' },
+    },
+    {
+      name: 'learningCatalogVisibility', type: 'select', defaultValue: () => 'assigned', label: 'Видимость каталога',
+      options: [{ label: 'Показывать только назначенное', value: 'assigned' }, { label: 'Показывать опубликованный каталог', value: 'catalog' }],
+      access: { create: canAdministerUsers, update: canAdministerUsers },
+      admin: { position: 'sidebar', description: 'Скрывает неназначенные материалы, в том числе из поиска и прямых ссылок.' },
+    },
+    {
+      name: 'trainerAccessMode', type: 'select', defaultValue: () => 'assigned', label: 'Доступ к тренажёру',
+      options: [{ label: 'Только назначенные темы и задачи', value: 'assigned' }, { label: 'Все опубликованные задачи', value: 'all' }, { label: 'Полностью закрыт', value: 'disabled' }],
+      access: { create: canAdministerUsers, update: canAdministerUsers },
+      admin: { position: 'sidebar', description: 'Точечные назначения задаются в разделе «Доступ к обучению».' },
     },
     {
       name: 'firstName',

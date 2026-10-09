@@ -20,6 +20,14 @@ const initTransaction = vi.fn(async () => true)
 const commitTransaction = vi.fn()
 const killTransaction = vi.fn()
 
+const getTrainerAccess = vi.fn<() => Promise<{ canAccessTask: (id: number) => boolean }>>(async () => ({ canAccessTask: () => true }))
+const requireTrainerTaskAccess = vi.fn()
+vi.mock('@/server/trainer-access', () => ({
+  getTrainerAccess, requireTrainerTaskAccess, invalidateTrainerAccess: vi.fn(),
+  TrainerAccessError: class TrainerAccessError extends Error {},
+}))
+vi.mock('@/payload/hooks/learningAccessLock', () => ({ lockLearningAccess: vi.fn() }))
+
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('payload', () => ({
   getPayload: vi.fn(async () => ({ auth, find, create, update, db: { sessions: { test: { db: { execute } } } } })),
@@ -87,6 +95,8 @@ function givenTaskWithoutProgress(): void {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  getTrainerAccess.mockResolvedValue({ canAccessTask: () => true })
+  requireTrainerTaskAccess.mockResolvedValue(undefined)
   auth.mockResolvedValue({ user: USER })
   runSolution.mockResolvedValue(passed())
   create.mockResolvedValue({ id: 1 })
@@ -98,6 +108,13 @@ beforeEach(() => {
 })
 
 describe('POST /api/trainer/submit: доступ и валидация', () => {
+  it('неназначенная задача — 403 до чтения кода, запуска и записи', async () => {
+    getTrainerAccess.mockResolvedValue({ canAccessTask: () => false })
+    const response = await POST(request({ taskId: '42', code: 'const x = 1' }))
+    expect(response.status).toBe(403)
+    expect(find).not.toHaveBeenCalled()
+  })
+
   it('без авторизации — 401', async () => {
     auth.mockResolvedValue({ user: null })
 

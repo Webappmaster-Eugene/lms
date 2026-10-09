@@ -13,6 +13,7 @@ import { DIFFICULTY_LABELS, COMPANY_LABELS, TAG_LABELS } from '@/lib/trainer/con
 import { publicCases, normalizeCases, starterCodeFor, taskLanguages } from '@/lib/trainer/spec'
 import { lexicalToMarkdown } from '@/lib/lexical'
 import { cn } from '@/lib/utils'
+import { getTrainerAccess } from '@/server/trainer-access'
 import { collectAllPages } from '@/lib/paginate'
 import { nextUnsolvedTask } from '@/lib/trainer/next-task'
 import type { ClientProgress, ClientTaskSpec } from '@/lib/trainer/api'
@@ -32,13 +33,15 @@ const DIFFICULTY_CLASS: Record<TrainerDifficulty, string> = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { topicSlug, taskSlug } = await params
   const payload = await getPayload()
+  const { user } = await payload.auth({ headers: await headers() })
+  const scope = await getTrainerAccess(payload, user)
 
   // Условие совпадает с тем, по которому страница ищет задачу: иначе у
   // несуществующего адреса вида /trainer/чужая-тема/задача заголовок
   // подставлялся бы правильный, а страница отдавала 404.
   const topics = await payload.find({
     collection: 'trainer-topics',
-    where: { slug: { equals: topicSlug }, isPublished: { equals: true } },
+    where: { slug: { equals: topicSlug }, isPublished: { equals: true }, ...(scope.admin ? {} : { id: { in: scope.browseTopicIds.length ? scope.browseTopicIds : [-1] } }) },
     limit: 1,
     select: { slug: true },
   })
@@ -51,6 +54,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       slug: { equals: taskSlug },
       topic: { equals: topic.id },
       isPublished: { equals: true },
+      ...(scope.admin ? {} : { id: { in: scope.accessibleTaskIds.length ? scope.accessibleTaskIds : [-1] } }),
     },
     limit: 1,
     select: { title: true },
@@ -64,10 +68,11 @@ export default async function TaskPage({ params }: Props) {
   const payload = await getPayload()
   const headersList = await headers()
   const { user } = await payload.auth({ headers: headersList })
+  const scope = await getTrainerAccess(payload, user)
 
   const topics = await payload.find({
     collection: 'trainer-topics',
-    where: { slug: { equals: topicSlug }, isPublished: { equals: true } },
+    where: { slug: { equals: topicSlug }, isPublished: { equals: true }, ...(scope.admin ? {} : { id: { in: scope.browseTopicIds.length ? scope.browseTopicIds : [-1] } }) },
     limit: 1,
   })
   const topic = topics.docs[0]
@@ -79,6 +84,7 @@ export default async function TaskPage({ params }: Props) {
       slug: { equals: taskSlug },
       topic: { equals: topic.id },
       isPublished: { equals: true },
+      ...(scope.admin ? {} : { id: { in: scope.accessibleTaskIds.length ? scope.accessibleTaskIds : [-1] } }),
     },
     limit: 1,
   })
@@ -90,7 +96,7 @@ export default async function TaskPage({ params }: Props) {
     ({ page, limit }) =>
       payload.find({
         collection: 'trainer-tasks',
-        where: { topic: { equals: topic.id }, isPublished: { equals: true } },
+        where: { topic: { equals: topic.id }, isPublished: { equals: true }, ...(scope.admin ? {} : { id: { in: scope.accessibleTaskIds.length ? scope.accessibleTaskIds : [-1] } }) },
         sort: ['order', 'id'],
         select: { slug: true, title: true, order: true },
         page,

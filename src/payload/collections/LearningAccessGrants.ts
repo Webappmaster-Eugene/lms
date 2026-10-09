@@ -20,7 +20,7 @@ export const LearningAccessGrants: CollectionConfig = {
   hooks: { beforeOperation: [captureRawCollectionPatch], beforeValidate: [validateLearningGrant], beforeChange: [lockLearningGrantChange], beforeDelete: [lockLearningGrantDelete], afterChange: [auditLearningGrantChange], afterDelete: [auditLearningGrantDelete] },
   fields: [
     { name: 'user', type: 'relationship', relationTo: 'users', required: true, index: true, label: 'Ученик' },
-    { name: 'target', type: 'relationship', relationTo: [...learningTargetCollections], required: true, label: 'Роадмап, тема, курс, раздел или урок' },
+    { name: 'target', type: 'relationship', relationTo: [...learningTargetCollections], required: true, label: 'Роадмап, курс, урок, тема или задача тренажёра' },
     { name: 'effect', type: 'select', required: true, defaultValue: 'allow', label: 'Действие', options: [{ label: 'Открыть доступ', value: 'allow' }, { label: 'Закрыть доступ', value: 'deny' }] },
     { name: 'startsAt', type: 'date', label: 'Открыть начиная с', admin: { date: { pickerAppearance: 'dayAndTime' } } },
     { name: 'expiresAt', type: 'date', label: 'Доступ до', admin: { date: { pickerAppearance: 'dayAndTime' } } },

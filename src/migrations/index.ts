@@ -16,6 +16,7 @@ import * as migration_20261008_143020_authoritative_learning_access_policies fro
 import * as migration_20261008_152004_auth_session_revocations from './20261008_152004_auth_session_revocations';
 import * as migration_20261008_193430_pwa_notifications_and_learning_rewards from './20261008_193430_pwa_notifications_and_learning_rewards';
 import * as migration_20261008_205700_student_analytics_and_web_vitals from './20261008_205700_student_analytics_and_web_vitals';
+import * as migration_20261009_122629_catalog_visibility_and_trainer_access from './20261009_122629_catalog_visibility_and_trainer_access';
 
 export const migrations = [
   {
@@ -106,6 +107,11 @@ export const migrations = [
   {
     up: migration_20261008_205700_student_analytics_and_web_vitals.up,
     down: migration_20261008_205700_student_analytics_and_web_vitals.down,
-    name: '20261008_205700_student_analytics_and_web_vitals'
+    name: '20261008_205700_student_analytics_and_web_vitals',
+  },
+  {
+    up: migration_20261009_122629_catalog_visibility_and_trainer_access.up,
+    down: migration_20261009_122629_catalog_visibility_and_trainer_access.down,
+    name: '20261009_122629_catalog_visibility_and_trainer_access'
   },
 ];

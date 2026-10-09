@@ -4,6 +4,7 @@ import { isAdmin } from '@/payload/access/isAdmin'
 import { isAdminOrSelf } from '@/payload/access/isAdminOrSelf'
 import { checkAchievements } from '@/payload/hooks/checkAchievements'
 import { updateStreak } from '@/payload/hooks/updateStreak'
+import { guardTrainerProgress } from '@/server/trainer-access'
 import { lockUserProgress } from '@/payload/hooks/lockUserProgress'
 import { awardTrainerPoints } from '@/payload/hooks/awardTrainerPoints'
 import { LANGUAGE_OPTIONS, TRAINER_LIMITS } from '@/lib/trainer/constants'
@@ -25,6 +26,7 @@ export const UserTrainerProgress: CollectionConfig = {
   },
   hooks: {
     beforeChange: [
+      guardTrainerProgress,
       lockUserProgress,
       ({ data, req, operation }) => {
         if (!data) return data

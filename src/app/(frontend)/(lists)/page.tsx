@@ -36,6 +36,10 @@ export default async function DashboardPage() {
       ({ page, limit }) =>
         payload.find({
           collection: 'roadmaps',
+          overrideAccess: false,
+          req,
+          select: { title: true, slug: true },
+          depth: 0,
           where: { isPublished: { equals: true } },
           sort: ['order', 'id'],
           page,
@@ -45,6 +49,8 @@ export default async function DashboardPage() {
     ),
     payload.find({
       collection: 'courses',
+      overrideAccess: false,
+      req,
       where: { and: [{ isPublished: { equals: true } }, assignedCourses] },
       sort: ['order', 'id'],
       limit: DASHBOARD_COURSES,
@@ -53,6 +59,8 @@ export default async function DashboardPage() {
     }),
     payload.find({
       collection: 'user-progress',
+      overrideAccess: false,
+      req,
       where: {
         user: { equals: user.id },
         isCompleted: { equals: true },
@@ -102,6 +110,8 @@ export default async function DashboardPage() {
     ({ page, limit }) =>
       payload.find({
         collection: 'user-progress',
+        overrideAccess: false,
+        req,
         where: { user: { equals: user.id }, isCompleted: { equals: true } },
         select: { lesson: true, updatedAt: true },
         depth: 0,
@@ -119,6 +129,8 @@ export default async function DashboardPage() {
           ({ page, limit }) =>
             payload.find({
               collection: 'lessons',
+              overrideAccess: false,
+              req,
               where: { id: { in: [...completedLessonIds] } },
               select: { course: true },
               depth: 0,
@@ -148,6 +160,8 @@ export default async function DashboardPage() {
       ? (
           await payload.find({
             collection: 'courses',
+            overrideAccess: false,
+            req,
             where: { and: [{ id: { in: recentIds }, isPublished: { equals: true } }, assignedCourses] },
             select: { title: true, slug: true, estimatedHours: true },
             depth: 0,
@@ -158,7 +172,7 @@ export default async function DashboardPage() {
   const hasStarted = startedCourses.length > 0
   const shownCourses = hasStarted ? startedCourses.slice(0, DASHBOARD_COURSES) : courses.docs
 
-  const courseLessons = await loadCourseLessons(payload, shownCourses.map((c) => c.id), 'дашборд', policy.canAccessLessonMetadata)
+  const courseLessons = await loadCourseLessons(payload, shownCourses.map((c) => c.id), 'дашборд', policy.canAccessLessonMetadata, req)
 
   const coursesWithProgress = shownCourses.map((course) => {
     const cId = String(course.id)
@@ -171,7 +185,7 @@ export default async function DashboardPage() {
       id: cId,
       title: course.title,
       slug: course.slug,
-      estimatedHours: course.estimatedHours,
+      estimatedHours: policy.catalogVisibility === 'catalog' ? course.estimatedHours : null,
       totalLessons,
       completedCount,
       progressPercent,
@@ -258,6 +272,9 @@ export default async function DashboardPage() {
       </div>
 
       {/* Мои курсы */}
+      {coursesWithProgress.length === 0 && (
+        <p className="rounded-xl border border-border bg-card p-5 text-muted-foreground">Администратор ещё не назначил обучение</p>
+      )}
       {coursesWithProgress.length > 0 && (
         <div>
           <div className="flex items-center justify-between">
@@ -314,7 +331,7 @@ export default async function DashboardPage() {
       <div>
         <h2 className="text-lg font-semibold text-foreground">Роадмапы</h2>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {roadmapDocs.map((roadmap) => (
+          {roadmapDocs.filter((roadmap) => policy.canBrowseRoadmap(roadmap.id)).map((roadmap) => (
             <Link
               key={roadmap.id}
               href={`/roadmaps/${roadmap.slug}`}

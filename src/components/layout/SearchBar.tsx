@@ -16,6 +16,7 @@ type SearchResult = {
 }
 
 type SearchBarProps = {
+  trainerEnabled?: boolean
   autoFocus?: boolean
   onNavigate?: () => void
   /** «/» и Ctrl/⌘+K ставят фокус в поиск. Только у одного экземпляра на странице. */
@@ -55,7 +56,7 @@ function isTyping(target: EventTarget | null): boolean {
   return target.isContentEditable || Boolean(target.closest('input, textarea, select, .monaco-editor'))
 }
 
-export function SearchBar({ autoFocus, onNavigate, hotkey }: SearchBarProps = {}) {
+export function SearchBar({ autoFocus, onNavigate, hotkey, trainerEnabled = true }: SearchBarProps = {}) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   // Запрос, по которому получены results: «ничего не найдено» показывается только для него.
@@ -114,7 +115,7 @@ export function SearchBar({ autoFocus, onNavigate, hotkey }: SearchBarProps = {}
         fetchDocs<Doc>('roadmaps', q, 3),
         fetchDocs<Doc>('courses', q, 5),
         fetchDocs<Doc>('lessons', q, 5),
-        fetchDocs<TaskDoc>('trainer-tasks', q, 5, '&depth=1&select[title]=true&select[slug]=true&select[topic]=true'),
+        trainerEnabled ? fetchDocs<TaskDoc>('trainer-tasks', q, 5, '&depth=1&select[title]=true&select[slug]=true&select[topic]=true') : Promise.resolve([]),
       ])
       if (request !== requestRef.current) return
 
@@ -192,7 +193,7 @@ export function SearchBar({ autoFocus, onNavigate, hotkey }: SearchBarProps = {}
           ref={inputRef}
           type="text"
           role="combobox"
-          aria-label="Поиск по курсам, урокам и задачам"
+          aria-label={trainerEnabled ? 'Поиск по курсам, урокам и задачам' : 'Поиск по курсам и урокам'}
           aria-expanded={expanded}
           aria-controls={listId}
           aria-autocomplete="list"
@@ -201,7 +202,7 @@ export function SearchBar({ autoFocus, onNavigate, hotkey }: SearchBarProps = {}
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => searched !== null && setOpen(true)}
-          placeholder="Поиск курсов, уроков и задач..."
+          placeholder={trainerEnabled ? 'Поиск курсов, уроков и задач...' : 'Поиск курсов и уроков...'}
           autoFocus={autoFocus}
           className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
         />

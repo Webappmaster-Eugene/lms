@@ -34,16 +34,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const payload = await getPayload()
   const { user } = await payload.auth({ headers: await headers() })
   if (!user) return { title: 'Вход' }
+  const req = await createLocalReq({ user }, payload)
+  const access = await getLearningAccess(payload, user, req)
   const result = await payload.find({
     collection: 'roadmaps',
     where: { slug: { equals: slug }, isPublished: { equals: true } },
     limit: 1,
     depth: 0,
     select: { title: true },
-    overrideAccess: true,
+    overrideAccess: false,
+    req,
   })
   const roadmap = result.docs[0]
-  return { title: roadmap?.title ?? 'Роадмап' }
+  return { title: roadmap && access.canBrowseRoadmap(roadmap.id) ? roadmap.title : 'Роадмап' }
 }
 
 export default async function RoadmapDetailPage({ params }: Props) {
@@ -64,12 +67,12 @@ export default async function RoadmapDetailPage({ params }: Props) {
     limit: 1,
     depth: 0,
     select: { title: true, slug: true },
-    overrideAccess: true,
+    overrideAccess: false,
     req,
   })
 
   const roadmap = roadmapResult.docs[0]
-  if (!roadmap) return notFound()
+  if (!roadmap || !access.canBrowseRoadmap(roadmap.id)) return notFound()
 
   // Загружаем курсы роадмапа
   const courseDocs = await collectAllPages(
@@ -83,7 +86,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
         sort: ['order', 'id'],
         depth: 0,
         select: { title: true, slug: true, estimatedHours: true, prerequisites: true, roadmapNode: true },
-        overrideAccess: true,
+        overrideAccess: false,
         req,
         page,
         limit,
@@ -101,8 +104,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
             payload.find({
               collection: 'lessons',
               where: {
-                course: { in: courseIds },
-                isPublished: { equals: true },
+                and: [{ course: { in: courseIds }, isPublished: { equals: true } }, access.browseLessonWhere],
               },
               select: { course: true, section: true, order: true, slug: true, title: true, isPublished: true },
               overrideAccess: true,
@@ -124,7 +126,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
               collection: 'sections',
               where: { course: { in: courseIds }, isPublished: { equals: true } },
               select: { order: true },
-              overrideAccess: true,
+              overrideAccess: false,
               req,
               depth: 0,
               sort: ['order', 'id'],
@@ -221,7 +223,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
       id: cId,
       title: course.title,
       slug: course.slug,
-      estimatedHours: course.estimatedHours,
+      estimatedHours: access.catalogVisibility === 'catalog' ? course.estimatedHours : null,
       nextLesson: nextLesson((orderedLessons.get(cId) ?? []).filter((lesson) => accessibleLessons.has(lesson.id)), completedLessonIds),
       accessAllowed: access.canAccessCourse(course.id),
       accessibleLessons: courseLessonIds.filter((id) => accessibleLessons.has(id)).length,
@@ -251,7 +253,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
           sort: ['order', 'id'],
           depth: 0,
           select: { nodeId: true, nodeType: true, course: true, label: true, positionX: true, positionY: true, bullets: true, icon: true, description: true, stage: true, color: true },
-          overrideAccess: true,
+          overrideAccess: false,
           req,
           page,
           limit,
@@ -266,7 +268,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
           sort: 'id',
           depth: 0,
           select: { edgeId: true, source: true, target: true, edgeType: true, animated: true },
-          overrideAccess: true,
+          overrideAccess: false,
           req,
           page,
           limit,
@@ -277,7 +279,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
 
   // Трансформация в формат ReactFlow
   const { graphNodes, graphEdges, placedCourseIds } = buildGraphData(
-    nodeDocs,
+    nodeDocs.filter((node) => access.canBrowseNode(node.id)).map((node) => access.catalogVisibility === 'assigned' ? { ...node, description: null, bullets: [] } : node),
     edgeDocs,
     coursesWithProgress,
     nextStep?.id ?? null,
@@ -331,7 +333,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
 
         <div className="mt-4 max-w-md">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Общий прогресс</span>
+            <span className="text-muted-foreground">{access.catalogVisibility === 'assigned' ? 'Прогресс назначенного обучения' : 'Общий прогресс'}</span>
             <span className="font-medium text-foreground">{overallPercent}%</span>
           </div>
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-secondary">
@@ -346,6 +348,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
       <NextStepCard
         nextStep={nextStep}
         allDone={totalLessons > 0 && accessibleLessons.size === totalLessons && completedTotal === totalLessons}
+        assignedOnly={access.catalogVisibility === 'assigned'}
       />
 
       <section>
@@ -396,13 +399,13 @@ function toNodeCourse(course: CourseWithProgress): NodeCourse {
   }
 }
 
-function NextStepCard({ nextStep, allDone }: { nextStep: CourseWithProgress | null; allDone: boolean }) {
+function NextStepCard({ nextStep, allDone, assignedOnly = false }: { nextStep: CourseWithProgress | null; allDone: boolean; assignedOnly?: boolean }) {
   if (allDone) {
     return (
       <div className="flex items-center gap-3 rounded-xl border border-success/40 bg-success/10 p-4">
         <PartyPopper className="h-6 w-6 shrink-0 text-success" aria-hidden="true" />
         <p className="text-sm text-foreground">
-          Все курсы роадмапа пройдены. Сертификаты — в разделе{' '}
+          {assignedOnly ? 'Все назначенные уроки пройдены. Ваши сертификаты — в разделе ' : 'Все курсы роадмапа пройдены. Сертификаты — в разделе '}
           <Link href="/certificates" className="font-medium underline underline-offset-2">
             «Сертификаты»
           </Link>

@@ -33,12 +33,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const payload = await getPayload()
   const { user } = await payload.auth({ headers: await headers() })
   if (!user) return { title: 'Урок' }
+  const req = await createLocalReq({ user }, payload)
   const result = await payload.find({
     collection: 'lessons',
     where: { slug: { equals: slug }, isPublished: { equals: true } },
     limit: 1,
     depth: 0,
     select: { title: true },
+    overrideAccess: false,
+    req,
   })
   const lesson = result.docs[0]
   return { title: lesson?.title ?? 'Урок' }
@@ -53,7 +56,7 @@ export default async function LessonPage({ params }: Props) {
   const req = await createLocalReq({ user }, payload)
   const policy = await getLearningAccess(payload, user, req)
 
-  // Catalog metadata is safe to preview; fetch the learning material only after authorization.
+  // Only browseable metadata can be rendered; content requires a separate lesson grant.
   const metadataResult = await payload.find({
     collection: 'lessons',
     where: { slug: { equals: slug }, isPublished: { equals: true } },
@@ -115,6 +118,8 @@ export default async function LessonPage({ params }: Props) {
         ({ page, limit }) =>
           payload.find({
             collection: 'sections',
+            overrideAccess: false,
+            req,
             select: { title: true, course: true, isPublished: true, order: true },
             depth: 0,
             where: {
@@ -131,6 +136,8 @@ export default async function LessonPage({ params }: Props) {
         ({ page, limit }) =>
           payload.find({
             collection: 'lessons',
+            overrideAccess: false,
+            req,
             select: { title: true, slug: true, course: true, section: true, order: true, isPublished: true },
             depth: 0,
             where: {
@@ -170,6 +177,8 @@ export default async function LessonPage({ params }: Props) {
           ({ page, limit }) =>
             payload.find({
               collection: 'user-progress',
+              overrideAccess: false,
+              req,
               where: {
                 user: { equals: user.id },
                 lesson: { in: courseLessonIds },
@@ -207,9 +216,10 @@ export default async function LessonPage({ params }: Props) {
       }
     }
 
-    sidebarSections = sectionDocs.map((s) => {
+    sidebarSections = sectionDocs.flatMap((s) => {
       const sLessons = sectionMap.get(String(s.id)) ?? []
-      return {
+      if (sLessons.length === 0) return []
+      return [{
         id: String(s.id),
         title: s.title,
         order: s.order ?? 0,
@@ -219,7 +229,7 @@ export default async function LessonPage({ params }: Props) {
           slug: l.slug,
           order: l.order ?? 0,
         })),
-      }
+      }]
     })
 
     // Если есть уроки без секции, добавляем "виртуальную" секцию
@@ -248,6 +258,8 @@ export default async function LessonPage({ params }: Props) {
   if (user) {
     const progressDoc = await payload.find({
       collection: 'user-progress',
+      overrideAccess: false,
+      req,
       where: {
         user: { equals: user.id },
         lesson: { equals: lesson.id },
@@ -269,7 +281,14 @@ export default async function LessonPage({ params }: Props) {
   const totalLessons = allCourseLessons.length
   const totalCompleted = allCourseLessons.filter((l) => completedLessonIds.has(String(l.id))).length
   // Остальные уроки курса пройдены — отметка этого завершает курс.
-  const othersDone = allCourseLessons.every((l) => l.id === lesson.id || completedLessonIds.has(String(l.id)))
+  // A partial lesson assignment must not promise a whole-course certificate.
+  const publishedCourseLessons = course ? await payload.count({
+    collection: 'lessons',
+    where: { course: { equals: course.id }, isPublished: { equals: true } },
+    overrideAccess: true,
+    req,
+  }) : null
+  const othersDone = publishedCourseLessons?.totalDocs === allCourseLessons.length && allCourseLessons.every((l) => l.id === lesson.id || completedLessonIds.has(String(l.id)))
 
   return (
     <div className={hasSidebar ? 'flex flex-col gap-6 lg:flex-row' : ''}>
@@ -282,6 +301,7 @@ export default async function LessonPage({ params }: Props) {
           currentLessonId={String(lesson.id)}
           totalLessons={totalLessons}
           totalCompleted={totalCompleted}
+          assignedOnly={policy.catalogVisibility === 'assigned'}
         />
       )}
       {/* Main content */}
@@ -312,7 +332,7 @@ export default async function LessonPage({ params }: Props) {
             <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
               {position && (
                 <span>
-                  Урок {position.index} из {position.total}
+                  {policy.catalogVisibility === 'assigned' ? 'Назначенный урок' : 'Урок'} {position.index} из {position.total}
                 </span>
               )}
               {lesson.estimatedMinutes && (

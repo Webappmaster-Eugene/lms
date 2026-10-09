@@ -121,3 +121,40 @@ describe('гранулярная политика учебного доступ�
     expect(policy.lessonWhere.and).toContainEqual({ id: { not_in: [40] } })
   })
 })
+
+
+describe('скрытый каталог', () => {
+  const strict = { ...student, learningCatalogVisibility: 'assigned' as const }
+  it('не открывает каталог, родителей и темы при нуле назначений', () => {
+    const policy = buildLearningAccess(strict, [], metadata)
+    expect(policy.browseCourseIds).toEqual([])
+    expect(policy.browseRoadmapIds).toEqual([])
+    expect(policy.browseSectionIds).toEqual([])
+    expect(policy.browseNodeIds).toEqual([])
+    expect(policy.canBrowseLessonMetadata(metadata.lessons[0])).toBe(false)
+    expect(policy.browseLessonWhere).toEqual(policy.lessonWhere)
+  })
+  it('один урок показывает его родителей и скрывает соседний урок и чужой курс', () => {
+    const policy = buildLearningAccess(strict, [grant('lessons', 40)], metadata)
+    expect(policy.browseCourseIds).toEqual([10])
+    expect(policy.browseRoadmapIds).toEqual([1])
+    expect(policy.browseSectionIds).toEqual([30])
+    expect(policy.canBrowseNode(101)).toBe(true)
+    expect(policy.canBrowseLessonMetadata(metadata.lessons[0])).toBe(true)
+    expect(policy.canBrowseLessonMetadata(metadata.lessons[1])).toBe(false)
+    expect(policy.canBrowseCourse(11)).toBe(false)
+  })
+  it('исключённый курс не появляется как связанная тема при назначении роадмапа', () => {
+    const policy = buildLearningAccess(strict, [grant('roadmaps', 1), grant('courses', 10, 'deny'), grant('courses', 11, 'deny')], metadata)
+    expect(policy.browseCourseIds).toEqual([])
+    expect(policy.canBrowseNode(100)).toBe(false)
+    expect(policy.canBrowseNode(101)).toBe(false)
+    expect(policy.canBrowseRoadmap(1)).toBe(true)
+  })
+  it('видимость каталога не разрешает прохождение закрытого урока', () => {
+    const policy = buildLearningAccess({ ...strict, learningCatalogVisibility: 'catalog' }, [], metadata)
+    expect(policy.canBrowseLessonMetadata(metadata.lessons[0])).toBe(true)
+    expect(policy.canAccessLessonMetadata(metadata.lessons[0])).toBe(false)
+    expect(policy.browseCourseIds).toHaveLength(3)
+  })
+})

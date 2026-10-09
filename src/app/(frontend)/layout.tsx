@@ -16,6 +16,8 @@ import { getPayload } from '@/lib/payload'
 import { redirect } from 'next/navigation'
 import { PwaProvider } from '@/components/pwa/PwaProvider'
 import { StudentActivityBridge } from '@/components/analytics/StudentActivityBridge'
+import { createLocalReq } from 'payload'
+import { getTrainerAccess } from '@/server/trainer-access'
 
 const inter = Inter({
   subsets: ['cyrillic', 'latin'],
@@ -49,6 +51,8 @@ export default async function FrontendLayout({ children }: { children: React.Rea
   const { user } = await payload.auth({ headers: await headers() })
   if (!user) redirect('/login')
   const isAdmin = user.role === 'admin'
+  const req = await createLocalReq({ user }, payload)
+  const trainerEnabled = (await getTrainerAccess(payload, user, req)).hasAccess
 
   return (
     <html lang="ru" className={inter.variable} suppressHydrationWarning>
@@ -59,24 +63,24 @@ export default async function FrontendLayout({ children }: { children: React.Rea
             <Suspense fallback={null}><StudentActivityBridge userId={user.id} /></Suspense>
             <Suspense fallback={null}>
               <NavigationProgress />
-              <KeyboardShortcuts />
+              <KeyboardShortcuts trainerEnabled={trainerEnabled} />
             </Suspense>
             <SidebarProvider>
               <div className="flex min-h-dvh overflow-x-hidden">
                 <div className="contents print:hidden">
-                  <Sidebar isAdmin={isAdmin} />
+                  <Sidebar isAdmin={isAdmin} trainerEnabled={trainerEnabled} />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col lg:ml-64 print:ml-0">
                   <div className="contents print:hidden">
-                    <Header />
+                    <Header trainerEnabled={trainerEnabled} />
                   </div>
                   <main className="flex-1 overflow-x-hidden px-[max(1rem,env(safe-area-inset-left),env(safe-area-inset-right))] py-6 lg:px-8">{children}</main>
                   <div className="contents print:hidden">
-                    <Footer />
+                    <Footer trainerEnabled={trainerEnabled} />
                   </div>
                 </div>
                 <div className="contents print:hidden">
-                  <BottomNav />
+                  <BottomNav trainerEnabled={trainerEnabled} />
                 </div>
               </div>
             </SidebarProvider>

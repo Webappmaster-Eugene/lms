@@ -6,6 +6,9 @@ import { Map as MapIcon } from 'lucide-react'
 import { collectAllPages } from '@/lib/paginate'
 import { relationId } from '@/lib/relation-id'
 import { pluralize } from '@/lib/utils'
+import { createLocalReq } from 'payload'
+import { redirect } from 'next/navigation'
+import { getLearningAccess } from '@/server/learning-access'
 
 export const metadata: Metadata = {
   title: 'Роадмапы',
@@ -14,11 +17,18 @@ export const metadata: Metadata = {
 export default async function RoadmapsPage() {
   const payload = await getPayload()
   const { user } = await payload.auth({ headers: await headers() })
+  if (!user) redirect('/login')
+  const req = await createLocalReq({ user }, payload)
+  const access = await getLearningAccess(payload, user, req)
 
   const roadmapDocs = await collectAllPages(
     ({ page, limit }) =>
       payload.find({
         collection: 'roadmaps',
+        overrideAccess: false,
+        req,
+        depth: 0,
+        select: { title: true, slug: true },
         where: { isPublished: { equals: true } },
         sort: ['order', 'id'],
         page,
@@ -35,6 +45,8 @@ export default async function RoadmapsPage() {
           ({ page, limit }) =>
             payload.find({
               collection: 'courses',
+              overrideAccess: false,
+              req,
               where: { roadmap: { in: roadmapIds }, isPublished: { equals: true } },
               select: { roadmap: true },
               depth: 0,
@@ -53,8 +65,10 @@ export default async function RoadmapsPage() {
           ({ page, limit }) =>
             payload.find({
               collection: 'lessons',
-              where: { course: { in: courseDocs.map((c) => c.id) }, isPublished: { equals: true } },
-              select: { course: true },
+              where: { and: [{ course: { in: courseDocs.map((c) => c.id) }, isPublished: { equals: true } }, access.browseLessonWhere] },
+              select: { course: true, section: true, isPublished: true },
+              overrideAccess: true,
+              req,
               depth: 0,
               sort: 'id',
               page,
@@ -68,6 +82,8 @@ export default async function RoadmapsPage() {
           ({ page, limit }) =>
             payload.find({
               collection: 'user-progress',
+              overrideAccess: false,
+              req,
               where: { user: { equals: user.id }, isCompleted: { equals: true } },
               select: { lesson: true },
               depth: 0,
@@ -87,8 +103,9 @@ export default async function RoadmapsPage() {
     stats.set(id, current)
     return current
   }
-  for (const course of courseDocs) statsFor(relationId(course.roadmap)).courses += 1
+  for (const course of courseDocs) if (access.canBrowseCourse(course.id)) statsFor(relationId(course.roadmap)).courses += 1
   for (const lesson of lessonDocs) {
+    if (!access.canBrowseLessonMetadata(lesson)) continue
     const roadmapId = roadmapOfCourse.get(relationId(lesson.course))
     if (roadmapId === undefined) continue
     const entry = statsFor(roadmapId)
@@ -101,7 +118,7 @@ export default async function RoadmapsPage() {
       <h1 className="text-xl font-bold text-foreground sm:text-2xl">Роадмапы</h1>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {roadmapDocs.map((roadmap) => {
+        {roadmapDocs.filter((roadmap) => access.canBrowseRoadmap(roadmap.id)).map((roadmap) => {
           const { courses = 0, lessons = 0, done = 0 } = stats.get(roadmap.id) ?? {}
           const percent = lessons > 0 ? Math.round((done / lessons) * 100) : 0
           const status = done === 0 ? 'Не начат' : done === lessons ? 'Пройден' : 'В процессе'
@@ -143,7 +160,7 @@ export default async function RoadmapsPage() {
 
         {roadmapDocs.length === 0 && (
           <p className="col-span-full text-center text-muted-foreground py-12">
-            Роадмапы пока не опубликованы
+            Администратор ещё не назначил обучение
           </p>
         )}
       </div>

@@ -31,7 +31,7 @@ export type Data = Record<string, unknown>
 export const INTERNAL_COLLECTIONS = new Set(['payload-preferences', 'payload-migrations', 'payload-locked-documents', 'payload-kv'])
 
 export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
-  users: () => ({ email: `${uid('fx')}@lms.test`, password: 'Fixture-Pass-1', firstName: 'Имя', lastName: 'Фамилия', learningAccessMode: 'all' }),
+  users: () => ({ email: `${uid('fx')}@lms.test`, password: 'Fixture-Pass-1', firstName: 'Имя', lastName: 'Фамилия', learningCatalogVisibility: 'catalog', trainerAccessMode: 'all', learningAccessMode: 'all' }),
   roadmaps: () => ({ title: `Роадмап ${uid()}` }),
   'roadmap-nodes': (ctx) => ({ nodeId: uid('node'), label: 'Узел', roadmap: ctx.roadmapId }),
   'roadmap-edges': (ctx) => ({ edgeId: uid('edge'), roadmap: ctx.roadmapId, source: ctx.nodeId, target: ctx.nodeId }),

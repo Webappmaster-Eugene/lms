@@ -4,6 +4,8 @@ import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, ArrowRight, CheckCircle2, Circle } from 'lucide-react'
+import { TrainerCatalogLink } from '@/components/trainer/TrainerCatalogLink'
+import { getTrainerAccess } from '@/server/trainer-access'
 import { collectAllPages } from '@/lib/paginate'
 
 type Props = {
@@ -13,9 +15,11 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { topicSlug } = await params
   const payload = await getPayload()
+  const { user } = await payload.auth({ headers: await headers() })
+  const scope = await getTrainerAccess(payload, user)
   const topics = await payload.find({
     collection: 'trainer-topics',
-    where: { slug: { equals: topicSlug } },
+    where: { slug: { equals: topicSlug }, ...(scope.admin ? {} : { id: { in: scope.browseTopicIds.length ? scope.browseTopicIds : [-1] } }) },
     limit: 1,
   })
   const topic = topics.docs[0]
@@ -27,10 +31,11 @@ export default async function TopicTasksPage({ params }: Props) {
   const payload = await getPayload()
   const headersList = await headers()
   const { user } = await payload.auth({ headers: headersList })
+  const scope = await getTrainerAccess(payload, user)
 
   const topics = await payload.find({
     collection: 'trainer-topics',
-    where: { slug: { equals: topicSlug }, isPublished: { equals: true } },
+    where: { slug: { equals: topicSlug }, isPublished: { equals: true }, ...(scope.admin ? {} : { id: { in: scope.browseTopicIds.length ? scope.browseTopicIds : [-1] } }) },
     limit: 1,
   })
 
@@ -44,7 +49,10 @@ export default async function TopicTasksPage({ params }: Props) {
         where: {
           topic: { equals: topic.id },
           isPublished: { equals: true },
+          ...(scope.admin ? {} : { id: { in: scope.browseTaskIds.length ? scope.browseTaskIds : [-1] } }),
         },
+        select: { title: true, slug: true, topic: true, difficulty: true, pointsReward: true },
+        depth: 0,
         sort: ['order', 'id'],
         page,
         limit,
@@ -98,7 +106,7 @@ export default async function TopicTasksPage({ params }: Props) {
 
       <div>
         <h1 className="text-2xl font-bold text-foreground">{topic.title}</h1>
-        {topic.description && (
+        {scope.catalogVisibility === 'catalog' && topic.description && (
           <p className="mt-2 text-muted-foreground">{topic.description}</p>
         )}
         <p className="mt-2 text-sm text-muted-foreground">
@@ -111,12 +119,14 @@ export default async function TopicTasksPage({ params }: Props) {
       ) : (
         <div className="space-y-2">
           {tasks.map((task) => {
+            const allowed = scope.canAccessTask(task.id)
             const isCompleted = completedTaskIds.has(String(task.id))
             const diff = difficultyLabels[task.difficulty ?? 'easy'] ?? difficultyLabels.easy
 
             return (
-              <Link
+              <TrainerCatalogLink
                 key={task.id}
+                allowed={allowed}
                 href={`/trainer/${topicSlug}/${task.slug}`}
                 className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/50 hover:bg-accent/50"
               >
@@ -128,7 +138,7 @@ export default async function TopicTasksPage({ params }: Props) {
 
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-foreground truncate group-hover:text-primary transition-colors">
-                    {task.title}
+                    {task.title}{!allowed && <span className="ml-2 text-xs text-muted-foreground">Доступ не назначен</span>}
                   </p>
                 </div>
 
@@ -141,7 +151,7 @@ export default async function TopicTasksPage({ params }: Props) {
                 </span>
 
                 <ArrowRight className="h-4 w-4 flex-shrink-0 text-muted-foreground group-hover:text-primary transition-colors" />
-              </Link>
+              </TrainerCatalogLink>
             )
           })}
         </div>

@@ -4,6 +4,7 @@ import config from '@payload-config'
 
 import type { SolutionResponse } from '@/lib/trainer/api'
 import { parseTaskId } from '@/lib/trainer/task-id'
+import { getTrainerAccess } from '@/server/trainer-access'
 
 /**
  * GET /api/trainer/solution?taskId=...
@@ -29,6 +30,10 @@ export async function GET(request: Request): Promise<Response> {
   const taskId = parseTaskId(new URL(request.url).searchParams.get('taskId'))
   if (taskId === null) {
     return NextResponse.json({ error: 'Не указан taskId' }, { status: 400 })
+  }
+
+  if (!(await getTrainerAccess(payload, user)).canAccessTask(taskId)) {
+    return NextResponse.json({ error: 'Доступ к этой задаче не назначен' }, { status: 403 })
   }
 
   const tasks = await payload.find({

@@ -25,16 +25,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const payload = await getPayload()
   const { user } = await payload.auth({ headers: await headers() })
   if (!user) return { title: 'Вход' }
+  const req = await createLocalReq({ user }, payload)
+  const access = await getLearningAccess(payload, user, req)
   const result = await payload.find({
     collection: 'courses',
     where: { slug: { equals: slug }, isPublished: { equals: true } },
     limit: 1,
     depth: 0,
     select: { title: true },
-    overrideAccess: true,
+    overrideAccess: false,
+    req,
   })
   const course = result.docs[0]
-  return { title: course?.title ?? 'Курс' }
+  return { title: course && access.canBrowseCourse(course.id) ? course.title : 'Курс' }
 }
 
 export default async function CourseDetailPage({ params }: Props) {
@@ -55,14 +58,14 @@ export default async function CourseDetailPage({ params }: Props) {
     limit: 1,
     depth: 0,
     select: { title: true, slug: true, roadmap: true, estimatedHours: true },
-    overrideAccess: true,
+    overrideAccess: false,
     req,
   })
 
   const course = courseResult.docs[0]
   if (!course || !access.canBrowseCourse(course.id)) return notFound()
 
-  const [sectionDocs, loadedLessonDocs, progressDocs, roadmapDocs, courseContent] = await Promise.all([
+  const [loadedSectionDocs, loadedLessonDocs, progressDocs, roadmapDocs, courseContent] = await Promise.all([
     collectAllPages(
       ({ page, limit }) =>
         payload.find({
@@ -74,7 +77,7 @@ export default async function CourseDetailPage({ params }: Props) {
           sort: ['order', 'id'],
           select: { title: true, order: true },
           depth: 0,
-          overrideAccess: true,
+          overrideAccess: false,
           req,
           page,
           limit,
@@ -86,8 +89,7 @@ export default async function CourseDetailPage({ params }: Props) {
         payload.find({
           collection: 'lessons',
           where: {
-            course: { equals: course.id },
-            isPublished: { equals: true },
+            and: [{ course: { equals: course.id }, isPublished: { equals: true } }, access.browseLessonWhere],
           },
           sort: ['order', 'id'],
           select: { title: true, slug: true, course: true, section: true, order: true, isPublished: true, estimatedMinutes: true },
@@ -119,11 +121,12 @@ export default async function CourseDetailPage({ params }: Props) {
           { label: `прогресс пользователя ${user.id}` },
         )
       : [],
-    course.roadmap ? payload.find({ collection: 'roadmaps', where: { id: { equals: relationKey(course.roadmap) }, isPublished: { equals: true } }, select: { title: true, slug: true }, depth: 0, limit: 1, overrideAccess: true, req }) : null,
-    access.canAccessCourse(course.id) ? payload.findByID({ collection: 'courses', id: course.id, select: { description: true }, depth: 0, overrideAccess: true, req }) : null,
+    course.roadmap ? payload.find({ collection: 'roadmaps', where: { id: { equals: relationKey(course.roadmap) }, isPublished: { equals: true } }, select: { title: true, slug: true }, depth: 0, limit: 1, overrideAccess: false, req }) : null,
+    access.canAccessCourse(course.id) && access.catalogVisibility === 'catalog' ? payload.findByID({ collection: 'courses', id: course.id, select: { description: true }, depth: 0, overrideAccess: true, req }) : null,
   ])
 
   const lessonDocs = loadedLessonDocs.filter((lesson) => access.canBrowseLessonMetadata(lesson))
+  const sectionDocs = loadedSectionDocs.filter((section) => access.canBrowseSection(section.id))
 
   const completedLessonIds = new Set(
     progressDocs.map((p) => String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson)),
@@ -194,7 +197,7 @@ export default async function CourseDetailPage({ params }: Props) {
           {sectionDocs.length > 0 && (
             <span>{pluralize(sectionDocs.length, 'раздел', 'раздела', 'разделов')}</span>
           )}
-          {course.estimatedHours ? (
+          {course.estimatedHours && access.catalogVisibility === 'catalog' ? (
             <span className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
               ~{course.estimatedHours}ч
@@ -205,7 +208,7 @@ export default async function CourseDetailPage({ params }: Props) {
         {/* Progress bar */}
         <div className="mt-4">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Прогресс</span>
+            <span className="text-muted-foreground">{access.catalogVisibility === 'assigned' ? 'Прогресс назначенных уроков' : 'Прогресс'}</span>
             <span className="font-medium text-foreground">
               {completedCount}/{totalLessons} ({progressPercent}%)
             </span>
@@ -257,7 +260,7 @@ export default async function CourseDetailPage({ params }: Props) {
         <div className="flex items-center gap-3 rounded-xl border border-success/40 bg-success/10 p-4">
           <PartyPopper className="h-6 w-6 shrink-0 text-success" aria-hidden="true" />
           <p className="text-sm text-foreground">
-            Курс пройден.{' '}
+            {access.catalogVisibility === 'assigned' ? 'Все назначенные уроки пройдены. ' : 'Курс пройден. '}
             {roadmap ? (
               <Link href={`/roadmaps/${roadmap.slug}`} className="font-medium underline underline-offset-2">
                 Что дальше по роадмапу

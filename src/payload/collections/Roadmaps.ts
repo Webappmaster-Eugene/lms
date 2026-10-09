@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
-import { isPublishedOrAdmin } from '@/payload/access/isPublishedOrAdmin'
+import { learningRoadmapRead } from '@/payload/access/learningCatalogRead'
 import { generateSlug } from '@/payload/hooks/generateSlug'
 import { protectRoadmapSources } from '@/payload/hooks/protectCourseSources'
 import { cleanupLearningTargetGrants } from '@/payload/hooks/learningAccessCleanup'
@@ -19,7 +19,7 @@ export const Roadmaps: CollectionConfig = {
   },
   access: {
     create: isAdmin,
-    read: isPublishedOrAdmin,
+    read: learningRoadmapRead,
     update: isAdmin,
     delete: isAdmin,
   },

@@ -1,7 +1,8 @@
 import type { CollectionConfig } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
-import { isPublishedOrAdmin } from '@/payload/access/isPublishedOrAdmin'
+import { getTrainerAccess, trainerTopicReadAccess } from '@/server/trainer-access'
+import { cleanupLearningTargetGrants } from '@/payload/hooks/learningAccessCleanup'
 import { generateSlug } from '@/payload/hooks/generateSlug'
 import { TOPIC_CATEGORY_OPTIONS } from '@/lib/trainer/constants'
 
@@ -14,12 +15,18 @@ export const TrainerTopics: CollectionConfig = {
   },
   access: {
     create: isAdmin,
-    read: isPublishedOrAdmin,
+    read: trainerTopicReadAccess,
     update: isAdmin,
     delete: isAdmin,
   },
   hooks: {
+    afterRead: [async ({ doc, req, overrideAccess }) => {
+      if (overrideAccess || !req.user || !Object.hasOwn(doc, 'description')) return doc
+      const scope = await getTrainerAccess(req.payload, req.user, req)
+      return !scope.admin && scope.catalogVisibility === 'assigned' ? { ...doc, description: null } : doc
+    }],
     beforeValidate: [generateSlug],
+    beforeDelete: [cleanupLearningTargetGrants('trainer-topics')],
   },
   fields: [
     {

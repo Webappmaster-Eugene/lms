@@ -95,11 +95,11 @@ describe('POST /api/trainer/submit — вход', () => {
     expect(body.error).toMatch(/20000/)
   })
 
-  it('неопубликованная задача — 404, как несуществующая', async () => {
+  it('неопубликованная и несуществующая задачи одинаково закрыты до чтения содержания', async () => {
     const { token } = await newStudent()
     const draft = await createSumTask(payload, { isPublished: false })
-    expect((await submit(request('/api/trainer/submit', { token, body: { taskId: draft.id, code: 'x' } }))).status).toBe(404)
-    expect((await submit(request('/api/trainer/submit', { token, body: { taskId: 987654, code: 'x' } }))).status).toBe(404)
+    expect((await submit(request('/api/trainer/submit', { token, body: { taskId: draft.id, code: 'x' } }))).status).toBe(403)
+    expect((await submit(request('/api/trainer/submit', { token, body: { taskId: 987654, code: 'x' } }))).status).toBe(403)
   })
 
   it('язык, которого нет у задачи, — 400', async () => {
@@ -243,7 +243,8 @@ describe('GET /api/trainer/solution', () => {
     expect((await get(undefined)).status).toBe(401)
     expect((await solution(request('/api/trainer/solution', { token, method: 'GET' }))).status).toBe(400)
     const draft = await createSumTask(payload, { isPublished: false })
-    expect((await get(token, draft.id)).status).toBe(404)
+    // The same access denial hides both missing and unpublished tasks.
+    expect((await get(token, draft.id)).status).toBe(403)
   })
 
   it('до решения закрыто (403), после решения — эталон и разбор', async () => {

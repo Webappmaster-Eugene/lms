@@ -10,6 +10,7 @@ type GrantDocument = {
   user: unknown
   target: { relationTo: LearningTargetCollection; value: unknown }
   effect: 'allow' | 'deny'
+  ruleKey?: string
   startsAt?: string | null
   expiresAt?: string | null
 }
@@ -39,17 +40,26 @@ export const validateLearningGrant: CollectionBeforeValidateHook = async ({ data
 async function auditGrant(req: PayloadRequest, doc: GrantDocument, operation: 'create' | 'update' | 'delete', previous?: GrantDocument) {
   const actorId = learningRelationId(req.user)
   const userId = learningRelationId(doc.user)
-  const targetId = learningRelationId(doc.target.value)
-  if (!req.user || (await getAuthoritativeLearningPolicy(req.payload, req.user.id, req)).role !== 'admin' || actorId === null || userId === null || targetId === null) throw new Forbidden(req.t)
+  let targetType: LearningTargetCollection | undefined = doc.target?.relationTo
+  let targetId = learningRelationId(doc.target?.value)
+  // Deleted polymorphic targets can resolve to null. The immutable server key retains the audit identity.
+  if (operation === 'delete' && targetId === null && typeof doc.ruleKey === 'string') {
+    const [owner, collection, rawId, extra] = doc.ruleKey.split(':')
+    if (extra === undefined && learningRelationId(owner) === userId && learningTargetCollections.includes(collection as LearningTargetCollection)) {
+      targetType = collection as LearningTargetCollection
+      targetId = learningRelationId(rawId)
+    }
+  }
+  if (!req.user || (await getAuthoritativeLearningPolicy(req.payload, req.user.id, req)).role !== 'admin' || actorId === null || userId === null || targetId === null || !targetType || !learningTargetCollections.includes(targetType)) throw new Forbidden(req.t)
   await req.payload.create({
     collection: 'learning-access-audit', overrideAccess: true, req,
-    data: { actorId, userId, grantId: doc.id, operation, targetType: doc.target.relationTo, targetId, effect: doc.effect,
-      previous: previous ? { userId: learningRelationId(previous.user), targetType: previous.target.relationTo, targetId: learningRelationId(previous.target.value), effect: previous.effect, startsAt: previous.startsAt, expiresAt: previous.expiresAt } : null,
+    data: { actorId, userId, grantId: doc.id, operation, targetType, targetId, effect: doc.effect,
+      previous: previous ? { userId: learningRelationId(previous.user), targetType: previous.target?.relationTo, targetId: learningRelationId(previous.target?.value), effect: previous.effect, startsAt: previous.startsAt, expiresAt: previous.expiresAt } : null,
       current: operation === 'delete' ? null : { startsAt: doc.startsAt, expiresAt: doc.expiresAt },
     },
   })
   invalidateLearningAccess(req)
-  recordLearningAssignment({ actorId, userId, operation, targetType: doc.target.relationTo, targetId, effect: doc.effect })
+  recordLearningAssignment({ actorId, userId, operation, targetType, targetId, effect: doc.effect })
 }
 
 export const auditLearningGrantChange: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, req }) => {

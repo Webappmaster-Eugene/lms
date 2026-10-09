@@ -1,7 +1,8 @@
 import type { CollectionConfig, FieldAccess } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
-import { isPublishedOrAdmin } from '@/payload/access/isPublishedOrAdmin'
+import { trainerTaskReadAccess } from '@/server/trainer-access'
+import { cleanupLearningTargetGrants } from '@/payload/hooks/learningAccessCleanup'
 import { generateSlug } from '@/payload/hooks/generateSlug'
 import { cleanupTaskRelations } from '@/payload/hooks/cleanupOwnedRelations'
 import {
@@ -39,13 +40,13 @@ export const TrainerTasks: CollectionConfig = {
   },
   access: {
     create: isAdmin,
-    read: isPublishedOrAdmin,
+    read: trainerTaskReadAccess,
     update: isAdmin,
     delete: isAdmin,
   },
   hooks: {
     beforeValidate: [generateSlug],
-    beforeDelete: [cleanupTaskRelations],
+    beforeDelete: [cleanupLearningTargetGrants('trainer-tasks'), cleanupTaskRelations],
   },
   fields: [
     {

@@ -8,6 +8,7 @@ import { TrainerSpecError } from '@/lib/trainer/spec'
 import type { SubmitResponse } from '@/lib/trainer/api'
 import type { TrainerLanguage, TrainerRunResult } from '@/lib/trainer/types'
 import { parseTaskId } from '@/lib/trainer/task-id'
+import { getTrainerAccess, TrainerAccessError } from '@/server/trainer-access'
 import { runSolution, TrainerRunnerError } from '@/server/trainer/sandbox'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
 import { logger } from '@/lib/telemetry'
@@ -65,6 +66,10 @@ export async function POST(request: Request): Promise<Response> {
     )
   }
 
+  if (!(await getTrainerAccess(payload, user)).canAccessTask(taskId)) {
+    return NextResponse.json({ error: 'Доступ к этой задаче не назначен' }, { status: 403 })
+  }
+
   const tasks = await payload.find({
     collection: 'trainer-tasks',
     where: { id: { equals: taskId }, isPublished: { equals: true } },
@@ -116,6 +121,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     progress = await saveTrainerProgress({ payload, user, task, language, code, result })
   } catch (error) {
+    if (error instanceof TrainerAccessError) return NextResponse.json({ error: error.message }, { status: 403 })
     logger.error('Не удалось сохранить прогресс тренажёра', error, {
       'trainer.task.id': taskId,
       'user.id': String(user.id),

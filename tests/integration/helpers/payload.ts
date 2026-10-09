@@ -43,7 +43,7 @@ export async function createUser(
       firstName: 'Тест',
       lastName: 'Пользователь',
       role,
-      learningAccessMode: 'all',
+      learningCatalogVisibility: 'catalog', trainerAccessMode: 'all', learningAccessMode: 'all',
       isActive: true,
       ...overrides,
       password,

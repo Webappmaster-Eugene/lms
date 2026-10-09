@@ -12,6 +12,14 @@ const auth = vi.fn()
 const find = vi.fn()
 const compileTypeScript = vi.fn()
 
+const getTrainerAccess = vi.fn<() => Promise<{ canAccessTask: (id: number) => boolean }>>(async () => ({ canAccessTask: () => true }))
+const requireTrainerTaskAccess = vi.fn()
+vi.mock('@/server/trainer-access', () => ({
+  getTrainerAccess, requireTrainerTaskAccess, invalidateTrainerAccess: vi.fn(),
+  TrainerAccessError: class TrainerAccessError extends Error {},
+}))
+vi.mock('@/payload/hooks/learningAccessLock', () => ({ lockLearningAccess: vi.fn() }))
+
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('payload', () => ({ getPayload: vi.fn(async () => ({ auth, find })) }))
 vi.mock('@/server/trainer/sandbox', async (importOriginal) => {
@@ -62,6 +70,8 @@ function givenTask(task: Record<string, unknown> = TASK, progress: unknown[] = [
 
 beforeEach(() => {
   vi.clearAllMocks()
+  getTrainerAccess.mockResolvedValue({ canAccessTask: () => true })
+  requireTrainerTaskAccess.mockResolvedValue(undefined)
   auth.mockResolvedValue({ user: USER })
   compileTypeScript.mockResolvedValue({ js: 'скомпилировано', diagnostics: [] })
   givenTask()
@@ -70,6 +80,13 @@ beforeEach(() => {
 })
 
 describe('POST /api/trainer/compile', () => {
+  it('неназначенная задача — 403 до чтения кода, запуска и записи', async () => {
+    getTrainerAccess.mockResolvedValue({ canAccessTask: () => false })
+    const response = await POST(compileRequest({ taskId: '42', code: 'const x = 1' }))
+    expect(response.status).toBe(403)
+    expect(find).not.toHaveBeenCalled()
+  })
+
   it('без авторизации — 401', async () => {
     auth.mockResolvedValue({ user: null })
     expect((await POST(compileRequest({ taskId: '42', code: 'x' }))).status).toBe(401)
@@ -137,6 +154,8 @@ describe('POST /api/trainer/compile', () => {
     expect(compileTypeScript.mock.calls[0][0].typeHarness).toBe('')
 
     vi.clearAllMocks()
+  getTrainerAccess.mockResolvedValue({ canAccessTask: () => true })
+  requireTrainerTaskAccess.mockResolvedValue(undefined)
     compileTypeScript.mockResolvedValue({ js: '', diagnostics: [] })
     givenTask({ ...TASK, checkMode: 'types' })
 
