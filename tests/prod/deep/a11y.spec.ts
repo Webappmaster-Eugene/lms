@@ -12,6 +12,12 @@ test.use({ storageState: stateOf('student') })
 
 type Violation = { id: string; impact?: string | null; help: string; nodes: { target: unknown[] }[] }
 
+async function visit(page: Page, path: string) {
+  await page.goto(path, { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('main')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+}
+
 async function audit(page: Page, name: string): Promise<string[]> {
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()
   await test.info().attach(`axe-${name}.json`, { body: JSON.stringify(results.violations, null, 2), contentType: 'application/json' })
@@ -22,11 +28,11 @@ async function audit(page: Page, name: string): Promise<string[]> {
 
 /** Страницы платформы; курс, урок и роадмап — первые из каталога прода. */
 async function pages(page: Page): Promise<[string, string][]> {
-  await page.goto('/courses')
+  await visit(page, '/courses')
   const course = await page.locator('a[href^="/courses/"]').filter({ has: page.locator('h3') }).first().getAttribute('href')
-  await page.goto(course ?? '/courses')
+  await visit(page, course ?? '/courses')
   const lesson = await page.locator('a[href^="/lessons/"]').first().getAttribute('href')
-  await page.goto('/roadmaps')
+  await visit(page, '/roadmaps')
   const roadmap = await page.locator('main a[href^="/roadmaps/"]').first().getAttribute('href')
   return [
     ['дашборд', '/'],
@@ -54,8 +60,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.addInitScript((value) => window.localStorage.setItem('theme', value), theme)
     const problems: string[] = []
     for (const [name, path] of list) {
-      await page.goto(path)
-      await page.waitForLoadState('networkidle')
+      await visit(page, path)
       problems.push(...(await audit(page, `${theme}-${name}`)).map((p) => `${name} (${path}): ${p}`))
     }
     expect(problems).toEqual([])
@@ -70,8 +75,7 @@ test.describe('телефон 375px', () => {
     const list = await pages(page)
     const overflow: string[] = []
     for (const [name, path] of list) {
-      await page.goto(path)
-      await page.waitForLoadState('networkidle')
+      await visit(page, path)
       const [scroll, client] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth])
       if (scroll > client) overflow.push(`${name} (${path}): ширина ${scroll} при экране ${client}`)
       await expect(page.locator('nav').filter({ hasText: 'Главная' }), name).toBeVisible()
