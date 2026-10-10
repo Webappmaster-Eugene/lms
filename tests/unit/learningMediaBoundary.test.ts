@@ -4,8 +4,8 @@ import { acquireLearningStream, LearningStreamLimitError, limitedLearningBody } 
 import { parseLearningRange } from '@/server/learning-media-response'
 import { safeLearningUpstream, upstreamLearningMedia, LearningUpstreamError } from '@/server/learning-upstream'
 
-const { resolveHref } = vi.hoisted(() => ({ resolveHref: vi.fn() }))
-vi.mock('@/lib/yandex-disk-href', () => ({ resolveHref }))
+const { resolveHref, invalidateHref } = vi.hoisted(() => ({ resolveHref: vi.fn(), invalidateHref: vi.fn() }))
+vi.mock('@/lib/yandex-disk-href', () => ({ resolveHref, invalidateHref }))
 vi.mock('@/lib/learning-observability', () => ({ recordLearningAccess: vi.fn() }))
 const upstream = vi.fn()
 const ref = { publicKey: 'https://disk.yandex.ru/d/fixture', path: '/video.mp4' }
@@ -50,6 +50,48 @@ describe('native Range and closed upstream sources', () => {
     expect(response.headers.get('Content-Length')).toBe('3')
     expect(response.body).toBeNull()
   })
+  it.each([403, 410])('a rejected temporary CDN link (%s) refreshes once without changing Range or leaking href', async (status) => {
+    const old = 'https://downloader.disk.yandex.ru/disk/old/video.mp4'
+    const fresh = 'https://downloader.disk.yandex.ru/disk/new/video.mp4'
+    resolveHref.mockResolvedValueOnce(old).mockResolvedValueOnce(fresh)
+    const rejected = new Response('expired', { status })
+    const cancel = vi.spyOn(rejected.body as ReadableStream, 'cancel')
+    upstream.mockResolvedValueOnce(rejected).mockResolvedValueOnce(new Response(new Uint8Array([4, 5]), { status: 206, headers: { 'Content-Range': 'bytes 4-5/20', 'Content-Length': '2', 'Content-Type': 'video/mp4' } }))
+    const response = await upstreamLearningMedia(new Request('https://lms.test/media', { headers: { Range: 'bytes=4-5' } }), viewerId, ref)
+    expect(invalidateHref).toHaveBeenCalledWith(ref, old)
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(upstream.mock.calls.map((call) => String(call[0]))).toEqual([old, fresh])
+    expect(upstream.mock.calls.every((call) => call[1].headers.Range === 'bytes=4-5')).toBe(true)
+    expect(response.status).toBe(206)
+    expect(response.headers.get('Content-Range')).toBe('bytes 4-5/20')
+    expect(response.headers.get('Server-Timing')).toMatch(/^disk_href;dur=\d+\.\d, disk_headers;dur=\d+\.\d$/)
+    expect(response.headers.get('Location')).toBeNull()
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+    expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([4, 5])
+  })
+  it('a persistent CDN refusal has two attempts, a generic error, and releases its stream slot', async () => {
+    upstream.mockImplementation(async () => new Response('refused', { status: 403 }))
+    const response = await upstreamLearningMedia(new Request('https://lms.test/media'), viewerId, ref)
+    expect(response.status).toBe(502)
+    expect(upstream).toHaveBeenCalledTimes(2)
+    expect(resolveHref).toHaveBeenCalledTimes(2)
+    expect(JSON.stringify(await response.json())).not.toContain('yandex')
+    const releases = Array.from({ length: 6 }, () => acquireLearningStream(viewerId))
+    releases.forEach((release) => release())
+  })
+  it('a refresh redirect is validated again instead of bypassing the CDN allowlist', async () => {
+    upstream.mockResolvedValueOnce(new Response('expired', { status: 403 }))
+      .mockResolvedValueOnce(new Response(null, { status: 302, headers: { Location: 'http://169.254.169.254/metadata' } }))
+    await expect(upstreamLearningMedia(new Request('https://lms.test/media'), viewerId, ref)).rejects.toMatchObject({ reason: 'invalid_source' })
+    expect(upstream).toHaveBeenCalledTimes(2)
+  })
+  it('a real missing file is not retried as an expired CDN capability', async () => {
+    upstream.mockResolvedValue(new Response('missing', { status: 404 }))
+    const response = await upstreamLearningMedia(new Request('https://lms.test/media'), viewerId, ref)
+    expect(response.status).toBe(404)
+    expect(upstream).toHaveBeenCalledOnce()
+    expect(invalidateHref).not.toHaveBeenCalled()
+  })
   it('416 retains the complete file size and private caching', async () => {
     upstream.mockResolvedValue(new Response(null, { status: 416, headers: { 'Content-Range': 'bytes */3' } }))
     const response = await upstreamLearningMedia(new Request('https://lms.test/media', { headers: { Range: 'bytes=99-' } }), viewerId, ref)
@@ -75,6 +117,19 @@ describe('native Range and closed upstream sources', () => {
     const failure = expect(pending).rejects.toMatchObject({ reason: 'upstream_timeout' })
     await vi.advanceTimersByTimeAsync(15001)
     await failure
+    const releases = Array.from({ length: 6 }, () => acquireLearningStream(viewerId))
+    releases.forEach((release) => release())
+  })
+  it('refresh uses the original 15-second deadline and preserves the HEAD method', async () => {
+    vi.useFakeTimers()
+    upstream.mockResolvedValueOnce(new Response('expired', { status: 403 }))
+      .mockImplementationOnce((_url, init) => new Promise((_resolve, reject) => init.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })))
+    const pending = upstreamLearningMedia(new Request('https://lms.test/media', { method: 'HEAD' }), viewerId, ref)
+    const failure = expect(pending).rejects.toMatchObject({ reason: 'upstream_timeout' })
+    await vi.advanceTimersByTimeAsync(15001)
+    await failure
+    expect(upstream).toHaveBeenCalledTimes(2)
+    expect(upstream.mock.calls.every((call) => call[1].method === 'HEAD')).toBe(true)
     const releases = Array.from({ length: 6 }, () => acquireLearningStream(viewerId))
     releases.forEach((release) => release())
   })

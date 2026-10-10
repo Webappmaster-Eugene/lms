@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ExternalLink, Play, Clock, AlertTriangle } from 'lucide-react'
 
 import { useVideoMemory } from '@/hooks/use-video-memory'
@@ -79,7 +79,7 @@ function isTransportStream(videoUrl: string): boolean {
 /**
  * Как проигрывать видео.
  *
- * Обычные записи браузер тянет сам — прямо с CDN. Поток MPEG-TS он не понимает,
+ * Обычные записи браузер читает через авторизованный серверный поток. MPEG-TS он не понимает,
  * такие разбираются отдельным плеером. Расширение подсказывает формат, но врёт:
  * часть потоков лежит под именем .mp4. Поэтому при отказе нативного плеера
  * пробуем поток, и только потом показываем карточку со ссылкой.
@@ -111,8 +111,7 @@ export function VideoPlayer({ memoryId, title, videoUrl, displayMode, descriptio
     )
   }
 
-  // Яндекс.Диск запрещает встраивание своих страниц в iframe, поэтому его видео
-  // проигрывается нативным плеером через серверный редирект на прямую ссылку.
+  // Страницы Диска не встраиваются в iframe; источник остаётся за проверкой доступа LMS.
   if (isYandexDisk) {
     if (mode === 'link') {
       return (
@@ -204,6 +203,40 @@ function NativeVideo({ memoryId, videoUrl, direct = false, onFailure }: { memory
   const videoRef = useRef<HTMLVideoElement>(null)
   const memory = useVideoMemory(videoRef, memoryId ?? videoUrl)
 
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection
+    const conserveData = connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType ?? '')
+    const canObserve = typeof IntersectionObserver !== 'undefined'
+    let nearViewport = !canObserve
+    let warmed = false
+    let disposed = false
+    let observer: IntersectionObserver | undefined
+    const warm = () => {
+      if (disposed || warmed || !nearViewport || document.visibilityState === 'hidden') return
+      // A background tab can still intersect its viewport. Only prepare the
+      // active tab, without interrupting playback when it later loses focus.
+      warmed = true
+      video.preload = conserveData || !canObserve ? 'metadata' : 'auto'
+      observer?.disconnect()
+      document.removeEventListener('visibilitychange', warm)
+    }
+    document.addEventListener('visibilitychange', warm)
+    if (canObserve) {
+      observer = new IntersectionObserver((entries) => {
+        nearViewport = entries.at(-1)?.isIntersecting ?? false
+        warm()
+      }, { rootMargin: '200px' })
+      observer.observe(video)
+    } else warm()
+    return () => {
+      disposed = true
+      observer?.disconnect()
+      document.removeEventListener('visibilitychange', warm)
+    }
+  }, [])
+
   return (
     <>
       <div className="overflow-hidden rounded-xl border border-border bg-black">
@@ -212,7 +245,7 @@ function NativeVideo({ memoryId, videoUrl, direct = false, onFailure }: { memory
           src={direct ? videoUrl : getStreamUrl(videoUrl)}
           className="aspect-video w-full"
           controls
-          preload="metadata"
+          preload="none"
           controlsList="nodownload"
           disableRemotePlayback
           playsInline

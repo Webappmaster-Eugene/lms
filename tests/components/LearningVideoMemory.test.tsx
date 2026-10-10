@@ -44,6 +44,46 @@ beforeEach(() => {
 })
 
 describe('синхронизация места остановки', () => {
+  it('серверная позиция сразу доступна плееру без дополнительного GET', async () => {
+    server.positions[videoId] = { seconds: 42, at: 100, ended: false }
+    const { container } = render(<LessonLearningProvider lessonId={10} userId={1} initialState={server}>
+      <VideoPlayer title="Запись" videoUrl="/api/media/file/demo.mp4" memoryId={videoId} displayMode="embed" />
+    </LessonLearningProvider>)
+    expect(screen.queryByText('Загружаем место остановки…')).not.toBeInTheDocument()
+    metadata(video(container))
+    expect(video(container).currentTime).toBe(42)
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(vi.mocked(fetch).mock.calls.every(([, options]) => options?.method === 'POST')).toBe(true)
+  })
+
+  it('не применяет начальную позицию другого аккаунта', async () => {
+    server.positions[videoId] = { seconds: 7, at: 100, ended: false }
+    const initialState = { ...server, userId: 2, positions: { [videoId]: { seconds: 500, at: 200, ended: false } } }
+    const { container } = render(<LessonLearningProvider lessonId={10} userId={1} initialState={initialState}>
+      <VideoPlayer title="Запись" videoUrl="/api/media/file/demo.mp4" memoryId={videoId} displayMode="embed" />
+    </LessonLearningProvider>)
+    metadata(video(container))
+    await waitFor(() => expect(video(container).currentTime).toBe(7))
+    expect(vi.mocked(fetch).mock.calls.some(([, options]) => options?.method !== 'POST')).toBe(true)
+  })
+
+  it('StrictMode и готовая серверная позиция фиксируют только одно открытие', async () => {
+    render(<StrictMode><LessonLearningProvider lessonId={10} userId={1} initialState={server}><span>Контент</span></LessonLearningProvider></StrictMode>)
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(writes[0]).toMatchObject({ lessonId: 10, expectedUserId: 1 })
+  })
+
+  it('начальная серверная позиция не превращает скрытую вкладку в просмотр', async () => {
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    render(<LessonLearningProvider lessonId={10} userId={1} initialState={server}><span>Контент</span></LessonLearningProvider>)
+    await act(async () => { await Promise.resolve() })
+    expect(fetch).not.toHaveBeenCalled()
+    visibility.mockReturnValue('visible')
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
+    expect(writes).toHaveLength(1)
+    visibility.mockRestore()
+  })
+
   it('явная ссылка выбирает только своё видео и скорость; смена rate не повторяет перемотку', async () => {
     const otherId = 'second:456'
     server.positions[videoId] = { seconds: 12, at: 100, ended: false }

@@ -112,7 +112,7 @@ describe('мобильные панели', () => {
     expect(more).toHaveAttribute('aria-expanded', 'true')
     expect(within(dialog).getByRole('link', { name: 'Приложение' })).toHaveAttribute('href', '/settings/app')
     expect(within(dialog).getAllByRole('link').map((link) => link.textContent)).toEqual([
-      'Дашборд', 'Роадмапы', 'Курсы', 'Тренажёр', 'Сертификаты', 'Заметки', 'Вопросы',
+      'Дашборд', 'Роадмапы', 'Курсы', 'Тренажёр', 'История обучения', 'Сертификаты', 'Заметки', 'Вопросы',
       'Сохранённое', 'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь',
     ])
     const settings = within(dialog).getByRole('link', { name: 'Уведомления' })

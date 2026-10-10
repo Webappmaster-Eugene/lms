@@ -1,3 +1,4 @@
+import { createLocalReq } from 'payload'
 import { getPayload } from '@/lib/payload'
 import { accessibleLearningLesson, getLearningState, learningMutation, LearningStateError, saveLearningState } from '@/server/learning-state'
 import { recordLearningAccess, withLearningSpan } from '@/lib/learning-observability'
@@ -14,7 +15,8 @@ async function handle(request: Request, write: boolean) {
     if (!/^(?:JWT|Bearer) \S+$/.test(authorization)) return response({ error: 'Войдите в аккаунт' }, 401)
     headers.delete('cookie')
   }
-  const { user } = await payload.auth({ headers })
+  const req = await createLocalReq({}, payload)
+  const { user } = await payload.auth({ headers, req })
   if (!user) return response({ error: 'Войдите в аккаунт' }, 401)
   const origin = request.headers.get('origin')
   if (write) {
@@ -33,8 +35,8 @@ async function handle(request: Request, write: boolean) {
     const expectedUserId = write && body && typeof body === 'object' && 'expectedUserId' in body ? body.expectedUserId : new URL(request.url).searchParams.get('expectedUserId')
     if (expectedUserId !== undefined && expectedUserId !== null && Number(expectedUserId) !== user.id) return response({ error: 'Аккаунт изменился. Обновите страницу' }, 403)
     const { lessonId, mutation } = learningMutation(body)
-    const lesson = await accessibleLearningLesson(payload, user, lessonId)
-    return response(write ? await saveLearningState(payload, user, lesson, mutation) : await getLearningState(payload, user, lesson))
+    const lesson = await accessibleLearningLesson(payload, user, lessonId, req)
+    return response(write ? await saveLearningState(payload, user, lesson, mutation, req) : await getLearningState(payload, user, lesson, req))
   } catch (error) {
     if (error instanceof RequestBodyError) return response({ error: error.message }, error.status)
     if (error instanceof LearningStateError) return response({ error: error.message }, error.status)

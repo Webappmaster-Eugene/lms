@@ -31,12 +31,13 @@ type LearningContext = {
 const Context = createContext<LearningContext | null>(null)
 export const useLessonLearning = () => useContext(Context)
 
-type Props = { lessonId: number; userId: number; children: ReactNode }
+type Props = { lessonId: number; userId: number; initialState?: LearningState; children: ReactNode }
 
-export function LessonLearningProvider({ lessonId, userId, children }: Props) {
-  const [ready, setReady] = useState(false)
-  const [positions, setPositions] = useState<VideoPositions>({})
-  const [status, setStatus] = useState<'loading' | 'saved' | 'offline' | 'auth'>('loading')
+export function LessonLearningProvider({ lessonId, userId, initialState, children }: Props) {
+  const suppliedState = initialState?.userId === userId ? initialState : undefined
+  const [ready, setReady] = useState(Boolean(suppliedState))
+  const [positions, setPositions] = useState<VideoPositions>(() => readVideoPositions(suppliedState?.positions))
+  const [status, setStatus] = useState<'loading' | 'saved' | 'offline' | 'auth'>(suppliedState ? 'saved' : 'loading')
   const mounted = useRef(false)
   const pending = useRef(new Map<string, VideoPosition>())
   const pendingOpenAt = useRef<number | null>(null)
@@ -85,7 +86,8 @@ export function LessonLearningProvider({ lessonId, userId, children }: Props) {
       pendingOpenAt.current = at
       void persist({ at }).then((saved) => { if (saved && pendingOpenAt.current === at) pendingOpenAt.current = null })
     }
-    void fetch(`/api/learning-state?lessonId=${lessonId}&expectedUserId=${userId}`, { credentials: 'same-origin', cache: 'no-store', signal: controller.signal })
+    if (suppliedState) queueMicrotask(() => { if (alive && mounted.current) open() })
+    else void fetch(`/api/learning-state?lessonId=${lessonId}&expectedUserId=${userId}`, { credentials: 'same-origin', cache: 'no-store', signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error(String(response.status))
         const state = await response.json() as LearningState
@@ -112,7 +114,7 @@ export function LessonLearningProvider({ lessonId, userId, children }: Props) {
       document.removeEventListener('visibilitychange', open)
       window.removeEventListener('online', retry)
     }
-  }, [lessonId, userId, persist, save])
+  }, [lessonId, userId, suppliedState, persist, save])
 
   const context = useMemo(() => ({ lessonId, userId, ready, positions, save }), [lessonId, userId, ready, positions, save])
   return (

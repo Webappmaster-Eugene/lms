@@ -41,7 +41,7 @@ describe('нижняя навигация', () => {
   it('содержит основные разделы', () => {
     render(<BottomNav />)
 
-    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Главная', 'Роадмапы', 'Курсы', 'Тренажёр'])
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Роадмапы', 'Курсы', 'Тренажёр', 'Главная'])
     for (const label of ['Главная', 'Курсы', 'Тренажёр', 'Роадмапы']) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }

@@ -142,7 +142,7 @@ test('уведомления помещаются в маленький экра
   await panel.getByRole('link', { name: 'Все уведомления' }).click()
   await expect(page).toHaveURL(/\/notifications$/)
   await expect(page.getByRole('heading', { name: 'Уведомления', level: 1 })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Приложение и напоминания', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Настройки уведомлений', exact: true })).toHaveAttribute('href', '/settings/notifications')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   const accessibility = await new AxeBuilder({ page }).include('main').withTags(['wcag2a', 'wcag2aa']).analyze()
   expect(accessibility.violations).toEqual([])

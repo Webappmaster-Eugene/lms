@@ -3,8 +3,10 @@ import 'server-only'
 import { sql } from '@payloadcms/db-postgres'
 import { commitTransaction, createLocalReq, initTransaction, killTransaction, type Payload, type PayloadRequest } from 'payload'
 import type { Lesson, User } from '@/payload-types'
-import { learningVideoHref, learningVideos, readVideoPositions, type LearningState, type VideoPosition } from '@/lib/learning-state'
+import { learningVideos, readVideoPositions, type LearningState } from '@/lib/learning-state'
 import { LearningAccessError, requireLessonAccess } from '@/server/learning-access'
+import { learningHistory } from '@/server/learning-history'
+import { populateLearningVideoFiles } from '@/server/learning-videos'
 import { recordLearningActivity } from '@/server/notification-service'
 
 export class LearningStateError extends Error {
@@ -15,7 +17,7 @@ export async function accessibleLearningLesson(payload: Payload, user: User, id:
   const req = request ?? await createLocalReq({ user }, payload)
   let lesson
   try {
-    lesson = await payload.findByID({ collection: 'lessons', id, depth: 1, overrideAccess: true, req })
+    lesson = await payload.findByID({ collection: 'lessons', id, depth: 0, select: { title: true, slug: true, course: true, section: true, isPublished: true, content: true, updatedAt: true, createdAt: true }, overrideAccess: true, req })
   } catch (error) {
     if (error instanceof Error && 'status' in error && error.status === 404) throw new LearningStateError('Урок недоступен', 404)
     throw error
@@ -26,13 +28,27 @@ export async function accessibleLearningLesson(payload: Payload, user: User, id:
     if (error instanceof LearningAccessError) throw new LearningStateError('Урок недоступен', error.status)
     throw error
   }
-  return lesson
+  return (await populateLearningVideoFiles(payload, [lesson], req))[0]
 }
 
-export async function getLearningState(payload: Payload, user: User, lesson: Lesson): Promise<LearningState> {
-  const result = await payload.find({ collection: 'lesson-learning-states', where: { user: { equals: user.id }, lesson: { equals: lesson.id } }, limit: 1, depth: 0, overrideAccess: false, user })
+async function authorizeState(payload: Payload, user: User, lesson: Lesson, req: PayloadRequest) {
+  if (req.user?.id !== user.id) throw new LearningStateError('Аккаунт изменился. Обновите страницу', 403)
+  try {
+    await requireLessonAccess(payload, user, lesson, req)
+  } catch (error) {
+    if (error instanceof LearningAccessError) throw new LearningStateError('Урок недоступен', error.status)
+    throw error
+  }
+}
+
+export async function getLearningState(payload: Payload, user: User, lesson: Lesson, request?: PayloadRequest): Promise<LearningState> {
+  const req = request ?? await createLocalReq({ user }, payload)
+  await authorizeState(payload, user, lesson, req)
+  // This lesson was authorized above; the indexed owner filter avoids loading the entire access catalogue.
+  const result = await payload.find({ collection: 'lesson-learning-states', where: { user: { equals: user.id }, lesson: { equals: lesson.id } }, limit: 1, depth: 0, overrideAccess: true, req })
   const state = result.docs[0]
-  const validIds = new Set(learningVideos(lesson).map((video) => video.id))
+  if (state && state.user !== user.id) throw new LearningStateError('Доступ запрещён', 403)
+  const validIds = new Set(learningVideos((await populateLearningVideoFiles(payload, [lesson], req))[0]).map((video) => video.id))
   return {
     userId: user.id,
     positions: Object.fromEntries(Object.entries(readVideoPositions(state?.positions)).filter(([id]) => validIds.has(id))),
@@ -72,14 +88,15 @@ async function lockViewer(req: PayloadRequest, userId: number) {
   await db.execute(sql`select pg_advisory_xact_lock(7203, ${userId})`)
 }
 
-export async function saveLearningState(payload: Payload, user: User, lesson: Lesson, mutation: LearningMutation) {
-  const videos = learningVideos(lesson)
+export async function saveLearningState(payload: Payload, user: User, lesson: Lesson, mutation: LearningMutation, request?: PayloadRequest) {
+  const req = request ?? await createLocalReq({ user }, payload)
+  await authorizeState(payload, user, lesson, req)
+  const videos = learningVideos((await populateLearningVideoFiles(payload, [lesson], req))[0])
   if (mutation.videoId && !videos.some((video) => video.id === mutation.videoId)) throw new LearningStateError('Видео обновлено. Обновите страницу', 409)
-  const req = await createLocalReq({ user }, payload)
-  await initTransaction(req)
+  const ownTransaction = await initTransaction(req)
   try {
     await lockViewer(req, user.id)
-    const found = await payload.find({ collection: 'lesson-learning-states', where: { user: { equals: user.id }, lesson: { equals: lesson.id } }, limit: 1, depth: 0, overrideAccess: false, user, req })
+    const found = await payload.find({ collection: 'lesson-learning-states', where: { user: { equals: user.id }, lesson: { equals: lesson.id } }, limit: 1, depth: 0, overrideAccess: true, req })
     const existing = found.docs[0]
     // Even server-owned Local API writes verify document ownership before overrideAccess.
     if (existing && existing.user !== user.id) throw new LearningStateError('Доступ запрещён', 403)
@@ -87,7 +104,7 @@ export async function saveLearningState(payload: Payload, user: User, lesson: Le
     const validIds = new Set(videos.map((video) => video.id))
     for (const id of Object.keys(positions)) if (!validIds.has(id)) delete positions[id]
     const previousAt = existing ? new Date(existing.lastViewedAt).getTime() : 0
-    let lastVideoId = existing?.lastVideoId ?? null
+    let lastVideoId = existing?.lastVideoId && validIds.has(existing.lastVideoId) ? existing.lastVideoId : null
     let studiedVideo = false
     if (mutation.videoId && (!positions[mutation.videoId] || positions[mutation.videoId].at < mutation.at)) {
       studiedVideo = (mutation.seconds ?? 0) > 0 && positions[mutation.videoId]?.seconds !== mutation.seconds
@@ -98,33 +115,17 @@ export async function saveLearningState(payload: Payload, user: User, lesson: Le
     if (existing) await payload.update({ collection: 'lesson-learning-states', id: existing.id, data, req, depth: 0, overrideAccess: true })
     else await payload.create({ collection: 'lesson-learning-states', data, req, depth: 0, overrideAccess: true })
     if (studiedVideo) await recordLearningActivity(req, user.id, new Date(mutation.at))
-    await commitTransaction(req)
+    if (ownTransaction) await commitTransaction(req)
     return { userId: user.id, positions, lastVideoId, lastViewedAt: data.lastViewedAt } satisfies LearningState
   } catch (error) {
-    await killTransaction(req)
+    if (ownTransaction) await killTransaction(req)
     throw error
   }
 }
 
-export async function latestLearningResume(payload: Payload, user: User) {
-  const req = await createLocalReq({ user }, payload)
-  // Pagination avoids a hidden limit when recent lessons have since been unpublished.
-  let page = 1
-  for (;;) {
-    const states = await payload.find({ collection: 'lesson-learning-states', where: { user: { equals: user.id } }, sort: ['-lastViewedAt', '-id'], depth: 0, overrideAccess: false, user, page, limit: 20 })
-    for (const state of states.docs) {
-      try {
-        const id = typeof state.lesson === 'object' ? state.lesson.id : state.lesson
-        const lesson = await accessibleLearningLesson(payload, user, id, req)
-        const video = learningVideos(lesson).find((item) => item.id === state.lastVideoId)
-        const position: VideoPosition | undefined = video ? readVideoPositions(state.positions)[video.id] : undefined
-        return { title: lesson.title, course: typeof lesson.course === 'object' ? lesson.course.title : '', href: learningVideoHref(lesson.slug, video?.id), videoTitle: video?.title, seconds: position?.seconds, ended: position?.ended, lastViewedAt: state.lastViewedAt }
-      } catch (error) {
-        if (error instanceof LearningStateError && (error.status === 404 || error.status === 403)) continue
-        throw error
-      }
-    }
-    if (!states.hasNextPage) return null
-    page += 1
-  }
+export async function latestLearningResume(payload: Payload, user: User, request?: PayloadRequest) {
+  const entry = (await learningHistory(payload, user, { limit: 1 }, request)).docs[0]
+  if (!entry) return null
+  const { title, course, href, videoTitle, seconds, ended, lastViewedAt } = entry
+  return { title, course, href, videoTitle, seconds, ended, lastViewedAt }
 }

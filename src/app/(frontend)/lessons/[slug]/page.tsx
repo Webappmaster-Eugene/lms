@@ -22,6 +22,7 @@ import { getLearningAccess } from '@/server/learning-access'
 import { recordLearningAccess } from '@/lib/learning-observability'
 import { loadPublishedProgrammeLessons } from '@/lib/course-completion'
 import { getLearningRequest } from '@/server/learning-request'
+import { getLearningState } from '@/server/learning-state'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -266,7 +267,10 @@ export default async function LessonPage({ params }: Props) {
     }
   }
 
-  const bookmarkId = user ? await findBookmarkId(payload, user.id, { lesson: lesson.id }) : null
+  const [bookmarkId, initialLearningState] = await Promise.all([
+    findBookmarkId(payload, user.id, { lesson: lesson.id }),
+    getLearningState(payload, user, lesson, req),
+  ])
 
   const visibleLesson = user.role === 'admin' ? lesson : protectLessonVideoSources(lesson)
   const blocks = visibleLesson.content ?? []
@@ -335,7 +339,7 @@ export default async function LessonPage({ params }: Props) {
 
         {/* Контент урока */}
         {user ? (
-          <LessonLearningProvider key={`${user.id}:${lesson.id}`} userId={user.id} lessonId={lesson.id}>
+          <LessonLearningProvider key={`${user.id}:${lesson.id}`} userId={user.id} lessonId={lesson.id} initialState={initialLearningState}>
             <ContentBlockRenderer blocks={blocks} learningVideos={learningVideos(lesson)} />
           </LessonLearningProvider>
         ) : <ContentBlockRenderer blocks={blocks} />}

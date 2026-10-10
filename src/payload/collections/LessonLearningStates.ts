@@ -14,7 +14,7 @@ export const LessonLearningStates: CollectionConfig = {
     update: () => false,
     delete: () => false,
   },
-  indexes: [{ fields: ['lesson', 'user'], unique: true }],
+  indexes: [{ fields: ['lesson', 'user'], unique: true }, { fields: ['user', 'lastViewedAt'] }],
   fields: [
     { name: 'user', type: 'relationship', relationTo: 'users', required: true, label: 'Пользователь' },
     { name: 'lesson', type: 'relationship', relationTo: 'lessons', required: true, label: 'Урок' },

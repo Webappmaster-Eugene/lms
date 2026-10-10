@@ -14,10 +14,10 @@ type Tab = {
 }
 
 const TABS: readonly Tab[] = [
-  { href: '/', label: 'Главная', icon: LayoutDashboard, exact: true },
   { href: '/roadmaps', label: 'Роадмапы', icon: Map },
   { href: '/courses', label: 'Курсы', icon: GraduationCap },
   { href: '/trainer', label: 'Тренажёр', icon: Code2 },
+  { href: '/', label: 'Главная', icon: LayoutDashboard, exact: true },
 ]
 
 export function BottomNav({ trainerEnabled = true }: { trainerEnabled?: boolean } = {}) {

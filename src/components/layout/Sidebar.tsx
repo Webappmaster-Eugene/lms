@@ -21,6 +21,7 @@ import {
   User,
   LogOut,
   Smartphone,
+  History,
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { MobileSheet } from './MobileSheet'
@@ -35,6 +36,7 @@ const NAV_ITEMS = [
   { href: '/roadmaps', label: 'Роадмапы', icon: Map },
   { href: '/courses', label: 'Курсы', icon: GraduationCap },
   { href: '/trainer', label: 'Тренажёр', icon: Code2 },
+  { href: '/learning-history', label: 'История обучения', icon: History },
   { href: '/certificates', label: 'Сертификаты', icon: Award },
   { href: '/notes', label: 'Заметки', icon: StickyNote },
   { href: '/questions', label: 'Вопросы', icon: MessagesSquare },

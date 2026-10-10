@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { recordLearningAccess } from '@/lib/learning-observability'
-import { resolveHref } from '@/lib/yandex-disk-href'
+import { invalidateHref, resolveHref } from '@/lib/yandex-disk-href'
 import type { PublicResourceRef } from '@/lib/yandex-disk-url'
 import { PRIVATE_MEDIA_HEADERS, mediaError } from '@/server/learning-media-response'
 import { acquireLearningStream, limitedLearningBody } from '@/server/learning-stream-limits'
@@ -51,24 +51,39 @@ export async function upstreamLearningMedia(request: Request, userId: number, re
       recordLearningAccess({ resource: 'media', outcome: 'deny', reason: 'invalid_range', userId })
       return mediaError('Некорректный диапазон файла', 416)
     }
-    const href = await resolveHref(ref, controller.signal)
-    let target = safeLearningUpstream(href)
+    let hrefDuration = 0
+    let upstreamDuration = 0
     let upstream: Response | undefined
-    for (let redirects = 0; redirects <= 3; redirects++) {
-      upstream = await fetch(target, {
-        method: request.method === 'HEAD' ? 'HEAD' : 'GET',
-        headers: { 'Accept-Encoding': 'identity', ...(range ? { Range: range } : {}) },
-        cache: 'no-store', redirect: 'manual', signal: controller.signal,
-      })
-      if (![301, 302, 303, 307, 308].includes(upstream.status)) break
-      const location = upstream.headers.get('location')
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const hrefStarted = performance.now()
+      const href = await resolveHref(ref, controller.signal)
+      hrefDuration += performance.now() - hrefStarted
+      let target = safeLearningUpstream(href)
+      const upstreamStarted = performance.now()
+      for (let redirects = 0; redirects <= 3; redirects++) {
+        upstream = await fetch(target, {
+          method: request.method === 'HEAD' ? 'HEAD' : 'GET',
+          headers: { 'Accept-Encoding': 'identity', ...(range ? { Range: range } : {}) },
+          cache: 'no-store', redirect: 'manual', signal: controller.signal,
+        })
+        if (![301, 302, 303, 307, 308].includes(upstream.status)) break
+        const location = upstream.headers.get('location')
+        await upstream.body?.cancel()
+        if (!location || redirects === 3) throw new LearningUpstreamError('invalid_source')
+        target = safeLearningUpstream(new URL(location, target).href)
+      }
+      upstreamDuration += performance.now() - upstreamStarted
+      // A CDN capability can expire before our conservative TTL; retry once,
+      // with the same Range and deadline, rather than breaking native playback.
+      if (!upstream || ![403, 410].includes(upstream.status)) break
+      invalidateHref(ref, href)
+      if (attempt === 1) break
       await upstream.body?.cancel()
-      if (!location || redirects === 3) throw new LearningUpstreamError('invalid_source')
-      target = safeLearningUpstream(new URL(location, target).href)
     }
     clearTimeout(timer)
     if (!upstream) throw new LearningUpstreamError('invalid_source')
     const headers = new Headers(PRIVATE_MEDIA_HEADERS)
+    headers.set('Server-Timing', `disk_href;dur=${hrefDuration.toFixed(1)}, disk_headers;dur=${upstreamDuration.toFixed(1)}`)
     for (const name of FORWARDED_HEADERS) {
       const value = upstream.headers.get(name)
       if (value) headers.set(name, value)

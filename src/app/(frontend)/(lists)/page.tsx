@@ -6,7 +6,8 @@ import { collectAllPages } from '@/lib/paginate'
 import { pluralize } from '@/lib/utils'
 import { streakView } from '@/lib/streak'
 import { loadCourseLessons, relationKey } from '@/lib/course-lessons'
-import { latestLearningResume } from '@/server/learning-state'
+import { recentLearningCourses } from '@/server/learning-history'
+import { RecentLearningCourses } from '@/components/learning/LearningHistory'
 import { formatTime } from '@/lib/video-memory'
 import { nextLesson, recentCourseIds } from '@/lib/roadmap-next-step'
 import type { Where } from 'payload'
@@ -27,7 +28,7 @@ export default async function DashboardPage() {
   const assignedCourses: Where = user.role === 'admin' ? {} : { id: { in: policy.accessibleCourseIds } }
 
   // Загружаем данные параллельно
-  const [roadmapDocs, courses, progressData, achievementsData, streakData, certificatesData, answers] = await Promise.all([
+  const [roadmapDocs, courses, progressData, achievementsData, streakData, certificatesData, answers, learningCourses] = await Promise.all([
     collectAllPages(
       ({ page, limit }) =>
         payload.find({
@@ -94,6 +95,7 @@ export default async function DashboardPage() {
       limit: 3,
       depth: 0,
     }),
+    recentLearningCourses(payload, user, 6, req),
   ])
 
   const completedLessons = progressData.totalDocs
@@ -190,7 +192,7 @@ export default async function DashboardPage() {
   })
 
   // Продолжить — самый свежий из незаконченных курсов.
-  const exactResume = await latestLearningResume(payload, user)
+  const exactResume = learningCourses[0]
   const resume = hasStarted ? coursesWithProgress.find((c) => c.next && c.completedCount < c.totalLessons) : undefined
 
   return (
@@ -217,6 +219,7 @@ export default async function DashboardPage() {
       {(exactResume || resume?.next) && (
         <Link
           href={exactResume?.href ?? `/lessons/${resume?.next?.slug}`}
+          prefetch={false}
           className="flex flex-col gap-3 rounded-xl border border-primary/40 bg-primary/5 p-4 transition-colors hover:bg-primary/10 sm:flex-row sm:items-center sm:p-5"
         >
           <div className="min-w-0 flex-1">
@@ -257,6 +260,8 @@ export default async function DashboardPage() {
           </ul>
         </section>
       )}
+
+      <RecentLearningCourses entries={learningCourses} />
 
       {/* Статистика — горизонтальный скролл на мобильных */}
       <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide sm:grid sm:grid-cols-5 sm:gap-4 sm:overflow-visible sm:pb-0">

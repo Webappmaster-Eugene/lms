@@ -43,10 +43,15 @@ test('другое устройство видит точный урок/рол�
 
     // Exercise a real native video, including seek, playback and pause; the API is not mocked.
     const laptop = await first.newPage()
+    let resumeGets = 0
+    laptop.on('request', request => { if (new URL(request.url()).pathname === '/api/learning-state' && request.method() === 'GET') resumeGets++ })
     await laptop.goto(`/lessons/${lesson.slug}`)
     const video = laptop.locator('video')
     await expect(laptop.getByText(/Место остановки сохраняется в аккаунте/)).toBeVisible()
+    await video.scrollIntoViewIfNeeded()
+    await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.preload)).toBe('auto')
     await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState)).toBeGreaterThanOrEqual(1)
+    expect(resumeGets).toBe(0)
     await video.evaluate((element: HTMLVideoElement) => { element.currentTime = 754 })
     await video.evaluate((element: HTMLVideoElement) => element.play())
     await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(754.1)

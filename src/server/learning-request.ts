@@ -8,7 +8,8 @@ import { getPayload } from '@/lib/payload'
 /** React scopes this memo to one render, including its layout and metadata. */
 export const getLearningRequest = cache(async () => {
   const payload = await getPayload()
-  const { user } = await payload.auth({ headers: await headers() })
-  const req = await createLocalReq({ user: user ?? undefined }, payload)
+  // Payload auth evaluates collection access; retain that request's already calculated policy.
+  const req = await createLocalReq({}, payload)
+  const { user } = await payload.auth({ headers: await headers(), req })
   return { payload, user, req }
 })

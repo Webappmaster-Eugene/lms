@@ -10,7 +10,7 @@ import { APP_URL } from '../fixtures/env'
 const screenshotDirectory = resolve('.codex/state/account-ux')
 const password = 'Account-Test-Password-123'
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64')
-const menuLabels = ['Дашборд', 'Роадмапы', 'Курсы', 'Тренажёр', 'Сертификаты', 'Заметки', 'Вопросы', 'Сохранённое', 'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь']
+const menuLabels = ['Дашборд', 'Роадмапы', 'Курсы', 'Тренажёр', 'История обучения', 'Сертификаты', 'Заметки', 'Вопросы', 'Сохранённое', 'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь']
 
 type Account = { id: number; email: string; admin: APIRequestContext; commentIds: number[] }
 const test = base.extend<{ account: Account }>({

@@ -19,6 +19,7 @@ import * as migration_20261008_205700_student_analytics_and_web_vitals from './2
 import * as migration_20261009_122629_catalog_visibility_and_trainer_access from './20261009_122629_catalog_visibility_and_trainer_access';
 import * as migration_20261010_064516_trainer_go_frontend from './20261010_064516_trainer_go_frontend';
 import * as migration_20261010_132320_account_comments_settings from './20261010_132320_account_comments_settings';
+import * as migration_20261010_151210_learning_history_index from './20261010_151210_learning_history_index';
 
 export const migrations = [
   {
@@ -124,6 +125,11 @@ export const migrations = [
   {
     up: migration_20261010_132320_account_comments_settings.up,
     down: migration_20261010_132320_account_comments_settings.down,
-    name: '20261010_132320_account_comments_settings'
+    name: '20261010_132320_account_comments_settings',
+  },
+  {
+    up: migration_20261010_151210_learning_history_index.up,
+    down: migration_20261010_151210_learning_history_index.down,
+    name: '20261010_151210_learning_history_index'
   },
 ];
