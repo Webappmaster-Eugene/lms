@@ -37,7 +37,7 @@ describe('боковое меню', () => {
   it('содержит основные разделы платформы', async () => {
     render(<Sidebar />)
 
-    for (const label of ['Дашборд', 'Курсы', 'Роадмапы', 'Тренажёр', 'Лидерборд']) {
+    for (const label of ['Дашборд', 'Курсы', 'Роадмапы', 'Тренажёр', 'Собеседования', 'Лидерборд']) {
       expect(within(desktop()).getByRole('link', { name: new RegExp(label) })).toBeInTheDocument()
     }
   })
@@ -46,7 +46,7 @@ describe('боковое меню', () => {
     render(<Sidebar isAdmin />)
     const links = within(desktop()).getAllByRole('link')
     expect(links.map((link) => link.textContent)).toEqual([
-      'Дашборд', 'Роадмапы', 'Курсы', 'Тренажёр', 'История обучения', 'Сертификаты', 'Заметки', 'Вопросы',
+      'Дашборд', 'Роадмапы', 'Курсы', 'Тренажёр', 'Собеседования', 'История обучения', 'Сертификаты', 'Заметки', 'Вопросы',
       'Сохранённое', 'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь',
     ])
     expect(within(desktop()).getByRole('link', { name: 'Приложение' })).toHaveAttribute('href', '/settings/app')
@@ -57,7 +57,7 @@ describe('боковое меню', () => {
   it('при выключенном тренажёре сохраняет порядок остальных пунктов', () => {
     render(<Sidebar trainerEnabled={false} />)
     expect(within(desktop()).getAllByRole('link').map((link) => link.textContent)).toEqual([
-      'Дашборд', 'Роадмапы', 'Курсы', 'История обучения', 'Сертификаты', 'Заметки', 'Вопросы', 'Сохранённое',
+      'Дашборд', 'Роадмапы', 'Курсы', 'Собеседования', 'История обучения', 'Сертификаты', 'Заметки', 'Вопросы', 'Сохранённое',
       'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь',
     ])
   })
@@ -67,6 +67,14 @@ describe('боковое меню', () => {
     render(<Sidebar />)
 
     expect(within(desktop()).getByRole('link', { name: /Курсы/ }).className).toContain('bg-')
+  })
+
+  it('подсвечивает библиотеку на странице записи и сохраняет доступ без тренажёра', () => {
+    pathname.current = '/interviews/4'
+    render(<Sidebar trainerEnabled={false} />)
+    expect(within(desktop()).getByRole('link', { name: 'Собеседования' })).toHaveAttribute('href', '/interviews')
+    expect(within(desktop()).getByRole('link', { name: 'Собеседования' })).toHaveAttribute('aria-current', 'page')
+    expect(within(desktop()).queryByRole('link', { name: 'Тренажёр' })).not.toBeInTheDocument()
   })
 
   it('дашборд подсвечивается только на главной', () => {

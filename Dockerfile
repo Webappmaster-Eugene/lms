@@ -136,7 +136,7 @@ RUN mkdir -p media \
     && chown nextjs:nodejs media
 
 # curl for healthcheck
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl ffmpeg
 
 USER nextjs
 

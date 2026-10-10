@@ -27,6 +27,8 @@ export const ADMIN_NAV_GROUPS = [
       { href: '/admin/collections/sections', label: 'Разделы курсов' },
       { href: '/admin/collections/lessons', label: 'Уроки' },
       { href: '/admin/collections/media', label: 'Медиафайлы' },
+      { href: '/admin/collections/interview-directions', label: 'Направления собеседований' },
+      { href: '/admin/collections/interview-recordings', label: 'Общие записи собеседований' },
       { href: '/admin/import-yandex', label: 'Импорт из Яндекс.Диска' },
       { href: '/admin/collections/yandex-disk-imports', label: 'История импорта' },
       { href: '/admin/collections/roadmap-nodes', label: 'Узлы роадмапов' },

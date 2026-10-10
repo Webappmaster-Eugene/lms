@@ -101,6 +101,9 @@ export interface Config {
     'trainer-tasks': TrainerTask;
     'user-trainer-progress': UserTrainerProgress;
     'interview-rooms': InterviewRoom;
+    'interview-directions': InterviewDirection;
+    'interview-recordings': InterviewRecording;
+    'interview-analysis-usage': InterviewAnalysisUsage;
     'faq-items': FaqItem;
     'yandex-disk-imports': YandexDiskImport;
     'payload-kv': PayloadKv;
@@ -144,6 +147,9 @@ export interface Config {
     'trainer-tasks': TrainerTasksSelect<false> | TrainerTasksSelect<true>;
     'user-trainer-progress': UserTrainerProgressSelect<false> | UserTrainerProgressSelect<true>;
     'interview-rooms': InterviewRoomsSelect<false> | InterviewRoomsSelect<true>;
+    'interview-directions': InterviewDirectionsSelect<false> | InterviewDirectionsSelect<true>;
+    'interview-recordings': InterviewRecordingsSelect<false> | InterviewRecordingsSelect<true>;
+    'interview-analysis-usage': InterviewAnalysisUsageSelect<false> | InterviewAnalysisUsageSelect<true>;
     'faq-items': FaqItemsSelect<false> | FaqItemsSelect<true>;
     'yandex-disk-imports': YandexDiskImportsSelect<false> | YandexDiskImportsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -1380,6 +1386,108 @@ export interface InterviewRoom {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "interview-directions".
+ */
+export interface InterviewDirection {
+  id: number;
+  title: string;
+  slug: string;
+  description?: string | null;
+  order?: number | null;
+  criteria?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "interview-recordings".
+ */
+export interface InterviewRecording {
+  id: number;
+  title: string;
+  description?: string | null;
+  direction: number | InterviewDirection;
+  category: 'mentor' | 'community' | 'personal';
+  owner?: (number | null) | User;
+  status: 'uploading' | 'ready' | 'failed';
+  size: number;
+  mimeType?: string | null;
+  publicKey?: string | null;
+  publicPath?: string | null;
+  sourceKey?: string | null;
+  diskPath?: string | null;
+  uploadClaim?: string | null;
+  uploadLeaseUntil?: string | null;
+  analysisStatus: 'idle' | 'queued' | 'processing' | 'completed' | 'failed';
+  analysisProgress?: string | null;
+  analysisError?: string | null;
+  analysisInput?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  analysisReport?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  analysisScore?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  analysisCriteria?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  analysisTranscript?: string | null;
+  analysisModel?: string | null;
+  analysisClaim?: string | null;
+  analysisLeaseUntil?: string | null;
+  analysisAttempts?: number | null;
+  analysisRequestedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "interview-analysis-usage".
+ */
+export interface InterviewAnalysisUsage {
+  id: number;
+  owner: number | User;
+  day: string;
+  requests: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "faq-items".
  */
 export interface FaqItem {
@@ -1532,6 +1640,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'interview-rooms';
         value: number | InterviewRoom;
+      } | null)
+    | ({
+        relationTo: 'interview-directions';
+        value: number | InterviewDirection;
       } | null)
     | ({
         relationTo: 'faq-items';
@@ -2292,6 +2404,65 @@ export interface InterviewRoomsSelect<T extends boolean = true> {
   language?: T;
   version?: T;
   endedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "interview-directions_select".
+ */
+export interface InterviewDirectionsSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  description?: T;
+  order?: T;
+  criteria?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "interview-recordings_select".
+ */
+export interface InterviewRecordingsSelect<T extends boolean = true> {
+  title?: T;
+  description?: T;
+  direction?: T;
+  category?: T;
+  owner?: T;
+  status?: T;
+  size?: T;
+  mimeType?: T;
+  publicKey?: T;
+  publicPath?: T;
+  sourceKey?: T;
+  diskPath?: T;
+  uploadClaim?: T;
+  uploadLeaseUntil?: T;
+  analysisStatus?: T;
+  analysisProgress?: T;
+  analysisError?: T;
+  analysisInput?: T;
+  analysisReport?: T;
+  analysisScore?: T;
+  analysisCriteria?: T;
+  analysisTranscript?: T;
+  analysisModel?: T;
+  analysisClaim?: T;
+  analysisLeaseUntil?: T;
+  analysisAttempts?: T;
+  analysisRequestedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "interview-analysis-usage_select".
+ */
+export interface InterviewAnalysisUsageSelect<T extends boolean = true> {
+  owner?: T;
+  day?: T;
+  requests?: T;
   updatedAt?: T;
   createdAt?: T;
 }

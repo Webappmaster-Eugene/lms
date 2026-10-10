@@ -65,6 +65,13 @@ services:
     environment:
       - DATABASE_URL=postgresql://lms:${DB_PASSWORD:-changeme}@lms-mentor-db:5432/lms_platform
       - PAYLOAD_SECRET=${PAYLOAD_SECRET}
+      - YANDEX_DISK_TOKEN=${YANDEX_DISK_TOKEN:-}
+      - YANDEX_INTERVIEWS_ROOT=${YANDEX_INTERVIEWS_ROOT:-disk:/LMS interviews}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - MEETING_STT_MODEL=${MEETING_STT_MODEL:-google/gemini-3.1-pro-preview}
+      - MEETING_STT_MODEL_FALLBACKS=${MEETING_STT_MODEL_FALLBACKS:-google/gemini-2.5-pro,google/gemini-2.5-flash}
+      - STT_PIN_VERTEX_AI=${STT_PIN_VERTEX_AI:-true}
+      - INTERVIEW_EVAL_MODEL=${INTERVIEW_EVAL_MODEL:-anthropic/claude-sonnet-5.5}
       - TRAINER_RUNTIME_URL=${TRAINER_RUNTIME_URL:-}
       - TRAINER_RUNTIME_TOKEN=${TRAINER_RUNTIME_TOKEN:-}
       - REDIS_URL=${REDIS_URL-redis://lms-mentor-redis:6379}
@@ -160,6 +167,41 @@ services:
     networks: [dokploy-network]
     healthcheck:
       test: ["CMD", "node", "-e", "const fs=require('node:fs');process.exit(Date.now()-Number(fs.readFileSync('/tmp/notifications-heartbeat','utf8'))<900000?0:1)"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 96M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  lms-mentor-interviews:
+    image: node:22-alpine
+    command: ["node", "/app/interview-scheduler.mjs"]
+    restart: unless-stopped
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      lms-mentor-app:
+        condition: service_healthy
+    environment:
+      - PAYLOAD_SECRET=${PAYLOAD_SECRET}
+      - LMS_INTERVIEW_APP_URL=http://lms-mentor-app:3000
+    volumes:
+      - ./scripts/interview-scheduler.mjs:/app/interview-scheduler.mjs:ro
+    tmpfs:
+      - /tmp:size=8m,mode=1777
+    networks: [dokploy-network]
+    healthcheck:
+      test: ["CMD", "node", "-e", "const fs=require('node:fs');process.exit(Date.now()-Number(fs.readFileSync('/tmp/interviews-heartbeat','utf8'))<300000?0:1)"]
       interval: 60s
       timeout: 5s
       retries: 3

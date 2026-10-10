@@ -30,6 +30,7 @@ import { Notes } from '@/payload/collections/Notes'
 import { Comments } from '@/payload/collections/Comments'
 import { Notifications } from '@/payload/collections/Notifications'
 import { NotificationPreferences, PushSubscriptions, NotificationDeliveries, NotificationJobState } from '@/payload/collections/NotificationInfrastructure'
+import { bootstrapInterviewDirections } from '@/server/interviews/bootstrap'
 import { bootstrapDefaultAchievements } from '@/lib/default-achievements'
 import { StudentSessionTelemetry, StudentLearningEvents } from '@/payload/collections/StudentAnalytics'
 import { WebVitalsReports } from '@/payload/collections/WebVitalsReports'
@@ -38,6 +39,7 @@ import { Streaks } from '@/payload/collections/Streaks'
 import { TrainerTopics } from '@/payload/collections/TrainerTopics'
 import { TrainerTasks } from '@/payload/collections/TrainerTasks'
 import { UserTrainerProgress } from '@/payload/collections/UserTrainerProgress'
+import { InterviewDirections, InterviewRecordings, InterviewAnalysisUsage } from '@/payload/collections/InterviewLibrary'
 import { InterviewRooms } from '@/payload/collections/InterviewRooms'
 import { FaqItems } from '@/payload/collections/FaqItems'
 import { YandexDiskImports } from '@/payload/collections/YandexDiskImports'
@@ -115,6 +117,9 @@ export default buildConfig({
     TrainerTasks,
     UserTrainerProgress,
     InterviewRooms,
+    InterviewDirections,
+    InterviewRecordings,
+    InterviewAnalysisUsage,
     FaqItems,
     YandexDiskImports,
   ],
@@ -142,6 +147,7 @@ export default buildConfig({
 
   onInit: async (payload) => {
     await bootstrapDefaultAchievements(payload)
+    await bootstrapInterviewDirections(payload)
     // --- Auto-create admin user on first launch ---
     const { totalDocs: usersCount } = await payload.count({ collection: 'users' })
 

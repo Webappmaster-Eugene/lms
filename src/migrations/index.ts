@@ -21,6 +21,8 @@ import * as migration_20261010_064516_trainer_go_frontend from './20261010_06451
 import * as migration_20261010_132320_account_comments_settings from './20261010_132320_account_comments_settings';
 import * as migration_20261010_151210_learning_history_index from './20261010_151210_learning_history_index';
 import * as migration_20261010_184804_trainer_python_interview_metadata from './20261010_184804_trainer_python_interview_metadata';
+import * as migration_20261010_211458_interview_library from './20261010_211458_interview_library';
+import * as migration_20261010_212032_interview_analysis_usage from './20261010_212032_interview_analysis_usage';
 
 export const migrations = [
   {
@@ -136,6 +138,16 @@ export const migrations = [
   {
     up: migration_20261010_184804_trainer_python_interview_metadata.up,
     down: migration_20261010_184804_trainer_python_interview_metadata.down,
-    name: '20261010_184804_trainer_python_interview_metadata'
+    name: '20261010_184804_trainer_python_interview_metadata',
+  },
+  {
+    up: migration_20261010_211458_interview_library.up,
+    down: migration_20261010_211458_interview_library.down,
+    name: '20261010_211458_interview_library',
+  },
+  {
+    up: migration_20261010_212032_interview_analysis_usage.up,
+    down: migration_20261010_212032_interview_analysis_usage.down,
+    name: '20261010_212032_interview_analysis_usage'
   },
 ];
