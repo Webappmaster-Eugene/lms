@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import type { Payload } from 'payload'
+import type { CollectionBeforeValidateHook, Payload } from 'payload'
 
 import { createAdmin, createCourseTree, createStudent, getTestPayload, login, rest, type CourseTree } from '../helpers/payload'
 
@@ -10,6 +10,7 @@ let other: string
 let mentor: string
 let ownerId: number
 let otherId: number
+let mentorId: number
 
 async function comment(token: string, content = 'Исходный вопрос', parentComment?: number) {
   const result = await rest('POST', '/comments', { token, body: { lesson: tree.lessons[0].id, content, parentComment } })
@@ -27,7 +28,9 @@ beforeAll(async () => {
   otherId = stranger.id
   mine = await login(payload, owner)
   other = await login(payload, stranger)
-  mentor = await login(payload, await createAdmin(payload))
+  const mentorUser = await createAdmin(payload)
+  mentorId = mentorUser.id
+  mentor = await login(payload, mentorUser)
 })
 
 describe('редактирование и удаление своих комментариев через REST', () => {
@@ -81,10 +84,10 @@ describe('редактирование и удаление своих комме
   })
 
   it('не позволяет подделать дату удаления при создании или правке и воскресить удалённое', async () => {
-    const created = await rest('POST', '/comments', { token: mine, body: { lesson: tree.lessons[0].id, content: 'Живой', deletedAt: '2026-10-10T00:00:00Z' } })
+    const created = await rest('POST', '/comments', { token: mine, body: { lesson: tree.lessons[0].id, content: 'Живой', deletedAt: '2026-10-10T00:00:00Z', isResolved: true } })
     expect(created.status).toBe(201)
     const id = (created.json.doc as { id: number }).id
-    expect((await payload.findByID({ collection: 'comments', id })).deletedAt).toBeNull()
+    expect(await payload.findByID({ collection: 'comments', id })).toMatchObject({ deletedAt: null, isResolved: false })
     expect((await rest('PATCH', `/comments/${id}`, { token: mine, body: { deletedAt: '2026-10-10T00:00:00Z' } })).status).toBe(200)
     expect((await payload.findByID({ collection: 'comments', id })).deletedAt).toBeNull()
     await rest('DELETE', `/comments/${id}/remove`, { token: mine })
@@ -107,6 +110,134 @@ describe('редактирование и удаление своих комме
     expect((await rest('PATCH', `/comments/${id}`, { token: mine, body: { content: 'После снятия' } })).status).toBe(404)
     expect((await rest('DELETE', `/comments/${id}/remove`, { token: mine })).status).toBe(404)
     expect((await rest('DELETE', `/comments/${id}/remove`)).status).toBe(401)
+  })
+
+  it('редактирование и удаление сохраняют resolved, ответы и прочитанные уведомления без повторной рассылки', async () => {
+    const root = await comment(mine, 'Вопрос с ответом')
+    const answer = await comment(mentor, 'Ответ, который будет исправлен', root)
+    expect((await rest('PATCH', `/comments/${root}`, { token: mentor, body: { isResolved: true } })).status).toBe(200)
+    const notifications = () => payload.find({
+      collection: 'notifications', depth: 0, limit: 10, sort: 'id', where: { and: [
+        { user: { in: [ownerId, mentorId] } }, { type: { equals: 'comment' } },
+        { or: [{ link: { equals: `/admin/questions#comment-${root}` } }, { link: { equals: `/lessons/${tree.lessons[0].slug}#comment-${root}` } }] },
+      ] },
+    })
+    const created = await notifications()
+    expect(created.docs).toHaveLength(2)
+    for (const notification of created.docs) {
+      expect((await rest('PATCH', `/notifications/${notification.id}`, { token: notification.user === ownerId ? mine : mentor, body: { isRead: true } })).status).toBe(200)
+    }
+    const before = await notifications()
+    const originalAnswer = await payload.findByID({ collection: 'comments', id: answer, depth: 0 })
+    expect((await rest('PATCH', `/comments/${root}`, { token: mine, body: { content: 'Исправленный вопрос' } })).status).toBe(200)
+    expect((await rest('PATCH', `/comments/${answer}`, { token: mentor, body: { content: 'Исправленный ответ' } })).status).toBe(200)
+    expect((await rest('DELETE', `/comments/${root}/remove`, { token: mine })).status).toBe(200)
+    expect((await payload.findByID({ collection: 'comments', id: root })).isResolved).toBe(true)
+    expect(await payload.findByID({ collection: 'comments', id: answer, depth: 0 })).toMatchObject({
+      content: 'Исправленный ответ', parentComment: root, user: mentorId, createdAt: originalAnswer.createdAt, deletedAt: null,
+    })
+    const after = await notifications()
+    expect(after.totalDocs).toBe(before.totalDocs)
+    expect(after.docs.map(({ id, message, isRead }) => ({ id, message, isRead }))).toEqual(before.docs.map(({ id, message, isRead }) => ({ id, message, isRead })))
+  })
+
+  it.each(['student', 'admin'] as const)('правка %s сохраняет свежий resolved; отметку явно меняет только ментор', async (actor) => {
+    const id = await comment(mine)
+    let enter: () => void = () => undefined
+    let release: () => void = () => undefined
+    const entered = new Promise<void>((resolve) => { enter = resolve })
+    const released = new Promise<void>((resolve) => { release = resolve })
+    const hooks = payload.collections.comments.config.hooks.beforeValidate ?? []
+    const pause: CollectionBeforeValidateHook = async ({ data, originalDoc, operation }) => {
+      if (operation === 'update' && originalDoc?.id === id && data?.content === 'Отложенная правка') { enter(); await released }
+      return data
+    }
+    hooks.unshift(pause)
+    let pending: ReturnType<typeof rest> | undefined
+    try {
+      pending = rest('PATCH', `/comments/${id}`, { token: actor === 'admin' ? mentor : mine, body: { content: 'Отложенная правка' } })
+      await Promise.race([entered, pending.then((result) => { throw new Error(`PATCH завершился до точки гонки: ${result.status}`) })])
+      expect((await rest('PATCH', `/comments/${id}`, { token: mentor, body: { isResolved: true } })).status).toBe(200)
+      release()
+      expect((await pending).status).toBe(200)
+      expect(await payload.findByID({ collection: 'comments', id, depth: 0 })).toMatchObject({ content: 'Отложенная правка', isResolved: true })
+      expect((await rest('PATCH', `/comments/${id}`, { token: mine, body: { content: 'Правка с подделкой', isResolved: false } })).status).toBe(200)
+      expect(await payload.findByID({ collection: 'comments', id })).toMatchObject({ content: 'Правка с подделкой', isResolved: true })
+      expect((await rest('PATCH', `/comments/${id}`, { token: mentor, body: { isResolved: false } })).status).toBe(200)
+      expect((await payload.findByID({ collection: 'comments', id })).isResolved).toBe(false)
+      expect((await rest('PATCH', `/comments/${id}`, { token: mine, body: { isResolved: true } })).status).toBe(200)
+      expect((await payload.findByID({ collection: 'comments', id })).isResolved).toBe(false)
+    } finally {
+      release()
+      if (pending) await pending
+      const index = hooks.indexOf(pause)
+      if (index !== -1) hooks.splice(index, 1)
+    }
+  })
+
+  it('отложенная отметка resolved сохраняет текст, который автор исправил до блокировки ментора', async () => {
+    const id = await comment(mine, 'Первоначальный текст')
+    let enter: () => void = () => undefined
+    let release: () => void = () => undefined
+    const entered = new Promise<void>((resolve) => { enter = resolve })
+    const released = new Promise<void>((resolve) => { release = resolve })
+    const hooks = payload.collections.comments.config.hooks.beforeValidate ?? []
+    const pause: CollectionBeforeValidateHook = async ({ data, originalDoc, operation }) => {
+      if (operation === 'update' && originalDoc?.id === id && data?.isResolved === true && data.content === 'Первоначальный текст') { enter(); await released }
+      return data
+    }
+    hooks.unshift(pause)
+    let pending: ReturnType<typeof rest> | undefined
+    try {
+      pending = rest('PATCH', `/comments/${id}`, { token: mentor, body: { isResolved: true } })
+      await Promise.race([entered, pending.then((result) => { throw new Error(`PATCH завершился до точки гонки: ${result.status}`) })])
+      expect((await rest('PATCH', `/comments/${id}`, { token: mine, body: { content: 'Свежая правка автора' } })).status).toBe(200)
+      expect(await payload.findByID({ collection: 'comments', id, depth: 0 })).toMatchObject({ content: 'Свежая правка автора', isResolved: false })
+      release()
+      const resolved = await pending
+      expect(resolved.status).toBe(200)
+      expect(resolved.json.doc).toMatchObject({ content: 'Свежая правка автора', isResolved: true })
+      expect(await payload.findByID({ collection: 'comments', id, depth: 0 })).toMatchObject({ content: 'Свежая правка автора', isResolved: true, user: ownerId })
+    } finally {
+      release()
+      if (pending) await pending
+      const index = hooks.indexOf(pause)
+      if (index !== -1) hooks.splice(index, 1)
+    }
+  })
+
+  it('заранее начатая правка после удаления получает409 и не восстанавливает текст, дату и ветку', async () => {
+    const id = await comment(mine, 'Удаляемый корень')
+    const answer = await comment(mentor, 'Сохраняемый ответ', id)
+    const before = await payload.findByID({ collection: 'comments', id, depth: 0 })
+    let enter: () => void = () => undefined
+    let release: () => void = () => undefined
+    const entered = new Promise<void>((resolve) => { enter = resolve })
+    const released = new Promise<void>((resolve) => { release = resolve })
+    const hooks = payload.collections.comments.config.hooks.beforeValidate ?? []
+    const pause: CollectionBeforeValidateHook = async ({ data, originalDoc, operation }) => {
+      if (operation === 'update' && originalDoc?.id === id && data?.content === 'Поздний текст') { enter(); await released }
+      return data
+    }
+    hooks.unshift(pause)
+    let pending: ReturnType<typeof rest> | undefined
+    try {
+      pending = rest('PATCH', `/comments/${id}`, { token: mine, body: { content: 'Поздний текст', deletedAt: null, parentComment: null } })
+      await Promise.race([entered, pending.then((result) => { throw new Error(`PATCH завершился до точки гонки: ${result.status}`) })])
+      const removed = await rest('DELETE', `/comments/${id}/remove`, { token: mine })
+      expect(removed.status).toBe(200)
+      release()
+      expect((await pending).status).toBe(409)
+      expect(await payload.findByID({ collection: 'comments', id, depth: 0 })).toMatchObject({
+        content: '(Комментарий удалён)', deletedAt: removed.json.deletedAt, createdAt: before.createdAt, user: ownerId, parentComment: null,
+      })
+      expect(await payload.findByID({ collection: 'comments', id: answer, depth: 0 })).toMatchObject({ content: 'Сохраняемый ответ', parentComment: id, user: mentorId })
+    } finally {
+      release()
+      if (pending) await pending
+      const index = hooks.indexOf(pause)
+      if (index !== -1) hooks.splice(index, 1)
+    }
   })
 
   it('одновременные удаление и правка не восстанавливают содержимое', async () => {

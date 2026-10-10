@@ -61,9 +61,28 @@ const SET_DEFAULT = /^ALTER TABLE "(\w+)" ALTER COLUMN "(\w+)" SET DEFAULT (.+);
 async function drift(): Promise<string[]> {
   const { pushSchema } = db().requireDrizzleKit()
   const result = await pushSchema(db().schema, db().drizzle, undefined, db().tablesFilter)
+  const identifierNoOps = new Set<string>()
+  // PostgreSQL truncates identifiers to 63 bytes; drizzle-kit compares the untruncated name.
+  // Suppress only a paired drop/add whose existing, validated FK definition is identical.
+  for (const statement of result.statementsToExecute) {
+    const match = /^ALTER TABLE "(\w+)" ADD CONSTRAINT "(\w+)" (FOREIGN KEY .+);$/.exec(statement.trim())
+    if (!match) continue
+    const [, table, name, definition] = match
+    if (Buffer.byteLength(name) <= 63) continue
+    const truncated = name.slice(0, 63)
+    const drop = result.statementsToExecute.find(value => value.trim() === `ALTER TABLE "${table}" DROP CONSTRAINT "${truncated}";`)
+    if (!drop) continue
+    const existing = await raw(`select pg_get_constraintdef(c.oid) as definition from pg_constraint c join pg_class t on t.oid = c.conrelid join pg_namespace n on n.oid = t.relnamespace where n.nspname = 'public' and t.relname = '${table}' and c.conname = '${truncated}' and c.contype = 'f' and c.convalidated and not c.condeferrable and not c.condeferred`)
+    const normalize = (value: string) => value.replaceAll('"', '').replaceAll('public.', '').replace(/\s+/g, ' ').replace(/ ON UPDATE no action$/i, '').toLowerCase()
+    if (existing.length === 1 && normalize(String(existing[0].definition)) === normalize(definition)) {
+      identifierNoOps.add(drop)
+      identifierNoOps.add(statement)
+    }
+  }
   const real: string[] = []
   for (const statement of result.statementsToExecute) {
     if (KNOWN_MIGRATION_ONLY.includes(statement)) continue
+    if (identifierNoOps.has(statement)) continue
     const match = SET_DEFAULT.exec(statement)
     if (match) {
       const [, table, column, wanted] = match
@@ -118,6 +137,27 @@ describe('миграции на чистой базе', () => {
   })
 
   it('схема после миграций совпадает с конфигом Payload (drizzle не видит расхождений)', async () => {
+    expect(await drift()).toEqual([])
+  })
+
+  it('усечение имени FK не скрывает реальное изменение ON DELETE', async () => {
+    const table = 'notification_deliveries'
+    const name = 'notification_deliveries_subscription_id_push_subscriptions_id_fk'.slice(0, 63)
+    const rows = await raw(`select pg_get_constraintdef(oid) as definition from pg_constraint where conrelid = '${table}'::regclass and conname = '${name}'`)
+    expect(rows).toHaveLength(1)
+    const original = String(rows[0].definition)
+    expect(original).toMatch(/ON DELETE SET NULL/i)
+    try {
+      await raw(`ALTER TABLE "${table}" DROP CONSTRAINT "${name}"`)
+      await raw(`ALTER TABLE "${table}" ADD CONSTRAINT "${name}" ${original.replace(/ON DELETE SET NULL/i, 'ON DELETE RESTRICT')}`)
+      const statements = await drift()
+      expect(statements).toHaveLength(2)
+      expect(statements.join('\n')).toContain(`DROP CONSTRAINT "${name}"`)
+      expect(statements.join('\n')).toContain('ON DELETE set null')
+    } finally {
+      await raw(`ALTER TABLE "${table}" DROP CONSTRAINT IF EXISTS "${name}"`)
+      await raw(`ALTER TABLE "${table}" ADD CONSTRAINT "${name}" ${original}`)
+    }
     expect(await drift()).toEqual([])
   })
 
@@ -212,7 +252,8 @@ describe('откат миграций (down) в обратном порядке'
   it('ранние миграции откатываются: внешние ключи, снятые CASCADE, не удаляются повторно', async () => {
     const req = await createLocalReq({}, payload)
     for (const name of EARLY_DOWN) {
-      const migration = migrations.find((m) => m.name === name)!
+      const migration = migrations.find((m) => m.name === name)
+      if (!migration) throw new Error(`Миграция ${name} не зарегистрирована`)
       await expect(migration.down({ db: db().drizzle, payload, req } as never), `down ${name}`).resolves.toBeUndefined()
       await raw(`delete from payload_migrations where name = '${name}'`)
     }

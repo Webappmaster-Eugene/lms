@@ -50,6 +50,19 @@ async function validationPaths(promise: Promise<unknown>): Promise<string[]> {
   return []
 }
 
+/** Эти поля отвергаются до стандартной валидации полей, со своей публичной ошибкой. */
+async function expectInvalidField(slug: string, field: string, promise: Promise<unknown>): Promise<void> {
+  if (slug === 'users' && field === 'telegram') {
+    await expect(promise).rejects.toMatchObject({ status: 400, message: 'Укажите Telegram в формате @username или https://t.me/username' })
+    return
+  }
+  if (slug === 'comments' && field === 'content') {
+    await expect(promise).rejects.toMatchObject({ status: 400, message: 'Комментарий должен содержать от 1 до 2000 символов' })
+    return
+  }
+  expect(await validationPaths(promise), `${slug}.${field}`).toContain(field)
+}
+
 beforeAll(async () => {
   payload = await getTestPayload()
   ctx = await buildFixtureContext(payload)
@@ -81,9 +94,8 @@ describe.each(Object.keys(VALID))('коллекция %s', (slug) => {
     for (const field of required) {
       const data = await makeValidDoc(slug)
       delete data[field.name]
-      const paths = await validationPaths(createAs(slug, data))
       // Slug генерируется хуком из title — без title пропадают оба поля.
-      expect(paths, `${slug}.${field.name}`).toContain(field.name)
+      await expectInvalidField(slug, field.name, createAs(slug, data))
     }
   })
 
@@ -128,7 +140,7 @@ describe.each(Object.keys(VALID))('коллекция %s', (slug) => {
       if ((f.type === 'text' || f.type === 'textarea') && f.maxLength) {
         const data = await makeValidDoc(slug)
         data[f.name] = 'я'.repeat(f.maxLength + 1)
-        expect(await validationPaths(createAs(slug, data)), `${slug}.${f.name} maxLength`).toContain(f.name)
+        await expectInvalidField(slug, f.name, createAs(slug, data))
       }
       if (f.type === 'number' && typeof f.min === 'number') {
         const data = await makeValidDoc(slug)
@@ -251,6 +263,20 @@ describe('частные правила полей', () => {
       content: [{ blockType: 'miro', title: 'Доска', embedUrl: 'https://miro.com/app/live-embed/x/' }],
     })
     expect((ok.content?.[0] as { height?: number }).height).toBe(600)
+  })
+
+  it.each([
+    ['@fixture_account', 'https://t.me/fixture_account'],
+    ['https://t.me/fixture_account/', 'https://t.me/fixture_account'],
+    ['', null],
+  ])('Users.telegram: «%s» сохраняется как %s', async (telegram, expected) => {
+    const doc = await createAs<User>('users', { ...await makeValidDoc('users'), telegram })
+    const read = await payload.findByID({ collection: 'users', id: doc.id, depth: 0 })
+    expect(read.telegram).toBe(expected)
+  })
+
+  it.each(['https://evil.example/fixture_account', 'javascript:alert(1)', '@bad', '@' + 'a'.repeat(33)])('Users.telegram отвергает некорректное значение «%s»', async (telegram) => {
+    await expectInvalidField('users', 'telegram', createAs('users', { ...await makeValidDoc('users'), telegram }))
   })
 
   it('Users: email уникален без учёта регистра, пароль не возвращается', async () => {

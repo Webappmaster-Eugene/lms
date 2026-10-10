@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
-import type { Payload } from 'payload'
+import type { CollectionBeforeChangeHook, Payload } from 'payload'
 
 import { GET, PATCH } from '@/app/api/profile/route'
 import { POST } from '@/app/api/profile/password/route'
@@ -150,6 +150,146 @@ describe('персональный профиль и безопасность у
       expect((await auth(result.token)).user?.email).toBe(email)
       expect(await login(payload, { email, password: user.password })).toEqual(expect.any(String))
     } finally { release(); if (pending) await pending; spy.mockRestore() }
+  })
+
+  it('обычный профиль через cookie сохраняет обе сессии и не открывает неназначенный курс', async () => {
+    const user = await createStudent(payload, { learningAccessMode: 'assigned', totalPoints: 37 })
+    const tree = await createCourseTree(payload, { lessons: 1 })
+    const token = await login(payload, user)
+    const device2 = await login(payload, user)
+    const before = await payload.findByID({ collection: 'users', id: user.id })
+    const headers = { Cookie: `payload-token=${token}`, Origin: 'http://lms.test', 'Content-Type': 'application/json' }
+    const response = await PATCH(new Request('http://lms.test/api/profile', { method: 'PATCH', headers, body: JSON.stringify({ firstName: 'Имя из cookie', bio: 'Новые сведения', email: user.email.toUpperCase() }) }))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('set-cookie')).toBeNull()
+    expect((await response.json()).profile).toMatchObject({ id: user.id, firstName: 'Имя из cookie', email: user.email })
+    const after = await payload.findByID({ collection: 'users', id: user.id })
+    expect(after.sessions).toEqual(before.sessions)
+    expect(after).toMatchObject({ totalPoints: 37, learningAccessMode: 'assigned', role: 'student' })
+    expect((await auth(token)).user?.id).toBe(user.id)
+    expect((await auth(device2)).user?.id).toBe(user.id)
+    expect(await canAccessLesson(payload, { id: user.id, role: 'student' }, tree.lessons[0].id)).toBe(false)
+    const profile = await GET(new Request('http://lms.test/api/profile', { headers: { Cookie: `payload-token=${device2}`, Origin: 'http://lms.test' } }))
+    expect(profile.status).toBe(200)
+    expect((await profile.json()).profile.firstName).toBe('Имя из cookie')
+  })
+
+  it('malformed JSON и превышение фактических байтов потока не меняют профиль или сессии', async () => {
+    const user = await createStudent(payload)
+    const token = await login(payload, user)
+    const device2 = await login(payload, user)
+    const before = await payload.findByID({ collection: 'users', id: user.id })
+    const headers = { Cookie: `payload-token=${token}`, Origin: 'http://lms.test', 'Content-Type': 'application/json' }
+    for (const body of ['{', 'null', '[]', '"строка"', '{"firstName":"Не сохранить"} trailing']) {
+      const response = await PATCH(new Request('http://lms.test/api/profile', { method: 'PATCH', headers, body }))
+      expect(response.status).toBe(400)
+      expect(response.headers.get('set-cookie')).toBeNull()
+    }
+    let cancelled = false
+    let first = true
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(encoder.encode(first ? '{"firstName":"Не сохранить","bio":"' : 'я'.repeat(2048)))
+        first = false
+      },
+      cancel() { cancelled = true },
+    })
+    const options: RequestInit & { duplex: 'half' } = { method: 'PATCH', headers: { ...headers, 'Content-Length': '2' }, body: stream, duplex: 'half' }
+    const oversized = await PATCH(new Request('http://lms.test/api/profile', options))
+    expect(oversized.status).toBe(413)
+    expect(cancelled).toBe(true)
+    expect(oversized.headers.get('set-cookie')).toBeNull()
+    const after = await payload.findByID({ collection: 'users', id: user.id })
+    expect(after).toMatchObject({ firstName: before.firstName, lastName: before.lastName, email: before.email, bio: before.bio, telegram: before.telegram })
+    expect(after.sessions).toEqual(before.sessions)
+    expect((await auth(token)).user?.id).toBe(user.id)
+    expect((await auth(device2)).user?.id).toBe(user.id)
+  })
+
+  it('поздний сбой чтения DTO откатывает email, имя и отзыв сессий до выдачи cookie', async () => {
+    const user = await createStudent(payload)
+    const token = await login(payload, user)
+    const device2 = await login(payload, user)
+    const before = await payload.findByID({ collection: 'users', id: user.id })
+    const email = `${uid('rollback-email')}@lms.test`
+    let observedUncommittedEmail: unknown
+    const findByID = payload.findByID.bind(payload)
+    const spy = vi.spyOn(payload, 'findByID').mockImplementation(async (args) => {
+      if (args.collection === 'users' && args.id === user.id && args.user?.id === user.id && args.req) {
+        const current = await payload.db.findOne({ collection: 'users', where: { id: { equals: user.id } }, req: args.req })
+        observedUncommittedEmail = current && 'email' in current ? current.email : null
+        throw new Error('Injected profile DTO read failure')
+      }
+      return findByID(args)
+    })
+    try {
+      const response = await PATCH(request(token, { email, firstName: 'Не сохранить имя', currentPassword: user.password }))
+      expect(response.status).toBe(500)
+      expect(response.headers.get('set-cookie')).toBeNull()
+      expect(await response.json()).not.toHaveProperty('token')
+      expect(observedUncommittedEmail).toBe(email)
+    } finally { spy.mockRestore() }
+    const after = await payload.findByID({ collection: 'users', id: user.id })
+    expect(after).toMatchObject({ email: before.email, firstName: before.firstName })
+    expect(after.sessions).toEqual(before.sessions)
+    expect((await payload.count({ collection: 'auth-session-revocations', where: { user: { equals: user.id } } })).totalDocs).toBe(0)
+    expect((await auth(token)).user?.email).toBe(user.email)
+    expect((await auth(device2)).user?.email).toBe(user.email)
+    expect(await login(payload, user)).toEqual(expect.any(String))
+  })
+
+  it.each(['email', 'password'] as const)('смена %s делает ранее выданный reset-token недействительным', async (field) => {
+    const user = await createStudent(payload)
+    const token = await login(payload, user)
+    const resetToken = await payload.forgotPassword({ collection: 'users', data: { email: user.email }, disableEmail: true })
+    expect(resetToken).toEqual(expect.any(String))
+    const email = field === 'email' ? `${uid('reset-invalidated')}@lms.test` : user.email
+    const password = field === 'password' ? 'Current-Changed-Password-123' : user.password
+    const response = field === 'email'
+      ? await PATCH(request(token, { email, currentPassword: user.password }))
+      : await POST(request(token, { newPassword: password, currentPassword: user.password }, '/profile/password'))
+    expect(response.status).toBe(200)
+    const reset = await rest('POST', '/users/reset-password', { body: { token: resetToken, password: 'Must-Not-Be-Accepted-123' } })
+    expect(reset.status).toBeGreaterThanOrEqual(400)
+    expect(await login(payload, { email, password })).toEqual(expect.any(String))
+    const actual = await payload.db.findOne({ collection: 'users', where: { id: { equals: user.id } } })
+    expect(actual).toMatchObject({ resetPasswordToken: null, resetPasswordExpiration: null })
+  })
+
+  it('отложенная смена email после выхода текущего устройства не сохраняется и не отзывает другое устройство', async () => {
+    const user = await createStudent(payload)
+    const token = await login(payload, user)
+    const device2 = await login(payload, user)
+    const email = `${uid('logged-out-race')}@lms.test`
+    let enter: () => void = () => undefined
+    let release: () => void = () => undefined
+    const entered = new Promise<void>((resolve) => { enter = resolve })
+    const released = new Promise<void>((resolve) => { release = resolve })
+    const hooks = payload.collections.users.config.hooks.beforeChange ?? []
+    const pause: CollectionBeforeChangeHook = async ({ data, originalDoc, operation }) => {
+      if (operation === 'update' && originalDoc?.id === user.id && data.email === email) { enter(); await released }
+      return data
+    }
+    hooks.unshift(pause)
+    let pending: ReturnType<typeof PATCH> | undefined
+    try {
+      pending = PATCH(request(token, { email, currentPassword: user.password }))
+      await Promise.race([entered, pending.then((result) => { throw new Error(`PATCH завершился до точки гонки: ${result.status}`) })])
+      expect((await rest('POST', '/users/logout', { token })).status).toBe(200)
+      release()
+      const response = await pending
+      expect(response.status).toBe(403)
+      expect(response.headers.get('set-cookie')).toBeNull()
+      expect((await payload.findByID({ collection: 'users', id: user.id })).email).toBe(user.email)
+      expect((await auth(token)).user).toBeNull()
+      expect((await auth(device2)).user?.email).toBe(user.email)
+    } finally {
+      release()
+      if (pending) await pending
+      const index = hooks.indexOf(pause)
+      if (index !== -1) hooks.splice(index, 1)
+    }
   })
 
   it('не позволяет выбрать чужую private media как аватар', async () => {

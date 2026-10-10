@@ -7,6 +7,7 @@ import { notifyCommentThread, restrictCommentThread } from '@/payload/hooks/comm
 import { guardLearningLessonWrite } from '@/payload/hooks/learningLessonWrite'
 import { learningStateRead } from '@/payload/access/learningStateRead'
 import { guardCommentMutation, removeOwnedComment } from '@/payload/hooks/commentMutation'
+import { captureRawCollectionPatch } from '@/payload/hooks/rawCollectionPatch'
 
 export const Comments: CollectionConfig = {
   slug: 'comments',
@@ -27,6 +28,7 @@ export const Comments: CollectionConfig = {
     delete: isAdmin,
   },
   hooks: {
+    beforeOperation: [captureRawCollectionPatch],
     beforeValidate: [guardCommentMutation, restrictCommentThread],
     beforeChange: [assignOwner, guardLearningLessonWrite],
     afterChange: [notifyCommentThread],
@@ -75,6 +77,10 @@ export const Comments: CollectionConfig = {
       type: 'checkbox',
       defaultValue: false,
       label: 'Решён (для Q&A)',
+      access: {
+        create: async ({ req }) => (await isAdmin({ req })) === true,
+        update: async ({ req }) => (await isAdmin({ req })) === true,
+      },
       admin: {
         position: 'sidebar',
       },

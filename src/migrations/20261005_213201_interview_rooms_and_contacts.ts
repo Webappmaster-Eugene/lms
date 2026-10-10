@@ -61,10 +61,10 @@ export async function down({ db, payload, req }: MigrateDownArgs): Promise<void>
    ALTER TABLE "interview_rooms" DISABLE ROW LEVEL SECURITY;
   ALTER TABLE "interview_rooms_rels" DISABLE ROW LEVEL SECURITY;
   ALTER TABLE "site_settings_contacts_links" DISABLE ROW LEVEL SECURITY;
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_interview_rooms_fk";
   DROP TABLE "interview_rooms" CASCADE;
   DROP TABLE "interview_rooms_rels" CASCADE;
   DROP TABLE "site_settings_contacts_links" CASCADE;
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_interview_rooms_fk";
 
   DROP INDEX "payload_locked_documents_rels_interview_rooms_id_idx";
   ALTER TABLE "payload_locked_documents_rels" DROP COLUMN "interview_rooms_id";

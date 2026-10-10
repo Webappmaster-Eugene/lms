@@ -16,6 +16,7 @@ function run(command, args, env = process.env) {
 
 let buildx
 let server
+const database = process.argv.includes('--database')
 try {
   if (process.argv.includes('--build')) {
     buildx = await mkdtemp(path.join(os.tmpdir(), 'lms-runtime-buildx-'))
@@ -31,7 +32,7 @@ try {
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
   const address = server.address()
   if (!address || typeof address === 'string') throw new Error('Не удалось открыть тестовый runtime')
-  await run('pnpm', ['exec', 'vitest', 'run', '-c', 'vitest.runtime.config.ts', ...process.argv.slice(2).filter((value) => value !== '--build')], {
+  await run('pnpm', ['exec', 'vitest', 'run', '-c', database ? 'vitest.runtime-integration.config.ts' : 'vitest.runtime.config.ts', ...process.argv.slice(2).filter((value) => value !== '--build' && value !== '--database')], {
     ...process.env, TRAINER_RUNTIME_URL: `http://127.0.0.1:${address.port}`, TRAINER_RUNTIME_TOKEN: token,
   })
 } catch (error) {

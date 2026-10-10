@@ -248,10 +248,10 @@
 - Игнорирование загрузок должно быть `/media/`, а не `media/`: прежний шаблон
   скрывал из Git защищённый route `src/app/api/media/file/[filename]/route.ts`
   и делал чистую сборку неполной. Источник: `.gitignore`, media access tests.
-- Подготовленная ветка `codex/pwa-mobile-cache-sequence-20261010` проверяется
-  в отдельном worktree `../qa-mobile-pwa`, чтобы не включить параллельные
-  изменения тренажёра и чужую память. Выкат/production env пока не изменены;
-  показ Web Push на физическом телефоне по-прежнему требует отдельной проверки.
+- Мобильные изменения выпущены в `18e99da`, восстановление после частичного
+  precache failure — в `56d491f`. Для проверок используются отдельные worktree,
+  чтобы не включить чужой dirty tree. Показ Web Push на физическом телефоне
+  по-прежнему требует отдельной проверки. Источник: Git history, `docs/pwa-mobile.md`.
 - Inter сохранён в public/fonts/inter без изменения файлов, с лицензией OFL;
   все7Unicode-subsets/метрики сохранены, preloads — RU/Latin, кеш immutable.
   Сборка больше не скачивает Google Fonts. Источник: `docs/font-assets.md`.
@@ -277,3 +277,37 @@
   лениво с собственного домена; ассеты генерирует `scripts/copy-monaco.mjs`.
   Подсветка Markdown использует общий ленивый Shiki. Источник: `useCodeRunner.ts`,
   `MonacoCodeEditor.tsx`, `src/lib/markdown-highlighter.ts`.
+
+## Профиль, комментарии и полная интеграция (2026-10-10)
+
+- Профиль/аватар/Telegram/смена credentials, свой comment edit/delete и порядок
+  14 пунктов меню выпущены в `9d8ba18`. Смена email/пароля требует текущий пароль,
+  сохраняет текущий SID и отзывает остальные устройства. Политика доступа хранится
+  отдельно от auth-документа Users и не меняется правкой профиля. Источники:
+  `docs/account-settings.md`, `tests/integration/api/profileAccount.test.ts`.
+- Нативный password verifier SDK Payload импортируется через node:module с
+  webpackIgnore; Docker runtime-deps содержит его зависимости отдельно, поскольку
+  Next standalone trace пропускал их. Проверять скомпилированный Docker runtime,
+  одних исходников недостаточно. Источники: `src/server/profile/account.ts`, Dockerfile.
+- SDK заполняет пропущенные PATCH-поля до collection.beforeValidate. У comments
+  исходные keys фиксируются в beforeOperation; после rowlock omitted content и
+  isResolved берутся из свежей строки. Иначе edit сбрасывает resolved, а resolve
+  возвращает старый content. Менять resolved вправе только админ. Источники:
+  `commentMutation.ts`, `rawCollectionPatch.ts`, `commentEditing.test.ts`.
+- PostgreSQL обрезает имена FK до 63 байт; drizzle-kit может предлагать лишние
+  DROP/ADD. Проверка миграций игнорирует только парный no-op с равной полной
+  definition валидного FK. Изменение ON DELETE остаётся drift. Старый down
+  interview_rooms должен снимать FK до DROP TABLE CASCADE. Источники:
+  `tests/integration/cms/migrations.test.ts`, `20261005_213201_interview_rooms_and_contacts.ts`.
+- `pnpm test:integration:runtime [--build]` проверяет реальные Docker jobs,
+  HTTP gateway, route handlers и серверный прогресс в отдельной одноразовой
+  `lms_runtime_integration`. Клиентский passed не обходит скрытые тесты,
+  публичный запуск не пишет XP, повторный успех не начисляет их дважды. Набор
+  включён в CI; запускать отдельно от тяжёлой Next-сборки. Источники:
+  `docs/trainer-runtime.md`, `tests/runtime-integration/`, `.github/workflows/ci.yml`.
+- 401 Dokploy означает отказ конкретного API credential, а не отсутствие SSH
+  или сбой авторизации LMS. Значение apikey из БД нельзя считать действующим raw
+  API key. Путь к файлу — лишь вариант безопасного предоставления credential;
+  допустима авторизованная панель. Environment остаётся источником конфигурации,
+  его не обходить прямой правкой БД Dokploy/.env. Источник: `docs/trainer-runtime.md`,
+  фактическая API/SSH-проверка 2026-10-10.

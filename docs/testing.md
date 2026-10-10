@@ -1,12 +1,15 @@
 # Тестирование
 
-Пять уровней, от быстрых к медленным. Первый не требует ничего, кроме Node;
-остальные поднимают одноразовый PostgreSQL в Docker и сами за собой убирают.
+Наборы от быстрых к медленным. Unit-тесты не требуют БД. Локальные CMS/API
+и браузерные проверки используют одноразовые базы PostgreSQL; Go/frontend
+дополнительно требуют Docker jobs. Проверка прода работает с живым приложением
+и удаляет созданные тестовые аккаунты.
 
 | Уровень | Команда | Что внутри | Время |
 |---|---|---|---|
 | Unit, компоненты, смоук | `pnpm test` | vitest на моках, без БД (`tests/unit`, `components`, `smoke`) | ~10 с |
-| Интеграция CMS и API | `pnpm test:integration` | настоящий Payload Local API + PostgreSQL (`tests/integration`) | ~1 мин |
+| Интеграция CMS и API | `pnpm test:integration` | настоящий Payload Local API + PostgreSQL (`tests/integration`) | несколько минут |
+| Go/frontend и серверный зачёт | `pnpm test:integration:runtime` | настоящие Docker jobs, HTTP gateway, маршруты LMS и PostgreSQL | несколько минут + сборка образов |
 | E2E + HTTP API | `pnpm test:e2e` | Playwright против `next start` с сидом (`tests/e2e/specs`, `tests/e2e/api`) | ~2 мин + сборка |
 | Контент и a11y | `pnpm test:content` | SEO лендинга, битые ссылки, axe-core (`tests/e2e/content`) | ~1,5 мин |
 | Скриншоты | `pnpm test:visual` | `toHaveScreenshot` в контейнере Playwright (`tests/e2e/visual`) | ~5 мин |
@@ -24,6 +27,7 @@
 | `lms_integration` | интеграционные тесты, миграции — штатным `payload migrate` |
 | `lms_migrations` | тест миграций: программный прогон, как `prodMigrations` на старте прода |
 | `lms_seed` | тест сидов: `pnpm seed:trainer` и `pnpm seed` как CLI |
+| `lms_runtime_integration` | Go/frontend: настоящие jobs, HTTP gateway и серверный прогресс |
 | `lms_e2e_<порт>` | e2e/скриншоты: база своя на каждый порт приложения |
 
 ```sh
@@ -36,7 +40,10 @@ pnpm test:db:down   # остановить и удалить контейнер 
 
 Реальная почта не отправляется: `SMTP_HOST` пустой, а интеграционные тесты
 перехватывают `payload.sendEmail` и `payload.email.sendEmail`. Внешняя сеть
-в тестах маршрутов запрещена подменой `fetch`.
+в обычных тестах маршрутов запрещена подменой `fetch`. Набор
+`test:integration:runtime` использует настоящий HTTP gateway на loopback;
+контейнеры пользовательского кода остаются без внешней сети. Для первого
+запуска добавьте `--build`, чтобы собрать образы Go, frontend и Next.js.
 
 ## Интеграционные тесты (`tests/integration`)
 
@@ -51,9 +58,13 @@ pnpm test:db:down   # остановить и удалить контейнер 
   документов со связями, гонки.
 - `cms/migrations` — миграции на чистую БД, реестр, drizzle не видит
   расхождений схемы с конфигом, откат `down` и повторный накат.
-- `cms/seed` — `seed:trainer` дважды (идемпотентность), затем **каждая задача
-  каталога из БД** прогоняется в настоящей серверной песочнице (isolated-vm + tsc):
-  эталон проходит, шаблон — нет.
+- `cms/seed` — `seed:trainer` дважды (идемпотентность), точное сохранение всех
+  полей каталога, включая файлы и скрытые runtime-кейсы. Каждая JS/TS-задача
+  из БД исполняется в isolated-vm + tsc: эталон проходит, шаблон — нет.
+  Каталог Go/frontend исполняет отдельный `test:integration:runtime`.
+- `api/profileAccount` и `cms/commentEditing` — персонализация, смена
+  credentials и сессии, защита REST, редактирование и удаление своих
+  комментариев, сохранение ответов и статуса вопроса при гонках.
 - `cms/bootstrap` — `onInit`: первый админ из env и автосид роадмапов.
 - `api/rest` — REST Payload через `handleEndpoints` (тот же обработчик, что за
   `/api/[...slug]`): логин, токены, logout, forgot-password, коды ответов.

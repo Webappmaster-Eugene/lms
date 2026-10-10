@@ -5,18 +5,21 @@ import pg from 'pg'
 import type { Payload } from 'payload'
 
 import { TRAINER_CATALOG } from '@/data/trainer'
+import { flattenCatalog, POINTS_BY_DIFFICULTY, toCaseSpecs } from '@/data/trainer/types'
+import { collectAllPages } from '@/lib/paginate'
+import { isFrontendLanguage, runtimeCases } from '@/lib/trainer/runtime-spec'
 import { solutionCodeFor, starterCodeFor, taskLanguages } from '@/lib/trainer/spec'
 import { runSolution } from '@/server/trainer/sandbox'
-import type { TrainerTask } from '@/payload-types'
+import type { TrainerTask, TrainerTopic } from '@/payload-types'
 import { databaseUrl, migrateFresh } from '../../../scripts/test-db.mjs'
 import { TEST_SECRET } from '../setup/constants'
 
 /**
  * Сиды — штатными CLI-командами на отдельной чистой базе, как их запускают
  * люди. Затем каждая задача каталога, прошедшая через Payload и БД, проверяется
- * в настоящей серверной песочнице (isolated-vm + tsc): эталон проходит свои
- * тесты, шаблон — нет. Юнит-тест каталога делает то же в node:vm и до БД не
- * доходит, поэтому потерю данных при сохранении он не заметит.
+ * против источника по всем полям, включая Go/frontend и скрытые runtime-кейсы.
+ * JS/TS дополнительно исполняются в isolated-vm + tsc. Каталог Go/frontend
+ * исполняет Docker-набор; маршруты и запись прогресса — runtime integration.
  */
 const DB = 'lms_seed'
 const APP_DIR = fileURLToPath(new URL('../../../', import.meta.url))
@@ -32,6 +35,13 @@ function cli(args: string[], extraEnv: Record<string, string> = {}) {
     timeout: 240_000,
   })
   return { status: result.status, out: `${result.stdout}\n${result.stderr}` }
+}
+
+function runtimeCaseData(row: { name: string; hidden?: boolean | null; input?: string | null; expected?: string | null; checks?: unknown; viewport?: unknown; path?: string | null }) {
+  return {
+    name: row.name, hidden: row.hidden, input: row.input ?? null, expected: row.expected ?? null,
+    checks: row.checks ?? null, viewport: row.viewport ?? null, path: row.path ?? null,
+  }
 }
 
 async function indexExists(name: string): Promise<boolean> {
@@ -90,17 +100,59 @@ describe('pnpm seed:trainer', () => {
   }, 300_000)
 })
 
-describe('каталог в базе: каждая задача решаема на сервере', () => {
+describe('каталог в базе: сохранность всех языков и серверный JS/TS-прогон', () => {
   let tasks: TrainerTask[] = []
+  let topics: TrainerTopic[] = []
 
   beforeAll(async () => {
     process.env.DATABASE_URL = databaseUrl(DB)
     const { getPayload } = await import('payload')
     const { default: config } = await import('@payload-config')
     payload = await getPayload({ config, disableOnInit: true, key: 'seed' })
-    const found = await payload.find({ collection: 'trainer-tasks', limit: 1000, depth: 0, overrideAccess: true, sort: 'id' })
-    tasks = found.docs
+    tasks = await collectAllPages(({ page, limit }) => payload.find({ collection: 'trainer-tasks', page, limit, depth: 0, overrideAccess: true, sort: 'id' }), { label: 'Все сохранённые задачи каталога' })
+    topics = await collectAllPages(({ page, limit }) => payload.find({ collection: 'trainer-topics', page, limit, depth: 0, overrideAccess: true, sort: 'id' }), { label: 'Все сохранённые темы каталога' })
   }, 120_000)
+
+  it('все темы и задачи всех языков сохраняют содержимое источника, включая скрытые кейсы и файлы проектов', () => {
+    const source = flattenCatalog(TRAINER_CATALOG)
+    expect(tasks.map((task) => task.slug).sort()).toEqual(source.map(({ task }) => task.slug).sort())
+    expect(topics.map((topic) => topic.slug).sort()).toEqual(TRAINER_CATALOG.map((topic) => topic.slug).sort())
+    const topicsBySlug = new Map(topics.map((topic) => [topic.slug, topic]))
+    const tasksBySlug = new Map(tasks.map((task) => [task.slug, task]))
+    for (const topic of TRAINER_CATALOG) {
+      expect(topicsBySlug.get(topic.slug), topic.slug).toMatchObject({ title: topic.title, description: topic.description, category: topic.category, icon: topic.icon ?? null, order: topic.order, isPublished: true })
+      for (const [index, expected] of topic.tasks.entries()) {
+        const actual = tasksBySlug.get(expected.slug)
+        expect(actual, expected.slug).toBeDefined()
+        if (!actual) throw new Error(`Не сохранена задача ${expected.slug}`)
+        expect(actual, expected.slug).toMatchObject({
+          title: expected.title, topic: topicsBySlug.get(topic.slug)?.id, order: index + 1,
+          difficulty: expected.difficulty, checkMode: expected.checkMode, languages: expected.languages,
+          descriptionMd: expected.descriptionMd, entryName: expected.entryName ?? null,
+          setupCode: expected.setupCode ?? null, setupTypes: expected.setupTypes ?? null,
+          starterCode: expected.starterCode, starterCodeTs: expected.starterCodeTs ?? null,
+          starterCodeGo: expected.starterCodeGo ?? null,
+          solutionCode: expected.solutionCode, solutionCodeTs: expected.solutionCodeTs ?? null,
+          solutionCodeGo: expected.solutionCodeGo ?? null,
+          solutionNotes: expected.solutionNotes ?? null, testCode: expected.testCode ?? null,
+          typeHarness: expected.typeHarness ?? null, expectedOutput: expected.expectedOutput ?? null,
+          timeLimitMs: expected.timeLimitMs ?? 5000, sourceUrl: expected.sourceUrl ?? null,
+          leetcodeNumber: expected.leetcodeNumber ?? null,
+          pointsReward: expected.pointsReward ?? POINTS_BY_DIFFICULTY[expected.difficulty], isPublished: true,
+        })
+        expect(actual.starterFiles ?? null, expected.slug).toEqual(expected.starterFiles ?? null)
+        expect(actual.solutionFiles ?? null, expected.slug).toEqual(expected.solutionFiles ?? null)
+        expect(actual.languages, expected.slug).toEqual(expected.languages)
+        expect(actual.description?.root.type, expected.slug).toBe('root')
+        expect(actual.description?.root.children, expected.slug).toEqual([{ type: 'paragraph', version: 1, children: [{ type: 'text', version: 1, text: expected.title }] }])
+        expect((actual.hints ?? []).map(({ hint }) => hint), expected.slug).toEqual(expected.hints ?? [])
+        expect(actual.tags ?? [], expected.slug).toEqual(expected.tags ?? [])
+        expect(actual.companies ?? [], expected.slug).toEqual(expected.companies ?? [])
+        expect((actual.testCases ?? []).map(({ name, argsCode, expectedCode, compare, hidden }) => ({ name, argsCode, expectedCode, compare, hidden })), expected.slug).toEqual(toCaseSpecs(expected.cases))
+        expect((actual.runtimeCases ?? []).map(runtimeCaseData), expected.slug).toEqual((expected.runtimeCases ?? []).map(runtimeCaseData))
+      }
+    }
+  })
 
   it('все задачи опубликованы, со slug, темой и хотя бы одним способом проверки', () => {
     expect(tasks.length).toBeGreaterThan(100)
@@ -110,15 +162,24 @@ describe('каталог в базе: каждая задача решаема �
       const hasCheck =
         (task.checkMode === 'unit' && ((task.testCases?.length ?? 0) > 0 || Boolean(task.testCode?.trim()))) ||
         (task.checkMode === 'types' && Boolean(task.typeHarness?.trim())) ||
-        (task.checkMode === 'stdout' && Boolean(task.expectedOutput?.trim()))
+        (task.checkMode === 'stdout' && Boolean(task.expectedOutput?.trim())) ||
+        (task.checkMode === 'program' && runtimeCases(task).length > 0 && runtimeCases(task).every((row) => typeof row.input === 'string' && typeof row.expected === 'string')) ||
+        (task.checkMode === 'dom' && runtimeCases(task).length > 0 && runtimeCases(task).every((row) => (row.checks?.length ?? 0) > 0))
       expect(hasCheck, `${task.slug}: нет тестов`).toBe(true)
+      if (task.checkMode === 'program') expect(taskLanguages(task), task.slug).toEqual(['go'])
+      else if (task.checkMode === 'dom') expect(taskLanguages(task).every(isFrontendLanguage), task.slug).toBe(true)
+      else expect(taskLanguages(task).every((language) => language === 'js' || language === 'ts'), task.slug).toBe(true)
+      for (const language of taskLanguages(task)) {
+        expect(starterCodeFor(task, language).trim(), `${task.slug} [${language}]: шаблон`).toBeTruthy()
+        expect(solutionCodeFor(task, language)?.trim(), `${task.slug} [${language}]: эталон`).toBeTruthy()
+      }
     }
   })
 
-  it('эталон проходит собственные тесты в isolated-vm на каждом языке задачи', async () => {
+  it('эталон проходит собственные тесты в isolated-vm для JS и tsc для TS', async () => {
     const failures: string[] = []
     for (const task of tasks) {
-      for (const language of taskLanguages(task)) {
+      for (const language of taskLanguages(task).filter((language) => language === 'js' || language === 'ts')) {
         const code = solutionCodeFor(task, language)
         if (!code) {
           failures.push(`${task.slug} [${language}]: нет эталона`)
@@ -134,10 +195,10 @@ describe('каталог в базе: каждая задача решаема �
     expect(failures).toEqual([])
   }, 600_000)
 
-  it('стартовый шаблон тесты не проходит', async () => {
+  it('стартовый шаблон JS/TS не проходит серверную проверку', async () => {
     const trivial: string[] = []
     for (const task of tasks) {
-      for (const language of taskLanguages(task)) {
+      for (const language of taskLanguages(task).filter((language) => language === 'js' || language === 'ts')) {
         const result = await runSolution(task, language, starterCodeFor(task, language))
         if (result.status === 'passed') trivial.push(`${task.slug} [${language}]`)
       }

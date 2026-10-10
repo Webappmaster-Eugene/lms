@@ -3,6 +3,8 @@ import { APIError, type CollectionBeforeValidateHook, type PayloadRequest } from
 
 import { relationId } from '@/lib/relation-id'
 import { requireLessonAccess } from '@/server/learning-access'
+import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
+import { consumeRawCollectionPatch } from '@/payload/hooks/rawCollectionPatch'
 
 export const DELETED_COMMENT = '(Комментарий удалён)'
 
@@ -13,7 +15,10 @@ interface TransactionAdapter {
 /** All updates, including REST PATCH, serialize against deletion before validation. */
 export const guardCommentMutation: CollectionBeforeValidateHook = async ({ data, originalDoc, operation, req }) => {
   if (!data) return data
+  const actorIsAdmin = req.user ? (await getAuthoritativeLearningPolicy(req.payload, req.user.id, req)).role === 'admin' : false
   if (operation === 'update' && originalDoc) {
+    const patch = consumeRawCollectionPatch(req, 'comments', originalDoc.id)
+    if (!patch) throw new APIError('Исходные поля комментария не определены', 409)
     const transactionID = await req.transactionID
     const adapter = req.payload.db as unknown as TransactionAdapter
     const db = transactionID === undefined ? undefined : adapter.sessions[transactionID]?.db
@@ -22,15 +27,20 @@ export const guardCommentMutation: CollectionBeforeValidateHook = async ({ data,
     const current = await req.payload.findByID({ collection: 'comments', id: originalDoc.id, depth: 0, req })
     if (current.deletedAt) throw new APIError('Удалённый комментарий нельзя изменить', 409)
     if (req.user) {
-      if (req.user.role !== 'admin' && relationId(current.user) !== req.user.id) throw new APIError('Комментарий не найден', 404)
+      if (!actorIsAdmin && relationId(current.user) !== req.user.id) throw new APIError('Комментарий не найден', 404)
       await requireLessonAccess(req.payload, req.user, relationId(current.lesson), req)
     }
     // Preserve immutable relationships even when a stale concurrent request supplied them.
     data.user = relationId(current.user)
     data.lesson = relationId(current.lesson)
     data.parentComment = current.parentComment ? relationId(current.parentComment) : null
+    if (!patch.keys.has('content')) data.content = current.content
+    // Omitted checkboxes contain a pre-lock fallback; only an explicit administrative patch may replace the fresh value.
+    const explicitAdministrativeResolve = patch.keys.has('isResolved') && (actorIsAdmin || (!req.user && patch.overrideAccess))
+    if (!explicitAdministrativeResolve) data.isResolved = current.isResolved ?? false
     data.deletedAt = req.context.removeOwnedComment ? new Date().toISOString() : null
   } else {
+    if (req.user && !actorIsAdmin) data.isResolved = false
     data.deletedAt = null
   }
   if (req.context.removeOwnedComment) data.content = DELETED_COMMENT

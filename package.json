@@ -47,7 +47,8 @@
     "codex:browser-check": "node scripts/codex/mcp.mjs browser-check",
     "codex:native-check": "node scripts/codex/native-check.mjs",
     "codex:trust": "node scripts/codex/trust.mjs",
-    "test:trainer-runtime": "node scripts/test-trainer-runtime.mjs"
+    "test:trainer-runtime": "node scripts/test-trainer-runtime.mjs",
+    "test:integration:runtime": "node scripts/test-trainer-runtime.mjs --database"
   },
   "dependencies": {
     "@monaco-editor/react": "4.7.0",

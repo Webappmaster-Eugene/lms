@@ -105,4 +105,26 @@ const nextConfig = {
   },
 }
 
-export default withPayload(nextConfig)
+const configWithPayload = withPayload(nextConfig)
+const headersWithPayload = configWithPayload.headers
+const themeHintKeys = new Set(['Accept-CH', 'Vary', 'Critical-CH'])
+
+export default {
+  ...configWithPayload,
+  async headers() {
+    const rules = await headersWithPayload()
+    return rules.flatMap((rule, index) => {
+      // Payload добавляет этот набор последним. На учебных страницах Critical-CH
+      // вызывает повторный запрос, хотя их тема определяется в браузере.
+      const isPayloadThemeBundle = index === rules.length - 1 && rule.source === '/:path*'
+        && [...themeHintKeys].every((key) => rule.headers.some((header) => header.key === key && header.value === 'Sec-CH-Prefers-Color-Scheme'))
+      if (!isPayloadThemeBundle) return [rule]
+      const themeHints = rule.headers.filter((header) => themeHintKeys.has(header.key) && header.value === 'Sec-CH-Prefers-Color-Scheme')
+      const otherHeaders = rule.headers.filter((header) => !themeHints.includes(header))
+      return [
+        ...(otherHeaders.length ? [{ ...rule, headers: otherHeaders }] : []),
+        { ...rule, source: '/admin/:path*', headers: themeHints },
+      ]
+    })
+  },
+}
