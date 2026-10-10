@@ -93,7 +93,7 @@ export async function registerPush(payload: Payload, user: User, subscription: {
     const existing = found.docs[0]
     if (existing && relationId(existing.user) !== user.id) throw new NotificationError('Это устройство связано с другим аккаунтом. Отключите прежнюю подписку в браузере', 409)
     const count = await payload.count({ collection: 'push-subscriptions', where: { and: [{ user: { equals: user.id } }, { enabled: { equals: true } }] }, req, overrideAccess: true })
-    if (!existing && count.totalDocs >= 10) throw new NotificationError('Достигнут лимит устройств. Отключите уведомления на одном из них', 409)
+    if (!existing?.enabled && count.totalDocs >= 10) throw new NotificationError('Достигнут лимит устройств. Отключите уведомления на одном из них', 409)
     const data = { user: user.id, endpointHash, endpoint: subscription.endpoint, p256dh: subscription.keys.p256dh, auth: subscription.keys.auth, sessionHash: authSessionHash(sid), enabled: true }
     if (existing) await payload.update({ collection: 'push-subscriptions', id: existing.id, data, req, overrideAccess: true, depth: 0 })
     else await payload.create({ collection: 'push-subscriptions', data, req, overrideAccess: true, depth: 0 })
