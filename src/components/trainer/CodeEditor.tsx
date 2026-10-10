@@ -9,6 +9,10 @@ export type CodeEditorProps = {
   value: string
   onChange: (value: string) => void
   language: TrainerLanguage
+  /** Язык отдельного файла в frontend-проекте. */
+  editorLanguage?: 'html' | 'css' | 'javascript' | 'typescript' | 'json'
+  filePath?: string
+  ariaLabel?: string
   readOnly?: boolean
   /** Диагностики компилятора: рисуются подчёркиванием прямо в коде. */
   diagnostics?: TrainerDiagnostic[]
@@ -27,7 +31,7 @@ type FullEditorProps = CodeEditorProps & {
 
 /** Текст доступен сразу: загрузка Monaco и его языкового сервиса не блокирует решение. */
 export function CodeEditor(props: CodeEditorProps) {
-  const { value, onChange, readOnly = false, height = '100%', onRun, onSubmit } = props
+  const { value, onChange, readOnly = false, height = '100%', onRun, onSubmit, ariaLabel = 'Код решения' } = props
   const [FullEditor, setFullEditor] = useState<ComponentType<FullEditorProps> | null>(null)
   const [ready, setReady] = useState(false)
   const [loadingSlow, setLoadingSlow] = useState(false)
@@ -114,7 +118,7 @@ export function CodeEditor(props: CodeEditorProps) {
           </p>
           <textarea
             ref={textareaRef}
-            aria-label="Код решения"
+            aria-label={ariaLabel}
             value={value}
             onChange={(event) => onChange(event.target.value)}
             onKeyDown={handleKeyDown}

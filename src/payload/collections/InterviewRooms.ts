@@ -2,7 +2,7 @@ import { APIError, type CollectionConfig, type Where } from 'payload'
 
 import { getTrainerAccess } from '@/server/trainer-access'
 
-import { TRAINER_LIMITS } from '@/lib/trainer/constants'
+import { TRAINER_LIMITS, LANGUAGE_OPTIONS } from '@/lib/trainer/constants'
 
 export const InterviewRooms: CollectionConfig = {
   slug: 'interview-rooms',
@@ -47,7 +47,7 @@ export const InterviewRooms: CollectionConfig = {
     { name: 'setupCode', type: 'textarea' },
     { name: 'setupTypes', type: 'textarea' },
     { name: 'code', type: 'textarea', maxLength: TRAINER_LIMITS.maxCodeLength },
-    { name: 'language', type: 'select', required: true, options: ['js', 'ts'], defaultValue: 'js' },
+    { name: 'language', type: 'select', required: true, options: [...LANGUAGE_OPTIONS], defaultValue: 'js' },
     { name: 'version', type: 'number', required: true, defaultValue: 1, min: 1 },
     { name: 'endedAt', type: 'date' },
   ],

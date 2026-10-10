@@ -103,7 +103,7 @@ export const TrainerTasks: CollectionConfig = {
       admin: {
         position: 'sidebar',
         description:
-          'stdout — сравнение вывода (legacy); unit — прогон тестов; types — проверка типов TypeScript',
+          'stdout — сравнение вывода; unit — JS/TS; types — типы TS; program — Go; dom — frontend',
       },
     },
     {
@@ -148,7 +148,7 @@ export const TrainerTasks: CollectionConfig = {
       name: 'starterCode',
       type: 'textarea',
       required: true,
-      label: 'Стартовый код (JavaScript)',
+      label: 'Стартовый код (JavaScript / резервный шаблон)',
       admin: {
         description: 'Шаблон кода, который увидит пользователь. Используйте комментарии для подсказок.',
       },
@@ -160,6 +160,37 @@ export const TrainerTasks: CollectionConfig = {
       admin: {
         description: 'Используется, когда пользователь выбрал TypeScript.',
       },
+    },
+    {
+      name: 'starterCodeGo', type: 'textarea', label: 'Стартовый код (Go)',
+      admin: { description: 'Полная программа package main, которая читает stdin и пишет в stdout.' },
+    },
+    {
+      name: 'starterFiles', type: 'json', label: 'Стартовые файлы frontend-проекта',
+      admin: { description: 'Объект: относительный путь файла → код. HTML: index.html; React: App.tsx; Next.js: app/page.tsx и app/layout.tsx.' },
+    },
+    {
+      name: 'solutionCodeGo', type: 'textarea', label: 'Эталонное решение (Go)',
+      access: { read: ({ req }) => req.user?.role === 'admin' },
+    },
+    {
+      name: 'solutionFiles', type: 'json', label: 'Эталонные файлы frontend-проекта',
+      access: { read: ({ req }) => req.user?.role === 'admin' },
+    },
+    {
+      name: 'runtimeCases', type: 'array', label: 'Проверки Go и frontend', maxRows: 50,
+      admin: { condition: showForModes('program', 'dom'), description: 'Go: stdin и stdout. Frontend: последовательность действий и проверок DOM/CSS. Скрытые данные видны только администратору.' },
+      fields: [
+        { name: 'name', type: 'text', required: true, label: 'Название проверки' },
+        { name: 'hidden', type: 'checkbox', defaultValue: false, label: 'Скрытая проверка' },
+        { name: 'input', type: 'textarea', label: 'Ввод программы (stdin)', access: { read: readUnlessHiddenCase } },
+        { name: 'expected', type: 'textarea', label: 'Ожидаемый вывод (stdout)', access: { read: readUnlessHiddenCase } },
+        { name: 'checks', type: 'json', label: 'Проверки интерфейса', access: { read: readUnlessHiddenCase },
+          admin: { description: 'Массив: {selector, action?: click/fill, value?, text?, count?, visible?, css?, attribute?: {name,value}}.' } },
+        { name: 'viewport', type: 'json', label: 'Размер окна', access: { read: readUnlessHiddenCase },
+          admin: { description: 'Объект {width,height} для проверки адаптивной вёрстки.' } },
+        { name: 'path', type: 'text', label: 'Путь страницы Next.js', access: { read: readUnlessHiddenCase } },
+      ],
     },
     {
       name: 'setupCode',

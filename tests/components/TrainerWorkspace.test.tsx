@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createElement, type FunctionComponent } from 'react'
-import { navigationURL, setNavigationURL } from '../helpers/url-navigation'
+import { navigationURL, navigationRouter, setNavigationURL } from '../helpers/url-navigation'
 import userEvent from '@testing-library/user-event'
 
 const toast = vi.fn()
@@ -10,6 +10,15 @@ const refresh = vi.fn()
 vi.mock('next/navigation', async () => { const mock = (await import('../helpers/url-navigation')).urlNavigationMock(); return { ...mock, useRouter: () => ({ ...mock.useRouter(), refresh }) } })
 vi.mock('@/components/ui/Toast', () => ({ useToast: () => ({ toast }) }))
 vi.mock('@monaco-editor/react', async () => (await import('../helpers/component-mocks')).monacoMock())
+vi.mock('@/components/trainer/FrontendEditor', () => ({
+  FrontendEditor: ({ value, onChange, previewHtml, previewUrl, readOnly }: { value: string; onChange: (code: string) => void; previewHtml?: string; previewUrl?: string; readOnly?: boolean }) => (
+    <div>
+      <textarea aria-label="Файлы проекта" value={value} onChange={(event) => onChange(event.target.value)} readOnly={readOnly} />
+      {previewHtml && <output aria-label="HTML предпросмотра">{previewHtml}</output>}
+      {previewUrl && <output aria-label="Адрес предпросмотра">{previewUrl}</output>}
+    </div>
+  ),
+}))
 vi.mock('react-markdown', async () => (await import('../helpers/component-mocks')).markdownMock())
 vi.mock('remark-gfm', () => ({ default: () => {} }))
 vi.mock('next/link', async () => (await import('../helpers/component-mocks')).linkMock())
@@ -95,6 +104,7 @@ describe('рабочее место тренажёра', () => {
   beforeEach(() => {
     setNavigationURL('/trainer/tasks/sum')
     vi.clearAllMocks()
+    vi.spyOn(window.history, 'pushState').mockImplementation((_data, _title, url) => { if (url) navigationRouter().push(String(url)) })
     window.localStorage.clear()
     monacoCommands.clear()
     run.mockResolvedValue(passed)
@@ -301,6 +311,127 @@ describe('рабочее место тренажёра', () => {
       await user.click(screen.getByRole('button', { name: /Сбросить/ }))
 
       expect(await screen.findByTestId('monaco')).toHaveValue('function createCounter() {}')
+    })
+  })
+
+  describe('Go и frontend', () => {
+    const goTask: ClientTaskSpec = { ...task, id: '42', languages: ['go'], checkMode: 'program', entryName: '', testCode: '',
+      starters: { go: 'package main\nfunc main() {}' }, runtimeCases: [{ name: 'Публичный', hidden: false, input: '2 3', expected: '5' }] }
+    const reactCode = JSON.stringify({ 'App.tsx': 'export default () => <h1>Hello</h1>' })
+    const nextCode = JSON.stringify({ 'app/page.tsx': 'export default () => <h1>Hello</h1>' })
+    const frontendTask: ClientTaskSpec = { ...task, id: '43', languages: ['react'], checkMode: 'dom', entryName: '', testCode: '',
+      starters: { react: reactCode }, runtimeCases: [{ name: 'Заголовок', hidden: false, checks: [{ selector: 'h1', text: 'Hello' }] }] }
+
+    it('запускает Go с собственным stdin на сервере; отправляет только решение без своих или публичных тестов', async () => {
+      const user = userEvent.setup()
+      const goSolution = 'package main\nimport "fmt"\nfunc main() { var a, b int; fmt.Scan(&a, &b); fmt.Println(a + b) }'
+      global.fetch = vi.fn(async () => Response.json({ result: passed, completed: true, attempts: 1, awardedPoints: 10 })) as unknown as typeof fetch
+      render(<TrainerWorkspace task={goTask} progress={progress} />)
+      const editor = await screen.findByTestId('monaco')
+      fireEvent.change(editor, { target: { value: goSolution } })
+      await user.click(screen.getByText('Свои проверки Go (0)'))
+      await user.click(screen.getByRole('button', { name: 'Добавить проверку Go' }))
+      await user.type(screen.getByLabelText('Ввод Go 1'), '10 11')
+      await user.type(screen.getByLabelText('Ожидаемый вывод Go 1'), '21')
+      await user.click(screen.getByRole('button', { name: 'Запустить' }))
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/trainer/run', expect.anything()))
+      const runCall = vi.mocked(global.fetch).mock.calls.find(([url]) => url === '/api/trainer/run')
+      const runBody = JSON.parse(String(runCall?.[1]?.body))
+      expect(runBody).toEqual({ taskId: '42', language: 'go', code: goSolution, customCases: [{ name: 'Своя проверка 1', input: '10 11', expected: '21', hidden: false }] })
+      expect(run).not.toHaveBeenCalled()
+      expect(refresh).not.toHaveBeenCalled()
+      expect(screen.queryByText('Решено')).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Отправить' }))
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/trainer/submit', expect.anything()))
+      const submitCall = vi.mocked(global.fetch).mock.calls.find(([url]) => url === '/api/trainer/submit')
+      expect(JSON.parse(String(submitCall?.[1]?.body))).toEqual({ taskId: '42', language: 'go', code: goSolution })
+      expect(await screen.findByText('Решено')).toBeInTheDocument()
+    })
+
+    it('получает React-предпросмотр через runtime и просит обновить его после изменения файлов', async () => {
+      const user = userEvent.setup()
+      global.fetch = vi.fn(async () => Response.json({ result: passed, preview: { html: '<h1>Hello</h1>' } })) as unknown as typeof fetch
+      render(<TrainerWorkspace task={frontendTask} progress={progress} />)
+      expect(await screen.findByLabelText('Файлы проекта')).toHaveValue(reactCode)
+      await user.click(screen.getByRole('button', { name: 'Запустить' }))
+      expect(await screen.findByLabelText('HTML предпросмотра')).toHaveTextContent('<h1>Hello</h1>')
+      expect(global.fetch).toHaveBeenCalledWith('/api/trainer/run', expect.objectContaining({ body: JSON.stringify({ taskId: '43', language: 'react', code: reactCode }) }))
+      expect(run).not.toHaveBeenCalled()
+      expect(refresh).not.toHaveBeenCalled()
+      const updated = JSON.stringify({ 'App.tsx': 'export default () => <h1>Updated</h1>' })
+      fireEvent.change(screen.getByLabelText('Файлы проекта'), { target: { value: updated } })
+      expect(screen.getByText('Код изменён. Нажмите «Запустить», чтобы обновить предпросмотр.')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Запустить' }))
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2))
+      expect(JSON.parse(String(vi.mocked(global.fetch).mock.calls[1][1]?.body))).toMatchObject({ code: updated, language: 'react' })
+      expect(vi.mocked(global.fetch).mock.calls.every(([url]) => url === '/api/trainer/run')).toBe(true)
+    })
+
+    it('освобождает Next.js-сессии до повторного запуска и перед серверной отправкой', async () => {
+      const user = userEvent.setup()
+      const nextTask: ClientTaskSpec = { ...frontendTask, id: '44', languages: ['next'], starters: { next: nextCode } }
+      let sequence = 0
+      let finishRelease = () => {}
+      const firstRelease = new Promise<Response>((resolve) => { finishRelease = () => resolve(new Response(null, { status: 204 })) })
+      global.fetch = vi.fn(async (url: RequestInfo | URL) => {
+        if (String(url).endsWith(`/preview-release/${'1'.padStart(48, 'a')}`)) return firstRelease
+        if (String(url).includes('/preview-release/')) return new Response(null, { status: 204 })
+        if (url === '/api/trainer/run') {
+          const leaseToken = (++sequence).toString().padStart(48, 'a')
+          return Response.json({ result: passed, preview: { leaseToken, previewPath: `/api/trainer/preview/${leaseToken}/` } })
+        }
+        return Response.json({ result: passed, completed: true, attempts: 1, awardedPoints: 10 })
+      }) as typeof fetch
+      const view = render(<TrainerWorkspace task={nextTask} progress={progress} />)
+      await screen.findByLabelText('Файлы проекта')
+      for (let index = 0; index < 3; index++) {
+        await user.click(screen.getByRole('button', { name: 'Запустить' }))
+        if (index === 1) {
+          expect(vi.mocked(global.fetch).mock.calls.filter(([url]) => url === '/api/trainer/run')).toHaveLength(1)
+          await act(async () => { finishRelease() })
+        }
+        await waitFor(() => expect(screen.getByLabelText('Адрес предпросмотра')).toHaveTextContent((index + 1).toString().padStart(48, 'a')))
+      }
+      await user.click(screen.getByRole('button', { name: 'Отправить' }))
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/trainer/submit', expect.anything()))
+      const calls = vi.mocked(global.fetch).mock.calls
+      const runIndexes = calls.map(([url], index) => url === '/api/trainer/run' ? index : -1).filter((index) => index >= 0)
+      for (let index = 1; index < runIndexes.length; index++) {
+        const releaseIndex = calls.findIndex(([url]) => url === `/api/trainer/preview-release/${index.toString().padStart(48, 'a')}`)
+        expect(releaseIndex).toBeGreaterThan(runIndexes[index - 1])
+        expect(releaseIndex).toBeLessThan(runIndexes[index])
+      }
+      const lastRelease = calls.findIndex(([url]) => url === `/api/trainer/preview-release/${'3'.padStart(48, 'a')}`)
+      expect(lastRelease).toBeGreaterThan(runIndexes[2])
+      expect(lastRelease).toBeLessThan(calls.findIndex(([url]) => url === '/api/trainer/submit'))
+      const submitCall = calls.find(([url]) => url === '/api/trainer/submit')
+      expect(JSON.parse(String(submitCall?.[1]?.body))).toEqual({ taskId: '44', language: 'next', code: nextCode })
+      expect(run).not.toHaveBeenCalled()
+      expect(screen.queryByLabelText('Адрес предпросмотра')).not.toBeInTheDocument()
+      view.unmount()
+    })
+
+    it('хранит отдельные черновики React/Next и не переносит код, зачёт и попытки в другую задачу', async () => {
+      const user = userEvent.setup()
+      const bilingual: ClientTaskSpec = { ...frontendTask, languages: ['react', 'next'], starters: { react: reactCode, next: nextCode } }
+      const privateReact = JSON.stringify({ 'App.tsx': '// private React draft\nexport default () => null' })
+      const privateNext = JSON.stringify({ 'app/page.tsx': '// private Next draft\nexport default () => null' })
+      const view = render(<TrainerWorkspace task={bilingual} progress={{ ...progress, isCompleted: true, attempts: 3 }} />)
+      await screen.findByLabelText('Файлы проекта')
+      fireEvent.change(screen.getByLabelText('Файлы проекта'), { target: { value: privateReact } })
+      await user.click(screen.getByRole('button', { name: 'Next.js' }))
+      expect(screen.getByLabelText('Файлы проекта')).toHaveValue(nextCode)
+      fireEvent.change(screen.getByLabelText('Файлы проекта'), { target: { value: privateNext } })
+      await user.click(screen.getByRole('button', { name: 'React' }))
+      expect(screen.getByLabelText('Файлы проекта')).toHaveValue(privateReact)
+      const other: ClientTaskSpec = { ...bilingual, id: '45', starters: { react: '{"App.tsx":"new task"}', next: nextCode } }
+      view.rerender(<TrainerWorkspace task={other} progress={progress} />)
+      expect(await screen.findByLabelText('Файлы проекта')).toHaveValue('{"App.tsx":"new task"}')
+      expect(screen.queryByText('Решено')).not.toBeInTheDocument()
+      expect(screen.queryByText('Попыток: 3')).not.toBeInTheDocument()
+      expect(window.localStorage.getItem('lms.trainer.draft.43.react')).toBe(privateReact)
+      expect(window.localStorage.getItem('lms.trainer.draft.43.next')).toBe(privateNext)
+      expect(navigationURL()).not.toContain('private')
     })
   })
 })

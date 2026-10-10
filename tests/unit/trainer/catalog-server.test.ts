@@ -5,7 +5,7 @@ import { flattenCatalog, toCaseSpecs } from '@/data/trainer/types'
 import { runSolution } from '@/server/trainer/sandbox'
 import { getRunnerPool } from '@/server/trainer/pool'
 
-const entries = flattenCatalog(TRAINER_CATALOG)
+const entries = flattenCatalog(TRAINER_CATALOG).filter(({ task }) => task.checkMode !== 'program' && task.checkMode !== 'dom')
 
 afterAll(() => getRunnerPool().dispose())
 

@@ -6,7 +6,7 @@ import type { Where } from 'payload'
 
 import { getPayload } from '@/lib/payload'
 import { TaskFilters, type TaskFilterValues } from '@/components/trainer/TaskFilters'
-import { COMPANY_LABELS, DIFFICULTY_LABELS, TAG_LABELS } from '@/lib/trainer/constants'
+import { COMPANY_LABELS, DIFFICULTY_LABELS, TAG_LABELS, LANGUAGE_LABELS } from '@/lib/trainer/constants'
 import { taskLanguages } from '@/lib/trainer/spec'
 import { cn } from '@/lib/utils'
 import { TrainerCatalogLink } from '@/components/trainer/TrainerCatalogLink'
@@ -198,7 +198,7 @@ export default async function AllTasksPage({ searchParams }: Props) {
                           key={language}
                           className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
                         >
-                          {language.toUpperCase()}
+                          {LANGUAGE_LABELS[language]}
                         </span>
                       ))}
                     </span>

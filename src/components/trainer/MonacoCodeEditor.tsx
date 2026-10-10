@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTheme } from 'next-themes'
 import Editor, { loader, type BeforeMount, type Monaco, type OnMount } from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
@@ -20,7 +20,36 @@ loader.config({ paths: { vs: '/monaco/vs' } })
 
 const THEME_DARK = 'lms-trainer-dark'
 const THEME_LIGHT = 'lms-trainer-light'
+const configuredThemes = new WeakSet<Monaco>()
+const configuredTypeScript = new WeakSet<Monaco>()
+const reactDeclarations = new WeakMap<Monaco, Promise<void>>()
 
+function loadReactDeclarations(monaco: Monaco): Promise<void> {
+  const existing = reactDeclarations.get(monaco)
+  if (existing) return existing
+  const pending = (async () => {
+    const response = await fetch('/monaco/react-types.json')
+    if (!response.ok) throw new Error('Не удалось загрузить подсказки React')
+    const declarations: unknown = await response.json()
+    if (!declarations || typeof declarations !== 'object' || Array.isArray(declarations)) {
+      throw new Error('Некорректный файл подсказок React')
+    }
+    const libraries = Object.entries(declarations)
+    if (libraries.some(([, source]) => typeof source !== 'string')) {
+      throw new Error('Некорректный файл подсказок React')
+    }
+    for (const defaults of [monaco.languages.typescript.typescriptDefaults, monaco.languages.typescript.javascriptDefaults]) {
+      for (const [name, source] of libraries) {
+        if (typeof source === 'string') defaults.addExtraLib(source, `inmemory://trainer/node_modules/@types/lms-react/${name}`)
+      }
+    }
+  })().catch((error: unknown) => {
+    reactDeclarations.delete(monaco)
+    throw error
+  })
+  reactDeclarations.set(monaco, pending)
+  return pending
+}
 
 /**
  * Темы под токены дизайн-системы.
@@ -30,6 +59,8 @@ const THEME_LIGHT = 'lms-trainer-light'
  * дороже и ненадёжнее (переменные объявлены на :root, а не на элементе).
  */
 function defineThemes(monaco: Monaco): void {
+  if (configuredThemes.has(monaco)) return
+  configuredThemes.add(monaco)
   monaco.editor.defineTheme(THEME_DARK, {
     base: 'vs-dark',
     inherit: true,
@@ -65,6 +96,8 @@ function defineThemes(monaco: Monaco): void {
  * tsc, и настройки здесь подобраны так, чтобы расхождений было поменьше.
  */
 function configureTypeScript(monaco: Monaco): void {
+  if (configuredTypeScript.has(monaco)) return
+  configuredTypeScript.add(monaco)
   const defaults = [monaco.languages.typescript.typescriptDefaults, monaco.languages.typescript.javascriptDefaults]
 
   for (const target of defaults) {
@@ -73,6 +106,7 @@ function configureTypeScript(monaco: Monaco): void {
       lib: ['es2022', 'dom'],
       strict: true,
       noEmit: true,
+      jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
       allowNonTsExtensions: true,
       moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
     })
@@ -90,6 +124,9 @@ export function MonacoCodeEditor({
   value,
   onChange,
   language,
+  editorLanguage,
+  filePath,
+  ariaLabel = 'Код решения',
   readOnly = false,
   diagnostics,
   errorLine,
@@ -100,23 +137,83 @@ export function MonacoCodeEditor({
 }: CodeEditorProps & { onReady: (instance: editor.IStandaloneCodeEditor) => void }) {
   const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const [reactTypesError, setReactTypesError] = useState<string | null>(null)
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<Monaco | null>(null)
+  const editorId = useId()
+  const modelPrefix = `inmemory://trainer/${encodeURIComponent(editorId)}/`
   const decorationsRef = useRef<editor.IEditorDecorationsCollection | null>(null)
   // Команды Monaco регистрируются один раз при монтировании, а обработчики
   // меняются на каждом рендере — поэтому вызываются через ref.
-  const shortcutsRef = useRef({ onRun, onSubmit })
+  const shortcutsRef = useRef({ onRun, onSubmit, readOnly })
+  const onChangeRef = useRef(onChange)
+  const resolvedLanguage = editorLanguage ?? MONACO_LANGUAGE[language]
+  const isFileEditor = filePath !== undefined
+  useEffect(() => () => {
+    // При смене вкладки Monaco хранит модели для undo; освобождаем весь проект при уходе.
+    for (const model of monacoRef.current?.editor.getModels() ?? []) {
+      if (model.uri.toString().startsWith(modelPrefix)) model.dispose()
+    }
+  }, [modelPrefix])
   useEffect(() => {
-    shortcutsRef.current = { onRun, onSubmit }
-  }, [onRun, onSubmit])
+    onChangeRef.current = onChange
+  }, [onChange])
+  useEffect(() => {
+    shortcutsRef.current = { onRun, onSubmit, readOnly }
+  }, [onRun, onSubmit, readOnly])
 
   // Темы регистрируются ДО создания редактора: если сделать это в onMount,
   // первый кадр отрисуется дефолтной темой Monaco — в тёмном интерфейсе это
   // белый прямоугольник, который потом дёргается.
   const handleBeforeMount = useCallback<BeforeMount>((monaco) => {
     defineThemes(monaco)
-    configureTypeScript(monaco)
-  }, [])
+    if (resolvedLanguage === 'javascript' || resolvedLanguage === 'typescript') configureTypeScript(monaco)
+  }, [resolvedLanguage])
+
+  useEffect(() => {
+    if (monacoRef.current && (resolvedLanguage === 'javascript' || resolvedLanguage === 'typescript')) {
+      configureTypeScript(monacoRef.current)
+    }
+  }, [resolvedLanguage, mounted])
+
+  useEffect(() => {
+    const monaco = monacoRef.current
+    if (!monaco || (language !== 'react' && language !== 'next')) return
+    if (resolvedLanguage !== 'javascript' && resolvedLanguage !== 'typescript') return
+    let active = true
+    // Типы фреймворка нужны только frontend-проекту; их загрузка не блокирует ввод.
+    void loadReactDeclarations(monaco).then(
+      () => { if (active) setReactTypesError(null) },
+      () => { if (active) setReactTypesError('Подсказки типов React недоступны. Код можно запускать.') },
+    )
+    return () => { active = false }
+  }, [language, resolvedLanguage, mounted])
+
+  const handleChange = useCallback((next: string | undefined) => onChangeRef.current(next ?? ''), [])
+  // Без memo Monaco применяет настройки заново при каждом введённом символе.
+  const options = useMemo<editor.IStandaloneEditorConstructionOptions>(() => ({
+    readOnly,
+    ariaLabel,
+    fontSize: 14,
+    lineHeight: 22,
+    fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace)',
+    minimap: { enabled: false },
+    scrollBeyondLastLine: false,
+    automaticLayout: true,
+    tabSize: 2,
+    insertSpaces: true,
+    renderLineHighlight: 'line',
+    glyphMargin: true,
+    smoothScrolling: true,
+    padding: { top: 12, bottom: 12 },
+    bracketPairColorization: { enabled: true },
+    scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
+    quickSuggestions: { other: true, comments: false, strings: false },
+    suggestOnTriggerCharacters: true,
+    wordWrap: 'off',
+    // Вхождения инициируют запросы к воркеру, отменяющиеся при смене файла.
+    occurrencesHighlight: isFileEditor ? 'off' : 'singleFile',
+  }), [readOnly, ariaLabel, isFileEditor])
 
   const handleMount = useCallback<OnMount>((instance, monaco) => {
     editorRef.current = instance
@@ -124,10 +221,12 @@ export function MonacoCodeEditor({
     decorationsRef.current = instance.createDecorationsCollection([])
     setMounted(true)
     onReady(instance)
-    instance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => shortcutsRef.current.onRun?.())
-    instance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter, () =>
-      shortcutsRef.current.onSubmit?.(),
-    )
+    instance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+      if (!shortcutsRef.current.readOnly) shortcutsRef.current.onRun?.()
+    })
+    instance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
+      if (!shortcutsRef.current.readOnly) shortcutsRef.current.onSubmit?.()
+    })
   }, [onReady])
 
   // Маркеры диагностик из серверного компилятора: свои, отдельно от тех, что
@@ -183,42 +282,24 @@ export function MonacoCodeEditor({
   }, [errorLine, mounted])
 
   return (
-    <Editor
-      height={height}
-      language={MONACO_LANGUAGE[language]}
-      theme={resolvedTheme === 'light' ? THEME_LIGHT : THEME_DARK}
-      value={value}
-      onChange={(next) => onChange(next ?? '')}
-      beforeMount={handleBeforeMount}
-      onMount={handleMount}
-      loading={
-        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-          Загрузка редактора…
-        </div>
-      }
-      options={{
-        readOnly,
-        ariaLabel: 'Код решения',
-        fontSize: 14,
-        lineHeight: 22,
-        fontFamily:
-          'var(--font-mono, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace)',
-        minimap: { enabled: false },
-        scrollBeyondLastLine: false,
-        automaticLayout: true,
-        tabSize: 2,
-        insertSpaces: true,
-        renderLineHighlight: 'line',
-        glyphMargin: true,
-        smoothScrolling: true,
-        padding: { top: 12, bottom: 12 },
-        bracketPairColorization: { enabled: true },
-        scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
-        // Подсказки помогают учиться, но не должны подставлять целое решение.
-        quickSuggestions: { other: true, comments: false, strings: false },
-        suggestOnTriggerCharacters: true,
-        wordWrap: 'off',
-      }}
-    />
+    <>
+      <Editor
+        height={height}
+        path={filePath ? `${modelPrefix}${filePath}` : undefined}
+        language={resolvedLanguage}
+        theme={resolvedTheme === 'light' ? THEME_LIGHT : THEME_DARK}
+        value={value}
+        onChange={handleChange}
+        beforeMount={handleBeforeMount}
+        onMount={handleMount}
+        loading={
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+            Загрузка редактора…
+          </div>
+        }
+        options={options}
+      />
+      {reactTypesError && <p role="status" className="absolute bottom-2 right-2 z-10 max-w-xs rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground">{reactTypesError}</p>}
+    </>
   )
 }

@@ -647,7 +647,16 @@ export interface TrainerTopic {
   /**
    * Используется для группировки и фильтров в каталоге задач.
    */
-  category: 'javascript' | 'typescript' | 'algorithms' | 'leetcode' | 'companies' | 'patterns' | 'webapi';
+  category:
+    | 'javascript'
+    | 'typescript'
+    | 'algorithms'
+    | 'leetcode'
+    | 'companies'
+    | 'patterns'
+    | 'webapi'
+    | 'go'
+    | 'frontend';
   /**
    * Emoji или имя иконки lucide (например: "code", "braces", "terminal")
    */
@@ -672,10 +681,10 @@ export interface TrainerTask {
   order?: number | null;
   difficulty: 'easy' | 'medium' | 'hard';
   /**
-   * stdout — сравнение вывода (legacy); unit — прогон тестов; types — проверка типов TypeScript
+   * stdout — сравнение вывода; unit — JS/TS; types — типы TS; program — Go; dom — frontend
    */
-  checkMode: 'stdout' | 'unit' | 'types';
-  languages: ('js' | 'ts')[];
+  checkMode: 'stdout' | 'unit' | 'types' | 'program' | 'dom';
+  languages: ('js' | 'ts' | 'go' | 'html' | 'react' | 'next')[];
   /**
    * Оставлено для старых задач. Для новых заполняйте «Условие (Markdown)».
    */
@@ -710,6 +719,69 @@ export interface TrainerTask {
    * Используется, когда пользователь выбрал TypeScript.
    */
   starterCodeTs?: string | null;
+  /**
+   * Полная программа package main, которая читает stdin и пишет в stdout.
+   */
+  starterCodeGo?: string | null;
+  /**
+   * Объект: относительный путь файла → код. HTML: index.html; React: App.tsx; Next.js: app/page.tsx и app/layout.tsx.
+   */
+  starterFiles?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  solutionCodeGo?: string | null;
+  solutionFiles?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Go: stdin и stdout. Frontend: последовательность действий и проверок DOM/CSS. Скрытые данные видны только администратору.
+   */
+  runtimeCases?:
+    | {
+        name: string;
+        hidden?: boolean | null;
+        input?: string | null;
+        expected?: string | null;
+        /**
+         * Массив: {selector, action?: click/fill, value?, text?, count?, visible?, css?, attribute?: {name,value}}.
+         */
+        checks?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        /**
+         * Объект {width,height} для проверки адаптивной вёрстки.
+         */
+        viewport?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        path?: string | null;
+        id?: string | null;
+      }[]
+    | null;
   /**
    * Код, который выполняется ПЕРЕД решением: фикстуры, моки, вспомогательные классы. Доступен и решению, и тестам. Только JavaScript — преамбула одна на оба языка и в песочницу попадает без транспиляции.
    */
@@ -1176,7 +1248,7 @@ export interface UserTrainerProgress {
   task: number | TrainerTask;
   isCompleted?: boolean | null;
   userCode?: string | null;
-  language?: ('js' | 'ts') | null;
+  language?: ('js' | 'ts' | 'go' | 'html' | 'react' | 'next') | null;
   /**
    * Считаются все отправки, не прошедшие тесты.
    */
@@ -1230,7 +1302,7 @@ export interface InterviewRoom {
   setupCode?: string | null;
   setupTypes?: string | null;
   code?: string | null;
-  language: 'js' | 'ts';
+  language: 'js' | 'ts' | 'go' | 'html' | 'react' | 'next';
   version: number;
   endedAt?: string | null;
   updatedAt: string;
@@ -2056,6 +2128,22 @@ export interface TrainerTasksSelect<T extends boolean = true> {
   entryName?: T;
   starterCode?: T;
   starterCodeTs?: T;
+  starterCodeGo?: T;
+  starterFiles?: T;
+  solutionCodeGo?: T;
+  solutionFiles?: T;
+  runtimeCases?:
+    | T
+    | {
+        name?: T;
+        hidden?: T;
+        input?: T;
+        expected?: T;
+        checks?: T;
+        viewport?: T;
+        path?: T;
+        id?: T;
+      };
   setupCode?: T;
   setupTypes?: T;
   expectedOutput?: T;

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
+import { isTrainerLanguage } from '@/lib/trainer/runtime-spec'
+import { readTrainerBody, TrainerInputError } from '@/lib/trainer/request-body'
 import { TRAINER_LIMITS } from '@/lib/trainer/constants'
 import { supportsLanguage } from '@/lib/trainer/spec'
 import { TrainerSpecError } from '@/lib/trainer/spec'
@@ -33,19 +35,14 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ error: 'Требуется авторизация' }, { status: 401 })
   }
 
-  let body: { taskId?: unknown; language?: unknown; code?: unknown }
-  try {
-    const input: unknown = await request.json()
-    if (!input || typeof input !== 'object' || Array.isArray(input)) {
-      return NextResponse.json({ error: 'Ожидается объект JSON' }, { status: 400 })
-    }
-    body = input
-  } catch {
-    return NextResponse.json({ error: 'Невалидный JSON' }, { status: 400 })
+  let body: Record<string, unknown>
+  try { body = await readTrainerBody(request) } catch (error) {
+    return NextResponse.json({ error: error instanceof TrainerInputError ? error.message : 'Не удалось прочитать запрос' }, { status: error instanceof TrainerInputError ? error.status : 400 })
   }
 
   const taskId = parseTaskId(body.taskId)
-  const language: TrainerLanguage = body.language === 'ts' ? 'ts' : 'js'
+  if (body.language !== undefined && !isTrainerLanguage(body.language)) return NextResponse.json({ error: 'Неизвестный язык решения' }, { status: 400 })
+  const language: TrainerLanguage = isTrainerLanguage(body.language) ? body.language : 'js'
   const code = typeof body.code === 'string' ? body.code : ''
 
   if (taskId === null || code.trim().length === 0) {

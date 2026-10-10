@@ -167,6 +167,15 @@ export function monacoMock() {
   const fakeMonaco = {
     KeyMod: { CtrlCmd: MONACO_KEYS.CtrlCmd, Shift: MONACO_KEYS.Shift },
     KeyCode: { Enter: MONACO_KEYS.Enter },
+    MarkerSeverity: { Error: 8, Warning: 4 },
+    editor: { getModels: () => [], defineTheme: vi.fn(), setModelMarkers: vi.fn() },
+    languages: { typescript: {
+      typescriptDefaults: { setCompilerOptions: vi.fn(), setDiagnosticsOptions: vi.fn(), addExtraLib: vi.fn() },
+      javascriptDefaults: { setCompilerOptions: vi.fn(), setDiagnosticsOptions: vi.fn(), addExtraLib: vi.fn() },
+      ScriptTarget: { ES2022: 9 },
+      JsxEmit: { ReactJSX: 4 },
+      ModuleResolutionKind: { NodeJs: 2 },
+    } },
   }
   const fakeInstance = {
     addCommand: (keybinding: number, handler: () => void) => monacoCommands.set(keybinding, handler),

@@ -171,9 +171,7 @@ describe('фильтры каталога задач', () => {
       <TaskFilters values={{ ...values, topic: 'react' }} topics={topics} total={10} />,
     )
 
-    const topicSelect = screen.getAllByRole('combobox').find((el) =>
-      Array.from(el.querySelectorAll('option')).some((o) => o.value === 'react'),
-    )
+    const topicSelect = screen.getByRole('combobox', { name: 'Тема' })
     expect(topicSelect).toHaveValue('react')
   })
 
@@ -181,11 +179,9 @@ describe('фильтры каталога задач', () => {
     const user = userEvent.setup()
     render(<TaskFilters values={values} topics={topics} total={10} />)
 
-    const topicSelect = screen
-      .getAllByRole('combobox')
-      .find((el) => Array.from(el.querySelectorAll('option')).some((o) => o.value === 'react'))
+    const topicSelect = screen.getByRole('combobox', { name: 'Тема' })
     expect(topicSelect, 'нет выбора темы').toBeDefined()
-    await user.selectOptions(topicSelect as HTMLElement, 'react')
+    await user.selectOptions(topicSelect, 'react')
 
     expect(push).toHaveBeenCalled()
     expect(String(push.mock.calls[0][0])).toContain('topic=react')

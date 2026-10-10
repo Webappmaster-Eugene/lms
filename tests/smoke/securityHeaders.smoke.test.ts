@@ -55,7 +55,8 @@ describe('CSP: что разрешено', () => {
 
     expect(sources).not.toContain('*')
     expect(sources).not.toContain('https:')
-    expect(sources.every((s) => /^https:\/\/[a-z0-9.-]+$/.test(s))).toBe(true)
+    expect(sources).toContain("'self'")
+    expect(sources.every((s) => s === "'self'" || /^https:\/\/[a-z0-9.-]+$/.test(s))).toBe(true)
     expect(sources.length).toBeGreaterThan(2)
   })
 })

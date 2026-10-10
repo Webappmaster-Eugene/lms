@@ -1,0 +1,48 @@
+# Подключается явно: docker compose -f docker-compose.yml -f docker-compose.trainer-runtime.yml up -d
+# Job images заранее собираются: pnpm test:trainer-runtime --build
+services:
+  lms-mentor-app:
+    environment:
+      - TRAINER_RUNTIME_URL=http://lms-mentor-trainer-runtime:3100
+      - TRAINER_RUNTIME_TOKEN=${TRAINER_RUNTIME_TOKEN:?Set a shared runtime token of at least 32 characters}
+    networks:
+      - lms-trainer
+
+  lms-mentor-trainer-runtime:
+    build:
+      context: ./trainer-runtime
+      target: gateway
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      - TRAINER_RUNTIME_TOKEN=${TRAINER_RUNTIME_TOKEN:?Set a shared runtime token of at least 32 characters}
+      - TRAINER_GO_JOB_IMAGE=${TRAINER_GO_JOB_IMAGE:-lms-trainer-go:local}
+      - TRAINER_FRONTEND_JOB_IMAGE=${TRAINER_FRONTEND_JOB_IMAGE:-lms-trainer-frontend:local}
+      - TRAINER_NEXT_JOB_IMAGE=${TRAINER_NEXT_JOB_IMAGE:-lms-trainer-next:local}
+      - TRAINER_MAX_CONCURRENT=${TRAINER_MAX_CONCURRENT:-1}
+    # Только доверенный gateway имеет доступ к Docker; у приложения и решений socket отсутствует.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    networks: [lms-trainer]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/health',{headers:{authorization:'Bearer '+process.env.TRAINER_RUNTIME_TOKEN}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  lms-trainer:
+    internal: true

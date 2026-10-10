@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { Payload } from 'payload'
 import { interviewRequest } from '@/lib/trainer/interview-server'
+import { interviewStarter } from '@/lib/trainer/interview'
 import { createStudent, createSumTask, getTestPayload, login, rest } from './helpers/payload'
 
 let payload: Payload
@@ -10,7 +11,7 @@ let outsider: string
 let inactive: string
 const url = 'http://lms.test/api/trainer/interview'
 
-async function call(action: 'create' | 'read' | 'join' | 'update' | 'compile', auth?: string, token?: string, data?: object) {
+async function call(action: 'create' | 'read' | 'join' | 'update' | 'compile' | 'run', auth?: string, token?: string, data?: object) {
   const headers = new Headers()
   if (auth) headers.set('Authorization', `JWT ${auth}`)
   if (data) headers.set('Content-Type', 'application/json')
@@ -52,6 +53,7 @@ describe('совместное собеседование: настоящее х
     expect((await call('read', outsider, token)).status).toBe(403)
     expect((await call('update', outsider, token, { version: 1, code: 'foreign', language: 'js' })).status).toBe(403)
     expect((await call('compile', outsider, token, { code: 'const n: number = 1' })).status).toBe(403)
+    expect((await call('run', outsider, token, { code: interviewStarter('go'), language: 'go' })).status).toBe(403)
     expect((await call('join', guest, token, {})).status).toBe(200)
     const joined = await (await call('read', guest, token)).json()
     expect(joined.room.participants).toHaveLength(2)
@@ -97,6 +99,22 @@ describe('совместное собеседование: настоящее х
     expect((await call('join', outsider, token, {})).status).toBe(410)
     expect((await call('read', guest, token)).status).toBe(200)
     expect((await call('compile', guest, token, { code: 'const x = 1' })).status).toBe(410)
+    expect((await call('run', guest, token, { code: interviewStarter('go'), language: 'go' })).status).toBe(410)
+  })
+
+  it('сохраняет Go и frontend в общей комнате, не теряет версию при невалидном проекте', async () => {
+    const created = await call('create', owner, undefined, { language: 'go' })
+    expect(created.status).toBe(201)
+    const { room } = await created.json()
+    expect(room).toMatchObject({ language: 'go', code: expect.stringContaining('package main'), version: 1 })
+    const before = await payload.count({ collection: 'user-trainer-progress' })
+    expect((await call('update', owner, room.token, { version: 1, code: 'not JSON', language: 'react' })).status).toBe(400)
+    const reread = await (await call('read', owner, room.token)).json()
+    expect(reread.room).toMatchObject({ language: 'go', version: 1 })
+    const saved = await call('update', owner, room.token, { version: 1, code: interviewStarter('react'), language: 'react' })
+    expect(saved.status).toBe(200)
+    expect((await saved.json()).room).toMatchObject({ language: 'react', version: 2 })
+    expect((await payload.count({ collection: 'user-trainer-progress' })).totalDocs).toBe(before.totalDocs)
   })
 
   it('транспилирует TypeScript в существующем изолированном процессе, не пишет прогресс', async () => {

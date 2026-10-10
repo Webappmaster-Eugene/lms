@@ -1,0 +1,9 @@
+FROM mcr.microsoft.com/playwright:v1.58.2-noble
+WORKDIR /runtime
+COPY package.next.json ./package.json
+COPY package.next-lock.json ./package-lock.json
+RUN npm ci --omit=dev --ignore-scripts && chmod -R a+rX /runtime
+COPY next-worker.mjs native-style.mjs ./
+ENV HOME=/tmp NODE_ENV=development NEXT_TELEMETRY_DISABLED=1
+USER 10001:10001
+ENTRYPOINT ["/usr/bin/timeout", "--signal=KILL", "180s", "node", "/runtime/next-worker.mjs"]

@@ -232,3 +232,25 @@
 - Inter сохранён в public/fonts/inter без изменения файлов, с лицензией OFL;
   все7Unicode-subsets/метрики сохранены, preloads — RU/Latin, кеш immutable.
   Сборка больше не скачивает Google Fonts. Источник: `docs/font-assets.md`.
+
+## Go и frontend в тренажёре (2026-10-10)
+
+- Go (`program`) и HTML/CSS, React, Next.js (`dom`) исполняются через отдельный
+  доверенный `trainer-runtime/`; JS/TS сохраняют серверный V8-изолят. Job-контейнеры
+  без сети, секретов LMS и Docker socket; Next-сервер и браузер проверки разделены.
+  Подключение требует runtime URL/token, готовых образов и публикации новых задач;
+  локальная реализация сама не включает эти режимы на проде. Источник:
+  `docs/trainer-runtime.md`, `docker-compose.trainer-runtime.yml`.
+- Скрытые runtime-кейсы и эталоны закрыты Payload field access. Публичный запуск
+  и предпросмотр не начисляют прогресс; серверная отправка использует канонические
+  проверки. Схема расширена миграцией `20261010_064516_trainer_go_frontend`.
+  Источник: `TrainerTasks.ts`, `trainerRuntimeSchema.test.ts`, `docs/trainer.md`.
+- `pnpm test:trainer-runtime --build` собирает job-образы и реально проверяет Go,
+  браузер, Next.js, изоляцию и все 6 новых каталожных задач. Повторный запуск без
+  `--build` использует готовые образы; ошибки инфраструктуры не считаются успехом.
+  Источник: `scripts/test-trainer-runtime.mjs`, `tests/runtime/`.
+- Клиентский JS исполняется в Worker внутри opaque sandbox iframe, поэтому
+  бесконечный цикл прерывается без блокировки UI. Monaco загружает React typings
+  лениво с собственного домена; ассеты генерирует `scripts/copy-monaco.mjs`.
+  Подсветка Markdown использует общий ленивый Shiki. Источник: `useCodeRunner.ts`,
+  `MonacoCodeEditor.tsx`, `src/lib/markdown-highlighter.ts`.

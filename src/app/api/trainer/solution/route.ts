@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
+import { parseFrontendFiles } from '@/lib/trainer/runtime-spec'
 import type { SolutionResponse } from '@/lib/trainer/api'
 import { parseTaskId } from '@/lib/trainer/task-id'
 import { getTrainerAccess } from '@/server/trainer-access'
@@ -75,6 +76,8 @@ export async function GET(request: Request): Promise<Response> {
     solutionCode: task.solutionCode ?? null,
     solutionCodeTs: task.solutionCodeTs ?? null,
     solutionNotes: task.solutionNotes ?? null,
+    solutionCodeGo: task.solutionCodeGo ?? null,
+    solutionFiles: task.solutionFiles ? parseFrontendFiles(JSON.stringify(task.solutionFiles)) : null,
   }
 
   return NextResponse.json(response)

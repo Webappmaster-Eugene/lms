@@ -99,6 +99,19 @@ describe('браузерный прогон решения', () => {
       expect(srcdoc).not.toContain('function solve()')
       expect(srcdoc).toContain('atob(')
     })
+
+    it('iframe оставляет исполнение решения Worker и запрещает ему сетевые запросы', () => {
+      const { result } = renderHook(() => useCodeRunner())
+      act(() => { void result.current.run(SPEC) })
+      const document = frames()[0].srcdoc
+      expect(document).toContain('new Worker(url)')
+      expect(document).toContain('worker.terminate()')
+      expect(document).not.toContain('new Function(')
+      expect(document).toContain("default-src 'none'")
+      expect(document).toContain("worker-src blob:")
+      expect(document).toContain("connect-src 'none'")
+      expect(document).toContain("form-action 'none'")
+    })
   })
 
   describe('приём результата', () => {
@@ -211,7 +224,7 @@ describe('браузерный прогон решения', () => {
       expect(outcome.error).toMatch(/бесконечный цикл/i)
     })
 
-    it('зависший фрейм выбрасывается — синхронный цикл иначе не остановить', async () => {
+    it('резервный таймер удаляет фрейм, если bootstrap Worker не ответил', async () => {
       const { result } = renderHook(() => useCodeRunner())
 
       let run!: Promise<unknown>
@@ -243,6 +256,14 @@ describe('браузерный прогон решения', () => {
       expect(frames()).toHaveLength(0)
     })
 
+    it('отмена завершает Promise и не оставляет ожидающий интерфейс зависшим', async () => {
+      const { result } = renderHook(() => useCodeRunner())
+      let pending: Promise<unknown> | undefined
+      act(() => { pending = result.current.run(SPEC) })
+      act(() => result.current.cancel())
+      await expect(pending).resolves.toMatchObject({ status: 'error', error: 'Выполнение отменено' })
+    })
+
     it('повторный запуск не оставляет предыдущий фрейм', async () => {
       const { result } = renderHook(() => useCodeRunner())
 
@@ -256,6 +277,20 @@ describe('браузерный прогон решения', () => {
       })
 
       await waitFor(() => expect(frames()).toHaveLength(1))
+    })
+
+    it('повторный запуск отменяет ожидание первого, а новый принимает только свой ответ', async () => {
+      const { result } = renderHook(() => useCodeRunner())
+      let first: Promise<unknown> | undefined
+      let second: Promise<unknown> | undefined
+      act(() => { first = result.current.run(SPEC) })
+      const previousFrame = frames()[0]
+      act(() => { second = result.current.run(SPEC) })
+      await expect(first).resolves.toMatchObject({ status: 'error', error: 'Выполнение отменено' })
+      act(() => replyFrom(previousFrame, PASSED_PAYLOAD))
+      expect(frames()).toHaveLength(1)
+      act(() => replyFrom(frames()[0], PASSED_PAYLOAD))
+      await expect(second).resolves.toMatchObject({ status: 'passed' })
     })
 
     it('размонтирование компонента снимает фрейм и слушатель', async () => {

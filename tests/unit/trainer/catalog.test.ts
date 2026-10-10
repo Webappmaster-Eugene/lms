@@ -23,7 +23,8 @@ import type { TrainerLanguage, TrainerRunResult } from '@/lib/trainer/types'
  * наоборот, которая засчитывается сама по себе.
  */
 
-const entries = flattenCatalog(TRAINER_CATALOG)
+// Go/frontend исполняются отдельным обязательным pnpm test:trainer-runtime.
+const entries = flattenCatalog(TRAINER_CATALOG).filter(({ task }) => task.checkMode !== 'program' && task.checkMode !== 'dom')
 
 async function runSolutionOf(
   task: TrainerTaskSeed,

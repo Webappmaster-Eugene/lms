@@ -1,19 +1,18 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, ArrowRight, ChevronLeft } from 'lucide-react'
 
-import { getPayload } from '@/lib/payload'
+import { getTrainerTaskPage } from '@/server/trainer/task-page'
 import { TrainerWorkspace } from '@/components/trainer/TrainerWorkspace'
 import { BookmarkButton } from '@/components/bookmarks/BookmarkButton'
 import { findBookmarkId } from '@/lib/bookmarks'
 import { TaskSidePanel } from '@/components/trainer/TaskSidePanel'
-import { DIFFICULTY_LABELS, COMPANY_LABELS, TAG_LABELS } from '@/lib/trainer/constants'
+import { DIFFICULTY_LABELS, COMPANY_LABELS, TAG_LABELS, LANGUAGE_LABELS } from '@/lib/trainer/constants'
+import { isTrainerLanguage, runtimeCases } from '@/lib/trainer/runtime-spec'
 import { publicCases, normalizeCases, starterCodeFor, taskLanguages } from '@/lib/trainer/spec'
 import { lexicalToMarkdown } from '@/lib/lexical'
 import { cn } from '@/lib/utils'
-import { getTrainerAccess } from '@/server/trainer-access'
 import { collectAllPages } from '@/lib/paginate'
 import { nextUnsolvedTask } from '@/lib/trainer/next-task'
 import type { ClientProgress, ClientTaskSpec } from '@/lib/trainer/api'
@@ -32,64 +31,15 @@ const DIFFICULTY_CLASS: Record<TrainerDifficulty, string> = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { topicSlug, taskSlug } = await params
-  const payload = await getPayload()
-  const { user } = await payload.auth({ headers: await headers() })
-  const scope = await getTrainerAccess(payload, user)
-
-  // Условие совпадает с тем, по которому страница ищет задачу: иначе у
-  // несуществующего адреса вида /trainer/чужая-тема/задача заголовок
-  // подставлялся бы правильный, а страница отдавала 404.
-  const topics = await payload.find({
-    collection: 'trainer-topics',
-    where: { slug: { equals: topicSlug }, isPublished: { equals: true }, ...(scope.admin ? {} : { id: { in: scope.browseTopicIds.length ? scope.browseTopicIds : [-1] } }) },
-    limit: 1,
-    select: { slug: true },
-  })
-  const topic = topics.docs[0]
-  if (!topic) return { title: 'Задача' }
-
-  const tasks = await payload.find({
-    collection: 'trainer-tasks',
-    where: {
-      slug: { equals: taskSlug },
-      topic: { equals: topic.id },
-      isPublished: { equals: true },
-      ...(scope.admin ? {} : { id: { in: scope.accessibleTaskIds.length ? scope.accessibleTaskIds : [-1] } }),
-    },
-    limit: 1,
-    select: { title: true },
-  })
-
-  return { title: tasks.docs[0]?.title ?? 'Задача' }
+  const data = await getTrainerTaskPage(topicSlug, taskSlug)
+  return { title: data?.task.title ?? 'Задача' }
 }
 
 export default async function TaskPage({ params }: Props) {
   const { topicSlug, taskSlug } = await params
-  const payload = await getPayload()
-  const headersList = await headers()
-  const { user } = await payload.auth({ headers: headersList })
-  const scope = await getTrainerAccess(payload, user)
-
-  const topics = await payload.find({
-    collection: 'trainer-topics',
-    where: { slug: { equals: topicSlug }, isPublished: { equals: true }, ...(scope.admin ? {} : { id: { in: scope.browseTopicIds.length ? scope.browseTopicIds : [-1] } }) },
-    limit: 1,
-  })
-  const topic = topics.docs[0]
-  if (!topic) notFound()
-
-  const tasks = await payload.find({
-    collection: 'trainer-tasks',
-    where: {
-      slug: { equals: taskSlug },
-      topic: { equals: topic.id },
-      isPublished: { equals: true },
-      ...(scope.admin ? {} : { id: { in: scope.accessibleTaskIds.length ? scope.accessibleTaskIds : [-1] } }),
-    },
-    limit: 1,
-  })
-  const task = tasks.docs[0]
-  if (!task) notFound()
+  const data = await getTrainerTaskPage(topicSlug, taskSlug)
+  if (!data) notFound()
+  const { payload, user, scope, topic, task } = data
 
   // Соседи по теме — для навигации «предыдущая / следующая».
   const siblings = await collectAllPages(
@@ -156,7 +106,7 @@ export default async function TaskPage({ params }: Props) {
         attempts: record.attempts ?? 0,
         failedAttempts: record.failedAttempts ?? 0,
         savedCode: record.userCode ?? null,
-        savedLanguage: record.language === 'ts' ? 'ts' : record.language === 'js' ? 'js' : null,
+        savedLanguage: isTrainerLanguage(record.language) ? record.language : null,
       }
     }
   }
@@ -165,8 +115,9 @@ export default async function TaskPage({ params }: Props) {
   const starters: Partial<Record<TrainerLanguage, string>> = {}
   for (const language of languages) starters[language] = starterCodeFor(task, language)
 
-  const allCases = safeCases(task)
-  const visibleCases = publicCases(task)
+  const allCases = task.checkMode === 'unit' ? safeCases(task) : []
+  const visibleCases = task.checkMode === 'unit' ? publicCases(task) : []
+  const usesRuntime = task.checkMode === 'program' || task.checkMode === 'dom'
 
   const clientTask: ClientTaskSpec = {
     id: String(task.id),
@@ -180,7 +131,8 @@ export default async function TaskPage({ params }: Props) {
     setupCode: task.setupCode ?? '',
     testCode: task.testCode ?? '',
     publicCases: visibleCases,
-    hiddenCaseCount: allCases.length - visibleCases.length,
+    runtimeCases: usesRuntime ? runtimeCases(task, true) : [],
+    hiddenCaseCount: usesRuntime ? (task.runtimeCases ?? []).filter((item) => item.hidden).length : allCases.length - visibleCases.length,
     timeLimitMs: task.timeLimitMs ?? 5000,
     starters,
     pointsReward: task.pointsReward ?? 10,
@@ -226,7 +178,7 @@ export default async function TaskPage({ params }: Props) {
             <span className="text-muted-foreground">+{clientTask.pointsReward} XP</span>
             {languages.map((language) => (
               <span key={language} className="rounded bg-muted px-1.5 py-0.5 text-muted-foreground">
-                {language === 'ts' ? 'TypeScript' : 'JavaScript'}
+                {LANGUAGE_LABELS[language]}
               </span>
             ))}
             {tags.map((tag) => (
@@ -281,6 +233,7 @@ export default async function TaskPage({ params }: Props) {
             descriptionMd={description}
             hints={hints}
             publicCases={visibleCases}
+            runtimeCases={clientTask.runtimeCases}
             hiddenCaseCount={clientTask.hiddenCaseCount}
             testCode={clientTask.testCode}
             entryName={clientTask.entryName}

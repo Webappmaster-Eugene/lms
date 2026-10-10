@@ -2,6 +2,8 @@
  * Контракты HTTP-эндпоинтов тренажёра — общие для клиента и сервера.
  */
 
+import type { RuntimeCase } from './runtime-spec'
+
 import type {
   TrainerCaseSpec,
   TrainerCheckMode,
@@ -33,6 +35,7 @@ export type ClientTaskSpec = {
   hiddenCaseCount: number
   timeLimitMs: number
   starters: Partial<Record<TrainerLanguage, string>>
+  runtimeCases?: RuntimeCase[]
   pointsReward: number
 }
 
@@ -73,6 +76,8 @@ export type SolutionResponse = {
   solutionCode: string | null
   solutionCodeTs: string | null
   solutionNotes: string | null
+  solutionCodeGo?: string | null
+  solutionFiles?: Record<string, string> | null
 }
 
 export type ApiError = { error: string }

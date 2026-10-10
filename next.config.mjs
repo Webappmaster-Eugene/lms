@@ -91,7 +91,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data:",
-              "frame-src https://miro.com https://www.youtube.com https://youtube.com",
+              "frame-src 'self' https://miro.com https://www.youtube.com https://youtube.com",
               "connect-src 'self'",
               // blob: нужен плееру MPEG-TS: mpegts.js отдаёт видео через MediaSource,
               // а его поток адресуется blob-ссылкой

@@ -39,58 +39,81 @@ function encodeSource(source: string): string {
   return btoa(binary)
 }
 
-function buildSrcdoc(encodedSource: string): string {
-  // Скрипт декодирует исходник и исполняет его как тело функции. Сам исходник
-  // в разметку не попадает — только base64, поэтому экранировать нечего.
-  const bootstrap = `(function () {
+function buildSrcdoc(encodedSource: string, timeLimitMs: number): string {
+  const workerSource = `(function () {
+  var send = self.postMessage.bind(self);
   function decode(value) {
     var binary = atob(value);
     var bytes = new Uint8Array(binary.length);
     for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     return new TextDecoder().decode(bytes);
   }
-  function reply(payload) {
-    parent.postMessage({ type: 'trainer-result', payload: payload }, '*');
+  function fail(status, error) {
+    send({
+      status: status, tests: [], passedCount: 0, totalCount: 0, consoleOutput: [],
+      error: (error && error.name ? error.name + ': ' : '') + (error && error.message ? error.message : String(error)), totalMs: 0
+    });
   }
-  var source = decode('${encodedSource}');
   var result;
   try {
-    result = new Function(source)();
+    result = new Function(decode('${encodedSource}'))();
   } catch (error) {
-    reply({
-      status: 'compile_error',
-      tests: [],
-      passedCount: 0,
-      totalCount: 0,
-      consoleOutput: [],
-      error: (error && error.name ? error.name + ': ' : '') + (error && error.message ? error.message : String(error)),
-      totalMs: 0
-    });
+    fail('compile_error', error);
     return;
   }
-  Promise.resolve(result).then(reply, function (error) {
-    reply({
-      status: 'error',
-      tests: [],
-      passedCount: 0,
-      totalCount: 0,
-      consoleOutput: [],
-      error: error && error.message ? error.message : String(error),
-      totalMs: 0
-    });
+  Promise.resolve(result).then(send, function (error) { fail('error', error); });
+})();`
+  // В основном потоке фрейма работает только bootstrap. Цикл в решении
+  // занимает поток Worker и не блокирует ни интерфейс, ни таймер отмены.
+  const bootstrap = `(function () {
+  var worker, timer, url, finished = false;
+  function reply(payload) {
+    if (finished) return;
+    finished = true;
+    clearTimeout(timer);
+    if (worker) worker.terminate();
+    if (url) URL.revokeObjectURL(url);
+    parent.postMessage({ type: 'trainer-result', payload: payload }, '*');
+  }
+  function fail(status, message) {
+    reply({ status: status, tests: [], passedCount: 0, totalCount: 0, consoleOutput: [], error: message, totalMs: 0 });
+  }
+  function cleanup() {
+    finished = true;
+    clearTimeout(timer);
+    if (worker) worker.terminate();
+    if (url) URL.revokeObjectURL(url);
+  }
+  addEventListener('pagehide', cleanup);
+  addEventListener('message', function (event) {
+    if (event.source === parent && event.data && event.data.type === 'trainer-cancel') cleanup();
   });
+  try {
+    var binary = atob('${encodeSource(workerSource)}');
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    url = URL.createObjectURL(new Blob([bytes], { type: 'text/javascript' }));
+    worker = new Worker(url);
+    worker.onmessage = function (event) { reply(event.data); };
+    worker.onerror = function (event) { event.preventDefault(); fail('error', event.message || 'Не удалось выполнить код в Worker'); };
+    timer = setTimeout(function () {
+      fail('timeout', 'Превышен лимит времени (${timeLimitMs} мс). Похоже на бесконечный цикл.');
+    }, ${timeLimitMs});
+  } catch (error) {
+    fail('error', error && error.message ? error.message : String(error));
+  }
 })();`
 
-  // Закрывающий тег собирается конкатенацией: иначе он закрыл бы <script> в том
-  // документе, в который бандлер может встроить этот модуль.
   const closeScript = `</${'script'}>`
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><script>${bootstrap}${closeScript}</body></html>`
+  const policy = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; worker-src blob:; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${policy}"></head><body><script>${bootstrap}${closeScript}</body></html>`
 }
 
 export function useCodeRunner(): CodeRunner {
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const listenerRef = useRef<((event: MessageEvent) => void) | null>(null)
+  const resolveRef = useRef<((result: TrainerRunResult) => void) | null>(null)
 
   const cancel = useCallback(() => {
     if (timerRef.current) {
@@ -102,11 +125,13 @@ export function useCodeRunner(): CodeRunner {
       listenerRef.current = null
     }
     if (iframeRef.current) {
-      // Синхронный бесконечный цикл таймером не прервать: единственный способ
-      // остановить фрейм — выбросить его из документа.
+      iframeRef.current.contentWindow?.postMessage({ type: 'trainer-cancel' }, '*')
       iframeRef.current.remove()
       iframeRef.current = null
     }
+    const resolve = resolveRef.current
+    resolveRef.current = null
+    resolve?.(failureResult('error', 'Выполнение отменено'))
   }, [])
 
   useEffect(() => cancel, [cancel])
@@ -128,6 +153,7 @@ export function useCodeRunner(): CodeRunner {
       }
 
       return new Promise<TrainerRunResult>((resolve) => {
+        resolveRef.current = resolve
         const iframe = document.createElement('iframe')
         iframe.sandbox.add('allow-scripts')
         iframe.setAttribute('aria-hidden', 'true')
@@ -135,6 +161,8 @@ export function useCodeRunner(): CodeRunner {
         iframeRef.current = iframe
 
         const settle = (result: TrainerRunResult) => {
+          if (iframeRef.current !== iframe) return
+          resolveRef.current = null
           cancel()
           resolve(result)
         }
@@ -160,7 +188,7 @@ export function useCodeRunner(): CodeRunner {
           )
         }, spec.timeLimitMs + HOST_TIMEOUT_OVERHEAD_MS)
 
-        iframe.srcdoc = buildSrcdoc(encodeSource(composed.source))
+        iframe.srcdoc = buildSrcdoc(encodeSource(composed.source), spec.timeLimitMs)
         document.body.appendChild(iframe)
       })
     },

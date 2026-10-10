@@ -7,6 +7,7 @@
  * доезжает — сборка падает раньше.
  */
 
+import type { RuntimeCase } from '@/lib/trainer/runtime-spec'
 import { toArgsLiteral, toLiteral } from '@/lib/trainer/literal'
 import type { TrainerCompany, TrainerTag, TrainerTopicCategory } from '@/lib/trainer/constants'
 import type {
@@ -51,8 +52,13 @@ export type TrainerTaskSeed = {
   setupTypes?: string
   starterCode: string
   starterCodeTs?: string
+  starterCodeGo?: string
+  starterFiles?: Record<string, string>
+  solutionFiles?: Record<string, string>
+  runtimeCases?: RuntimeCase[]
   solutionCode: string
   solutionCodeTs?: string
+  solutionCodeGo?: string
   solutionNotes?: string
   cases?: TrainerCaseInput[]
   testCode?: string

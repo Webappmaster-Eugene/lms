@@ -7,15 +7,17 @@
  */
 
 /** Язык, на котором пользователь решает задачу. */
-export type TrainerLanguage = 'js' | 'ts'
+export type TrainerLanguage = 'js' | 'ts' | 'go' | 'html' | 'react' | 'next'
 
 /**
  * Способ проверки решения.
  * - `stdout` — легаси: сравнение вывода console.log с эталонной строкой.
  * - `unit`   — прогон тестов (табличных и/или написанных на API харнесса).
  * - `types`  — задача на систему типов TypeScript: проверяется только tsc.
+ * - `program` — Go: stdin/stdout в контейнере.
+ * - `dom` — frontend: браузерные действия и свойства элементов.
  */
-export type TrainerCheckMode = 'stdout' | 'unit' | 'types'
+export type TrainerCheckMode = 'stdout' | 'unit' | 'types' | 'program' | 'dom'
 
 export type TrainerDifficulty = 'easy' | 'medium' | 'hard'
 

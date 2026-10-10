@@ -1,8 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
+import { CustomProgramCases } from './CustomProgramCases'
+import { isTrainerLanguage, isFrontendLanguage, isRuntimeLanguage } from '@/lib/trainer/runtime-spec'
+import type { RuntimeCase } from '@/lib/trainer/runtime-spec'
 import { ArrowRight, Play, RotateCcw, Send, Trophy } from 'lucide-react'
 
 import { CodeEditor } from './CodeEditor'
@@ -23,10 +27,10 @@ import type { TrainerCaseSpec, TrainerDiagnostic, TrainerLanguage, TrainerRunRes
  * Рабочая область решения задачи.
  *
  * Две кнопки с разной природой:
- *   «Запустить» — прогон в браузерной песочнице по публичным тестам. Быстро,
- *                 бесплатно, ничего не сохраняет.
- *   «Отправить» — сервер пересобирает скрипт из своей копии задачи, гоняет
- *                 полный набор тестов (включая скрытые) в V8-изоляте и только
+ *   «Запустить» — публичные тесты и предпросмотр, без сохранения прогресса.
+ *                 JS/TS — Worker, Go/frontend — отдельная среда выполнения.
+ *   «Отправить» — сервер берёт полный набор тестов (включая скрытые)
+ *                 и проверяет решение в соответствующей песочнице. Только
  *                 по своему вердикту пишет прогресс и начисляет баллы.
  */
 
@@ -38,6 +42,8 @@ type TrainerWorkspaceProps = {
   /** Куда вернуться, когда в теме решено всё. */
   topicHref?: string
 }
+
+const FrontendEditor = dynamic(() => import('./FrontendEditor').then((module) => module.FrontendEditor), { loading: () => <p role="status">Загружаем файлы проекта…</p> })
 
 /**
  * Заглушка для локального прогона задач, которые сверяются с эталонным выводом.
@@ -71,7 +77,13 @@ function writeDraft(taskId: string, language: TrainerLanguage, code: string): vo
   }
 }
 
-export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }: TrainerWorkspaceProps) {
+export function TrainerWorkspace(props: TrainerWorkspaceProps) {
+  return <TrainerWorkspaceSession key={props.task.id} {...props} />
+}
+
+function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }: TrainerWorkspaceProps) {
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const router = useRouter()
   const pathname = usePathname()
   const search = useSearchParams()
@@ -84,10 +96,22 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
       : (task.languages[0] ?? 'js')
 
   const requestedLanguage = search.get('lang')
-  const language: TrainerLanguage = (requestedLanguage === 'js' || requestedLanguage === 'ts') && task.languages.includes(requestedLanguage) ? requestedLanguage : savedLanguage
+  const language: TrainerLanguage = isTrainerLanguage(requestedLanguage) && task.languages.includes(requestedLanguage) ? requestedLanguage : savedLanguage
   const [code, setCode] = useState<string>(
     () => (language === progress.savedLanguage ? progress.savedCode : null) ?? task.starters[language] ?? '',
   )
+  const [preview, setPreview] = useState<{ html?: string; previewPath?: string; leaseToken?: string } | null>(null)
+  useEffect(() => {
+    const token = preview?.leaseToken
+    const release = () => {
+      if (token) void fetch(`/api/trainer/preview-release/${encodeURIComponent(token)}`, { method: 'POST', keepalive: true, credentials: 'omit' }).catch(() => undefined)
+    }
+    window.addEventListener('pagehide', release)
+    return () => { window.removeEventListener('pagehide', release); release() }
+  }, [preview?.leaseToken])
+  const [previewSource, setPreviewSource] = useState('')
+  const [programTests, setProgramTests] = useState<{ taskId: string; cases: RuntimeCase[] }>({ taskId: task.id, cases: [] })
+  const programCases = useMemo(() => programTests.taskId === task.id ? programTests.cases : [], [programTests, task.id])
   const [result, setResult] = useState<TrainerRunResult | null>(null)
   const [origin, setOrigin] = useState<'client' | 'server' | null>(null)
   const [diagnostics, setDiagnostics] = useState<TrainerDiagnostic[]>([])
@@ -118,6 +142,7 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
     const restored = draft ?? (language === progress.savedLanguage ? progress.savedCode : null)
     setCode(restored ?? task.starters[language] ?? '')
     setResult(null)
+    setPreview(null)
     setOrigin(null)
     setDiagnostics([])
     setFocusLine(undefined)
@@ -143,8 +168,8 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
     if (!ready || busy || next === language) return
     // Смена языка может произойти раньше отложенной записи черновика.
     writeDraft(task.id, language, code)
-    router.push(queryHref(pathname, search.toString(), { lang: next }), { scroll: false })
-  }, [busy, code, language, ready, task.id, router, pathname, search])
+    window.history.pushState(null, '', queryHref(pathname, search.toString(), { lang: next }))
+  }, [busy, code, language, ready, task.id, pathname, search])
 
   /**
    * Готовит исполняемый JavaScript. Для TypeScript это делает сервер: тащить в
@@ -185,6 +210,28 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
     setFocusLine(undefined)
 
     try {
+      if (isRuntimeLanguage(language)) {
+        if (preview?.leaseToken) {
+          const released = await fetch(`/api/trainer/preview-release/${encodeURIComponent(preview.leaseToken)}`, { method: 'POST', credentials: 'omit' })
+          if (!released.ok) throw new Error('Не удалось закрыть предыдущий предпросмотр. Повторите запуск.')
+          setPreview(null)
+        }
+        const response = await fetch('/api/trainer/run', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+          body: JSON.stringify({ taskId: task.id, language, code, ...(language === 'go' ? { customCases: programCases } : {}) }),
+        })
+        const data = await response.json() as { result?: TrainerRunResult; preview?: { html?: string; previewPath?: string; leaseToken?: string }; error?: string }
+        if (!response.ok || !data.result) throw new Error(data.error ?? 'Не удалось запустить решение')
+        if (!mounted.current) {
+          if (data.preview?.leaseToken) void fetch(`/api/trainer/preview-release/${encodeURIComponent(data.preview.leaseToken)}`, { method: 'POST', keepalive: true, credentials: 'omit' }).catch(() => undefined)
+          return
+        }
+        setResult(data.result)
+        setDiagnostics([])
+        setPreview(data.preview ?? null)
+        setPreviewSource(code)
+        return
+      }
       const compiled = await prepareJavaScript(code)
       if (!compiled) return
 
@@ -247,7 +294,7 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
     } finally {
       setIsRunning(false)
     }
-  }, [busy, code, customCases, language, prepareJavaScript, ready, runner, task])
+  }, [busy, code, customCases, programCases, language, preview, prepareJavaScript, ready, runner, task])
 
   const handleSubmit = useCallback(async () => {
     if (!ready || busy || code.trim().length === 0) return
@@ -258,6 +305,11 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
     setFocusLine(undefined)
 
     try {
+      if (preview?.leaseToken) {
+        const released = await fetch(`/api/trainer/preview-release/${encodeURIComponent(preview.leaseToken)}`, { method: 'POST', credentials: 'omit' })
+        if (!released.ok) throw new Error('Не удалось закрыть предыдущий предпросмотр. Повторите отправку.')
+        setPreview(null)
+      }
       const response = await fetch('/api/trainer/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -303,10 +355,11 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
     } finally {
       setIsSubmitting(false)
     }
-  }, [busy, code, completed, language, ready, router, showToast, task.id])
+  }, [busy, code, completed, language, preview, ready, router, showToast, task.id])
 
   const handleReset = useCallback(() => {
     setCode(task.starters[language] ?? '')
+    setPreview(null)
     setResult(null)
     setDiagnostics([])
     setFocusLine(undefined)
@@ -387,8 +440,12 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
         </div>
       </div>
 
-      <div className="min-h-[320px] flex-1 overflow-hidden rounded-xl border border-border">
-        <CodeEditor
+      <div className="min-h-[320px] flex-1 overflow-auto rounded-xl border border-border">
+        {isFrontendLanguage(language) ? (
+          <FrontendEditor key={draftSlot} value={code} onChange={setCode} language={language}
+            readOnly={busy || !ready} previewHtml={preview?.html} previewUrl={preview?.previewPath}
+            onRun={handleRun} onSubmit={handleSubmit} />
+        ) : <CodeEditor
           value={code}
           onChange={setCode}
           language={language}
@@ -398,8 +455,12 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
           height="100%"
           onRun={handleRun}
           onSubmit={handleSubmit}
-        />
+        />}
       </div>
+
+      {isFrontendLanguage(language) && preview && previewSource !== code && <p className="text-xs text-muted-foreground">Код изменён. Нажмите «Запустить», чтобы обновить предпросмотр.</p>}
+      {language === 'next' && preview?.previewPath && <p className="text-xs text-muted-foreground">Предпросмотр действует недолго. Если он перестал отвечать, нажмите «Запустить» снова.</p>}
+      {isRuntimeLanguage(language) && <p className="text-xs text-muted-foreground">Первый запуск компилирует проект и может занять больше времени. «Запустить» не сохраняет прогресс; «Отправить» проверяет все тесты и засчитывает решение.</p>}
 
       {code.length > TRAINER_LIMITS.maxCodeLength * 0.9 && (
         <p className="text-xs text-warning">
@@ -417,9 +478,11 @@ export function TrainerWorkspace({ task, progress, nextTask = null, topicHref }:
       {hiddenNote && <p className="text-xs text-muted-foreground">{hiddenNote}</p>}
 
       {task.checkMode === 'unit' && task.entryName && (
-        <CustomTestCases cases={customCases} disabled={busy} entryName={task.entryName}
+        <CustomTestCases exampleCase={task.publicCases.find((item) => !item.hidden)} cases={customCases} disabled={busy} entryName={task.entryName}
           onChange={(cases) => setCustomTests({ taskId: task.id, cases })} />
       )}
+
+      {language === 'go' && <CustomProgramCases exampleCase={task.runtimeCases?.find((item) => !item.hidden)} cases={programCases} disabled={busy} onChange={(cases) => setProgramTests({ taskId: task.id, cases })} />}
 
       {/* Решено — следующий шаг сразу под результатом, а не кнопкой «Далее» в шапке. */}
       {completed && !busy && (nextTask || topicHref) && (

@@ -3,6 +3,9 @@ import 'server-only'
 import { composeScript } from '@/lib/trainer/compose'
 import { TRAINER_LIMITS } from '@/lib/trainer/constants'
 import { failureResult, normalizeRunResult } from '@/lib/trainer/result'
+import { isRuntimeLanguage, parseFrontendFiles, runtimeCases } from '@/lib/trainer/runtime-spec'
+import { runRuntime } from './runtime'
+import { TrainerSpecError } from '@/lib/trainer/spec'
 import { buildExecSpec, type TrainerTaskLike } from '@/lib/trainer/spec'
 
 import type { TrainerDiagnostic, TrainerLanguage, TrainerRunResult } from '@/lib/trainer/types'
@@ -124,6 +127,18 @@ export async function runSolution(
       'error',
       `Решение длиннее ${TRAINER_LIMITS.maxCodeLength} символов — сократите его`,
     )
+  }
+
+  if (isRuntimeLanguage(language)) {
+    if ((language === 'go' && task.checkMode !== 'program') || (language !== 'go' && task.checkMode !== 'dom')) {
+      throw new TrainerSpecError('Язык решения не соответствует режиму проверки задачи')
+    }
+    if (language !== 'go') parseFrontendFiles(code)
+    const cases = runtimeCases(task)
+    if (!cases.length || cases.some((item) => language === 'go' ? item.expected === undefined : !item.checks?.some((check) => check.text !== undefined || check.count !== undefined || check.visible !== undefined || check.css !== undefined || check.attribute !== undefined))) {
+      throw new TrainerSpecError('Для задачи нужны проверки с ожидаемым результатом')
+    }
+    return runRuntime({ language, code, cases, timeLimitMs: Math.min(Math.max(task.timeLimitMs ?? 5000, 500), TRAINER_LIMITS.maxTimeLimitMs) })
   }
 
   const checkMode = task.checkMode === 'unit' || task.checkMode === 'types' ? task.checkMode : 'stdout'

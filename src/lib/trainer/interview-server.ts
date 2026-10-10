@@ -15,11 +15,16 @@ import { starterCodeFor, taskLanguages } from '@/lib/trainer/spec'
 import { parseTaskId } from '@/lib/trainer/task-id'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
 import { compileTypeScript } from '@/server/trainer/sandbox'
-import { InterviewError, interviewBody, interviewCode, interviewLanguage, interviewVersion, validRoomToken, type InterviewParticipant, type InterviewRoom } from './interview'
+import { TrainerRunnerError } from '@/server/trainer/pool'
+import { previewRuntime, runRuntime } from '@/server/trainer/runtime'
+import { isFrontendLanguage, isRuntimeLanguage } from './runtime-spec'
+import type { TrainerLanguage } from './types'
+import { InterviewError, interviewBody, interviewCode, interviewLanguage, interviewStarter, interviewVersion, validRoomToken, type InterviewParticipant, type InterviewRoom } from './interview'
 
 const creates = createRateLimiter('interview-create', 10, 60_000)
 const writes = createRateLimiter('interview-write', 120, 60_000)
 const compiles = createRateLimiter('interview-compile', 30, 60_000)
+const runs = createRateLimiter('interview-run', 10, 60_000)
 const MAX_MEMBERS = 8
 
 type Executor = { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }
@@ -123,7 +128,7 @@ async function lockRoom(req: PayloadRequest, id: number): Promise<void> {
   await db.execute(sql`select id from interview_rooms where id = ${id} for update`)
 }
 
-type Action = 'create' | 'read' | 'join' | 'update' | 'compile'
+type Action = 'create' | 'read' | 'join' | 'update' | 'compile' | 'run'
 
 async function executeInterviewRequest(request: Request, action: Action, token?: string): Promise<Response> {
   const payload = await getPayload({ config })
@@ -151,8 +156,8 @@ async function executeInterviewRequest(request: Request, action: Action, token?:
       let descriptionMd = ''
       let setupCode = ''
       let setupTypes = ''
-      let code = '// Обсудите условие и напишите решение\nconsole.log("Готов к собеседованию")\n'
-      let language: 'js' | 'ts' = 'js'
+      let language: TrainerLanguage = input.language === undefined ? 'js' : interviewLanguage(input.language)
+      let code = interviewStarter(language)
       if (taskId !== null) {
         if (!trainerScope.canAccessTask(taskId)) throw new InterviewError('Доступ к задаче не назначен', 403)
         const found = await payload.find({ collection: 'trainer-tasks', where: { id: { equals: taskId }, isPublished: { equals: true } }, limit: 1, depth: 0, overrideAccess: false, user })
@@ -167,6 +172,7 @@ async function executeInterviewRequest(request: Request, action: Action, token?:
         setupCode = task.setupCode ?? ''
         setupTypes = task.setupTypes ?? ''
       }
+      interviewCode(code, language)
       req = await createLocalReq({ user }, payload)
       if (!await initTransaction(req)) throw new Error('Could not start interview transaction')
       await lockLearningAccess(req, user.id)
@@ -194,10 +200,25 @@ async function executeInterviewRequest(request: Request, action: Action, token?:
     if (action === 'compile') {
       assertMember(room, user)
       assertOpen(room)
+      if (input.language !== undefined && interviewLanguage(input.language) !== 'ts') throw new InterviewError('Компиляция доступна только для TypeScript')
       const code = interviewCode(input.code)
       if (!compiles.take(String(user.id))) throw new InterviewError('Слишком много запусков. Подождите минуту', 429)
       const result = await compileTypeScript({ code, setupCode: room.setupTypes?.trim() || room.setupCode || '', typeHarness: '', checkTypes: true })
       return Response.json({ js: result.js, diagnostics: result.diagnostics })
+    }
+    if (action === 'run') {
+      assertMember(room, user)
+      assertOpen(room)
+      const language = interviewLanguage(input.language ?? room.language)
+      if (!isRuntimeLanguage(language)) throw new InterviewError('JavaScript и TypeScript запускаются в браузере')
+      const code = interviewCode(input.code, language)
+      if (!runs.take(String(user.id))) throw new InterviewError('Слишком много запусков. Подождите минуту', 429)
+      if (isFrontendLanguage(language)) {
+        const preview = await previewRuntime({ language, code, timeLimitMs: 5000 })
+        return Response.json({ preview })
+      }
+      const result = await runRuntime({ language, code, cases: [], timeLimitMs: 5000, allowNoTests: true })
+      return Response.json({ result })
     }
     if (!writes.take(String(user.id))) throw new InterviewError('Слишком много изменений. Подождите минуту', 429)
     req = await createLocalReq({ user }, payload)
@@ -228,9 +249,10 @@ async function executeInterviewRequest(request: Request, action: Action, token?:
         req = undefined
         return Response.json({ error: 'Код изменён другим участником. Выберите, какую версию сохранить', room: clientRoom(room) }, { status: 409 })
       }
+      const language = input.end === true ? room.language : interviewLanguage(input.language)
       const data = input.end === true
         ? { endedAt: new Date().toISOString(), version: version + 1 }
-        : { code: interviewCode(input.code), language: interviewLanguage(input.language), version: version + 1 }
+        : { code: interviewCode(input.code, language), language, version: version + 1 }
       room = await payload.update({ collection: 'interview-rooms', id: room.id, data, req, depth: 0, overrideAccess: true })
     }
     await commitTransaction(req)
@@ -239,6 +261,7 @@ async function executeInterviewRequest(request: Request, action: Action, token?:
   } catch (error) {
     if (req) await killTransaction(req)
     if (error instanceof InterviewError) return Response.json({ error: error.message }, { status: error.status })
+    if (error instanceof TrainerRunnerError) return Response.json({ error: error.message }, { status: 503 })
     payload.logger.error({ msg: 'Interview room request failed', error: error instanceof Error ? error.name : 'UnknownError' })
     return Response.json({ error: 'Комната временно недоступна. Повторите попытку' }, { status: 503 })
   }

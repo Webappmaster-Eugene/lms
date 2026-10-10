@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
+import { readTrainerBody, TrainerInputError } from '@/lib/trainer/request-body'
 import { TRAINER_LIMITS } from '@/lib/trainer/constants'
 import { supportsLanguage } from '@/lib/trainer/spec'
 import type { TrainerDiagnostic } from '@/lib/trainer/types'
@@ -39,15 +40,9 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ error: 'Требуется авторизация' }, { status: 401 })
   }
 
-  let body: { taskId?: unknown; code?: unknown }
-  try {
-    const input: unknown = await request.json()
-    if (!input || typeof input !== 'object' || Array.isArray(input)) {
-      return NextResponse.json({ error: 'Ожидается объект JSON' }, { status: 400 })
-    }
-    body = input
-  } catch {
-    return NextResponse.json({ error: 'Невалидный JSON' }, { status: 400 })
+  let body: Record<string, unknown>
+  try { body = await readTrainerBody(request) } catch (error) {
+    return NextResponse.json({ error: error instanceof TrainerInputError ? error.message : 'Не удалось прочитать запрос' }, { status: error instanceof TrainerInputError ? error.status : 400 })
   }
 
   const taskId = parseTaskId(body.taskId)

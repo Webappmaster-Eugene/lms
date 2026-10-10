@@ -17,23 +17,37 @@ export type SelectOption<T extends string> = { readonly label: string; readonly 
 export const LANGUAGE_OPTIONS: ReadonlyArray<SelectOption<TrainerLanguage>> = [
   { label: 'JavaScript', value: 'js' },
   { label: 'TypeScript', value: 'ts' },
+  { label: 'Go', value: 'go' },
+  { label: 'HTML / CSS', value: 'html' },
+  { label: 'React', value: 'react' },
+  { label: 'Next.js', value: 'next' },
 ] as const
 
 export const LANGUAGE_LABELS: Readonly<Record<TrainerLanguage, string>> = {
   js: 'JavaScript',
   ts: 'TypeScript',
+  go: 'Go',
+  html: 'HTML / CSS',
+  react: 'React',
+  next: 'Next.js',
 }
 
 /** Идентификатор языка для Monaco и Shiki. */
 export const MONACO_LANGUAGE: Readonly<Record<TrainerLanguage, string>> = {
   js: 'javascript',
   ts: 'typescript',
+  go: 'go',
+  html: 'html',
+  react: 'typescript',
+  next: 'typescript',
 }
 
 export const CHECK_MODE_OPTIONS: ReadonlyArray<SelectOption<TrainerCheckMode>> = [
   { label: 'Сравнение вывода (легаси)', value: 'stdout' },
   { label: 'Юнит-тесты', value: 'unit' },
   { label: 'Проверка типов TypeScript', value: 'types' },
+  { label: 'Go: ввод и вывод программы', value: 'program' },
+  { label: 'Frontend: проверки в браузере', value: 'dom' },
 ] as const
 
 export const DIFFICULTY_OPTIONS: ReadonlyArray<SelectOption<TrainerDifficulty>> = [
@@ -147,6 +161,8 @@ export const TOPIC_CATEGORIES = [
   'companies',
   'patterns',
   'webapi',
+  'go',
+  'frontend',
 ] as const
 
 export type TrainerTopicCategory = (typeof TOPIC_CATEGORIES)[number]
@@ -159,6 +175,8 @@ export const TOPIC_CATEGORY_LABELS: Readonly<Record<TrainerTopicCategory, string
   companies: 'Задачи компаний',
   patterns: 'Паттерны',
   webapi: 'Web API',
+  go: 'Go',
+  frontend: 'HTML, CSS, React и Next.js',
 }
 
 export const TOPIC_CATEGORY_OPTIONS: ReadonlyArray<SelectOption<TrainerTopicCategory>> =
