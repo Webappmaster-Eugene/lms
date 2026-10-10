@@ -102,7 +102,7 @@ describe('совместное собеседование: настоящее х
     expect((await call('run', guest, token, { code: interviewStarter('go'), language: 'go' })).status).toBe(410)
   })
 
-  it('сохраняет Go и frontend в общей комнате, не теряет версию при невалидном проекте', async () => {
+  it('сохраняет Go, frontend и Python в общей комнате, не теряет версию при невалидном проекте', async () => {
     const created = await call('create', owner, undefined, { language: 'go' })
     expect(created.status).toBe(201)
     const { room } = await created.json()
@@ -114,6 +114,11 @@ describe('совместное собеседование: настоящее х
     const saved = await call('update', owner, room.token, { version: 1, code: interviewStarter('react'), language: 'react' })
     expect(saved.status).toBe(200)
     expect((await saved.json()).room).toMatchObject({ language: 'react', version: 2 })
+    const pythonCode = interviewStarter('python')
+    const python = await call('update', owner, room.token, { version: 2, code: pythonCode, language: 'python' })
+    expect(python.status).toBe(200)
+    const persisted = await (await call('read', owner, room.token)).json()
+    expect(persisted.room).toMatchObject({ language: 'python', code: pythonCode, version: 3 })
     expect((await payload.count({ collection: 'user-trainer-progress' })).totalDocs).toBe(before.totalDocs)
   })
 
@@ -148,7 +153,7 @@ describe('совместное собеседование: настоящее х
     }
     expect((await call('join', outsider, token, {})).status).toBe(409)
     expect((await call('update', author, token, { version: 1, code: 'x'.repeat(100_001), language: 'js' })).status).toBe(400)
-    expect((await call('update', author, token, { version: 1, code: '', language: 'python' })).status).toBe(400)
+    expect((await call('update', author, token, { version: 1, code: '', language: 'java' })).status).toBe(400)
     expect((await call('update', author, token, { version: 1, code: 'x'.repeat(160_000), language: 'js' })).status).toBe(413)
     for (let i = 0; i < 9; i++) expect((await call('create', author, undefined, {})).status).toBe(201)
     expect((await call('create', author, undefined, {})).status).toBe(429)
