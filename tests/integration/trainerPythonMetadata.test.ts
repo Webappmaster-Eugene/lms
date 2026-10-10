@@ -74,6 +74,22 @@ describe('Python и метаданные: настоящий REST и PostgreSQL'
     expect(current.interviewFormat).toBeNull()
   })
 
+  it('повторный аудит известной задачи учитывает JSONB и сохраняет заметку редактора без подтверждённого источника', async () => {
+    const admin = await createAdmin(payload)
+    const task = await createSumTask(payload, { slug: 'avito-event-bus', companies: ['avito', 'vk'], tags: [] })
+    const req = () => createLocalReq({ user: admin }, payload)
+    await backfillTrainerMetadata(await req(), false)
+    expect((await backfillTrainerMetadata(await req(), true)).changes.some((row) => row.id === task.id)).toBe(false)
+    const notes = [
+      { company: 'avito', kind: 'unverified', checkedAt: '2026-10-09', note: 'Редактор ещё проверяет эту историческую метку.' },
+      { company: 'vk', kind: 'unverified', checkedAt: '2026-10-09', note: 'Публичного подтверждения пока нет.' },
+    ]
+    await payload.update({ collection: 'trainer-tasks', id: task.id, data: { companyEvidence: notes } })
+    await backfillTrainerMetadata(await req(), false)
+    expect((await payload.findByID({ collection: 'trainer-tasks', id: task.id })).companyEvidence).toEqual(notes)
+    expect((await backfillTrainerMetadata(await req(), true)).changes.some((row) => row.id === task.id)).toBe(false)
+  })
+
   it('административный endpoint закрыт для гостя, ученика и чужого Origin', async () => {
     const request = (token?: string, origin = 'http://lms.test', body: unknown = { dryRun: true }) => new Request('http://lms.test/api/manage/trainer/metadata', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', ...(token ? { Authorization: `JWT ${token}` } : {}) }, body: JSON.stringify(body) })
     expect((await POST(request())).status).toBe(401)
@@ -86,5 +102,17 @@ describe('Python и метаданные: настоящий REST и PostgreSQL'
     expect(response.status).toBe(200)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     expect(await response.json()).toMatchObject({ dryRun: true, inspected: expect.any(Number) })
+  })
+
+  it('сохраняет источник CMS-задачи без отдельной метки компании и делает компанию доступной для фильтра', async () => {
+    const admin = await createAdmin(payload)
+    const evidence = [{ company: 'microsoft', kind: 'preparation', url: 'https://careers.microsoft.com/v2/global/en/hiring-tips/technical-interviewing', note: 'Источник уже сохранён редактором.', checkedAt: '2026-10-09' }]
+    const task = await createSumTask(payload, { companies: [], companyEvidence: evidence })
+    const req = () => createLocalReq({ user: admin }, payload)
+    await backfillTrainerMetadata(await req(), false)
+    const current = await payload.findByID({ collection: 'trainer-tasks', id: task.id })
+    expect(current.companies).toEqual(['microsoft'])
+    expect(current.companyEvidence).toEqual(evidence)
+    expect((await backfillTrainerMetadata(await req(), true)).changes.some((row) => row.id === task.id)).toBe(false)
   })
 })

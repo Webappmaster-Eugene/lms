@@ -30,12 +30,13 @@ function metadataSeed(task: MetadataTask, topic: TrainerTopic | undefined): Trai
     ...(task.interviewFormat ? { interviewFormat: task.interviewFormat } : {}),
     ...(task.recommendedMinutes != null ? { recommendedMinutes: task.recommendedMinutes } : {}),
   }
+  base.companies = [...new Set([...(base.companies ?? []), ...(base.companyEvidence ?? []).map((row) => row.company)])]
   if (known) {
     base.tags = [...new Set([...(base.tags ?? []), ...(known.tags ?? [])])]
     base.companies = [...new Set([...(base.companies ?? []), ...(known.companyEvidence ?? []).filter((row) => row.kind !== 'unverified').map((row) => row.company)])]
     base.companyEvidence = (base.companies ?? []).map((company) => {
       const current = base.companyEvidence?.find((row) => row.company === company)
-      const verified = known.companyEvidence?.find((row) => row.company === company)
+      const verified = known.companyEvidence?.find((row) => row.company === company && row.kind !== 'unverified')
       return current?.kind === 'unverified' ? verified ?? current : current ?? verified
     }).filter((row) => row !== undefined)
   }
