@@ -131,25 +131,42 @@ test('форма поддержки: кнопка неактивна до зап
 
 test('редактирование профиля: «О себе» сохраняется и видно в профиле', async ({ page }) => {
   const bio = `Люблю JavaScript ${Date.now()}`
-  // Форма подгружает текущий профиль уже после рендера — ждём, иначе он затрёт ввод.
-  const loaded = page.waitForResponse((r) => r.url().endsWith('/api/users/me'))
   await page.goto('/profile/edit')
-  await loaded
-  await page.locator('#bio').fill(bio)
-  await page.getByRole('button', { name: 'Сохранить' }).click()
-  await expect(page.getByText('Профиль обновлён. Перенаправление...')).toBeVisible()
+  await expect(page.getByLabel('Имя', { exact: true })).toHaveValue(USERS.doer.firstName)
+  const about = page.getByRole('textbox', { name: 'О себе', exact: true })
+  await expect(about).toBeEnabled()
+  await about.fill(bio)
+  await page.getByRole('button', { name: 'Сохранить профиль', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Профиль сохранён.' })).toBeVisible()
+  await expect(page).toHaveURL(/\/profile\/edit$/)
+
+  await page.reload()
+  await expect(about).toHaveValue(bio)
+  await page.getByRole('link', { name: 'Назад к профилю', exact: true }).click()
   await expect(page).toHaveURL(/\/profile$/)
-  await expect(page.getByText(bio)).toBeVisible()
+  await expect(page.getByText(bio, { exact: true })).toBeVisible()
 })
 
 test('студент может загрузить аватар в профиле', async ({ page }) => {
-  const loaded = page.waitForResponse((r) => r.url().endsWith('/api/users/me'))
   await page.goto('/profile/edit')
-  await loaded
+  await expect(page.getByLabel('Имя', { exact: true })).toHaveValue(USERS.doer.firstName)
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64')
-  await page.locator('input[type="file"]').setInputFiles({ name: 'avatar.png', mimeType: 'image/png', buffer: png })
-  await page.getByRole('button', { name: 'Сохранить' }).click()
-  await expect(page.getByText('Профиль обновлён. Перенаправление...')).toBeVisible({ timeout: 5000 })
+  await page.getByLabel('Изменить аватар', { exact: true }).setInputFiles({ name: 'avatar.png', mimeType: 'image/png', buffer: png })
+  const avatar = page.getByAltText('Ваш аватар', { exact: true })
+  await expect(avatar).toHaveAttribute('src', /^blob:/)
+  await page.getByRole('button', { name: 'Сохранить профиль', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Профиль сохранён.' })).toBeVisible()
+  await expect(page).toHaveURL(/\/profile\/edit$/)
+  await expect(avatar).toHaveAttribute('src', /\/api\/media\/file\//)
+  const savedUrl = await avatar.getAttribute('src')
+  if (!savedUrl) throw new Error('Сохранённый аватар не получил URL')
+
+  await page.reload()
+  await expect(avatar).toHaveAttribute('src', savedUrl)
+  await expect.poll(() => avatar.evaluate((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0)).toBe(true)
+  await page.getByRole('link', { name: 'Назад к профилю', exact: true }).click()
+  await expect(page).toHaveURL(/\/profile$/)
+  await expect(page.getByAltText('Аватар', { exact: true })).toHaveAttribute('src', savedUrl)
 })
 
 test('«?» открывает список горячих клавиш, кнопка в меню — тоже', async ({ page }) => {

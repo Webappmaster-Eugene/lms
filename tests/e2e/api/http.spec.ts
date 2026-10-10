@@ -11,25 +11,66 @@ import { APP_URL, storageStateOf } from '../fixtures/env'
 const PAGES = ['/login', '/forgot-password']
 
 test.describe('заголовки безопасности', () => {
+  function directive(csp: string | undefined, name: string): string[] {
+    const matches = (csp ?? '').split(';').map((part) => part.trim().split(/\s+/)).filter(([key]) => key === name)
+    expect(matches, `CSP: единственная директива ${name}`).toHaveLength(1)
+    return matches[0].slice(1)
+  }
+
+  function withoutThemeHints(headers: Record<string, string>, path: string) {
+    expect(headers['critical-ch'], path).toBeUndefined()
+    expect(headers['accept-ch'], path).toBeUndefined()
+    expect((headers.vary ?? '').split(',').map((value) => value.trim().toLowerCase()), path).not.toContain('sec-ch-prefers-color-scheme')
+  }
+
   for (const path of PAGES) {
-    test(`${path}: CSP, X-Frame-Options, nosniff, Referrer-Policy`, async ({ request }) => {
+    test(`${path}: CSP, X-Frame-Options, nosniff, Referrer-Policy без повторного Critical-CH запроса`, async ({ request }) => {
       const response = await request.get(path)
+      expect(response.status()).toBe(200)
       const headers = response.headers()
       expect(headers['x-frame-options']).toBe('DENY')
       expect(headers['x-content-type-options']).toBe('nosniff')
       expect(headers['referrer-policy']).toBe('no-referrer')
       const csp = headers['content-security-policy']
-      expect(csp).toContain("default-src 'self'")
-      expect(csp).toContain("connect-src 'self'")
-      expect(csp).toContain('frame-src https://miro.com')
+      expect(directive(csp, 'default-src')).toEqual(["'self'"])
+      expect(directive(csp, 'connect-src')).toEqual(["'self'"])
+      const frameSources = directive(csp, 'frame-src')
+      expect([...frameSources].sort()).toEqual(["'self'", 'https://miro.com', 'https://www.youtube.com', 'https://youtube.com'].sort())
+      expect(frameSources).not.toContain('*')
+      expect(frameSources).not.toContain('https:')
+      withoutThemeHints(headers, path)
     })
   }
 
-  test('админка тоже не встраивается во фрейм', async ({ request }) => {
-    const headers = (await request.get('/admin/login')).headers()
-    const protectedFromFraming =
-      headers['x-frame-options'] !== undefined || /frame-ancestors/.test(headers['content-security-policy'] ?? '')
-    expect(protectedFromFraming).toBe(true)
+  test('админка защищена от встраивания и сохраняет собственные подсказки темы', async ({ request }) => {
+    const response = await request.get('/admin/login')
+    expect(response.status()).toBe(200)
+    const headers = response.headers()
+    expect(headers['x-frame-options']).toBe('DENY')
+    expect(headers['x-content-type-options']).toBe('nosniff')
+    expect(directive(headers['content-security-policy'], 'frame-ancestors')).toEqual(["'none'"])
+    expect(headers['accept-ch']).toBe('Sec-CH-Prefers-Color-Scheme')
+    expect(headers['critical-ch']).toBe('Sec-CH-Prefers-Color-Scheme')
+    expect((headers.vary ?? '').split(',').map((value) => value.trim().toLowerCase())).toContain('sec-ch-prefers-color-scheme')
+  })
+
+  test('Monaco, шрифт и service worker сохраняют кеш и защиту без Critical-CH повторов', async ({ request }) => {
+    for (const { path, cache } of [
+      { path: '/monaco/vs/editor/editor.main.js', cache: 'public, max-age=3600, must-revalidate' },
+      { path: '/monaco/react-types.json', cache: 'public, max-age=3600, must-revalidate' },
+      { path: '/fonts/inter/e4af272ccee01ff0-s.p.woff2', cache: 'public, max-age=31536000, immutable' },
+      { path: '/sw.js', cache: 'no-cache, no-store, must-revalidate' },
+    ]) {
+      const response = await request.get(path)
+      expect(response.status(), path).toBe(200)
+      const headers = response.headers()
+      expect(headers['cache-control'], path).toBe(cache)
+      expect(headers['x-content-type-options'], path).toBe('nosniff')
+      expect(headers['x-frame-options'], path).toBe('DENY')
+      expect(directive(headers['content-security-policy'], 'connect-src'), path).toEqual(["'self'"])
+      if (path === '/sw.js') expect(headers['service-worker-allowed']).toBe('/')
+      withoutThemeHints(headers, path)
+    }
   })
 })
 
