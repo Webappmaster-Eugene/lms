@@ -38,13 +38,13 @@ beforeEach(() => {
   delete (globalThis as Record<symbol, unknown>)[Symbol.for('lms.trainer.rateLimit.interview-run')]
 })
 
-describe('собеседования Go и frontend', () => {
-  it('запускает Go один раз без тестов и без записи прогресса или комнаты', async () => {
-    const response = await request()
+describe('собеседования Go, Python и frontend', () => {
+  it.each(['go', 'python'] as const)('запускает %s один раз без тестов и без записи прогресса или комнаты', async (language) => {
+    const response = await request(language, interviewStarter(language))
     expect(response.status).toBe(200)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     expect(await response.json()).toMatchObject({ result: { consoleOutput: ['42'], tests: [], totalCount: 0 } })
-    expect(runRuntime).toHaveBeenCalledWith(expect.objectContaining({ language: 'go', cases: [], allowNoTests: true }))
+    expect(runRuntime).toHaveBeenCalledWith(expect.objectContaining({ language, cases: [], allowNoTests: true }))
     expect(create).not.toHaveBeenCalled()
     expect(update).not.toHaveBeenCalled()
   })
@@ -87,7 +87,7 @@ describe('собеседования Go и frontend', () => {
 
   it('не запускает невалидный проект, неизвестный язык и превышение rate limit', async () => {
     expect((await request('react', 'not JSON')).status).toBe(400)
-    expect((await request('python', '')).status).toBe(400)
+    expect((await request('java', '')).status).toBe(400)
     expect((await request('js', '')).status).toBe(400)
     for (let i = 0; i < 10; i++) expect((await request()).status).toBe(200)
     expect((await request()).status).toBe(429)
