@@ -19,6 +19,41 @@ interface PushPreferences {
   reminderHour: number
 }
 
+test('retries a native worker after an interrupted initial installation and network recovery without reload', async ({ page, context }) => {
+  let scriptRequests = 0
+  const response = await page.request.get('/sw.js')
+  expect(response.status()).toBe(200)
+  const source = await response.text()
+  await context.route('**/sw.js', async route => {
+    scriptRequests++
+    // Keep the native lifecycle and application worker; fail only its first install.
+    const interruption = "\nself.addEventListener('install', event => event.waitUntil(new Promise((resolve, reject) => setTimeout(() => reject(new Error('Interrupted precache')), 500))))"
+    await route.fulfill({ status: 200, contentType: 'application/javascript', body: source + (scriptRequests === 1 ? interruption : '') })
+  })
+  await page.addInitScript(() => {
+    localStorage.setItem('lms:pwa-install-explained:v1', 'seen')
+    const state = window as Window & { __initialWorkerState?: ServiceWorkerState }
+    const register = navigator.serviceWorker.register.bind(navigator.serviceWorker)
+    navigator.serviceWorker.register = async (...args) => {
+      const registration = await register(...args)
+      const worker = registration.installing
+      worker?.addEventListener('statechange', () => { state.__initialWorkerState = worker.state })
+      return registration
+    }
+  })
+  await page.goto('/')
+  await expect.poll(() => page.evaluate(() => (window as Window & { __initialWorkerState?: ServiceWorkerState }).__initialWorkerState)).toBe('redundant')
+  const offlineBanner = page.getByRole('status').filter({ hasText: 'Нет подключения' })
+  try {
+    await context.setOffline(true)
+    await expect(offlineBanner).toBeVisible()
+    await context.setOffline(false)
+    await expect.poll(() => page.evaluate(async () => Boolean((await navigator.serviceWorker.getRegistration())?.active)), { timeout: 30_000 }).toBe(true)
+    await expect(page.getByRole('status')).toHaveCount(0)
+    expect(scriptRequests).toBeGreaterThanOrEqual(2)
+  } finally { await context.setOffline(false) }
+})
+
 test('manifest and public PNG icons are installable resources with real pixel dimensions', async ({ page }) => {
   await page.goto('/')
   const manifestLink = page.locator('link[rel="manifest"]')

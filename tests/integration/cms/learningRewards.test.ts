@@ -186,6 +186,44 @@ describe('реальные автоматические награды и сер
     expect(certs.totalDocs).toBe(1)
   })
 
+  it('сбой сертификата роадмапа откатывает уже созданные награды курса и уведомления', async () => {
+    const user = await createStudent(payload)
+    const tree = await createCourseTree(payload, { lessons: 1 })
+    const hooks = payload.collections.certificates.config.hooks.beforeChange ??= []
+    const attempted: string[] = []
+    const failRoadmap: CollectionBeforeChangeHook = ({ data }) => {
+      if (data.user === user.id) {
+        attempted.push(data.type)
+        if (data.type === 'roadmap') throw new Error('roadmap-certificate-write-failure')
+      }
+      return data
+    }
+    hooks.push(failRoadmap)
+    try {
+      await expect(finish(user, tree.lessons[0].id)).rejects.toThrow('roadmap-certificate-write-failure')
+      expect(attempted).toEqual(['course', 'roadmap'])
+      expect(await count('user-progress', user.id)).toBe(0)
+      expect(await count('points-transactions', user.id)).toBe(0)
+      expect(await count('certificates', user.id)).toBe(0)
+      expect((await payload.count({ collection: 'notifications', where: { user: { equals: user.id } } })).totalDocs).toBe(0)
+      expect((await payload.findByID({ collection: 'users', id: user.id })).totalPoints).toBe(0)
+    } finally {
+      hooks.splice(hooks.indexOf(failRoadmap), 1)
+    }
+
+    await finish(user, tree.lessons[0].id)
+    expect(await count('user-progress', user.id)).toBe(1)
+    expect(await count('certificates', user.id)).toBe(2)
+    const bonuses = await payload.find({ collection: 'points-transactions', where: {
+      user: { equals: user.id }, reason: { in: ['course_completed', 'roadmap_completed'] },
+    }, sort: 'reason' })
+    expect(bonuses.docs.map(transaction => transaction.reason)).toEqual(['course_completed', 'roadmap_completed'])
+    const notices = await payload.find({ collection: 'notifications', where: {
+      user: { equals: user.id }, type: { in: ['course_completed', 'roadmap_completed'] },
+    }, sort: 'type' })
+    expect(notices.docs.map(notice => notice.type)).toEqual(['course_completed', 'roadmap_completed'])
+  })
+
   it('bootstrap повторяется, сохраняет ручные изменения и ничего не выдаёт ученикам', async () => {
     const user = await createStudent(payload)
     await bootstrapDefaultAchievements(payload)

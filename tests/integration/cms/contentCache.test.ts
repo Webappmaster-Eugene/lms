@@ -4,7 +4,7 @@ import { sql } from '@payloadcms/db-postgres'
 
 import { getLearningCatalog, getRoadmapContent } from '@/server/learning-catalog'
 import { getLearningAccess } from '@/server/learning-access'
-import { createAdmin, createStudent, getTestPayload, uid } from '../helpers/payload'
+import { createAdmin, createCourseTree, createStudent, getTestPayload, uid } from '../helpers/payload'
 
 let payload: Payload
 beforeAll(async () => { payload = await getTestPayload() })
@@ -53,6 +53,56 @@ describe('кеш каталога с настоящим Payload/PostgreSQL', () 
       await payload.db.rollbackTransaction(transactionID)
     }
     expect((await getLearningCatalog(payload)).roadmaps.find((row) => row.id === roadmap.id)?.isPublished).toBe(true)
+  })
+
+  it('видит изменение prerequisite без изменения родительского курса и удаление связи карты', async () => {
+    const tree = await createCourseTree(payload, { lessons: 1 })
+    const prerequisite = await payload.create({ collection: 'courses', data: {
+      title: uid('prerequisite'), slug: uid('prerequisite'), roadmap: tree.roadmap.id, isPublished: true,
+    } })
+    await payload.update({ collection: 'courses', id: tree.course.id, data: { prerequisites: [prerequisite.id] } })
+    const nodes = await Promise.all([tree.course, prerequisite].map(course => payload.create({
+      collection: 'roadmap-nodes', data: {
+        nodeId: uid('relation-node'), label: course.title, nodeType: 'topic',
+        roadmap: tree.roadmap.id, course: course.id, positionX: 0, positionY: 0,
+      },
+    })))
+    const edge = await payload.create({ collection: 'roadmap-edges', data: {
+      edgeId: uid('relation-edge'), roadmap: tree.roadmap.id, source: nodes[0].id, target: nodes[1].id,
+    } })
+    const first = await getRoadmapContent(payload, tree.roadmap.id)
+    expect(first.courses.find(course => course.id === tree.course.id)?.prerequisites).toEqual([prerequisite.id])
+    expect(first.edges.map(item => item.id)).toContain(edge.id)
+    const before = await payload.findByID({ collection: 'courses', id: tree.course.id })
+
+    const adapter = payload.db as unknown as { drizzle: { execute: (query: ReturnType<typeof sql>) => Promise<unknown> } }
+    await adapter.drizzle.execute(sql`delete from courses_rels where parent_id = ${tree.course.id} and path = 'prerequisites'`)
+    expect((await payload.findByID({ collection: 'courses', id: tree.course.id })).updatedAt).toBe(before.updatedAt)
+    const changed = await getRoadmapContent(payload, tree.roadmap.id)
+    expect(changed.courses.find(course => course.id === tree.course.id)?.prerequisites ?? []).toEqual([])
+    await payload.delete({ collection: 'roadmap-edges', id: edge.id })
+    expect((await getRoadmapContent(payload, tree.roadmap.id)).edges.map(item => item.id)).not.toContain(edge.id)
+  })
+
+  it('тёплый каталог не сохраняет старый режим из DTO ученика или удалённое назначение', async () => {
+    const tree = await createCourseTree(payload, { lessons: 1 })
+    const admin = await createAdmin(payload)
+    const user = await createStudent(payload)
+    const access = () => getLearningAccess(payload, user)
+    expect((await access()).canAccessCourse(tree.course.id)).toBe(true)
+    const warm = await getLearningCatalog(payload)
+
+    await payload.update({ collection: 'users', id: user.id, data: { learningAccessMode: 'assigned' }, user: admin, overrideAccess: false })
+    expect(user.learningAccessMode).toBe('all')
+    expect(await getLearningCatalog(payload)).toEqual(warm)
+    expect((await access()).canAccessCourse(tree.course.id)).toBe(false)
+    const grant = await payload.create({ collection: 'learning-access-grants', user: admin, overrideAccess: false, data: {
+      ruleKey: uid('cache-revocation'), user: user.id, target: { relationTo: 'courses', value: tree.course.id }, effect: 'allow',
+    } })
+    expect((await access()).canAccessCourse(tree.course.id)).toBe(true)
+    await payload.delete({ collection: 'learning-access-grants', id: grant.id, user: admin, overrideAccess: false })
+    expect(await getLearningCatalog(payload)).toEqual(warm)
+    expect((await access()).canAccessCourse(tree.course.id)).toBe(false)
   })
 
   it('тёплый общий каталог не кеширует права разных учеников и сразу видит отзыв доступа', async () => {

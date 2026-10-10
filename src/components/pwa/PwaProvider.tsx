@@ -45,13 +45,36 @@ export function PwaProvider() {
     let installing: ServiceWorker | null = null
     let registering = false
     let retryAfterCurrentAttempt = false
+    let retryAfterInstallation = false
+    let installationFailed = false
     const stateChanged = () => {
-      if (mounted && installing?.state === 'installed' && navigator.serviceWorker.controller) setWaiting(registration?.waiting ?? null)
+      if (!mounted) return
+      if (installing?.state === 'installed') {
+        retryAfterInstallation = false
+        installationFailed = false
+        setRegistrationError(false)
+        if (navigator.serviceWorker.controller) setWaiting(registration?.waiting ?? null)
+      } else if (installing?.state === 'redundant') {
+        // register() resolves before precaching: an initial installation can
+        // still fail later, while a failed update leaves the active app usable.
+        if (registration?.active || registration?.waiting) {
+          retryAfterInstallation = false
+          return
+        }
+        installationFailed = true
+        setRegistrationError(true)
+        if (retryAfterInstallation) {
+          retryAfterInstallation = false
+          if (registering) retryAfterCurrentAttempt = true
+          else registerWorker()
+        }
+      }
     }
     const updateFound = () => {
       installing?.removeEventListener('statechange', stateChanged)
       installing = registration?.installing ?? null
       installing?.addEventListener('statechange', stateChanged)
+      stateChanged()
     }
     const changed = () => {
       if (refreshRequested.current) window.location.reload()
@@ -62,11 +85,13 @@ export function PwaProvider() {
     navigator.serviceWorker.addEventListener('controllerchange', changed)
     navigator.serviceWorker.addEventListener('message', message)
     function registerWorker() {
-      if (!mounted || registering || registration) return
+      if (!mounted || registering || (registration && !installationFailed)) return
       registering = true
       void navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).then((value) => {
         if (!mounted) return
+        registration?.removeEventListener('updatefound', updateFound)
         registration = value
+        installationFailed = false
         setRegistrationError(false)
         setWaiting(value.waiting)
         value.addEventListener('updatefound', updateFound)
@@ -75,13 +100,15 @@ export function PwaProvider() {
         registering = false
         if (retryAfterCurrentAttempt) {
           retryAfterCurrentAttempt = false
-          registerWorker()
+          if (installing?.state === 'installing') retryAfterInstallation = true
+          else registerWorker()
         }
       })
     }
     retryRegistration.current = () => {
       // A request started offline may reject after connectivity has returned.
       if (registering) retryAfterCurrentAttempt = true
+      else if (installing?.state === 'installing') retryAfterInstallation = true
       else registerWorker()
     }
     registerWorker()
