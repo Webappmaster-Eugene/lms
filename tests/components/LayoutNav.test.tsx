@@ -39,7 +39,7 @@ describe('нижняя навигация', () => {
   it('содержит основные разделы', () => {
     render(<BottomNav />)
 
-    for (const label of ['Главная', 'Курсы', 'Тренажёр', 'Рейтинг']) {
+    for (const label of ['Главная', 'Курсы', 'Тренажёр', 'Роадмапы']) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }
   })
@@ -57,6 +57,8 @@ describe('нижняя навигация', () => {
 
     expect(screen.getByRole('link', { name: /Курсы/ })).toHaveAttribute('href', '/courses')
     expect(screen.getByRole('link', { name: /Тренажёр/ })).toHaveAttribute('href', '/trainer')
+    expect(screen.getByRole('link', { name: /Роадмапы/ })).toHaveAttribute('href', '/roadmaps')
+    expect(screen.queryByRole('link', { name: /Рейтинг/ })).not.toBeInTheDocument()
   })
 
   it('текущий раздел подсвечен', () => {
@@ -78,6 +80,12 @@ describe('нижняя навигация', () => {
     render(<BottomNav />)
 
     expect(screen.getByRole('link', { name: /Главная/ }).className).not.toContain('text-primary')
+  })
+
+  it('вложенный роадмап подсвечивает вкладку учебных карт', () => {
+    pathname.current = '/roadmaps/react'
+    render(<BottomNav />)
+    expect(screen.getByRole('link', { name: /Роадмапы/ })).toHaveAttribute('aria-current', 'page')
   })
 
   it('кнопка «Ещё» открывает боковое меню', async () => {

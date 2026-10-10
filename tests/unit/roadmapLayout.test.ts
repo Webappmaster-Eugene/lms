@@ -46,6 +46,17 @@ function assertGeometry(nodes: RoadmapLayoutNode[], edges: RoadmapLayoutEdge[], 
 }
 
 describe('roadmap display layout', () => {
+  it('draws sequential siblings from right to left edges and starts the next row on the left', () => {
+    const input = [node('a', 0, 0, 280, 180), node('b', 344, 0, 280, 280), node('c', 0, 400, 280, 150)]
+    const edges = [{ id: 'ab', source: 'a', target: 'b' }, { id: 'bc', source: 'b', target: 'c' }]
+    const result = layoutRoadmap(input, edges, { horizontalSteps: true })
+    const [a, b, c] = result.nodes
+    expect(a.position.x).toBe(0)
+    expect(c.position.x).toBe(0)
+    expect(result.routes.ab[0]).toEqual({ x: a.position.x + a.width, y: a.position.y + a.height / 2 })
+    expect(result.routes.ab.at(-1)).toEqual({ x: b.position.x, y: b.position.y + b.height / 2 })
+    expect(result.routes.bc.at(-1)).toEqual({ x: c.position.x + c.width / 2, y: c.position.y })
+  })
   it('unpacks overlapping Backend cards using measured dimensions and keeps the curriculum rows', () => {
     const nodes = [
       { ...node('start', 640, 0, 300, 90, 'start'), type: 'category' },

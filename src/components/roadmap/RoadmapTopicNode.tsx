@@ -49,6 +49,7 @@ export function RoadmapTopicNode({ data }: NodeProps) {
           )}
         </div>
         <span className="min-w-0 break-words pt-0.5 text-[15px] font-semibold leading-5">
+          {nodeData.learningOrder !== undefined && <span className="mr-2 inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-current/20 px-1 text-xs tabular-nums" aria-label={`Шаг ${nodeData.learningOrder}`}>{nodeData.learningOrder}</span>}
           {nodeData.label}
         </span>
       </div>

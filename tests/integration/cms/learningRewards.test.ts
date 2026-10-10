@@ -97,6 +97,51 @@ describe('реальные автоматические награды и сер
     expect(certs.totalDocs).toBe(1)
   })
 
+  it('неопубликованная секция не блокирует награды, а опубликованный урок без секции входит в программу', async () => {
+    const user = await createStudent(payload)
+    const tree = await createCourseTree(payload, { lessons: 1 })
+    const hiddenSection = await payload.create({ collection: 'sections', data: {
+      title: 'Черновая секция', slug: uid('hidden-section'), course: tree.course.id, isPublished: false,
+    } })
+    const hiddenLesson = await payload.create({ collection: 'lessons', data: {
+      title: 'Урок черновой секции', slug: uid('hidden-lesson'), course: tree.course.id, section: hiddenSection.id, isPublished: true,
+    } })
+    const unsectioned = await payload.create({ collection: 'lessons', data: {
+      title: 'Урок без секции', slug: uid('unsectioned'), course: tree.course.id, isPublished: true,
+    } })
+    await expect(finish(user, hiddenLesson.id)).rejects.toThrow()
+
+    await finish(user, tree.lessons[0].id)
+    expect(await count('certificates', user.id)).toBe(0)
+    await finish(user, unsectioned.id)
+
+    const certs = await payload.find({ collection: 'certificates', where: { user: { equals: user.id } }, sort: 'type' })
+    expect(certs.docs.map(certificate => [certificate.type, certificate.relatedEntity])).toEqual([
+      ['course', String(tree.course.id)], ['roadmap', String(tree.roadmap.id)],
+    ])
+    const bonuses = await payload.find({ collection: 'points-transactions', where: {
+      user: { equals: user.id }, reason: { in: ['course_completed', 'roadmap_completed'] },
+    } })
+    expect(bonuses.totalDocs).toBe(2)
+  })
+
+  it('курс только с черновыми секциями остаётся пустым и не завершает роадмап', async () => {
+    const user = await createStudent(payload)
+    const empty = await createCourseTree(payload, { lessons: 1 })
+    await payload.update({ collection: 'sections', id: empty.section.id, data: { isPublished: false } })
+    const visible = await createCourseTree(payload, { lessons: 1 })
+    await payload.update({ collection: 'courses', id: visible.course.id, data: { roadmap: empty.roadmap.id } })
+
+    await finish(user, visible.lessons[0].id)
+    const certs = await payload.find({ collection: 'certificates', where: { user: { equals: user.id } } })
+    expect(certs.docs.map(certificate => [certificate.type, certificate.relatedEntity])).toEqual([
+      ['course', String(visible.course.id)],
+    ])
+    expect((await payload.count({ collection: 'points-transactions', where: {
+      user: { equals: user.id }, reason: { equals: 'roadmap_completed' },
+    } })).totalDocs).toBe(0)
+  })
+
   it('параллельные разные уроки сериализуют награды и завершают курс один раз', async () => {
     const user = await createStudent(payload)
     const tree = await createCourseTree(payload, { lessons: 2 })

@@ -20,6 +20,10 @@ export type NodeCourse = {
 }
 
 export type RoadmapNodeData = {
+  /** Позиция всех узлов, включая заголовки этапов, в учебной последовательности. */
+  sequenceOrder?: number
+  /** Последовательный номер темы; одинаковый на карте и в мобильном списке. */
+  learningOrder?: number
   /** ID записи темы для управления; отличается от nodeId визуального графа. */
   managementNodeId?: number
   label: string

@@ -1,7 +1,7 @@
 import { expect, test, type Browser, type Page } from '@playwright/test'
 
 import { CONTENT, USERS, NOT_FOUND_HEADING } from '../fixtures/data'
-import { storageStateOf } from '../fixtures/env'
+import { APP_URL, storageStateOf } from '../fixtures/env'
 
 /**
  * Админка Payload: вход, создание и публикация урока, правка, снятие с
@@ -10,7 +10,7 @@ import { storageStateOf } from '../fixtures/env'
 test.use({ storageState: storageStateOf('admin') })
 
 async function asStudent<T>(browser: Browser, fn: (page: Page) => Promise<T>): Promise<T> {
-  const context = await browser.newContext({ storageState: storageStateOf('student') })
+  const context = await browser.newContext({ baseURL: APP_URL, storageState: storageStateOf('student') })
   try {
     return await fn(await context.newPage())
   } finally {
@@ -30,7 +30,7 @@ async function save(page: Page) {
 }
 
 test('вход в админку через форму и дашборд с группами коллекций', async ({ browser }) => {
-  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+  const context = await browser.newContext({ baseURL: APP_URL, storageState: { cookies: [], origins: [] } })
   const page = await context.newPage()
   await page.goto('/admin')
   await expect(page).toHaveURL(/\/admin\/login/)
@@ -53,14 +53,20 @@ test('студент в админку не попадает', async ({ browser 
 })
 
 test('страницы ментора на платформе: чужих уводят настоящим редиректом, а не страницей с кодом 200', async ({ browser }) => {
-  for (const state of [{ cookies: [], origins: [] }, storageStateOf('student')]) {
-    const context = await browser.newContext({ storageState: state })
-    for (const path of ['/admin/questions', '/admin/import-yandex']) {
-      const response = await context.request.get(path, { maxRedirects: 0 })
-      expect(response.status(), path).toBe(307)
-      expect(new URL(response.headers().location ?? '', 'http://x').pathname, path).toBe('/')
+  for (const { storageState, redirectPath } of [
+    { storageState: { cookies: [], origins: [] }, redirectPath: '/login' },
+    { storageState: storageStateOf('student'), redirectPath: '/' },
+  ]) {
+    const context = await browser.newContext({ baseURL: APP_URL, storageState })
+    try {
+      for (const path of ['/admin/questions', '/admin/import-yandex']) {
+        const response = await context.request.get(path, { maxRedirects: 0 })
+        expect(response.status(), path).toBe(307)
+        expect(new URL(response.headers().location ?? '', APP_URL).pathname, path).toBe(redirectPath)
+      }
+    } finally {
+      await context.close()
     }
-    await context.close()
   }
 })
 

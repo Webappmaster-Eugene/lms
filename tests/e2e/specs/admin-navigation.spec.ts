@@ -1,13 +1,13 @@
 import { expect, test, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { CONTENT } from '../fixtures/data'
-import { storageStateOf } from '../fixtures/env'
+import { APP_URL, storageStateOf } from '../fixtures/env'
 
 async function openAdminMenu(page: Page) {
   const sidebar = page.locator('aside.nav')
   await expect(sidebar).toHaveClass(/nav--nav-hydrated/)
   if (await sidebar.getAttribute('inert') !== null) {
-    await page.locator('#nav-toggler button').first().click()
+    await page.locator('button.nav-toggler:visible').click()
   }
   await expect(sidebar).not.toHaveAttribute('inert')
 }
@@ -15,12 +15,19 @@ async function openAdminMenu(page: Page) {
 test.describe('переходы администратора', () => {
   test.use({ storageState: storageStateOf('admin') })
 
-  test('меню → редактор → карта → настройки → редактор → платформа', async ({ page }, testInfo) => {
+  test('меню → админка → редактор → карта → настройки → редактор → платформа', async ({ page }, testInfo) => {
     await page.goto('/')
-    const menu = page.locator('aside').last().getByRole('navigation', { name: 'Меню платформы' })
-    await expect(menu.getByRole('link', { name: 'Редактор роадмапов' })).toBeVisible()
+    const menu = page.locator('aside').last()
+    const adminLink = menu.getByRole('link', { name: 'Админка', exact: true })
+    await expect(adminLink).toBeVisible()
+    await expect(menu.getByRole('link', { name: 'Редактор роадмапов', exact: true })).toHaveCount(0)
     await page.screenshot({ path: testInfo.outputPath('admin-menu-desktop.png') })
-    await menu.getByRole('link', { name: 'Редактор роадмапов' }).click()
+    await adminLink.focus()
+    await expect(adminLink).toBeFocused()
+    await adminLink.press('Enter')
+    await expect(page).toHaveURL(/\/admin$/)
+    await openAdminMenu(page)
+    await page.getByRole('navigation', { name: 'Переходы администратора' }).getByRole('link', { name: 'Редактор роадмапов', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Визуальный редактор роадмапов' })).toBeVisible()
     await page.getByRole('link', { name: new RegExp(CONTENT.roadmap.title) }).click()
     await expect(page).toHaveURL(/\/admin\/roadmap-editor\/\d+$/)
@@ -51,20 +58,35 @@ test.describe('переходы администратора', () => {
     await openAdminMenu(page)
     await page.getByRole('navigation', { name: 'Переходы администратора' }).getByRole('link', { name: 'Открыть платформу' }).click()
     await expect(page).toHaveURL(/\/$/)
-    await expect(menu.getByRole('link', { name: 'Редактор роадмапов' })).toBeVisible()
+    await expect(adminLink).toBeVisible()
   })
 
-  test('меню на телефоне → контент → импорт', async ({ page }, testInfo) => {
+  test('меню на телефоне → админка → контент → импорт', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
-    await page.getByRole('button', { name: 'Ещё', exact: true }).click()
-    const menu = page.locator('aside').first()
-    await expect(menu.getByRole('link', { name: 'Редактор роадмапов' })).toBeVisible()
-    await menu.locator('summary').filter({ hasText: 'Настройки контента в CMS' }).click()
+    const moreButton = page.getByRole('button', { name: 'Ещё', exact: true })
+    await moreButton.click()
+    const menu = page.getByRole('dialog', { name: 'Меню платформы', exact: true })
+    await expect(menu).toBeVisible()
+    await expect(menu).toHaveAttribute('aria-modal', 'true')
+    await expect(menu.getByRole('button', { name: 'Закрыть меню', exact: true })).toBeFocused()
+    await expect(menu.getByRole('link', { name: 'Редактор роадмапов', exact: true })).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await expect(menu).toHaveCount(0)
+    await expect(moreButton).toBeFocused()
+    await moreButton.click()
+    await expect(menu.getByRole('link', { name: 'Админка', exact: true })).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath('admin-menu-mobile.png') })
-    await menu.getByRole('link', { name: 'Импорт из Яндекс.Диска' }).click()
+    await menu.getByRole('link', { name: 'Админка', exact: true }).click()
+    await expect(page).toHaveURL(/\/admin$/)
+    await expect(menu).toHaveCount(0)
+    await openAdminMenu(page)
+    const adminMenu = page.getByRole('navigation', { name: 'Переходы администратора' })
+    await adminMenu.locator('summary').filter({ hasText: 'Настройки контента в CMS' }).click()
+    await adminMenu.getByRole('link', { name: 'Импорт из Яндекс.Диска', exact: true }).click()
     await expect(page).toHaveURL(/\/admin\/import-yandex$/)
-    await expect(page.getByRole('button', { name: 'Закрыть меню' })).not.toBeInViewport()
+    await expect(page.getByRole('heading', { name: 'Импорт из Яндекс.Диска', exact: true })).toBeVisible()
+    await expect(menu).toHaveCount(0)
   })
 
   test('на странице карты есть переход прямо к её редактору', async ({ page }) => {
@@ -76,7 +98,7 @@ test.describe('переходы администратора', () => {
 })
 
 test('ученик видит карту без управления и кнопок редактирования', async ({ browser }) => {
-  const context = await browser.newContext({ storageState: storageStateOf('student') })
+  const context = await browser.newContext({ baseURL: APP_URL, storageState: storageStateOf('student') })
   try {
     const page = await context.newPage()
     await page.goto(`/roadmaps/${CONTENT.roadmap.slug}`)
@@ -84,6 +106,7 @@ test('ученик видит карту без управления и кноп
     await expect(page.getByRole('link', { name: 'Редактировать карту' })).toHaveCount(0)
     await expect(page.getByRole('link', { name: 'Редактор роадмапов' })).toHaveCount(0)
     await expect(page.getByRole('link', { name: 'CMS и настройки' })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Админка', exact: true })).toHaveCount(0)
     await page.goto('/admin/roadmap-editor')
     await expect(page.getByRole('heading', { name: 'Визуальный редактор роадмапов' })).toHaveCount(0)
   } finally {

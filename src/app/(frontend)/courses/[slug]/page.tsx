@@ -1,8 +1,6 @@
 import type { Metadata } from 'next'
-import { getPayload } from '@/lib/payload'
-import { headers } from 'next/headers'
+import { getLearningRequest } from '@/server/learning-request'
 import { notFound, redirect } from 'next/navigation'
-import { createLocalReq } from 'payload'
 import { getLearningAccess } from '@/server/learning-access'
 import { CourseLessonItem } from '@/components/course/CourseLessonItem'
 import { ShareButton } from '@/components/ui/ShareButton'
@@ -22,10 +20,8 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const payload = await getPayload()
-  const { user } = await payload.auth({ headers: await headers() })
+  const { payload, user, req } = await getLearningRequest()
   if (!user) return { title: 'Вход' }
-  const req = await createLocalReq({ user }, payload)
   const access = await getLearningAccess(payload, user, req)
   const result = await payload.find({
     collection: 'courses',
@@ -42,11 +38,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CourseDetailPage({ params }: Props) {
   const { slug } = await params
-  const payload = await getPayload()
-  const headersList = await headers()
-  const { user } = await payload.auth({ headers: headersList })
+  const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login')
-  const req = await createLocalReq({ user }, payload)
   const access = await getLearningAccess(payload, user, req)
 
   const courseResult = await payload.find({

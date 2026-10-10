@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Code2, GraduationCap, LayoutDashboard, Menu, Trophy } from 'lucide-react'
+import { Code2, GraduationCap, LayoutDashboard, Map, Menu } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSidebar } from './SidebarContext'
 
@@ -17,7 +17,7 @@ const TABS: readonly Tab[] = [
   { href: '/', label: 'Главная', icon: LayoutDashboard, exact: true },
   { href: '/courses', label: 'Курсы', icon: GraduationCap },
   { href: '/trainer', label: 'Тренажёр', icon: Code2 },
-  { href: '/leaderboard', label: 'Рейтинг', icon: Trophy },
+  { href: '/roadmaps', label: 'Роадмапы', icon: Map },
 ]
 
 export function BottomNav({ trainerEnabled = true }: { trainerEnabled?: boolean } = {}) {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { boundedQueryText, queryHref, sharedVideoId } from '@/lib/shared-url'
 import { ShareButton } from '@/components/ui/ShareButton'
@@ -8,9 +9,17 @@ import { List, Network } from 'lucide-react'
 
 import { useHydrated } from '@/hooks/use-hydrated'
 import { cn } from '@/lib/utils'
-import { RoadmapGraph, isTopicNode } from './RoadmapGraph'
 import { RoadmapTopicList } from './RoadmapTopicList'
-import type { AnyRoadmapNode, GraphEdge, NodeCourse } from './types'
+import type { AnyRoadmapNode, GraphEdge, GraphNode, NodeCourse } from './types'
+
+const RoadmapGraph = dynamic(() => import('./RoadmapGraph').then((module) => module.RoadmapGraph), {
+  ssr: false,
+  loading: () => <div role="status" className="flex h-[650px] items-center justify-center rounded-xl border border-border bg-muted/20 text-sm text-muted-foreground sm:h-[800px]">Загружаем карту…</div>,
+})
+
+function isTopicNode(node: AnyRoadmapNode): node is GraphNode {
+  return node.type === 'topic' || node.type === 'subtopic'
+}
 
 type View = 'map' | 'list'
 
@@ -70,7 +79,7 @@ export function RoadmapExplorer({ nodes, edges, looseCourses, nextStepNodeId, ma
       aria-selected={view === value}
       onClick={() => choose(value)}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+        'inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring',
         view === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
       )}
     >
@@ -88,6 +97,7 @@ export function RoadmapExplorer({ nodes, edges, looseCourses, nextStepNodeId, ma
         </div>
         <ShareButton />
       </div>
+      <p className="text-sm text-muted-foreground">Проходите темы по порядку: слева направо, затем переходите на следующую строку. В списке сохраняется та же последовательность.</p>
       {view === 'map' ? (
         <RoadmapGraph nodes={nodes} edges={edges} nextStepNodeId={nextStepNodeId} managementRoadmapId={managementRoadmapId} selectedTopic={selectedTopic} onTopicChange={chooseTopic} searchQuery={query} onSearchQueryChange={changeQuery} />
       ) : (

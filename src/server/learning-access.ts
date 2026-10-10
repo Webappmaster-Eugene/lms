@@ -1,6 +1,6 @@
 import { APIError, type Access, type Payload, type PayloadRequest } from 'payload'
-import { sql } from '@payloadcms/db-postgres'
 
+import { getLearningCatalog } from '@/server/learning-catalog'
 import { invalidateTrainerAccess } from '@/server/trainer-access'
 import { collectAllPages } from '@/lib/paginate'
 import { recordLearningAccess, withLearningSpan } from '@/lib/learning-observability'
@@ -94,29 +94,13 @@ async function getLessonPolicy(payload: Payload, user: LearningAccessUser | null
 async function loadPolicy(payload: Payload, user: LearningAccessUser | null | undefined, req?: Partial<PayloadRequest>) {
   user = await resolveAccessUser(payload, user, req)
   if (!user || user.role === 'admin') return buildLearningAccess(user, [], { courses: [], sections: [], roadmaps: [], nodes: [], lessons: [] })
-  const [grants, courses, sections, roadmaps, nodes] = await Promise.all([
+  const [grants, catalog] = await Promise.all([
     collectAllPages(({ page, limit }) => payload.find({ collection: 'learning-access-grants', where: { user: { equals: user.id } }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'назначения учебного доступа' }),
-    collectAllPages(({ page, limit }) => payload.find({ collection: 'courses', select: { roadmap: true, roadmapNode: true, isPublished: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'метаданные доступа курсов' }),
-    collectAllPages(({ page, limit }) => payload.find({ collection: 'sections', select: { course: true, isPublished: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'метаданные доступа секций' }),
-    collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmaps', select: { isPublished: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'публикация роадмапов' }),
-    collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmap-nodes', select: { roadmap: true, course: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'метаданные доступа тем' }),
+    getLearningCatalog(payload, req),
   ])
   const lessonIds = grants.filter((grant) => grant.target?.relationTo === 'lessons').map((grant) => learningRelationId(grant.target?.value)).filter((id): id is number => id !== null)
   const lessons = lessonIds.length ? await collectAllPages(({ page, limit }) => payload.find({ collection: 'lessons', where: { id: { in: lessonIds } }, select: { course: true, section: true, isPublished: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'явные исключения доступа уроков' }) : []
-  const invalidLessonIds = await inconsistentLearningLessonIds(payload, req)
-  return buildLearningAccess(user, grants as LearningGrant[], { courses, sections, roadmaps, nodes, lessons, invalidLessonIds })
-}
-
-async function inconsistentLearningLessonIds(payload: Payload, req?: Partial<PayloadRequest>): Promise<number[]> {
-  type Executor = { execute: (query: ReturnType<typeof sql>) => Promise<{ rows: { id: number }[] }> }
-  const adapter = payload.db as unknown as { drizzle: Executor; sessions?: Record<string | number, { db: Executor } | undefined> }
-  const transactionID = await req?.transactionID
-  const db = (transactionID !== undefined && adapter.sessions?.[transactionID]?.db) || adapter.drizzle
-  const result = await db.execute(sql`select l.id from lessons l left join sections s on s.id = l.section_id
-    where l.is_published = true and l.section_id is not null and (s.id is null or s.course_id is distinct from l.course_id)
-    order by l.id limit 10001`)
-  if (result.rows.length > 10000) throw new APIError('Слишком много некорректных связей уроков и разделов', 503)
-  return result.rows.map((row) => row.id)
+  return buildLearningAccess(user, grants as LearningGrant[], { ...catalog, lessons })
 }
 
 /** Cache is scoped to this Payload request, invalidated by entitlement writes. */

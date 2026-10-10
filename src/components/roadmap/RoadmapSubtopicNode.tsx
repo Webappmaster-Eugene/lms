@@ -38,6 +38,7 @@ export function RoadmapSubtopicNode({ data }: NodeProps) {
         />
       )}
       {isCompleted && <CheckCircle2 className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />}
+      {nodeData.learningOrder !== undefined && <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full border border-current/20 px-1 text-xs tabular-nums" aria-label={`Шаг ${nodeData.learningOrder}`}>{nodeData.learningOrder}</span>}
       <span className="min-w-0 break-words text-[15px] font-semibold leading-5">{nodeData.label}</span>
 
       <Handle type="source" position={Position.Bottom} className="!h-2 !w-2 !bg-border !border-0" />

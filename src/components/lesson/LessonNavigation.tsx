@@ -6,7 +6,7 @@ type LessonLink = { slug: string; title: string }
 export function LessonNavigation({ previous, next }: { previous: LessonLink | null; next: LessonLink | null }) {
   if (!previous && !next) return null
   return (
-    <nav aria-label="Навигация по урокам" className="grid min-w-0 gap-3 sm:grid-cols-2">
+    <nav aria-label="Навигация по урокам" className="grid min-w-0 gap-3 [overflow-wrap:anywhere] sm:grid-cols-2">
       {previous && (
         <Link href={`/lessons/${previous.slug}`} aria-label={`Предыдущий урок: ${previous.title}`} title="Предыдущий урок (←)" className="flex min-h-16 min-w-0 items-center gap-3 rounded-xl border border-border px-4 py-3 transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">
           <ChevronLeft aria-hidden="true" className="h-5 w-5 shrink-0 text-muted-foreground" />

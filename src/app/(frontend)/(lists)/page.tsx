@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
-import { getPayload } from '@/lib/payload'
-import { headers } from 'next/headers'
+import { getLearningRequest } from '@/server/learning-request'
 import Link from 'next/link'
 import { ArrowRight, Award, BookOpen, Clock, Flame, GraduationCap, Map as MapIcon, MessagesSquare, Star, Trophy } from 'lucide-react'
 import { collectAllPages } from '@/lib/paginate'
@@ -10,7 +9,7 @@ import { loadCourseLessons, relationKey } from '@/lib/course-lessons'
 import { latestLearningResume } from '@/server/learning-state'
 import { formatTime } from '@/lib/video-memory'
 import { nextLesson, recentCourseIds } from '@/lib/roadmap-next-step'
-import { createLocalReq, type Where } from 'payload'
+import type { Where } from 'payload'
 import { getLearningAccess } from '@/server/learning-access'
 
 export const metadata: Metadata = {
@@ -21,12 +20,9 @@ export const metadata: Metadata = {
 const DASHBOARD_COURSES = 6
 
 export default async function DashboardPage() {
-  const payload = await getPayload()
-  const headersList = await headers()
-  const { user } = await payload.auth({ headers: headersList })
+  const { payload, user, req } = await getLearningRequest()
 
   if (!user) return null
-  const req = await createLocalReq({ user }, payload)
   const policy = await getLearningAccess(payload, user, req)
   const assignedCourses: Where = user.role === 'admin' ? {} : { id: { in: policy.accessibleCourseIds } }
 

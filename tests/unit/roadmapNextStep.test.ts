@@ -6,6 +6,7 @@ import {
   nextLesson,
   orderCourseLessons,
   pickNextStep,
+  pickSequentialNextStep,
   recentCourseIds,
   type LessonRef,
   type StepCourse,
@@ -78,6 +79,19 @@ function step(id: string, overrides: Partial<StepCourse> = {}): StepCourse {
 }
 
 describe('следующий шаг по роадмапу', () => {
+  it('последовательная карта рекомендует ранний непройденный курс, даже если начат поздний', () => {
+    expect(pickSequentialNextStep([step('html'), step('react', { completedCount: 3 })])?.id).toBe('html')
+  })
+
+  it('последовательная карта пропускает завершённые, пустые и недоступные курсы', () => {
+    expect(pickSequentialNextStep([
+      step('completed', { completedCount: 10, nextLesson: null }),
+      step('empty', { totalLessons: 0, nextLesson: null }),
+      step('blocked', { prerequisitesMet: false }),
+      step('next'),
+    ])?.id).toBe('next')
+    expect(pickSequentialNextStep([])).toBeNull()
+  })
   it('начатый курс важнее следующего по порядку', () => {
     const picked = pickNextStep([step('a'), step('b', { completedCount: 3 })])
     expect(picked?.id).toBe('b')

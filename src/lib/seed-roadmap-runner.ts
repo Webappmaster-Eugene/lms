@@ -9,6 +9,7 @@
  */
 
 import type { Payload } from 'payload'
+import { sequenceRoadmapNodes, sequentialRoadmapEdges } from './roadmap-sequence'
 import {
   findOrCreateRoadmap,
   createStubCourse,
@@ -72,33 +73,8 @@ const frontendNodes: NodeSeed[] = [
   { nodeId: 'fe-growth-3d', label: '3D / WebGL', nodeType: 'subtopic', positionX: 720, positionY: 1620, icon: 'layers', description: 'Three.js, React Three Fiber', order: 23, stage: 'growth', color: 'gray', bullets: [], createStub: true },
 ]
 
-const frontendEdges: EdgeSeed[] = [
-  { edgeId: 'fe-e-start-html', source: 'fe-start', target: 'fe-html' },
-  { edgeId: 'fe-e-start-css', source: 'fe-start', target: 'fe-css' },
-  { edgeId: 'fe-e-start-js', source: 'fe-start', target: 'fe-js', animated: true },
-  { edgeId: 'fe-e-start-jsdom', source: 'fe-start', target: 'fe-js-dom' },
-  { edgeId: 'fe-e-html-ts', source: 'fe-html', target: 'fe-ts-build' },
-  { edgeId: 'fe-e-css-jsadv', source: 'fe-css', target: 'fe-js-adv' },
-  { edgeId: 'fe-e-js-react', source: 'fe-js', target: 'fe-react', animated: true },
-  { edgeId: 'fe-e-jsdom-eco', source: 'fe-js-dom', target: 'fe-react-eco' },
-  { edgeId: 'fe-e-js-jsadv', source: 'fe-js', target: 'fe-js-adv' },
-  { edgeId: 'fe-e-ts-layout', source: 'fe-ts-build', target: 'fe-layout' },
-  { edgeId: 'fe-e-jsadv-arch', source: 'fe-js-adv', target: 'fe-arch' },
-  { edgeId: 'fe-e-react-next', source: 'fe-react', target: 'fe-nextjs', animated: true },
-  { edgeId: 'fe-e-eco-tests', source: 'fe-react-eco', target: 'fe-tests' },
-  { edgeId: 'fe-e-layout-real', source: 'fe-layout', target: 'fe-real-project' },
-  { edgeId: 'fe-e-arch-int', source: 'fe-arch', target: 'fe-complex-int' },
-  { edgeId: 'fe-e-next-perf', source: 'fe-nextjs', target: 'fe-perf' },
-  { edgeId: 'fe-e-tests-mobile', source: 'fe-tests', target: 'fe-mobile' },
-  { edgeId: 'fe-e-real-interview', source: 'fe-real-project', target: 'fe-interview' },
-  { edgeId: 'fe-e-int-resume', source: 'fe-complex-int', target: 'fe-resume' },
-  { edgeId: 'fe-e-perf-mentoring', source: 'fe-perf', target: 'fe-mentoring' },
-  { edgeId: 'fe-e-mobile-mentoring', source: 'fe-mobile', target: 'fe-mentoring' },
-  { edgeId: 'fe-e-interview-mono', source: 'fe-interview', target: 'fe-growth-monorepo' },
-  { edgeId: 'fe-e-resume-micro', source: 'fe-resume', target: 'fe-growth-micro' },
-  { edgeId: 'fe-e-mentoring-wasm', source: 'fe-mentoring', target: 'fe-growth-wasm' },
-  { edgeId: 'fe-e-mentoring-3d', source: 'fe-mentoring', target: 'fe-growth-3d' },
-]
+const frontendSequence = sequenceRoadmapNodes(frontendNodes)
+const frontendEdges: EdgeSeed[] = sequentialRoadmapEdges(frontendSequence)
 
 // ============================================================
 // BACKEND NODE.JS ROADMAP — data
@@ -135,35 +111,8 @@ const backendNodes: NodeSeed[] = [
   { nodeId: 'be-growth-arch', label: 'Cloud-native design', nodeType: 'subtopic', positionX: 700, positionY: 1620, icon: 'cloud', description: 'Serverless, edge', order: 27, stage: 'growth', color: 'gray', bullets: [], createStub: true },
 ]
 
-const backendEdges: EdgeSeed[] = [
-  { edgeId: 'be-e-start-js', source: 'be-start', target: 'be-js' },
-  { edgeId: 'be-e-start-ts', source: 'be-start', target: 'be-ts' },
-  { edgeId: 'be-e-start-git', source: 'be-start', target: 'be-git-net' },
-  { edgeId: 'be-e-start-node', source: 'be-start', target: 'be-node', animated: true },
-  { edgeId: 'be-e-start-linux', source: 'be-start', target: 'be-linux' },
-  { edgeId: 'be-e-js-algo', source: 'be-js', target: 'be-algo' },
-  { edgeId: 'be-e-ts-nest', source: 'be-ts', target: 'be-nest', animated: true },
-  { edgeId: 'be-e-git-arch', source: 'be-git-net', target: 'be-arch' },
-  { edgeId: 'be-e-node-sql', source: 'be-node', target: 'be-sql' },
-  { edgeId: 'be-e-linux-nosql', source: 'be-linux', target: 'be-nosql' },
-  { edgeId: 'be-e-algo-docker', source: 'be-algo', target: 'be-docker' },
-  { edgeId: 'be-e-nest-api', source: 'be-nest', target: 'be-api', animated: true },
-  { edgeId: 'be-e-arch-orm', source: 'be-arch', target: 'be-orm' },
-  { edgeId: 'be-e-sql-auth', source: 'be-sql', target: 'be-auth' },
-  { edgeId: 'be-e-nosql-queues', source: 'be-nosql', target: 'be-queues' },
-  { edgeId: 'be-e-docker-test', source: 'be-docker', target: 'be-testing' },
-  { edgeId: 'be-e-api-cicd', source: 'be-api', target: 'be-cicd' },
-  { edgeId: 'be-e-orm-obs', source: 'be-orm', target: 'be-observ' },
-  { edgeId: 'be-e-auth-sec', source: 'be-auth', target: 'be-security' },
-  { edgeId: 'be-e-test-micro', source: 'be-testing', target: 'be-microservices' },
-  { edgeId: 'be-e-cicd-k8s', source: 'be-cicd', target: 'be-k8s' },
-  { edgeId: 'be-e-obs-load', source: 'be-observ', target: 'be-load' },
-  { edgeId: 'be-e-sec-interview', source: 'be-security', target: 'be-interview' },
-  { edgeId: 'be-e-micro-ml', source: 'be-microservices', target: 'be-growth-ml' },
-  { edgeId: 'be-e-k8s-web3', source: 'be-k8s', target: 'be-growth-web3' },
-  { edgeId: 'be-e-load-rust', source: 'be-load', target: 'be-growth-rust' },
-  { edgeId: 'be-e-interview-arch', source: 'be-interview', target: 'be-growth-arch' },
-]
+const backendSequence = sequenceRoadmapNodes(backendNodes)
+const backendEdges: EdgeSeed[] = sequentialRoadmapEdges(backendSequence)
 
 // ============================================================
 // Helpers
@@ -307,10 +256,10 @@ export async function seedRoadmapNodes(payload: Payload): Promise<void> {
   }
   console.log('Cleaned up old nodes/edges')
 
-  const feNodeDbIds = await createNodes(payload, frontendNodes, frontendRoadmap.id)
+  const feNodeDbIds = await createNodes(payload, frontendSequence, frontendRoadmap.id)
   console.log(`Created ${feNodeDbIds.size} Frontend nodes`)
 
-  const beNodeDbIds = await createNodes(payload, backendNodes, backendRoadmap.id)
+  const beNodeDbIds = await createNodes(payload, backendSequence, backendRoadmap.id)
   console.log(`Created ${beNodeDbIds.size} Backend nodes`)
 
   await createEdges(payload, frontendEdges, feNodeDbIds, frontendRoadmap.id)

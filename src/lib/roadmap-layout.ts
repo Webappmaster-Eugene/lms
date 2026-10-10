@@ -108,8 +108,8 @@ function routeScore(points: RoadmapPoint[], previous: Segment[], edge: RoadmapLa
   return score
 }
 
-/** Display geometry only: stored positions, learning order and edges remain intact. */
-export function layoutRoadmap<T extends RoadmapLayoutNode>(input: readonly T[], edges: readonly RoadmapLayoutEdge[]) {
+/** Measured display geometry; horizontalSteps gives adjacent curriculum steps side ports. */
+export function layoutRoadmap<T extends RoadmapLayoutNode>(input: readonly T[], edges: readonly RoadmapLayoutEdge[], options: { horizontalSteps?: boolean } = {}) {
   if (!input.length) return { nodes: [] as T[], routes: {} as Record<string, RoadmapPoint[]> }
 
   const sorted = input.map((node) => ({
@@ -152,7 +152,7 @@ export function layoutRoadmap<T extends RoadmapLayoutNode>(input: readonly T[], 
   const rowBottoms: number[] = []
   let y = 0
   rows.forEach((row, index) => {
-    let x = (widest - rowWidths[index]) / 2
+    let x = options.horizontalSteps && !row.category ? 0 : (widest - rowWidths[index]) / 2
     rowTops.push(y)
     const height = Math.max(...row.nodes.map((node) => node.height))
     rowBottoms.push(y + height)
@@ -188,6 +188,19 @@ export function layoutRoadmap<T extends RoadmapLayoutNode>(input: readonly T[], 
     const sourceRow = rowByNode.get(edge.source)
     const targetRow = rowByNode.get(edge.target)
     if (!source || !target || sourceRow === undefined || targetRow === undefined) continue
+    if (options.horizontalSteps && sourceRow === targetRow && source.position.x + source.width < target.position.x) {
+      const start = { x: source.position.x + source.width, y: source.position.y + source.height / 2 }
+      const end = { x: target.position.x, y: target.position.y + target.height / 2 }
+      const middle = (start.x + end.x) / 2
+      const points = simplify([start, { x: middle, y: start.y }, { x: middle, y: end.y }, end])
+      const clear = points.slice(1).every((point, index) => nodes.every((node) =>
+        node.id === source.id || node.id === target.id || !intersects(points[index], point, bounds(node))))
+      if (clear) {
+        routes.set(edge.id, points)
+        points.slice(1).forEach((point, index) => previous.push({ start: points[index], end: point, source: edge.source, target: edge.target }))
+        continue
+      }
+    }
     const start = { x: source.position.x + source.width / 2, y: source.position.y + source.height }
     const end = { x: target.position.x + target.width / 2, y: target.position.y }
     const exit = { x: start.x, y: rowBottoms[sourceRow] + CLEARANCE + outgoing[sourceRow].indexOf(edge) * LANE_GAP }

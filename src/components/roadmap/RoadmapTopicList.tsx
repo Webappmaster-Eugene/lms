@@ -25,6 +25,17 @@ type StageGroup = { key: string; title: string; nodes: GraphNode[] }
 /** Темы по этапам в порядке обучения, внутри этапа — сверху вниз, как на карте. */
 export function groupTopicsByStage(nodes: GraphNode[]): StageGroup[] {
   const topics = nodes.filter((n) => n.type === 'topic' || n.type === 'subtopic')
+  if (topics.length && topics.every((node) => node.data.learningOrder !== undefined)) {
+    const groups: StageGroup[] = []
+    const ordered = [...topics].sort((a, b) => (a.data.learningOrder ?? 0) - (b.data.learningOrder ?? 0))
+    for (const node of ordered) {
+      const stage = node.data.stage
+      const previous = groups.at(-1)
+      if (previous?.nodes[0].data.stage === stage) previous.nodes.push(node)
+      else groups.push({ key: `${stage ?? 'other'}-${groups.length}`, title: stage ? STAGE_TITLES[stage] : 'Другие темы', nodes: [node] })
+    }
+    return groups
+  }
   const byStage = new Map<NodeStage | null, GraphNode[]>()
   for (const node of topics) {
     const bucket = byStage.get(node.data.stage) ?? []
@@ -50,18 +61,21 @@ function TopicRow({ data, nodeId, managementRoadmapId, selected, onSelect }: { d
       open={selected ?? data.isNextStep}
       className="group rounded-lg border border-border bg-background open:border-primary/40"
     >
-      <summary onClick={onSelect ? (event) => { event.preventDefault(); onSelect() } : undefined} className="flex cursor-pointer list-none items-center gap-3 p-3 [&::-webkit-details-marker]:hidden">
-        <Icon className={`h-4 w-4 shrink-0 ${STATUS_COLOR[data.status]}`} aria-hidden="true" />
-        <span className="flex-1 text-sm font-medium text-foreground">{data.label}</span>
+      <summary onClick={onSelect ? (event) => { event.preventDefault(); onSelect() } : undefined} className="grid min-h-11 cursor-pointer list-none grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 p-3 [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center gap-2">
+          <Icon className={`h-4 w-4 shrink-0 ${STATUS_COLOR[data.status]}`} aria-hidden="true" />
+          {data.learningOrder !== undefined && <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold tabular-nums text-foreground" aria-label={`Шаг ${data.learningOrder}`}>{data.learningOrder}</span>}
+        </span>
+        <span className="min-w-0 text-sm font-medium text-foreground [overflow-wrap:anywhere]">{data.label}</span>
+        <span className="text-xs text-muted-foreground">
+          {data.comingSoon ? 'готовится' : data.totalLessons > 0 ? `${data.progressPercent}%` : ''}
+        </span>
         {data.isNextStep && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">
+          <span className="col-span-2 col-start-2 inline-flex items-center gap-1 justify-self-start rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">
             <Play className="h-3 w-3" aria-hidden="true" />
             Следующий шаг
           </span>
         )}
-        <span className="shrink-0 text-xs text-muted-foreground">
-          {data.comingSoon ? 'готовится' : data.totalLessons > 0 ? `${data.progressPercent}%` : ''}
-        </span>
       </summary>
       <div className="border-t border-border p-3">
         {data.description && <p className="mb-3 text-sm text-muted-foreground">{data.description}</p>}
@@ -92,7 +106,7 @@ export function RoadmapTopicList({ nodes, looseCourses, managementRoadmapId, sel
     <div className="space-y-6">
       {groups.map((group) => (
         <section key={group.key}>
-          <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{group.title}</h3>
+          <h3 className="mb-2 text-sm font-semibold text-muted-foreground">{group.title}</h3>
           <div className="space-y-2">
             {group.nodes.map((node) => (
               <TopicRow key={node.id} data={node.data} nodeId={node.data.managementNodeId} managementRoadmapId={managementRoadmapId} selected={onTopicChange ? selectedTopic === node.id : undefined} onSelect={onTopicChange ? () => onTopicChange(selectedTopic === node.id ? null : node.id) : undefined} />

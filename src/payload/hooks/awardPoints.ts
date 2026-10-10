@@ -6,6 +6,7 @@ import { relationId } from '@/lib/relation-id'
 import { withSpan, logger } from '@/lib/telemetry'
 import { skipHooksReq } from '@/lib/payload-req'
 import { collectAllPages } from '@/lib/paginate'
+import { isCourseCompleted, isRoadmapCompleted } from '@/lib/course-completion'
 
 /**
  * Hook: начисляет баллы при отметке урока как пройденного.
@@ -38,22 +39,6 @@ export const awardPoints: CollectionAfterChangeHook = async ({
   const lessonId = relationId(doc.lesson)
 
   return withSpan('hook.awardPoints', { 'user.id': userId, 'lesson.id': lessonId }, async () => {
-    // Защита от повторного начисления: если урок уже был пройден ранее
-    const existingLessonTx = await req.payload.find({
-      req,
-      collection: 'points-transactions',
-      where: {
-        user: { equals: userId },
-        reason: { equals: 'lesson_completed' },
-        relatedEntity: { equals: String(lessonId) },
-      },
-      limit: 1,
-    })
-
-    if (existingLessonTx.totalDocs > 0) {
-      return doc
-    }
-
     // Загружаем настройки баллов
     let lessonPoints = DEFAULT_POINTS.LESSON_COMPLETED as number
     let coursePoints = DEFAULT_POINTS.COURSE_COMPLETED as number
@@ -74,17 +59,11 @@ export const awardPoints: CollectionAfterChangeHook = async ({
     }
 
     // 1. Баллы за урок
-    const created = await safeCreateTransaction(
+    await safeCreateTransaction(
       req, userId, lessonPoints, 'lesson_completed', String(lessonId), 'Урок пройден',
     )
-    if (!created) {
-      // Гонка: другой запрос уже начислил. Пересчёт всё равно выполняем — он
-      // идемпотентен и чинит возможное расхождение totalPoints с транзакциями
-      await recalculateTotalPoints(req, userId)
-      return doc
-    }
 
-    // 2. Проверяем завершение курса
+    // Repeated completion must recheck a changed programme and recover missing certificates.
     const lesson = typeof doc.lesson === 'object'
       ? doc.lesson
       : await req.payload.findByID({ req, collection: 'lessons', id: lessonId })
@@ -115,51 +94,7 @@ async function checkCourseCompletion(
   roadmapPoints: number,
 ) {
   return withSpan('awardPoints.checkCourseCompletion', { 'user.id': userId, 'course.id': courseId }, async () => {
-    const [courseLessons, userProgress] = await Promise.all([
-      collectAllPages(
-        ({ page, limit }) =>
-          req.payload.find({
-            req,
-            collection: 'lessons',
-            where: {
-              course: { equals: courseId },
-              isPublished: { equals: true },
-            },
-            select: {},
-            depth: 0,
-            sort: 'id',
-            page,
-            limit,
-          }),
-        { label: `уроки курса ${courseId}` },
-      ),
-      collectAllPages(
-        ({ page, limit }) =>
-          req.payload.find({
-            req,
-            collection: 'user-progress',
-            where: {
-              user: { equals: userId },
-              isCompleted: { equals: true },
-            },
-            select: { lesson: true },
-            depth: 0,
-            sort: 'id',
-            page,
-            limit,
-          }),
-        { label: `прогресс пользователя ${userId}` },
-      ),
-    ])
-
-    const completedIds = new Set(
-      userProgress.map((p) => String(typeof p.lesson === 'object' ? p.lesson.id : p.lesson)),
-    )
-
-    const courseCompleted =
-      courseLessons.length > 0 && courseLessons.every((l) => completedIds.has(String(l.id)))
-
-    if (!courseCompleted) return
+    if (!(await isCourseCompleted(req, userId, courseId))) return
 
     // Бонус за курс (с защитой от дублей)
     const created = await safeCreateTransaction(
@@ -179,54 +114,12 @@ async function checkCourseCompletion(
 
     if (!roadmapId) return
 
-    const [roadmapCourses, courseBonuses] = await Promise.all([
-      collectAllPages(
-        ({ page, limit }) =>
-          req.payload.find({
-            req,
-            collection: 'courses',
-            where: {
-              roadmap: { equals: roadmapId },
-              isPublished: { equals: true },
-            },
-            select: {},
-            depth: 0,
-            sort: 'id',
-            page,
-            limit,
-          }),
-        { label: `курсы роадмапа ${roadmapId}` },
-      ),
-      collectAllPages(
-        ({ page, limit }) =>
-          req.payload.find({
-            req,
-            collection: 'points-transactions',
-            where: {
-              user: { equals: userId },
-              reason: { equals: 'course_completed' },
-            },
-            select: { relatedEntity: true },
-            depth: 0,
-            sort: 'id',
-            page,
-            limit,
-          }),
-        { label: `бонусы за курсы пользователя ${userId}` },
-      ),
-    ])
-
-    const completedCourseIds = new Set(
-      courseBonuses.filter((t) => t.relatedEntity).map((t) => String(t.relatedEntity)),
-    )
-
-    const roadmapCompleted =
-      roadmapCourses.length > 0 && roadmapCourses.every((c) => completedCourseIds.has(String(c.id)))
-
-    if (roadmapCompleted) {
-      await safeCreateTransaction(
+    // Historical bonuses do not prove completion after new lessons are published.
+    if (await isRoadmapCompleted(req, userId, roadmapId)) {
+      const roadmapBonusCreated = await safeCreateTransaction(
         req, userId, roadmapPoints, 'roadmap_completed', roadmapId, 'Роадмап завершён',
       )
+      if (!roadmapBonusCreated) await ensureCertificate(req, userId, roadmapId, 'roadmap')
     }
   })
 }

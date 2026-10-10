@@ -50,7 +50,8 @@ beforeEach(() => {
     register, getRegistration: vi.fn(async () => registration), ready: Promise.resolve(registration), controller: {},
   })
   navigatorProperty('serviceWorker', serviceWorker)
-  api = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+  api = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (input === '/api/connectivity') return new Response(null, { status: 204, headers: { 'X-LMS-Connectivity': '1' } })
     if (init?.method === 'POST' || init?.method === 'DELETE' || init?.method === 'PATCH') return new Response(null, { status: 204 })
     return Response.json(settings)
   })
@@ -211,12 +212,13 @@ describe('PWA provider: installation, updates and live notifications', () => {
     window.removeEventListener('lms:notification', listener)
   })
 
-  it('shows a connection banner and recovers when the network returns', () => {
+  it('shows a connection banner and verifies the network before removing it', async () => {
     navigatorProperty('onLine', false)
     render(<PwaProvider />)
     expect(screen.getByRole('status')).toHaveTextContent('Нет подключения')
     act(() => { navigatorProperty('onLine', true); window.dispatchEvent(new Event('online')) })
-    expect(screen.queryByText(/Нет подключения/)).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText(/Нет подключения/)).not.toBeInTheDocument())
+    expect(api).toHaveBeenCalledWith('/api/connectivity', expect.objectContaining({ cache: 'no-store', redirect: 'error' }))
   })
 
   it('reports a registration failure without preventing the site from working', async () => {

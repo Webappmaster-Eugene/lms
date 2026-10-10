@@ -1,0 +1,907 @@
+[
+  {
+    "slug": "frontend-react",
+    "nodes": [
+      {
+        "id": 1,
+        "nodeId": "fe-start",
+        "label": "Начало",
+        "nodeType": "category",
+        "order": 0,
+        "stage": "start",
+        "positionX": 500,
+        "positionY": 0
+      },
+      {
+        "id": 2,
+        "nodeId": "fe-html",
+        "label": "HTML",
+        "nodeType": "topic",
+        "order": 1,
+        "stage": "base",
+        "positionX": 40,
+        "positionY": 180
+      },
+      {
+        "id": 3,
+        "nodeId": "fe-css",
+        "label": "CSS",
+        "nodeType": "topic",
+        "order": 2,
+        "stage": "base",
+        "positionX": 300,
+        "positionY": 180
+      },
+      {
+        "id": 4,
+        "nodeId": "fe-js",
+        "label": "JS",
+        "nodeType": "topic",
+        "order": 3,
+        "stage": "base",
+        "positionX": 560,
+        "positionY": 180
+      },
+      {
+        "id": 5,
+        "nodeId": "fe-js-dom",
+        "label": "JS + DOM",
+        "nodeType": "topic",
+        "order": 4,
+        "stage": "base",
+        "positionX": 820,
+        "positionY": 180
+      },
+      {
+        "id": 86,
+        "nodeId": "fe-git",
+        "label": "Git и работа с репозиториями",
+        "nodeType": "topic",
+        "order": 4.5,
+        "stage": "base",
+        "positionX": 1080,
+        "positionY": 180
+      },
+      {
+        "id": 6,
+        "nodeId": "fe-ts-build",
+        "label": "TypeScript и сборка",
+        "nodeType": "topic",
+        "order": 5,
+        "stage": "stage1",
+        "positionX": 40,
+        "positionY": 460
+      },
+      {
+        "id": 7,
+        "nodeId": "fe-js-adv",
+        "label": "JS — продвинутый",
+        "nodeType": "topic",
+        "order": 6,
+        "stage": "stage1",
+        "positionX": 300,
+        "positionY": 460
+      },
+      {
+        "id": 8,
+        "nodeId": "fe-react",
+        "label": "React JS",
+        "nodeType": "topic",
+        "order": 7,
+        "stage": "stage1",
+        "positionX": 560,
+        "positionY": 460
+      },
+      {
+        "id": 9,
+        "nodeId": "fe-react-eco",
+        "label": "Экосистема React",
+        "nodeType": "topic",
+        "order": 8,
+        "stage": "stage1",
+        "positionX": 820,
+        "positionY": 460
+      },
+      {
+        "id": 10,
+        "nodeId": "fe-layout",
+        "label": "Вёрстка",
+        "nodeType": "topic",
+        "order": 9,
+        "stage": "stage2",
+        "positionX": 40,
+        "positionY": 760
+      },
+      {
+        "id": 11,
+        "nodeId": "fe-arch",
+        "label": "Архитектура и код-ревью",
+        "nodeType": "topic",
+        "order": 10,
+        "stage": "stage2",
+        "positionX": 300,
+        "positionY": 760
+      },
+      {
+        "id": 12,
+        "nodeId": "fe-nextjs",
+        "label": "Next.js",
+        "nodeType": "topic",
+        "order": 11,
+        "stage": "stage2",
+        "positionX": 560,
+        "positionY": 760
+      },
+      {
+        "id": 13,
+        "nodeId": "fe-tests",
+        "label": "Тестирование",
+        "nodeType": "topic",
+        "order": 12,
+        "stage": "stage2",
+        "positionX": 820,
+        "positionY": 760
+      },
+      {
+        "id": 14,
+        "nodeId": "fe-real-project",
+        "label": "Реальные проекты",
+        "nodeType": "topic",
+        "order": 13,
+        "stage": "practice",
+        "positionX": 40,
+        "positionY": 1060
+      },
+      {
+        "id": 15,
+        "nodeId": "fe-complex-int",
+        "label": "Сложные интеграции",
+        "nodeType": "topic",
+        "order": 14,
+        "stage": "practice",
+        "positionX": 300,
+        "positionY": 1060
+      },
+      {
+        "id": 16,
+        "nodeId": "fe-perf",
+        "label": "Производительность",
+        "nodeType": "topic",
+        "order": 15,
+        "stage": "practice",
+        "positionX": 560,
+        "positionY": 1060
+      },
+      {
+        "id": 17,
+        "nodeId": "fe-mobile",
+        "label": "Mobile / PWA",
+        "nodeType": "topic",
+        "order": 16,
+        "stage": "practice",
+        "positionX": 820,
+        "positionY": 1060
+      },
+      {
+        "id": 87,
+        "nodeId": "fe-algorithms",
+        "label": "Алгоритмы и структуры данных",
+        "nodeType": "topic",
+        "order": 16.5,
+        "stage": "practice",
+        "positionX": 1080,
+        "positionY": 1060
+      },
+      {
+        "id": 18,
+        "nodeId": "fe-interview",
+        "label": "Подготовка к собеседованию",
+        "nodeType": "topic",
+        "order": 17,
+        "stage": "advanced",
+        "positionX": 180,
+        "positionY": 1340
+      },
+      {
+        "id": 19,
+        "nodeId": "fe-resume",
+        "label": "Резюме и портфолио",
+        "nodeType": "topic",
+        "order": 18,
+        "stage": "advanced",
+        "positionX": 480,
+        "positionY": 1340
+      },
+      {
+        "id": 20,
+        "nodeId": "fe-mentoring",
+        "label": "Менторинг и рост",
+        "nodeType": "topic",
+        "order": 19,
+        "stage": "advanced",
+        "positionX": 780,
+        "positionY": 1340
+      },
+      {
+        "id": 21,
+        "nodeId": "fe-growth-monorepo",
+        "label": "Монорепо",
+        "nodeType": "subtopic",
+        "order": 20,
+        "stage": "growth",
+        "positionX": 60,
+        "positionY": 1620
+      },
+      {
+        "id": 22,
+        "nodeId": "fe-growth-micro",
+        "label": "Микрофронтенды",
+        "nodeType": "subtopic",
+        "order": 21,
+        "stage": "growth",
+        "positionX": 280,
+        "positionY": 1620
+      },
+      {
+        "id": 23,
+        "nodeId": "fe-growth-wasm",
+        "label": "WebAssembly",
+        "nodeType": "subtopic",
+        "order": 22,
+        "stage": "growth",
+        "positionX": 500,
+        "positionY": 1620
+      },
+      {
+        "id": 24,
+        "nodeId": "fe-growth-3d",
+        "label": "3D / WebGL",
+        "nodeType": "subtopic",
+        "order": 23,
+        "stage": "growth",
+        "positionX": 720,
+        "positionY": 1620
+      },
+      {
+        "id": 88,
+        "nodeId": "fe-library-resources",
+        "label": "Библиотека и дополнительные материалы",
+        "nodeType": "topic",
+        "order": 24,
+        "stage": "growth",
+        "positionX": 980,
+        "positionY": 1620
+      }
+    ]
+  },
+  {
+    "slug": "backend-nodejs",
+    "nodes": [
+      {
+        "id": 25,
+        "nodeId": "be-start",
+        "label": "Начало",
+        "nodeType": "category",
+        "order": 0,
+        "stage": "start",
+        "positionX": 500,
+        "positionY": 0
+      },
+      {
+        "id": 26,
+        "nodeId": "be-js",
+        "label": "JS",
+        "nodeType": "topic",
+        "order": 1,
+        "stage": "base",
+        "positionX": 40,
+        "positionY": 180
+      },
+      {
+        "id": 27,
+        "nodeId": "be-ts",
+        "label": "TS",
+        "nodeType": "topic",
+        "order": 2,
+        "stage": "base",
+        "positionX": 240,
+        "positionY": 180
+      },
+      {
+        "id": 28,
+        "nodeId": "be-git-net",
+        "label": "Git и сеть",
+        "nodeType": "topic",
+        "order": 3,
+        "stage": "base",
+        "positionX": 440,
+        "positionY": 180
+      },
+      {
+        "id": 29,
+        "nodeId": "be-node",
+        "label": "Node.js",
+        "nodeType": "topic",
+        "order": 4,
+        "stage": "base",
+        "positionX": 640,
+        "positionY": 180
+      },
+      {
+        "id": 30,
+        "nodeId": "be-linux",
+        "label": "Linux / Терминал",
+        "nodeType": "topic",
+        "order": 5,
+        "stage": "base",
+        "positionX": 840,
+        "positionY": 180
+      },
+      {
+        "id": 31,
+        "nodeId": "be-algo",
+        "label": "Алгоритмы и структуры",
+        "nodeType": "topic",
+        "order": 6,
+        "stage": "stage1",
+        "positionX": -266,
+        "positionY": 467
+      },
+      {
+        "id": 32,
+        "nodeId": "be-nest",
+        "label": "NestJS",
+        "nodeType": "topic",
+        "order": 7,
+        "stage": "stage1",
+        "positionX": 240,
+        "positionY": 460
+      },
+      {
+        "id": 33,
+        "nodeId": "be-arch",
+        "label": "Архитектура",
+        "nodeType": "topic",
+        "order": 8,
+        "stage": "stage1",
+        "positionX": 440,
+        "positionY": 460
+      },
+      {
+        "id": 34,
+        "nodeId": "be-sql",
+        "label": "SQL и реляционные БД",
+        "nodeType": "topic",
+        "order": 9,
+        "stage": "stage1",
+        "positionX": 640,
+        "positionY": 460
+      },
+      {
+        "id": 35,
+        "nodeId": "be-nosql",
+        "label": "NoSQL",
+        "nodeType": "topic",
+        "order": 10,
+        "stage": "stage1",
+        "positionX": 1091,
+        "positionY": 460
+      },
+      {
+        "id": 36,
+        "nodeId": "be-docker",
+        "label": "Docker",
+        "nodeType": "topic",
+        "order": 11,
+        "stage": "stage2",
+        "positionX": 40,
+        "positionY": 760
+      },
+      {
+        "id": 37,
+        "nodeId": "be-api",
+        "label": "API: REST, GraphQL, gRPC",
+        "nodeType": "topic",
+        "order": 12,
+        "stage": "stage2",
+        "positionX": 240,
+        "positionY": 760
+      },
+      {
+        "id": 38,
+        "nodeId": "be-orm",
+        "label": "ORM и миграции",
+        "nodeType": "topic",
+        "order": 13,
+        "stage": "stage2",
+        "positionX": 440,
+        "positionY": 760
+      },
+      {
+        "id": 39,
+        "nodeId": "be-auth",
+        "label": "Аутентификация",
+        "nodeType": "topic",
+        "order": 14,
+        "stage": "stage2",
+        "positionX": 640,
+        "positionY": 760
+      },
+      {
+        "id": 40,
+        "nodeId": "be-queues",
+        "label": "Очереди сообщений",
+        "nodeType": "topic",
+        "order": 15,
+        "stage": "stage2",
+        "positionX": 1138,
+        "positionY": 828
+      },
+      {
+        "id": 41,
+        "nodeId": "be-testing",
+        "label": "Тестирование бэка",
+        "nodeType": "topic",
+        "order": 16,
+        "stage": "practice",
+        "positionX": 40,
+        "positionY": 1060
+      },
+      {
+        "id": 42,
+        "nodeId": "be-cicd",
+        "label": "CI/CD",
+        "nodeType": "topic",
+        "order": 17,
+        "stage": "practice",
+        "positionX": 260,
+        "positionY": 1060
+      },
+      {
+        "id": 43,
+        "nodeId": "be-observ",
+        "label": "Observability",
+        "nodeType": "topic",
+        "order": 18,
+        "stage": "practice",
+        "positionX": 480,
+        "positionY": 1060
+      },
+      {
+        "id": 44,
+        "nodeId": "be-security",
+        "label": "Безопасность",
+        "nodeType": "topic",
+        "order": 19,
+        "stage": "practice",
+        "positionX": 938,
+        "positionY": 1146
+      },
+      {
+        "id": 45,
+        "nodeId": "be-microservices",
+        "label": "Микросервисы",
+        "nodeType": "topic",
+        "order": 20,
+        "stage": "advanced",
+        "positionX": 40,
+        "positionY": 1340
+      },
+      {
+        "id": 46,
+        "nodeId": "be-k8s",
+        "label": "Kubernetes",
+        "nodeType": "topic",
+        "order": 21,
+        "stage": "advanced",
+        "positionX": 260,
+        "positionY": 1340
+      },
+      {
+        "id": 47,
+        "nodeId": "be-load",
+        "label": "Нагрузочное тестирование",
+        "nodeType": "topic",
+        "order": 22,
+        "stage": "advanced",
+        "positionX": 480,
+        "positionY": 1340
+      },
+      {
+        "id": 48,
+        "nodeId": "be-interview",
+        "label": "Подготовка к собеседованию",
+        "nodeType": "topic",
+        "order": 23,
+        "stage": "advanced",
+        "positionX": 700,
+        "positionY": 1340
+      },
+      {
+        "id": 49,
+        "nodeId": "be-growth-ml",
+        "label": "ML / AI в бэкенде",
+        "nodeType": "subtopic",
+        "order": 24,
+        "stage": "growth",
+        "positionX": 40,
+        "positionY": 1620
+      },
+      {
+        "id": 50,
+        "nodeId": "be-growth-web3",
+        "label": "Web3 / Blockchain",
+        "nodeType": "subtopic",
+        "order": 25,
+        "stage": "growth",
+        "positionX": 260,
+        "positionY": 1620
+      },
+      {
+        "id": 51,
+        "nodeId": "be-growth-rust",
+        "label": "Rust для бэка",
+        "nodeType": "subtopic",
+        "order": 26,
+        "stage": "growth",
+        "positionX": 480,
+        "positionY": 1620
+      },
+      {
+        "id": 52,
+        "nodeId": "be-growth-arch",
+        "label": "Cloud-native design",
+        "nodeType": "subtopic",
+        "order": 27,
+        "stage": "growth",
+        "positionX": 700,
+        "positionY": 1620
+      },
+      {
+        "id": 91,
+        "nodeId": "be-telegram-bots",
+        "label": "Telegram-боты и интеграции",
+        "nodeType": "topic",
+        "order": 28,
+        "stage": "advanced",
+        "positionX": 40,
+        "positionY": 1880
+      }
+    ]
+  },
+  {
+    "slug": "startup-marketing",
+    "nodes": [
+      {
+        "id": 73,
+        "nodeId": "startup-marketing-start",
+        "label": "Начало",
+        "nodeType": "category",
+        "order": 0,
+        "stage": "start",
+        "positionX": 500,
+        "positionY": 0
+      },
+      {
+        "id": 74,
+        "nodeId": "startup-marketing-startup-marketing",
+        "label": "Свой стартап и маркетинг",
+        "nodeType": "topic",
+        "order": 1,
+        "stage": "base",
+        "positionX": 500,
+        "positionY": 180
+      }
+    ]
+  },
+  {
+    "slug": "golang",
+    "nodes": [
+      {
+        "id": 57,
+        "nodeId": "golang-start",
+        "label": "Начало",
+        "nodeType": "category",
+        "order": 0,
+        "stage": "start",
+        "positionX": 500,
+        "positionY": 0
+      },
+      {
+        "id": 58,
+        "nodeId": "golang-golang-basics",
+        "label": "Основы Golang",
+        "nodeType": "topic",
+        "order": 1,
+        "stage": "base",
+        "positionX": 500,
+        "positionY": 180
+      },
+      {
+        "id": 59,
+        "nodeId": "golang-golang-advanced",
+        "label": "Продвинутый Golang",
+        "nodeType": "topic",
+        "order": 2,
+        "stage": "stage1",
+        "positionX": 500,
+        "positionY": 360
+      },
+      {
+        "id": 60,
+        "nodeId": "golang-golang-templ-fiber-htmx",
+        "label": "Templ, Fiber, HTMX",
+        "nodeType": "topic",
+        "order": 3,
+        "stage": "stage2",
+        "positionX": 500,
+        "positionY": 540
+      }
+    ]
+  },
+  {
+    "slug": "devops-infra",
+    "nodes": [
+      {
+        "id": 61,
+        "nodeId": "devops-infra-start",
+        "label": "Начало",
+        "nodeType": "category",
+        "order": 0,
+        "stage": "start",
+        "positionX": 500,
+        "positionY": 0
+      },
+      {
+        "id": 62,
+        "nodeId": "devops-infra-linux-course",
+        "label": "Linux",
+        "nodeType": "topic",
+        "order": 1,
+        "stage": "base",
+        "positionX": 500,
+        "positionY": 180
+      },
+      {
+        "id": 63,
+        "nodeId": "devops-infra-bash-scripts",
+        "label": "Bash-скрипты",
+        "nodeType": "topic",
+        "order": 2,
+        "stage": "base",
+        "positionX": 500,
+        "positionY": 360
+      },
+      {
+        "id": 64,
+        "nodeId": "devops-infra-docker-ansible",
+        "label": "Docker и Ansible",
+        "nodeType": "topic",
+        "order": 3,
+        "stage": "stage1",
+        "positionX": 500,
+        "positionY": 540
+      },
+      {
+        "id": 65,
+        "nodeId": "devops-infra-kubernetes-helm",
+        "label": "Kubernetes и Helm",
+        "nodeType": "topic",
+        "order": 4,
+        "stage": "stage2",
+        "positionX": 500,
+        "positionY": 720
+      },
+      {
+        "id": 85,
+        "nodeId": "devops-fullstack-deploy",
+        "label": "Деплой fullstack-приложения",
+        "nodeType": "topic",
+        "order": 6,
+        "stage": "practice",
+        "positionX": 40,
+        "positionY": 750
+      },
+      {
+        "id": 89,
+        "nodeId": "devops-observability",
+        "label": "Observability",
+        "nodeType": "topic",
+        "order": 7,
+        "stage": "practice",
+        "positionX": 40,
+        "positionY": 1660
+      }
+    ]
+  },
+  {
+    "slug": "system-design",
+    "nodes": [
+      {
+        "id": 66,
+        "nodeId": "system-design-start",
+        "label": "Начало",
+        "nodeType": "category",
+        "order": 0,
+        "stage": "start",
+        "positionX": 500,
+        "positionY": 0
+      },
+      {
+        "id": 67,
+        "nodeId": "system-design-system-design-neetcode",
+        "label": "System Design: основы",
+        "nodeType": "topic",
+        "order": 1,
+        "stage": "base",
+        "positionX": 500,
+        "positionY": 180
+      },
+      {
+        "id": 68,
+        "nodeId": "system-design-ood-interviews-2023",
+        "label": "Объектный дизайн",
+        "nodeType": "topic",
+        "order": 2,
+        "stage": "stage1",
+        "positionX": 500,
+        "positionY": 360
+      },
+      {
+        "id": 69,
+        "nodeId": "system-design-system-design-balun",
+        "label": "Паттерны проектирования",
+        "nodeType": "topic",
+        "order": 3,
+        "stage": "stage2",
+        "positionX": 500,
+        "positionY": 540
+      },
+      {
+        "id": 70,
+        "nodeId": "system-design-system-design-interviews-2022",
+        "label": "Разбор собеседований",
+        "nodeType": "topic",
+        "order": 4,
+        "stage": "practice",
+        "positionX": 500,
+        "positionY": 720
+      },
+      {
+        "id": 90,
+        "nodeId": "sd-async-architecture",
+        "label": "Асинхронная архитектура",
+        "nodeType": "topic",
+        "order": 5,
+        "stage": "advanced",
+        "positionX": 40,
+        "positionY": 980
+      }
+    ]
+  },
+  {
+    "slug": "ai-dev",
+    "nodes": [
+      {
+        "id": 71,
+        "nodeId": "ai-dev-start",
+        "label": "Начало",
+        "nodeType": "category",
+        "order": 0,
+        "stage": "start",
+        "positionX": 500,
+        "positionY": 0
+      },
+      {
+        "id": 72,
+        "nodeId": "ai-dev-podlodka-ai-crew",
+        "label": "AI в команде разработки",
+        "nodeType": "topic",
+        "order": 1,
+        "stage": "base",
+        "positionX": 500,
+        "positionY": 180
+      }
+    ]
+  },
+  {
+    "slug": "algorithms",
+    "nodes": [
+      {
+        "id": 77,
+        "nodeId": "algorithms-category",
+        "label": "Алгоритмы и структуры данных",
+        "nodeType": "category",
+        "order": 0,
+        "stage": "start",
+        "positionX": 40,
+        "positionY": 0
+      },
+      {
+        "id": 78,
+        "nodeId": "algorithms-basics",
+        "label": "Базовые алгоритмы и структуры данных",
+        "nodeType": "topic",
+        "order": 1,
+        "stage": "base",
+        "positionX": 40,
+        "positionY": 200
+      },
+      {
+        "id": 79,
+        "nodeId": "algorithms-advanced",
+        "label": "Продвинутые алгоритмы",
+        "nodeType": "topic",
+        "order": 2,
+        "stage": "advanced",
+        "positionX": 490,
+        "positionY": 200
+      },
+      {
+        "id": 80,
+        "nodeId": "algorithms-interviews",
+        "label": "Алгоритмические собеседования",
+        "nodeType": "topic",
+        "order": 3,
+        "stage": "practice",
+        "positionX": 40,
+        "positionY": 460
+      },
+      {
+        "id": 81,
+        "nodeId": "algorithms-theory",
+        "label": "Теория и дополнительные материалы",
+        "nodeType": "topic",
+        "order": 4,
+        "stage": "growth",
+        "positionX": 490,
+        "positionY": 460
+      }
+    ]
+  },
+  {
+    "slug": "career-teamwork",
+    "nodes": [
+      {
+        "id": 82,
+        "nodeId": "career-teamwork-category",
+        "label": "Карьера и командная работа",
+        "nodeType": "category",
+        "order": 0,
+        "stage": "start",
+        "positionX": 40,
+        "positionY": 0
+      },
+      {
+        "id": 83,
+        "nodeId": "career-agile",
+        "label": "Agile, Kanban и Scrum",
+        "nodeType": "topic",
+        "order": 1,
+        "stage": "practice",
+        "positionX": 40,
+        "positionY": 200
+      },
+      {
+        "id": 84,
+        "nodeId": "career-interviews",
+        "label": "Резюме и собеседования",
+        "nodeType": "topic",
+        "order": 2,
+        "stage": "growth",
+        "positionX": 490,
+        "positionY": 200
+      },
+      {
+        "id": 92,
+        "nodeId": "career-language-learning",
+        "label": "Изучение иностранных языков",
+        "nodeType": "topic",
+        "order": 3,
+        "stage": "growth",
+        "positionX": 940,
+        "positionY": 200
+      }
+    ]
+  }
+]

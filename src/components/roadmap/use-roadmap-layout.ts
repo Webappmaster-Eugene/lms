@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from 'react'
 import { useStore } from '@xyflow/react'
 import { layoutRoadmap } from '@/lib/roadmap-layout'
+import { sequenceRoadmapNodes, sequentialRoadmapEdges } from '@/lib/roadmap-sequence'
 import type { AnyRoadmapNode, GraphEdge, GraphNode } from '@/components/roadmap/types'
 
 export function isContentNode(node: AnyRoadmapNode): node is GraphNode {
@@ -22,12 +23,23 @@ export function useRoadmapLayout(nodes: AnyRoadmapNode[], edges: GraphEdge[]) {
     const entries = JSON.parse(dimensions) as [string, number, number][]
     for (const [id, width, height] of entries) sizes.set(id, { width, height })
     const ready = content.every((node) => (sizes.get(node.id)?.width ?? 0) > 0 && (sizes.get(node.id)?.height ?? 0) > 0)
+    const sequence = sequenceRoadmapNodes(content.map((node) => ({
+      id: node.id, nodeId: node.id, label: node.data.label, nodeType: node.data.nodeType,
+      order: node.data.sequenceOrder ?? node.data.learningOrder, stage: node.data.stage,
+      positionX: node.position.x, positionY: node.position.y,
+    })))
+    const positionById = new Map(sequence.map((node) => [node.id, { x: node.positionX, y: node.positionY }]))
+    const chain = sequentialRoadmapEdges(sequence).map((edge) => ({
+      ...(edges.find((candidate) => candidate.source === edge.source && candidate.target === edge.target) ?? {}),
+      id: edge.edgeId, source: edge.source, target: edge.target,
+    }))
     const result = layoutRoadmap(content.map((node) => ({
       ...node,
+      position: positionById.get(node.id) ?? node.position,
       width: sizes.get(node.id)?.width || (node.type === 'category' ? 320 : 280),
       height: sizes.get(node.id)?.height || (node.type === 'category' ? 96 : 260),
       stage: node.data.stage,
-    })), edges)
+    })), chain, { horizontalSteps: true })
     const positions = new Map(result.nodes.map((node) => [node.id, node.position]))
     return {
       ready,
@@ -43,7 +55,7 @@ export function useRoadmapLayout(nodes: AnyRoadmapNode[], edges: GraphEdge[]) {
           measured: size?.width && size.height ? size : node.measured,
         }
       })],
-      edges: edges.filter((edge) => result.routes[edge.id]).map((edge) => ({ ...edge, type: 'roadmap-route', animated: false,
+      edges: chain.filter((edge) => result.routes[edge.id]).map((edge) => ({ ...edge, type: 'roadmap-route', animated: false,
         ariaLabel: `Переход от «${content.find((node) => node.id === edge.source)?.data.label ?? edge.source}» к «${content.find((node) => node.id === edge.target)?.data.label ?? edge.target}»`,
         data: { ...edge.data, points: result.routes[edge.id] },
       })),

@@ -1,8 +1,6 @@
 import type { Metadata } from 'next'
-import { getPayload } from '@/lib/payload'
-import { headers } from 'next/headers'
+import { getLearningRequest } from '@/server/learning-request'
 import { redirect } from 'next/navigation'
-import { createLocalReq } from 'payload'
 import { BookOpen } from 'lucide-react'
 import { CourseCatalog } from '@/components/course/CourseCatalog'
 import { collectAllPages } from '@/lib/paginate'
@@ -13,11 +11,8 @@ export const metadata: Metadata = {
 }
 
 export default async function CoursesListPage() {
-  const payload = await getPayload()
-  const headersList = await headers()
-  const { user } = await payload.auth({ headers: headersList })
+  const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login')
-  const req = await createLocalReq({ user }, payload)
   const access = await getLearningAccess(payload, user, req)
 
   const courseDocs = await collectAllPages(

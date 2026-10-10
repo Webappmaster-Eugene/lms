@@ -83,6 +83,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-markdown": "9.1.0",
+    "redis": "^5.12.1",
     "rehype-raw": "7.0.0",
     "remark-gfm": "4.0.1",
     "require-in-the-middle": "8.0.1",
@@ -124,6 +125,7 @@
     "postcss": "8.5.28",
     "sass": "1.104.0",
     "tailwindcss": "4.3.3",
+    "tsx": "^4.23.15",
     "typescript-eslint": "^8.70.0",
     "vitest": "^5.0.0"
   },

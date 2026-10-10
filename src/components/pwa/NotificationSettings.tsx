@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { BellRing, CheckCircle2, Download, Smartphone } from 'lucide-react'
-import { currentInstallPrompt, rememberInstallPrompt, vapidBytes } from '@/lib/pwa-client'
+import { currentInstallPrompt, isInstalledPwa, isIosDevice, rememberInstallPrompt, vapidBytes } from '@/lib/pwa-client'
 
 interface Preferences {
   remindersEnabled: boolean
@@ -62,8 +62,8 @@ function subscribeToCapabilities(callback: () => void) {
 }
 
 function capabilities() {
-  const installed = window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
-  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  const installed = isInstalledPwa()
+  const ios = isIosDevice()
   const push = window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
   const denied = 'Notification' in window && Notification.permission === 'denied'
   return (push ? 1 : 0) | (installed ? 2 : 0) | (ios && !installed ? 4 : 0) | (currentInstallPrompt() ? 8 : 0) | (denied ? 16 : 0)

@@ -1,15 +1,15 @@
 import type { Metadata } from 'next'
-import { getPayload } from '@/lib/payload'
-import { headers } from 'next/headers'
+import { getLearningRequest } from '@/server/learning-request'
 import { notFound, redirect } from 'next/navigation'
-import { createLocalReq } from 'payload'
 import { getLearningAccess } from '@/server/learning-access'
+import { getRoadmapContent } from '@/server/learning-catalog'
+import { orderRoadmapNodes } from '@/lib/roadmap-sequence'
 import { groupCoursesByNode, summarizeNode } from '@/lib/roadmap-node-courses'
 import {
   blockingPrerequisites,
   nextLesson,
   orderCourseLessons,
-  pickNextStep,
+  pickSequentialNextStep,
   type LessonLink,
   type LessonRef,
 } from '@/lib/roadmap-next-step'
@@ -31,10 +31,8 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const payload = await getPayload()
-  const { user } = await payload.auth({ headers: await headers() })
+  const { payload, user, req } = await getLearningRequest()
   if (!user) return { title: 'Вход' }
-  const req = await createLocalReq({ user }, payload)
   const access = await getLearningAccess(payload, user, req)
   const result = await payload.find({
     collection: 'roadmaps',
@@ -51,11 +49,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function RoadmapDetailPage({ params }: Props) {
   const { slug } = await params
-  const payload = await getPayload()
-  const headersList = await headers()
-  const { user } = await payload.auth({ headers: headersList })
+  const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login')
-  const req = await createLocalReq({ user }, payload)
   const access = await getLearningAccess(payload, user, req)
 
   const roadmapResult = await payload.find({
@@ -74,27 +69,18 @@ export default async function RoadmapDetailPage({ params }: Props) {
   const roadmap = roadmapResult.docs[0]
   if (!roadmap || !access.canBrowseRoadmap(roadmap.id)) return notFound()
 
-  // Загружаем курсы роадмапа
-  const courseDocs = await collectAllPages(
-    ({ page, limit }) =>
-      payload.find({
-        collection: 'courses',
-        where: {
-          roadmap: { equals: roadmap.id },
-          isPublished: { equals: true },
-        },
-        sort: ['order', 'id'],
-        depth: 0,
-        select: { title: true, slug: true, estimatedHours: true, prerequisites: true, roadmapNode: true },
-        overrideAccess: false,
-        req,
-        page,
-        limit,
-      }),
-    { label: `курсы роадмапа «${roadmap.slug}»` },
-  )
-
-  const visibleCourses = courseDocs.filter((course) => access.canBrowseCourse(course.id))
+  const content = await getRoadmapContent(payload, roadmap.id, req)
+  const nodeDocs = orderRoadmapNodes(content.nodes.filter((node) => access.canBrowseNode(node.id)), roadmap.slug)
+  const edgeDocs = content.edges
+  const nodeRank = new Map(nodeDocs.map((node, index) => [String(node.id), index]))
+  const mainCourseRank = new Map(nodeDocs.flatMap((node, index) => {
+    const courseId = resolveRelationId(node.course)
+    return courseId ? [[courseId, index] as const] : []
+  }))
+  const rankCourse = (course: (typeof content.courses)[number]) =>
+    nodeRank.get(resolveRelationId(course.roadmapNode) ?? '') ?? mainCourseRank.get(String(course.id)) ?? Number.MAX_SAFE_INTEGER
+  const visibleCourses = content.courses.filter((course) => course.isPublished && access.canBrowseCourse(course.id))
+    .sort((first, second) => rankCourse(first) - rankCourse(second) || (first.order ?? 0) - (second.order ?? 0) || first.id - second.id)
   const courseIds = visibleCourses.map((c) => String(c.id))
 
   const [loadedLessonDocs, sectionDocs, progressDocs] = await Promise.all([
@@ -200,7 +186,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
 
     // Пререквизиты: проверяем по тем же данным (без доп. запросов)
     let prerequisitesMet = true
-    if (course.prerequisites && Array.isArray(course.prerequisites)) {
+    if (access.catalogVisibility !== 'assigned' && course.prerequisites && Array.isArray(course.prerequisites)) {
       for (const prereq of course.prerequisites) {
         const prereqId = String(typeof prereq === 'object' ? prereq.id : prereq)
         const prereqLessonIds = lessonsByCourse.get(prereqId) ?? []
@@ -214,7 +200,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
       }
     }
 
-    const prerequisites = (course.prerequisites ?? []).flatMap((p) => {
+    const prerequisites = (access.catalogVisibility === 'assigned' ? [] : course.prerequisites ?? []).flatMap((p) => {
       const prerequisite = visibleCourses.find((candidate) => String(candidate.id) === resolveRelationId(p))
       return prerequisite ? [{ id: String(prerequisite.id), title: prerequisite.title }] : []
     })
@@ -241,41 +227,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
   const totalLessons = coursesWithProgress.reduce((s, c) => s + c.totalLessons, 0)
   const completedTotal = coursesWithProgress.reduce((s, c) => s + c.completedCount, 0)
   const overallPercent = totalLessons > 0 ? Math.round((completedTotal / totalLessons) * 100) : 0
-  const nextStep = pickNextStep(coursesWithProgress.filter((course) => course.accessAllowed))
-
-  // Загружаем узлы и связи графа роадмапа (параллельно)
-  const [nodeDocs, edgeDocs] = await Promise.all([
-    collectAllPages(
-      ({ page, limit }) =>
-        payload.find({
-          collection: 'roadmap-nodes',
-          where: { roadmap: { equals: roadmap.id } },
-          sort: ['order', 'id'],
-          depth: 0,
-          select: { nodeId: true, nodeType: true, course: true, label: true, positionX: true, positionY: true, bullets: true, icon: true, description: true, stage: true, color: true },
-          overrideAccess: false,
-          req,
-          page,
-          limit,
-        }),
-      { label: `узлы роадмапа «${roadmap.slug}»` },
-    ),
-    collectAllPages(
-      ({ page, limit }) =>
-        payload.find({
-          collection: 'roadmap-edges',
-          where: { roadmap: { equals: roadmap.id } },
-          sort: 'id',
-          depth: 0,
-          select: { edgeId: true, source: true, target: true, edgeType: true, animated: true },
-          overrideAccess: false,
-          req,
-          page,
-          limit,
-        }),
-      { label: `связи роадмапа «${roadmap.slug}»` },
-    ),
-  ])
+  const nextStep = pickSequentialNextStep(coursesWithProgress.filter((course) => course.accessAllowed))
 
   // Трансформация в формат ReactFlow
   const { graphNodes, graphEdges, placedCourseIds } = buildGraphData(
@@ -470,7 +422,8 @@ function buildGraphData(
   const nodeIdSet = new Set<string>()
   const placedCourseIds = new Set<string>()
 
-  const graphNodes: AnyRoadmapNode[] = rawNodes.map((n) => {
+  let learningOrder = 0
+  const graphNodes: AnyRoadmapNode[] = rawNodes.map((n, index) => {
     nodeIdSet.add(n.nodeId)
 
     const linkedCourseId = resolveRelationId(n.course)
@@ -501,6 +454,8 @@ function buildGraphData(
       data: {
         ...(canManage ? { managementNodeId: n.id } : {}),
         label: n.label,
+        sequenceOrder: index,
+        ...(n.nodeType !== 'category' ? { learningOrder: ++learningOrder } : {}),
         nodeType: n.nodeType,
         courseSlug: comingSoon ? null : (linkedCourse ?? nodeCourses[0])?.slug ?? null,
         courses: comingSoon ? [] : fullCourses.map(toNodeCourse),

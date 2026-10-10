@@ -112,14 +112,14 @@ export function LessonComments({ lessonId }: Props) {
           placeholder="Что осталось непонятным?"
           maxLength={2000}
           rows={2}
-          className="flex-1 resize-none rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+          className="min-w-0 flex-1 resize-none rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
         />
         <button
           type="button"
           onClick={handleSubmit}
           disabled={submitting || !newComment.trim()}
           aria-label={submitting ? 'Отправляем вопрос' : 'Отправить вопрос'}
-          className="flex h-10 w-10 items-center justify-center self-end rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+          className="flex h-11 w-11 shrink-0 items-center justify-center self-end rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </button>
@@ -205,14 +205,14 @@ function ThreadItem({ thread, lessonId, onPosted }: { thread: Thread; lessonId: 
             maxLength={2000}
             rows={2}
             autoFocus
-            className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+            className="min-w-0 flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
           />
           <button
             type="button"
             onClick={send}
             disabled={sending || !text.trim()}
             aria-label={sending ? 'Отправляем уточнение' : 'Отправить уточнение'}
-            className="flex h-9 w-9 items-center justify-center self-end rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+            className="flex h-11 w-11 shrink-0 items-center justify-center self-end rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </button>
@@ -221,7 +221,7 @@ function ThreadItem({ thread, lessonId, onPosted }: { thread: Thread; lessonId: 
         <button
           type="button"
           onClick={() => setReplying(true)}
-          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className="flex min-h-11 items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           <CornerDownRight className="h-3.5 w-3.5" aria-hidden="true" />
           Уточнить
@@ -235,13 +235,13 @@ function CommentBody({ comment, children }: { comment: CommentDoc; children?: Re
   return (
     <div className="space-y-1">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+        <span className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-medium text-foreground [overflow-wrap:anywhere]">
           {authorName(comment.user)}
           {children}
         </span>
         <span className="text-xs text-muted-foreground">{formatDate(comment.createdAt)}</span>
       </div>
-      <p className="whitespace-pre-wrap text-sm text-foreground">{comment.content}</p>
+      <p className="whitespace-pre-wrap text-sm text-foreground [overflow-wrap:anywhere]">{comment.content}</p>
     </div>
   )
 }

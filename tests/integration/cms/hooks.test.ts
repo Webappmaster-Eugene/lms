@@ -173,6 +173,46 @@ describe('прохождение урока → баллы, серия, дост
     expect(await total(student.id)).toBe(before.reduce((a, t) => a + t.amount, 0))
   })
 
+  it('повторная отметка восстанавливает сертификаты курса и роадмапа без повторного начисления', async () => {
+    const student = await createStudent(payload)
+    const tree = await createCourseTree(payload, { lessons: 1 })
+    const progress = await completeLesson(student, tree.lessons[0].id)
+    const before = await transactions(student.id)
+    const notificationsBefore = await payload.count({ collection: 'notifications', where: { user: { equals: student.id } } })
+    await payload.delete({ collection: 'certificates', where: { user: { equals: student.id } } })
+
+    await payload.update({ collection: 'user-progress', id: progress.id, data: { isCompleted: false }, user: student, overrideAccess: false })
+    await payload.update({ collection: 'user-progress', id: progress.id, data: { isCompleted: true }, user: student, overrideAccess: false })
+
+    const certificates = await payload.find({ collection: 'certificates', where: { user: { equals: student.id } }, sort: 'type' })
+    expect(certificates.docs.map(certificate => [certificate.type, certificate.relatedEntity])).toEqual([
+      ['course', String(tree.course.id)],
+      ['roadmap', String(tree.roadmap.id)],
+    ])
+    expect(await transactions(student.id)).toEqual(before)
+    expect(await payload.count({ collection: 'notifications', where: { user: { equals: student.id } } })).toEqual(notificationsBefore)
+  })
+
+  it('бонус старого курса не завершает роадмап, если в курс добавили новый урок', async () => {
+    const student = await createStudent(payload)
+    const first = await createCourseTree(payload, { lessons: 1 })
+    const second = await createCourseTree(payload, { lessons: 1 })
+    await payload.update({ collection: 'courses', id: second.course.id, data: { roadmap: first.roadmap.id } })
+    await completeLesson(student, first.lessons[0].id)
+    const extra = await payload.create({
+      collection: 'lessons',
+      data: { title: 'Дополнительный урок', slug: `extra-${first.course.slug}`, course: first.course.id, section: first.section.id, isPublished: true },
+    })
+
+    await completeLesson(student, second.lessons[0].id)
+    expect((await transactions(student.id)).filter(transaction => transaction.reason === 'roadmap_completed')).toEqual([])
+    expect((await payload.find({ collection: 'certificates', where: { user: { equals: student.id }, type: { equals: 'roadmap' } } })).totalDocs).toBe(0)
+
+    await completeLesson(student, extra.id)
+    expect((await transactions(student.id)).filter(transaction => transaction.reason === 'roadmap_completed')).toHaveLength(1)
+    expect((await payload.find({ collection: 'certificates', where: { user: { equals: student.id }, type: { equals: 'roadmap' } } })).totalDocs).toBe(1)
+  })
+
   it('незавершённый прогресс (просто открыл урок) ничего не начисляет', async () => {
     const student = await createStudent(payload)
     const tree = await createCourseTree(payload, { lessons: 1 })

@@ -52,6 +52,10 @@ const nextConfig = {
         headers: [{ key: 'Cache-Control', value: 'public, max-age=3600, must-revalidate' }],
       },
       {
+        source: '/fonts/inter/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
+      {
         // Админке общий CSP не подходит (свои скрипты и стили Payload), но встраивать её
         // во фрейм нельзя: иначе кликджекинг действий администратора
         source: '/admin/:path*',

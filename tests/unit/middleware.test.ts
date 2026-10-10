@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { NextRequest } from 'next/server'
 
 import { config, middleware } from '@/middleware'
+import { PUBLIC_FONT_PATHS } from '@/lib/public-fonts'
 
 const ORIGIN = 'https://learn.mentorcareer.ru'
 
@@ -60,6 +61,13 @@ describe('публичные пути', () => {
 })
 
 describe('статика', () => {
+  it.each(PUBLIC_FONT_PATHS)('%s доступен до входа', (path) => {
+    expect(isRedirect(middleware(request(path)))).toBe(false)
+  })
+
+  it('не считает любой файл из /fonts публичным по расширению', () => {
+    expect(isRedirect(middleware(request('/fonts/inter/private.woff2')))).toBe(true)
+  })
   it.each(['/_next/static/chunk.js', '/images/logo.png', '/favicon.ico', '/icon.svg'])(
     '%s отдаётся без проверки',
     (path) => {

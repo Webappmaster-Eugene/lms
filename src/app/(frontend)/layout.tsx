@@ -1,6 +1,7 @@
 import '@/app/globals.css'
+import '@/app/fonts.css'
+import { FontPreloads } from '@/components/layout/FontPreloads'
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/layout/ThemeProvider'
 import { SidebarProvider } from '@/components/layout/SidebarContext'
 import { Sidebar } from '@/components/layout/Sidebar'
@@ -11,19 +12,11 @@ import { ToastProvider } from '@/components/ui/Toast'
 import { NavigationProgress } from '@/components/layout/NavigationProgress'
 import { KeyboardShortcuts } from '@/components/layout/KeyboardShortcuts'
 import { Suspense } from 'react'
-import { headers } from 'next/headers'
-import { getPayload } from '@/lib/payload'
+import { getLearningRequest } from '@/server/learning-request'
 import { redirect } from 'next/navigation'
 import { PwaProvider } from '@/components/pwa/PwaProvider'
 import { StudentActivityBridge } from '@/components/analytics/StudentActivityBridge'
-import { createLocalReq } from 'payload'
 import { getTrainerAccess } from '@/server/trainer-access'
-
-const inter = Inter({
-  subsets: ['cyrillic', 'latin'],
-  variable: '--font-inter',
-  display: 'swap',
-})
 
 export const metadata: Metadata = {
   manifest: '/manifest.webmanifest',
@@ -47,15 +40,14 @@ export const viewport: Viewport = {
 }
 
 export default async function FrontendLayout({ children }: { children: React.ReactNode }) {
-  const payload = await getPayload()
-  const { user } = await payload.auth({ headers: await headers() })
+  const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login')
   const isAdmin = user.role === 'admin'
-  const req = await createLocalReq({ user }, payload)
   const trainerEnabled = (await getTrainerAccess(payload, user, req)).hasAccess
 
   return (
-    <html lang="ru" className={inter.variable} suppressHydrationWarning>
+    <html lang="ru" suppressHydrationWarning>
+      <head><FontPreloads /></head>
       <body>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           <ToastProvider>

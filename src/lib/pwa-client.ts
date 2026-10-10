@@ -4,6 +4,30 @@ export interface InstallPromptEvent extends Event {
 }
 
 let installPrompt: InstallPromptEvent | null = null
+const INSTALL_EXPLANATION_KEY = 'lms:pwa-install-explained:v1'
+let explanationSeenWithoutStorage = false
+
+export function installExplanationSeen(): boolean {
+  if (explanationSeenWithoutStorage) return true
+  try { return localStorage.getItem(INSTALL_EXPLANATION_KEY) === 'seen' }
+  catch { return false }
+}
+
+export function rememberInstallExplanation(): void {
+  try { localStorage.setItem(INSTALL_EXPLANATION_KEY, 'seen') }
+  catch {
+    // Private browsing can disable storage; still avoid repeats in this session.
+    explanationSeenWithoutStorage = true
+  }
+}
+
+export function isInstalledPwa(): boolean {
+  return window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
+}
+
+export function isIosDevice(): boolean {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
 
 export function rememberInstallPrompt(prompt: InstallPromptEvent | null): void {
   installPrompt = prompt

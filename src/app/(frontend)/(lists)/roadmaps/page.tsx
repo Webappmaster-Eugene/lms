@@ -1,12 +1,10 @@
 import type { Metadata } from 'next'
-import { getPayload } from '@/lib/payload'
-import { headers } from 'next/headers'
+import { getLearningRequest } from '@/server/learning-request'
 import Link from 'next/link'
 import { Map as MapIcon } from 'lucide-react'
 import { collectAllPages } from '@/lib/paginate'
 import { relationId } from '@/lib/relation-id'
 import { pluralize } from '@/lib/utils'
-import { createLocalReq } from 'payload'
 import { redirect } from 'next/navigation'
 import { getLearningAccess } from '@/server/learning-access'
 
@@ -15,10 +13,8 @@ export const metadata: Metadata = {
 }
 
 export default async function RoadmapsPage() {
-  const payload = await getPayload()
-  const { user } = await payload.auth({ headers: await headers() })
+  const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login')
-  const req = await createLocalReq({ user }, payload)
   const access = await getLearningAccess(payload, user, req)
 
   const roadmapDocs = await collectAllPages(

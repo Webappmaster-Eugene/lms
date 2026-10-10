@@ -106,7 +106,7 @@ export function CompletionButton({
   const showPrompt = prompt && (!completed || (next !== null && !loading))
 
   return (
-    <div className="flex w-full min-w-0 flex-col items-center gap-2">
+    <div className="flex w-full min-w-0 flex-col items-center gap-2 [overflow-wrap:anywhere]">
       {showPrompt && (
         <div
           role="dialog"
@@ -167,7 +167,7 @@ export function CompletionButton({
         {completed ? 'Урок пройден' : 'Отметить пройденным'}
       </button>
       {error && (
-        <p className="text-sm text-destructive">{error}</p>
+        <p role="alert" className="text-sm text-destructive">{error}</p>
       )}
       {/* Урок отмечен — дальше один шаг, а не прокрутка до навигации внизу страницы. */}
       {completed && !loading && next && (

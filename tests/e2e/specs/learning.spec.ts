@@ -51,7 +51,7 @@ test('«Отметить пройденным» начисляет баллы: �
 
   await page.reload()
   await expect(page.getByRole('button', { name: 'Урок пройден' })).toBeVisible()
-  await expect(page.getByText(/1\s*\/\s*3/).first()).toBeVisible()
+  await expect(page.getByRole('progressbar', { name: 'Прогресс курса' })).toHaveAttribute('aria-valuenow', '33')
 
   // 10 за урок + 5 за достижение «Первый шаг».
   await page.goto('/profile')

@@ -5,6 +5,20 @@ import { storageStateOf } from '../fixtures/env'
 
 test.use({ storageState: storageStateOf('student') })
 
+test('название следующего шага роадмапа остаётся читаемым на узком экране', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 844 })
+  await page.goto(`/roadmaps/${CONTENT.roadmap.slug}?view=list`)
+  const title = page.locator('summary').getByText('Веб-основы', { exact: true })
+  await expect(title).toBeVisible()
+  const overflow = await title.evaluate((element) => {
+    element.textContent = 'НаблюдаемостьИРазвёртываниеFullstackПриложения'.repeat(4)
+    return element.scrollWidth - element.clientWidth
+  })
+  expect(overflow).toBeLessThanOrEqual(1)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('roadmap-long-title-320.png') })
+})
+
 const longTitle = 'Лиды, квалификация и онбординг: подробная инструкция к следующему уроку'
 
 for (const width of [320, 390]) {
@@ -67,6 +81,22 @@ for (const width of [320, 390]) {
         }
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
         await page.screenshot({ path: testInfo.outputPath(`lesson-navigation-${theme}-${width}.png`) })
+
+        const unbrokenTitle = 'ПолныйРазборКвалификацииНовыхУчеников'.repeat(8)
+        await page.getByRole('heading', { level: 1 }).evaluate((element, value) => { element.textContent = value }, unbrokenTitle)
+        await navigation.getByRole('link').last().locator('span').last().evaluate((element, value) => { element.textContent = value }, unbrokenTitle)
+        const completion = page.getByRole('link', { name: /Следующий урок:/ })
+        if (await completion.count()) {
+          await completion.locator('span').first().evaluate((element, value) => { element.textContent = `Следующий урок: ${value}` }, unbrokenTitle)
+        }
+        const question = page.getByRole('textbox', { name: 'Вопрос к уроку', exact: true })
+        await question.fill(`https://example.org/${'long-material-path-'.repeat(20)}`)
+        const send = page.getByRole('button', { name: 'Отправить вопрос', exact: true })
+        const sendBox = await send.boundingBox()
+        expect(sendBox?.width).toBeGreaterThanOrEqual(44)
+        expect(sendBox?.height).toBeGreaterThanOrEqual(44)
+        expect((sendBox?.x ?? 0) + (sendBox?.width ?? 0)).toBeLessThanOrEqual(width)
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
       })
     })
   }

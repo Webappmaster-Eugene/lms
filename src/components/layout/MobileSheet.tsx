@@ -8,6 +8,7 @@ type Props = {
   open: boolean
   onClose: () => void
   title: string
+  closeLabel?: string
   children: ReactNode
   id?: string
   returnFocusRef?: RefObject<HTMLElement | null>
@@ -16,7 +17,7 @@ type Props = {
 
 /** Native modal makes the background inert; explicit Tab wrapping also keeps
  * external mobile keyboards from briefly moving focus to browser chrome. */
-export function MobileSheet({ open, onClose, title, children, id, returnFocusRef, initialFocusSelector }: Props) {
+export function MobileSheet({ open, onClose, title, closeLabel, children, id, returnFocusRef, initialFocusSelector }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const closeRef = useRef(onClose)
   const titleId = useId()
@@ -100,7 +101,7 @@ export function MobileSheet({ open, onClose, title, children, id, returnFocusRef
           <button
             type="button"
             onClick={onClose}
-            aria-label={`Закрыть ${title === 'Меню платформы' ? 'меню' : title === 'Поиск' ? 'поиск' : 'содержание'}`}
+            aria-label={closeLabel ?? `Закрыть ${title === 'Меню платформы' ? 'меню' : title === 'Поиск' ? 'поиск' : 'содержание'}`}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
           >
             <X className="h-5 w-5" aria-hidden="true" />

@@ -1,21 +1,19 @@
 'use client'
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { rememberInstallPrompt, type InstallPromptEvent } from '@/lib/pwa-client'
+import { InstallExplanation } from './InstallExplanation'
+import { useConnectionStatus } from './use-connection-status'
 
 type BadgeNavigator = Navigator & { setAppBadge?: (count: number) => Promise<void>; clearAppBadge?: () => Promise<void> }
 
-function subscribeToNetwork(callback: () => void) {
-  window.addEventListener('online', callback)
-  window.addEventListener('offline', callback)
-  return () => { window.removeEventListener('online', callback); window.removeEventListener('offline', callback) }
-}
-
 export function PwaProvider() {
-  const offline = useSyncExternalStore(subscribeToNetwork, () => !navigator.onLine, () => false)
+  const offline = useConnectionStatus()
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null)
   const [registrationError, setRegistrationError] = useState(false)
   const refreshRequested = useRef(false)
+  const retryRegistration = useRef<(() => void) | null>(null)
+  const previousOffline = useRef(offline)
 
   useEffect(() => {
     const beforeInstall = (event: Event) => {
@@ -45,6 +43,8 @@ export function PwaProvider() {
     let mounted = true
     let registration: ServiceWorkerRegistration | undefined
     let installing: ServiceWorker | null = null
+    let registering = false
+    let retryAfterCurrentAttempt = false
     const stateChanged = () => {
       if (mounted && installing?.state === 'installed' && navigator.serviceWorker.controller) setWaiting(registration?.waiting ?? null)
     }
@@ -61,15 +61,33 @@ export function PwaProvider() {
     }
     navigator.serviceWorker.addEventListener('controllerchange', changed)
     navigator.serviceWorker.addEventListener('message', message)
-    void navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).then((value) => {
-      if (!mounted) return
-      registration = value
-      setWaiting(value.waiting)
-      value.addEventListener('updatefound', updateFound)
-      updateFound()
-    }).catch(() => { if (mounted) setRegistrationError(true) })
+    function registerWorker() {
+      if (!mounted || registering || registration) return
+      registering = true
+      void navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).then((value) => {
+        if (!mounted) return
+        registration = value
+        setRegistrationError(false)
+        setWaiting(value.waiting)
+        value.addEventListener('updatefound', updateFound)
+        updateFound()
+      }).catch(() => { if (mounted) setRegistrationError(true) }).finally(() => {
+        registering = false
+        if (retryAfterCurrentAttempt) {
+          retryAfterCurrentAttempt = false
+          registerWorker()
+        }
+      })
+    }
+    retryRegistration.current = () => {
+      // A request started offline may reject after connectivity has returned.
+      if (registering) retryAfterCurrentAttempt = true
+      else registerWorker()
+    }
+    registerWorker()
     return () => {
       mounted = false
+      retryRegistration.current = null
       registration?.removeEventListener('updatefound', updateFound)
       installing?.removeEventListener('statechange', stateChanged)
       navigator.serviceWorker.removeEventListener('controllerchange', changed)
@@ -77,15 +95,23 @@ export function PwaProvider() {
     }
   }, [])
 
-  if (!offline && !waiting && !registrationError) return null
+  useEffect(() => {
+    const recovered = previousOffline.current && !offline
+    previousOffline.current = offline
+    if (recovered) retryRegistration.current?.()
+  }, [offline])
+
   return (
-    <div className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-lg rounded-2xl border border-border bg-card p-4 text-sm shadow-lg print:hidden lg:bottom-6" role="status">
-      {offline ? <p>Нет подключения. Для переходов и синхронизации нужен интернет.</p> : waiting ? (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p>Доступно обновление приложения</p>
-          <button type="button" className="min-h-11 rounded-lg bg-primary px-4 font-medium text-primary-foreground" onClick={() => { refreshRequested.current = true; waiting.postMessage({ type: 'ACTIVATE_UPDATE' }) }}>Обновить</button>
-        </div>
-      ) : <p>Установка приложения временно недоступна. Сайт продолжает работать; попробуйте обновить страницу.</p>}
-    </div>
+    <>
+      <InstallExplanation paused={offline || Boolean(waiting) || registrationError} />
+      {(offline || waiting || registrationError) && <div className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-lg rounded-2xl border border-border bg-card p-4 text-sm shadow-lg print:hidden lg:bottom-6" role="status">
+        {offline ? <p>Нет подключения. Для переходов и синхронизации нужен интернет.</p> : waiting ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p>Доступно обновление приложения</p>
+            <button type="button" className="min-h-11 rounded-lg bg-primary px-4 font-medium text-primary-foreground" onClick={() => { refreshRequested.current = true; waiting.postMessage({ type: 'ACTIVATE_UPDATE' }) }}>Обновить</button>
+          </div>
+        ) : <p>Установка приложения временно недоступна. Сайт продолжает работать; попробуйте обновить страницу.</p>}
+      </div>}
+    </>
   )
 }

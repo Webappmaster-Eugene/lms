@@ -80,6 +80,12 @@ export function pickNextStep<T extends StepCourse>(courses: T[]): T | null {
   return open.find((c) => c.completedCount > 0) ?? open[0] ?? null
 }
 
+/** Карта следует учебной последовательности, даже если позже уже начат другой курс. */
+export function pickSequentialNextStep<T extends StepCourse>(courses: T[]): T | null {
+  return courses.find((course) => course.prerequisitesMet && course.totalLessons > 0
+    && course.completedCount < course.totalLessons && course.nextLesson) ?? null
+}
+
 export type PrerequisiteRef = { id: string; title: string }
 
 /**

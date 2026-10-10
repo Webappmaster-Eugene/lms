@@ -196,6 +196,20 @@ describe('карта', () => {
 })
 
 describe('список по этапам', () => {
+  it('номера шагов сохраняют единый порядок карты, даже если этапы и старые координаты расходятся', () => {
+    const groups = groupTopicsByStage([
+      node('js', { label: 'JS', learningOrder: 3, stage: 'base' }, { x: 0, y: 0 }),
+      node('css', { label: 'CSS', learningOrder: 2, stage: 'stage1' }, { x: 0, y: 100 }),
+      node('html', { label: 'HTML', learningOrder: 1, stage: 'base' }, { x: 0, y: 200 }),
+    ])
+    expect(groups.flatMap((group) => group.nodes.map((item) => item.data.label))).toEqual(['HTML', 'CSS', 'JS'])
+  })
+
+  it('показывает номер шага в мобильном списке', () => {
+    render(<RoadmapTopicList nodes={[node('html', { label: 'HTML', learningOrder: 1 })]} looseCourses={[]} />)
+    expect(screen.getByLabelText('Шаг 1')).toBeInTheDocument()
+  })
+
   it('этапы идут в порядке обучения, темы — сверху вниз', () => {
     const groups = groupTopicsByStage([
       node('late', { label: 'Практика', stage: 'practice' }),

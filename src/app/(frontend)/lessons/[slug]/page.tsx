@@ -1,8 +1,5 @@
 import type { Metadata } from 'next'
-import { getPayload } from '@/lib/payload'
-import { headers } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
-import { createLocalReq } from 'payload'
 import Link from 'next/link'
 import { ArrowLeft, Clock } from 'lucide-react'
 import { LessonLearningProvider } from '@/components/lesson/LessonLearningProvider'
@@ -23,6 +20,8 @@ import { protectLessonVideoSources } from '@/lib/lesson-video-source'
 import { ShareButton } from '@/components/ui/ShareButton'
 import { getLearningAccess } from '@/server/learning-access'
 import { recordLearningAccess } from '@/lib/learning-observability'
+import { loadPublishedProgrammeLessons } from '@/lib/course-completion'
+import { getLearningRequest } from '@/server/learning-request'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -30,10 +29,8 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const payload = await getPayload()
-  const { user } = await payload.auth({ headers: await headers() })
+  const { payload, user, req } = await getLearningRequest()
   if (!user) return { title: 'Урок' }
-  const req = await createLocalReq({ user }, payload)
   const result = await payload.find({
     collection: 'lessons',
     where: { slug: { equals: slug }, isPublished: { equals: true } },
@@ -49,11 +46,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function LessonPage({ params }: Props) {
   const { slug } = await params
-  const payload = await getPayload()
-  const headersList = await headers()
-  const { user } = await payload.auth({ headers: headersList })
+  const { payload, user, req } = await getLearningRequest()
   if (!user) redirect(`/login?redirect=${encodeURIComponent(`/lessons/${slug}`)}`)
-  const req = await createLocalReq({ user }, payload)
   const policy = await getLearningAccess(payload, user, req)
 
   // Only browseable metadata can be rendered; content requires a separate lesson grant.
@@ -282,16 +276,11 @@ export default async function LessonPage({ params }: Props) {
   const totalCompleted = allCourseLessons.filter((l) => completedLessonIds.has(String(l.id))).length
   // Остальные уроки курса пройдены — отметка этого завершает курс.
   // A partial lesson assignment must not promise a whole-course certificate.
-  const publishedCourseLessons = course ? await payload.count({
-    collection: 'lessons',
-    where: { course: { equals: course.id }, isPublished: { equals: true } },
-    overrideAccess: true,
-    req,
-  }) : null
-  const othersDone = publishedCourseLessons?.totalDocs === allCourseLessons.length && allCourseLessons.every((l) => l.id === lesson.id || completedLessonIds.has(String(l.id)))
+  const publishedCourseLessons = course ? await loadPublishedProgrammeLessons(req, [course.id]) : []
+  const othersDone = publishedCourseLessons.length > 0 && publishedCourseLessons.length === allCourseLessons.length && allCourseLessons.every((l) => l.id === lesson.id || completedLessonIds.has(String(l.id)))
 
   return (
-    <div className={hasSidebar ? 'flex flex-col gap-6 lg:flex-row' : ''}>
+    <div className={hasSidebar ? 'flex min-w-0 flex-col gap-6 lg:flex-row' : 'min-w-0'}>
       {hasSidebar && (
         <CourseSidebar
           key={String(lesson.id)}
@@ -305,7 +294,7 @@ export default async function LessonPage({ params }: Props) {
         />
       )}
       {/* Main content */}
-      <div className={`space-y-8 ${hasSidebar ? 'flex-1 min-w-0' : 'mx-auto max-w-4xl'}`}>
+      <div className={`min-w-0 space-y-8 [overflow-wrap:anywhere] ${hasSidebar ? 'flex-1' : 'mx-auto max-w-4xl'}`}>
         {/* Навигация */}
         {course && (
           <Link
@@ -320,7 +309,7 @@ export default async function LessonPage({ params }: Props) {
         {/* Заголовок */}
         <div className="space-y-2">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h1 className="text-xl font-bold text-foreground sm:text-2xl">{lesson.title}</h1>
+            <h1 className="min-w-0 text-xl font-bold text-foreground sm:text-2xl">{lesson.title}</h1>
             <ShareButton title={lesson.title} />
             {user?.role === 'admin' && <Link href={`/manage/lessons/${lesson.id}`} className="inline-flex min-h-[44px] items-center rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">Редактировать урок</Link>}
             {user && <BookmarkButton target={{ lesson: lesson.id }} initialId={bookmarkId} />}
