@@ -44,7 +44,13 @@ async function request(path: string, method = 'GET', body?: unknown): Promise<un
   })
   if (!response.ok) {
     if (response.status === 401) throw new Error('Сессия завершилась. Войдите в аккаунт заново.')
-    if (response.status === 409) throw new Error('Это устройство связано с другим аккаунтом. Отключите уведомления в прежнем аккаунте и попробуйте снова.')
+    if (response.status === 409) {
+      const body: unknown = await response.json().catch(() => null)
+      const message = body && typeof body === 'object' && 'error' in body ? body.error : null
+      throw new Error(typeof message === 'string' && message.trim() && message.length <= 300
+        ? message
+        : 'Не удалось подключить устройство. Проверьте подключённые устройства и попробуйте снова.')
+    }
     throw new Error('Не удалось выполнить действие. Проверьте подключение и попробуйте снова.')
   }
   return response.status === 204 ? null : response.json()

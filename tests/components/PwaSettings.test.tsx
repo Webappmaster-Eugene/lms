@@ -125,7 +125,7 @@ describe('notification settings: consent and device subscriptions', () => {
 
   it('rolls back the browser subscription if the server rejects device registration', async () => {
     api.mockImplementation(async (path, init) => {
-      if (path === '/api/push/subscriptions' && init?.method === 'POST') return new Response(null, { status: 409 })
+      if (path === '/api/push/subscriptions' && init?.method === 'POST') return Response.json({ error: 'Это устройство связано с другим аккаунтом. Отключите прежнюю подписку в браузере' }, { status: 409 })
       return Response.json(settings)
     })
     render(<NotificationSettings />)
@@ -133,6 +133,29 @@ describe('notification settings: consent and device subscriptions', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Это устройство связано с другим аккаунтом')
     expect(unsubscribe).toHaveBeenCalledOnce()
     expect(screen.queryByText('Уведомления на этом устройстве включены.')).not.toBeInTheDocument()
+  })
+
+  it('explains the device limit instead of incorrectly reporting an account conflict', async () => {
+    api.mockImplementation(async (path, init) => {
+      if (path === '/api/push/subscriptions' && init?.method === 'POST') return Response.json({ error: 'Достигнут лимит устройств. Отключите уведомления на одном из них' }, { status: 409 })
+      return Response.json(settings)
+    })
+    render(<NotificationSettings />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Включить уведомления' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Достигнут лимит устройств')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('другим аккаунтом')
+    expect(unsubscribe).toHaveBeenCalledOnce()
+  })
+
+  it('keeps a usable recovery message if a conflict response contains invalid JSON', async () => {
+    api.mockImplementation(async (path, init) => {
+      if (path === '/api/push/subscriptions' && init?.method === 'POST') return new Response('Invalid upstream response', { status: 409 })
+      return Response.json(settings)
+    })
+    render(<NotificationSettings />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Включить уведомления' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Проверьте подключённые устройства')
+    expect(unsubscribe).toHaveBeenCalledOnce()
   })
 
   it('shows a failed settings request and retries without saving invented defaults', async () => {

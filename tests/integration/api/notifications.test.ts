@@ -186,6 +186,58 @@ describe('реальные уведомления, подписки и scheduler
     expect((await getNotificationPreferences(req, student.id)).lastLearningAt).toBe(current.lastLearningAt)
     await commitTransaction(req)
   })
+  it('does not send an already queued inactivity reminder after learning resumes', async () => {
+    vi.mocked(sendEncryptedPush).mockResolvedValue(201)
+    const req = await createLocalReq({}, payload)
+    await initTransaction(req)
+    const prefs = await getNotificationPreferences(req, student.id)
+    await payload.update({ collection: 'notification-preferences', id: prefs.id, data: { lastLearningAt: new Date(Date.now() - 4 * 86_400_000).toISOString(), remindersEnabled: true }, req })
+    const notification = await payload.create({ collection: 'notifications', data: { user: student.id, title: uid('stale-reminder'), message: 'Вернитесь к уроку', type: 'learning_reminder', link: '/' }, req })
+    await recordLearningActivity(req, student.id)
+    await commitTransaction(req)
+    await dispatch(notification.id)
+    expect(await delivery(notification.id)).toMatchObject({ status: 'cancelled', lastStatusCode: 0 })
+    expect((await payload.findByID({ collection: 'push-subscriptions', id: subscriptionId })).enabled).toBe(true)
+  })
+  it('defers reminders outside the chosen local hour without consuming retry attempts', async () => {
+    const hour = new Date().getUTCHours()
+    const reminderHour = hour === 18 ? 19 : 18
+    await changeNotificationPreferences(payload, student, { timezone: 'UTC', reminderHour, remindersEnabled: true })
+    const req = await createLocalReq({}, payload)
+    await initTransaction(req)
+    const prefs = await getNotificationPreferences(req, student.id)
+    await payload.update({ collection: 'notification-preferences', id: prefs.id, data: { lastLearningAt: new Date(Date.now() - 4 * 86_400_000).toISOString() }, req })
+    const notification = await payload.create({ collection: 'notifications', data: { user: student.id, title: uid('quiet-hour'), message: 'Учебное напоминание', type: 'learning_reminder', link: '/' }, req })
+    await commitTransaction(req)
+    try {
+      const deferred = await dispatch(notification.id, (row) => Boolean(row && Date.parse(row.nextAttemptAt) > Date.now()))
+      expect(deferred).toMatchObject({ status: 'pending', attempts: 0, claimToken: null })
+      expect(Date.parse(deferred.nextAttemptAt) - Date.now()).toBeGreaterThan(25 * 60_000)
+      expect((await payload.findByID({ collection: 'push-subscriptions', id: subscriptionId })).enabled).toBe(true)
+    } finally {
+      await changeNotificationPreferences(payload, student, { timezone: 'Europe/Moscow', reminderHour: 18 })
+    }
+  })
+  it('enforces the ten-device limit when reactivating an old disabled subscription', async () => {
+    const owner = await createStudent(payload)
+    const ownerToken = await login(payload, owner)
+    const old = { ...subscription, endpoint: `https://fcm.googleapis.com/fcm/send/${uid('old-device')}` }
+    try {
+      expect((await subscribePOST(request('push/subscriptions', 'POST', old, ownerToken))).status).toBe(200)
+      const inactive = (await payload.find({ collection: 'push-subscriptions', where: { user: { equals: owner.id } }, depth: 0, limit: 1 })).docs[0]
+      await payload.update({ collection: 'push-subscriptions', id: inactive.id, data: { enabled: false } })
+      for (let index = 0; index < 10; index += 1) {
+        const active = { ...subscription, endpoint: `https://fcm.googleapis.com/fcm/send/${uid('active-device')}` }
+        expect((await subscribePOST(request('push/subscriptions', 'POST', active, ownerToken))).status).toBe(200)
+        if (index === 9) expect((await subscribePOST(request('push/subscriptions', 'POST', active, ownerToken))).status).toBe(200)
+      }
+      expect((await subscribePOST(request('push/subscriptions', 'POST', old, ownerToken))).status).toBe(409)
+      expect((await payload.count({ collection: 'push-subscriptions', where: { user: { equals: owner.id }, enabled: { equals: true } } })).totalDocs).toBe(10)
+      expect((await payload.findByID({ collection: 'push-subscriptions', id: inactive.id })).enabled).toBe(false)
+    } finally {
+      await payload.delete({ collection: 'users', id: owner.id })
+    }
+  })
   it('revoked login cannot receive a queued push on the shared device', async () => {
     const notification = await notify()
     expect((await rest('POST', '/users/logout', { token })).status).toBe(200)
