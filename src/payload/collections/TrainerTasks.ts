@@ -1,5 +1,6 @@
 import type { CollectionConfig, FieldAccess } from 'payload'
 
+import { INTERVIEW_FORMAT_OPTIONS, validateCompanyEvidence } from '@/lib/trainer/metadata'
 import { isAdmin } from '@/payload/access/isAdmin'
 import { trainerTaskReadAccess } from '@/server/trainer-access'
 import { cleanupLearningTargetGrants } from '@/payload/hooks/learningAccessCleanup'
@@ -103,7 +104,7 @@ export const TrainerTasks: CollectionConfig = {
       admin: {
         position: 'sidebar',
         description:
-          'stdout — сравнение вывода; unit — JS/TS; types — типы TS; program — Go; dom — frontend',
+          'stdout — сравнение вывода; unit — JS/TS; types — типы TS; program — Go/Python; dom — frontend',
       },
     },
     {
@@ -161,6 +162,8 @@ export const TrainerTasks: CollectionConfig = {
         description: 'Используется, когда пользователь выбрал TypeScript.',
       },
     },
+    { name: 'starterCodePython', type: 'textarea', label: 'Стартовый код (Python)', admin: { description: 'Python 3: чтение stdin и вывод ответа в stdout. Только стандартная библиотека.' } },
+    { name: 'solutionCodePython', type: 'textarea', label: 'Эталонное решение (Python)', access: { read: ({ req }) => req.user?.role === 'admin' } },
     {
       name: 'starterCodeGo', type: 'textarea', label: 'Стартовый код (Go)',
       admin: { description: 'Полная программа package main, которая читает stdin и пишет в stdout.' },
@@ -362,9 +365,12 @@ export const TrainerTasks: CollectionConfig = {
       name: 'companies',
       type: 'select',
       hasMany: true,
-      label: 'Где спрашивают',
+      label: 'Компании и подготовка',
       options: [...COMPANY_OPTIONS],
     },
+    { name: 'interviewFormat', type: 'select', label: 'Формат собеседования', options: [...INTERVIEW_FORMAT_OPTIONS] },
+    { name: 'recommendedMinutes', type: 'number', label: 'Время на тренировку (минуты)', min: 5, max: 180, admin: { description: 'Рекомендация платформы, не фактическая длительность интервью компании.' } },
+    { name: 'companyEvidence', type: 'json', label: 'Источники меток компаний', validate: validateCompanyEvidence, admin: { description: 'Компания, kind, url, note, checkedAt. official — опубликованный пример; candidate-report — рассказ кандидата; preparation — адаптация для подготовки; unverified — историческая метка без подтверждения.' } },
     {
       name: 'sourceUrl',
       type: 'text',

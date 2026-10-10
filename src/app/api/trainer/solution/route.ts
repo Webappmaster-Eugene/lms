@@ -76,6 +76,7 @@ export async function GET(request: Request): Promise<Response> {
     solutionCode: task.solutionCode ?? null,
     solutionCodeTs: task.solutionCodeTs ?? null,
     solutionNotes: task.solutionNotes ?? null,
+    solutionCodePython: task.solutionCodePython ?? null,
     solutionCodeGo: task.solutionCodeGo ?? null,
     solutionFiles: task.solutionFiles ? parseFrontendFiles(JSON.stringify(task.solutionFiles)) : null,
   }

@@ -5,6 +5,7 @@ export class InfrastructureError extends Error {}
 
 const images = {
   go: process.env.TRAINER_GO_JOB_IMAGE || 'lms-trainer-go:local',
+  python: process.env.TRAINER_PYTHON_JOB_IMAGE || 'lms-trainer-python:local',
   frontend: process.env.TRAINER_FRONTEND_JOB_IMAGE || 'lms-trainer-frontend:local',
 }
 
@@ -92,10 +93,39 @@ async function runFrontend(job, preview) {
   try { return JSON.parse(executed.stdout) } catch { throw new InfrastructureError('Браузерный runtime вернул некорректный ответ') }
 }
 
+async function runPython(job) {
+  const started = performance.now()
+  const compiled = await dockerJob(images.python, { mode: 'compile', code: job.code }, { timeoutMs: 15000, maxBytes: 16000, memory: '256m' })
+  if (compiled.timedOut || compiled.outputLimit || compiled.exitCode === 124) return result('compile_error', [], started, compiled.outputLimit ? 'Python: слишком большой результат проверки синтаксиса' : 'Python: превышен лимит проверки синтаксиса')
+  if (compiled.exitCode !== 0) throw new InfrastructureError('Проверка синтаксиса Python завершилась некорректно')
+  let syntax
+  try { syntax = JSON.parse(compiled.stdout) } catch { throw new InfrastructureError('Python вернул некорректный ответ проверки синтаксиса') }
+  if (typeof syntax.error === 'string') return result('compile_error', [], started, syntax.error.slice(0, 1000))
+  if (syntax.ok !== true) throw new InfrastructureError('Python не подтвердил проверку синтаксиса')
+  const tests = []
+  const cases = job.cases.length ? job.cases : [{ input: '' }]
+  for (const [index, item] of cases.entries()) {
+    const executed = await dockerJob(images.python, { mode: 'execute', code: job.code, input: item.input ?? '', timeLimitMs: job.timeLimitMs }, { timeoutMs: job.timeLimitMs + 5000, maxBytes: 32000, memory: '256m' })
+    const timeout = executed.timedOut || executed.exitCode === 124
+    if (job.cases.length === 0) return result(timeout ? 'timeout' : executed.exitCode === 0 && !executed.outputLimit ? 'passed' : 'error', [], started, timeout ? 'Превышен лимит времени' : executed.outputLimit ? 'Превышен лимит вывода' : executed.exitCode !== 0 ? executed.stderr.slice(0, 1000) || 'Python: ошибка исполнения' : undefined, executed.stdout.slice(0, 20000).split('\n').slice(0, 100))
+    const passed = !timeout && !executed.outputLimit && executed.exitCode === 0 && executed.stdout.trimEnd() === item.expected.trimEnd()
+    tests.push({ name: item.hidden ? `Скрытый тест ${index + 1}` : item.name, hidden: item.hidden, passed, durationMs: executed.durationMs,
+      ...(!item.hidden ? { input: item.input ?? '', expected: item.expected, actual: executed.stdout.slice(0, 8000) } : {}),
+      ...(!passed ? { message: item.hidden ? 'Скрытая проверка не пройдена' : timeout ? 'Превышен лимит времени' : executed.outputLimit ? 'Превышен лимит вывода' : executed.exitCode !== 0 ? executed.stderr.slice(0, 600) || 'Python: ошибка исполнения' : 'Вывод не совпадает с ожидаемым' } : {}),
+    })
+    if (performance.now() - started > 110000) {
+      for (const remaining of job.cases.slice(index + 1)) tests.push({ name: remaining.hidden ? 'Скрытый тест' : remaining.name, hidden: remaining.hidden, passed: false, durationMs: 0, message: 'Превышен общий лимит времени проверки' })
+      return result('timeout', tests, started, 'Превышен общий лимит времени проверки')
+    }
+  }
+  return result(tests.every((test) => test.passed) ? 'passed' : 'failed', tests, started)
+}
+
 export async function runJob(job, preview = false) {
   if (job.language === 'next') {
     const next = await import('./next-runtime.mjs')
     return preview ? next.previewNext(job, dockerJob) : next.runNext(job, dockerJob)
   }
+  if (job.language === 'python') return runPython(job)
   return job.language === 'go' ? runGo(job) : runFrontend(job, preview)
 }

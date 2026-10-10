@@ -18,6 +18,11 @@ function source(task: TrainerTaskSeed, language: RuntimeLanguage, solution: bool
     if (!code) throw new Error(`У ${task.slug} отсутствует ${solution ? 'эталон' : 'шаблон'} Go`)
     return code
   }
+  if (language === 'python') {
+    const code = solution ? task.solutionCodePython : task.starterCodePython
+    if (!code) throw new Error(`У ${task.slug} отсутствует ${solution ? 'эталон' : 'шаблон'} Python`)
+    return code
+  }
   const files = solution ? task.solutionFiles : task.starterFiles
   if (!files) throw new Error(`У ${task.slug} отсутствуют ${solution ? 'эталонные' : 'стартовые'} файлы`)
   return JSON.stringify(files)
@@ -52,7 +57,7 @@ function details(result: TrainerRunResult): string {
   ].filter(Boolean).join('\n')
 }
 
-describe('каталог Go и frontend в настоящей среде выполнения', () => {
+describe('каталог программ и frontend в настоящей среде выполнения', () => {
   beforeAll(() => {
     const configuredUrl = process.env.TRAINER_RUNTIME_URL
     const configuredToken = process.env.TRAINER_RUNTIME_TOKEN
@@ -64,7 +69,8 @@ describe('каталог Go и frontend в настоящей среде вып�
   })
 
   it('новые задачи подключены к основному каталогу', () => {
-    expect(new Set(entries.map(entry => entry.language))).toEqual(new Set(['go', 'html', 'react', 'next']))
+    expect(new Set(entries.map(entry => entry.language))).toEqual(new Set(['go', 'python', 'html', 'react', 'next']))
+    expect(new Set(entries.map(entry => `${entry.task.slug}:${entry.language}`)).size).toBe(entries.length)
   })
 
   describe.each(entries.map(({ topic, task, language }) => [topic.slug, task.slug, language, task] as const))(
@@ -90,6 +96,15 @@ describe('каталог Go и frontend в настоящей среде вып�
         expect(result.totalCount).toBe(runtimeCases(task).length)
         expect(result.passedCount).toBeLessThan(result.totalCount)
       })
+
+      if (task.wrongSolution) {
+        it('реалистичная ошибочная реализация отклоняется скрытыми проверками', { timeout: 250000 }, async () => {
+          const result = await run(task, language, task.wrongSolution ?? '')
+          expect(result.status, details(result)).toBe('failed')
+          expect(result.totalCount).toBe(runtimeCases(task).length)
+          expect(result.tests.some((test) => test.hidden && !test.passed), details(result)).toBe(true)
+        })
+      }
     },
   )
 })

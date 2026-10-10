@@ -19,6 +19,7 @@ services:
     environment:
       - TRAINER_RUNTIME_TOKEN=${TRAINER_RUNTIME_TOKEN:?Set a shared runtime token of at least 32 characters}
       - TRAINER_GO_JOB_IMAGE=${TRAINER_GO_JOB_IMAGE:-lms-trainer-go:local}
+      - TRAINER_PYTHON_JOB_IMAGE=${TRAINER_PYTHON_JOB_IMAGE:-lms-trainer-python:local}
       - TRAINER_FRONTEND_JOB_IMAGE=${TRAINER_FRONTEND_JOB_IMAGE:-lms-trainer-frontend:local}
       - TRAINER_NEXT_JOB_IMAGE=${TRAINER_NEXT_JOB_IMAGE:-lms-trainer-next:local}
       - TRAINER_MAX_CONCURRENT=${TRAINER_MAX_CONCURRENT:-1}

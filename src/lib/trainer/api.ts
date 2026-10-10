@@ -76,6 +76,7 @@ export type SolutionResponse = {
   solutionCode: string | null
   solutionCodeTs: string | null
   solutionNotes: string | null
+  solutionCodePython?: string | null
   solutionCodeGo?: string | null
   solutionFiles?: Record<string, string> | null
 }

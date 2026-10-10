@@ -11,6 +11,7 @@ import {
   TAG_OPTIONS,
 } from '@/lib/trainer/constants'
 import { cn } from '@/lib/utils'
+import { INTERVIEW_FORMAT_OPTIONS } from '@/lib/trainer/metadata'
 import { ShareButton } from '@/components/ui/ShareButton'
 
 /**
@@ -29,6 +30,7 @@ export type TaskFilterValues = {
   company: string
   topic: string
   status: string
+  format?: string
 }
 
 type TaskFiltersProps = {
@@ -79,7 +81,7 @@ export function TaskFilters({ values, topics, total }: TaskFiltersProps) {
     return () => clearTimeout(timer)
   }, [apply, query, values.q])
 
-  const hasFilters = Object.values(values).some((value) => value.length > 0)
+  const hasFilters = Object.values(values).some((value) => Boolean(value?.length))
 
   return (
     <div className="space-y-3">
@@ -92,7 +94,7 @@ export function TaskFilters({ values, topics, total }: TaskFiltersProps) {
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Поиск по названию"
             aria-label="Поиск задач"
-            className="h-10 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary"
+            className="min-h-11 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary"
           />
         </div>
 
@@ -101,6 +103,12 @@ export function TaskFilters({ values, topics, total }: TaskFiltersProps) {
           value={values.language}
           onChange={(value) => apply('language', value)}
           options={[{ label: 'Любой язык', value: '' }, ...LANGUAGE_OPTIONS]}
+        />
+        <Select
+          label="Формат собеседования"
+          value={values.format ?? ''}
+          onChange={(value) => apply('format', value)}
+          options={[{ label: 'Любой формат', value: '' }, ...INTERVIEW_FORMAT_OPTIONS]}
         />
         <Select
           label="Сложность"
@@ -140,7 +148,7 @@ export function TaskFilters({ values, topics, total }: TaskFiltersProps) {
               onClick={() => apply('status', option.value)}
               aria-pressed={values.status === option.value}
               className={cn(
-                'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                'min-h-11 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
                 values.status === option.value
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground',
@@ -156,10 +164,10 @@ export function TaskFilters({ values, topics, total }: TaskFiltersProps) {
             type="button"
             onClick={() => {
               const next = new URLSearchParams(searchParams.toString())
-              for (const key of Object.keys(values)) next.delete(key)
+              for (const key of new Set([...Object.keys(values), 'format'])) next.delete(key)
               startTransition(() => router.replace(next.size ? `${pathname}?${next}` : pathname, { scroll: false }))
             }}
-            className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
             Сбросить
@@ -191,7 +199,7 @@ function Select({
       value={value}
       onChange={(event) => onChange(event.target.value)}
       aria-label={label}
-      className="h-10 rounded-lg border border-border bg-card px-2 text-sm text-foreground outline-none transition-colors focus:border-primary"
+      className="min-h-11 max-w-full rounded-lg border border-border bg-card px-2 text-sm text-foreground outline-none transition-colors focus:border-primary"
     >
       {options.map((option) => (
         <option key={option.value} value={option.value}>

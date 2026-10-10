@@ -6,6 +6,28 @@ import { randomUUID } from 'node:crypto'
 import { sandboxArgs } from '../gateway.mjs'
 
 const enabled = process.env.TRAINER_RUNTIME_INTEGRATION === '1'
+test('React native submit events work with opaque origin and no native form navigation', { skip: !enabled, timeout: 30000 }, async () => {
+  const files = { 'App.jsx': `import {useState} from 'react';
+export default function App(){const [count,setCount]=useState(0);return <main><form onSubmit={event=>{event.preventDefault();setCount(value=>value+1)}}><input id="name"/><button id="submit" type="submit">Send</button></form><output>{count}</output></main>}` }
+  const result = await runJob({ language: 'react', code: JSON.stringify(files), timeLimitMs: 5000, cases: [{ name: 'native submit', hidden: false, checks: [
+    { selector: '#name', action: 'fill', value: 'React' }, { selector: '#submit', action: 'click' }, { selector: 'output', text: '1' },
+    { selector: '#name', action: 'press', value: 'Enter' }, { selector: 'output', text: '2' },
+  ] }] })
+  assert.equal(result.status, 'passed', JSON.stringify(result))
+})
+
+test('form capability never grants parent DOM access or navigation beyond trusted CSP', { skip: !enabled, timeout: 30000 }, async () => {
+  const files = { 'index.html': `<form id="form" action="https://outside.invalid/collect" method="post"><input name="value" value="test"/><button id="send">Send</button></form><output id="submitted">pending</output><output id="blocked">pending</output><output id="origin">pending</output>
+<script>try { void parent.document; document.querySelector('#origin').textContent='unsafe' } catch { document.querySelector('#origin').textContent='isolated' }
+document.querySelector('#form').addEventListener('submit',()=>{document.querySelector('#submitted').textContent='event worked'})
+document.addEventListener('securitypolicyviolation',event=>{if(event.violatedDirective==='form-action')document.querySelector('#blocked').textContent='blocked by CSP'})</script>` }
+  const result = await runJob({ language: 'html', code: JSON.stringify(files), timeLimitMs: 5000, cases: [{ name: 'form isolation', hidden: false, checks: [
+    { selector: '#origin', text: 'isolated' }, { selector: '#send', action: 'click' },
+    { selector: '#submitted', text: 'event worked' }, { selector: '#blocked', text: 'blocked by CSP' },
+  ] }] })
+  assert.equal(result.status, 'passed', JSON.stringify(result))
+})
+
 test('image watchdog stops a stuck process without gateway cleanup', { skip: !enabled, timeout: 60000 }, async () => {
   const name = `lms-trainer-watchdog-${randomUUID()}`
   const args = sandboxArgs(name, process.env.TRAINER_GO_JOB_IMAGE || 'lms-trainer-go:local')
@@ -105,5 +127,16 @@ test('student JS cannot spoof computed CSS styles used by the grader', { skip: !
 test('React CSS Modules exports class names and applies imported local styles', { skip: !enabled, timeout: 30000 }, async () => {
   const files = { 'App.jsx': 'import styles from "./Button.module.css";export default function App(){return <button className={styles.button}>CSS Modules</button>}', 'Button.module.css': '.button{color:rgb(255, 0, 0);display:flex;gap:16px}' }
   const result = await runJob({ language: 'react', code: JSON.stringify(files), timeLimitMs: 5000, cases: [{ name: 'CSS Modules', hidden: false, checks: [{ selector: 'button', text: 'CSS Modules', css: { color: 'rgb(255, 0, 0)', display: 'flex', gap: '16px' } }] }] })
+  assert.equal(result.status, 'passed', JSON.stringify(result))
+})
+
+test('browser keyboard checks press Escape to close a dialog and Space to activate a button', { skip: !enabled, timeout: 30000 }, async () => {
+  const files = { 'index.html': '<button id="open" type="button" onclick="document.querySelector(\'dialog\').showModal()">Открыть</button><dialog><p>Диалог</p></dialog>' }
+  const result = await runJob({ language: 'html', code: JSON.stringify(files), timeLimitMs: 3000, cases: [{ name: 'keyboard interaction', hidden: false, checks: [
+    { selector: '#open', action: 'press', value: 'Space' },
+    { selector: 'dialog', visible: true },
+    { selector: 'dialog', action: 'press', value: 'Escape' },
+    { selector: 'dialog', visible: false },
+  ] }] })
   assert.equal(result.status, 'passed', JSON.stringify(result))
 })

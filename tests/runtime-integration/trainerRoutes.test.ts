@@ -12,9 +12,11 @@ let payload: Payload
 let go: TrainerTask
 let html: TrainerTask
 let react: TrainerTask
+let python: TrainerTask
 
 const sum = 'package main\nimport "fmt"\nfunc main(){var a,b int;fmt.Scan(&a,&b);fmt.Println(a+b)}'
 const fixed = 'package main\nimport "fmt"\nfunc main(){fmt.Println(3)}'
+const pythonSum = 'import sys\na, b, *_ = sys.stdin.read().split()\nprint(int(a) + int(b))'
 const htmlCode = JSON.stringify({ 'index.html': '<main><h1>Команда</h1><style>main {display:flex}</style></main>' })
 const reactCode = JSON.stringify({ 'App.jsx': 'import {useState} from "react"; export default function App(){const[n,setN]=useState(0);return <main><output>{n}</output><button onClick={()=>setN(n+1)}>Плюс</button></main>}' })
 
@@ -50,6 +52,10 @@ beforeAll(async () => {
     { name: 'Начальное значение', hidden: false, checks: [{ selector: 'output', text: '0' }] },
     { name: 'PRIVATE_INTERACTION', hidden: true, checks: [{ selector: 'button', action: 'click' }, { selector: 'button', action: 'click' }, { selector: 'output', text: '2' }] },
   ] })
+  python = await createSumTask(payload, { checkMode: 'program', languages: ['python'], pointsReward: 29, starterCodePython: 'print(3)', solutionCodePython: pythonSum, runtimeCases: [
+    { name: 'Пример Python', hidden: false, input: '1 2', expected: '3' },
+    { name: 'PRIVATE_PYTHON_CASE', hidden: true, input: '931399 57853 PRIVATE_PYTHON_INPUT', expected: '989252' },
+  ] })
 })
 afterAll(async () => {
   vi.unstubAllEnvs()
@@ -57,6 +63,46 @@ afterAll(async () => {
 })
 
 describe('route handlers → HTTP gateway → изолят → настоящая PostgreSQL', () => {
+  it('Python: публичный и собственный ввод исполняются в CPython без записи прогресса', async () => {
+    const { user, token } = await student()
+    const response = await run(request(token, python, 'python', pythonSum, { customCases: [{ name: 'Мой Python-тест', input: '5 -2', expected: '3' }] }))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ result: { status: 'passed', totalCount: 2, passedCount: 2 } })
+    expect((await progress(user.id, python.id)).totalDocs).toBe(0)
+    expect((await ledger(user.id, python.id)).totalDocs).toBe(0)
+  })
+
+  it('Python: клиентский passed не обходит скрытый ввод; настоящее решение начисляет баллы один раз', async () => {
+    const { user, token } = await student()
+    const failedResponse = await submit(request(token, python, 'python', 'print(3)', { result: { status: 'passed' }, runtimeCases: [] }))
+    expect(failedResponse.status).toBe(200)
+    const failed = await failedResponse.json() as SubmitResponse
+    expect(failed).toMatchObject({ completed: false, awardedPoints: null, result: { status: 'failed', totalCount: 2, passedCount: 1 } })
+    expect(JSON.stringify(failed)).not.toMatch(/PRIVATE_PYTHON|989252/)
+    expect((await ledger(user.id, python.id)).totalDocs).toBe(0)
+    for (const awardedPoints of [29, null]) {
+      const response = await submit(request(token, python, 'python', pythonSum))
+      expect(response.status).toBe(200)
+      expect(await response.json()).toMatchObject({ completed: true, awardedPoints, result: { status: 'passed' } })
+    }
+    expect((await progress(user.id, python.id)).docs[0]).toMatchObject({ language: 'python', verifiedBy: 'server', isCompleted: true, attempts: 3, failedAttempts: 1 })
+    expect((await ledger(user.id, python.id)).docs).toEqual([expect.objectContaining({ amount: 29 })])
+  })
+
+  it('Python: неверный язык, бесконечный цикл и ошибка программы не засчитываются', async () => {
+    const { user, token } = await student()
+    expect((await run(request(token, go, 'python', pythonSum))).status).toBe(400)
+    for (const code of ['while True: pass', 'raise ValueError("bad")', 'def broken(:']) {
+      const response = await submit(request(token, python, 'python', code))
+      expect(response.status).toBe(200)
+      const body = await response.json() as SubmitResponse
+      expect(body.completed).toBe(false)
+      expect(body.awardedPoints).toBeNull()
+      expect(body.result.status).not.toBe('passed')
+    }
+    expect((await ledger(user.id, python.id)).totalDocs).toBe(0)
+  }, 90000)
+
   it('Go: публичные и собственные проверки исполняются, успех не пишет прогресс и XP', async () => {
     const { user, token } = await student()
     const response = await run(request(token, go, 'go', sum, { customCases: [{ name: 'Мой ввод', input: '3 4', expected: '7\n' }] }))

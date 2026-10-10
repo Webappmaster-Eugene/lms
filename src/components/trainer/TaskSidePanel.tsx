@@ -278,6 +278,7 @@ function BrowserCheckDetails({ check }: { check: BrowserCheck }) {
   return (
     <>
       {check.action === 'click' && <p>Действие: нажать на элемент.</p>}
+      {check.action === 'press' && <p>Действие: нажать клавишу <code className="font-mono text-foreground">{check.value}</code> на элементе.</p>}
       {check.action === 'fill' && <p>Действие: ввести <code className="break-all font-mono text-foreground">{JSON.stringify(check.value ?? '')}</code>.</p>}
       {check.text !== undefined && <p>Ожидаемый текст: <code className="break-all font-mono text-foreground">{JSON.stringify(check.text)}</code>.</p>}
       {check.count !== undefined && <p>Ожидаемое число элементов: {check.count}.</p>}
@@ -342,7 +343,9 @@ function SolutionTab({
 
   const frontendLanguage = language === 'html' || language === 'react' || language === 'next'
   const files = frontendLanguage ? Object.entries(solution.solutionFiles ?? {}) : []
-  const code = language === 'go'
+  const code = language === 'python'
+    ? solution.solutionCodePython
+    : language === 'go'
     ? solution.solutionCodeGo
     : language === 'ts'
       ? (solution.solutionCodeTs ?? solution.solutionCode)
@@ -382,7 +385,7 @@ function SolutionTab({
         </div>
       ) : code ? (
         <div className="prose prose-sm dark:prose-invert min-w-0 max-w-none">
-          <MarkdownRenderer content={codeMarkdown(code, language === 'go' ? 'go' : language === 'ts' ? 'typescript' : 'javascript')} />
+          <MarkdownRenderer content={codeMarkdown(code, language === 'python' ? 'python' : language === 'go' ? 'go' : language === 'ts' ? 'typescript' : 'javascript')} />
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">Эталонное решение для этого языка не задано.</p>

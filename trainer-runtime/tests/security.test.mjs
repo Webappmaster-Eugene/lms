@@ -30,9 +30,29 @@ test('job isolation has no network, privilege, writable root or host mounts', ()
 test('all job entrypoints have an independent process lifetime watchdog', async () => {
   const base = await readFile(new URL('../Dockerfile', import.meta.url), 'utf8')
   const next = await readFile(new URL('../Dockerfile.next', import.meta.url), 'utf8')
-  for (const [source, worker] of [[base, 'go-worker.mjs'], [base, 'frontend-worker.mjs'], [next, 'next-worker.mjs']]) {
+  for (const [source, worker] of [[base, 'go-worker.mjs'], [base, 'python-worker.mjs'], [base, 'frontend-worker.mjs'], [next, 'next-worker.mjs']]) {
     assert.ok(source.includes(`ENTRYPOINT ["/usr/bin/timeout", "--signal=KILL", "180s", "node", "/runtime/${worker}"]`), worker)
   }
+})
+
+test('Python validates stdin/stdout cases and restricts console mode to explicit trusted requests', () => {
+  const request = { ...goRequest, language: 'python', code: 'print(input())' }
+  assert.equal(validateRequest(request).language, 'python')
+  assert.throws(() => validateRequest(request, true), InputError)
+  assert.throws(() => validateRequest({ ...request, cases: [] }), InputError)
+  assert.equal(validateRequest({ ...request, cases: [], allowNoTests: true }).allowNoTests, true)
+  assert.throws(() => validateRequest({ ...request, cases: [{ name: 'bad', hidden: false, input: 42, expected: '' }] }), InputError)
+  assert.throws(() => validateRequest({ ...request, cases: [{ name: 'bad', hidden: false, input: '', expected: null }] }), InputError)
+  assert.throws(() => validateRequest({ ...request, cases: [{ name: 'bad', hidden: false, checks: [{ selector: 'main', text: 'x' }] }] }), InputError)
+})
+
+test('browser keyboard checks only accept the supported keys and forbid arbitrary shortcuts', () => {
+  const check = (value) => ({ selector: '#dialog', action: 'press', value })
+  const request = (value) => ({ language: 'react', code: '{"App.jsx":"export default function App(){}"}', cases: [{ name: 'keyboard', hidden: false, checks: [check(value)] }] })
+  for (const key of ['Enter', 'Escape', 'Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Tab']) {
+    assert.equal(validateRequest(request(key)).cases[0].checks[0].value, key)
+  }
+  for (const key of ['Control+R', 'Meta+Q', 'Alt+F4', 'F5', 'Escape+Enter', '', undefined, 13]) assert.throws(() => validateRequest(request(key)), InputError)
 })
 
 test('rejects traversal, secret filenames, oversized input and empty grading', () => {

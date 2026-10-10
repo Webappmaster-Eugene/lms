@@ -8,7 +8,7 @@ import { TrainerWorkspace } from '@/components/trainer/TrainerWorkspace'
 import { BookmarkButton } from '@/components/bookmarks/BookmarkButton'
 import { findBookmarkId } from '@/lib/bookmarks'
 import { TaskSidePanel } from '@/components/trainer/TaskSidePanel'
-import { DIFFICULTY_LABELS, COMPANY_LABELS, TAG_LABELS, LANGUAGE_LABELS } from '@/lib/trainer/constants'
+import { DIFFICULTY_LABELS, LANGUAGE_LABELS } from '@/lib/trainer/constants'
 import { isTrainerLanguage, runtimeCases } from '@/lib/trainer/runtime-spec'
 import { publicCases, normalizeCases, starterCodeFor, taskLanguages } from '@/lib/trainer/spec'
 import { lexicalToMarkdown } from '@/lib/lexical'
@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 import { collectAllPages } from '@/lib/paginate'
 import { nextUnsolvedTask } from '@/lib/trainer/next-task'
 import type { ClientProgress, ClientTaskSpec } from '@/lib/trainer/api'
-import type { TrainerCompany, TrainerTag } from '@/lib/trainer/constants'
+import { TaskMetadata } from '@/components/trainer/TaskMetadata'
 import type { TrainerDifficulty, TrainerLanguage } from '@/lib/trainer/types'
 
 type Props = {
@@ -149,9 +149,6 @@ export default async function TaskPage({ params }: Props) {
     ? task.hints.map((item, index) => ({ hint: String(item?.hint ?? ''), id: item?.id ?? String(index) }))
     : []
 
-  const tags = (task.tags ?? []) as TrainerTag[]
-  const companies = (task.companies ?? []) as TrainerCompany[]
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -181,20 +178,8 @@ export default async function TaskPage({ params }: Props) {
                 {LANGUAGE_LABELS[language]}
               </span>
             ))}
-            {tags.map((tag) => (
-              <span key={tag} className="rounded bg-primary/10 px-1.5 py-0.5 text-primary">
-                {TAG_LABELS[tag] ?? tag}
-              </span>
-            ))}
-            {companies.map((company) => (
-              <span key={company} className="rounded bg-info/10 px-1.5 py-0.5 text-info">
-                {COMPANY_LABELS[company] ?? company}
-              </span>
-            ))}
-            {task.leetcodeNumber ? (
-              <span className="text-muted-foreground">LeetCode #{task.leetcodeNumber}</span>
-            ) : null}
           </div>
+          <TaskMetadata task={task} className="mt-3" />
         </div>
 
         <div className="flex shrink-0 items-center gap-2">

@@ -18,6 +18,7 @@ export const LANGUAGE_OPTIONS: ReadonlyArray<SelectOption<TrainerLanguage>> = [
   { label: 'JavaScript', value: 'js' },
   { label: 'TypeScript', value: 'ts' },
   { label: 'Go', value: 'go' },
+  { label: 'Python', value: 'python' },
   { label: 'HTML / CSS', value: 'html' },
   { label: 'React', value: 'react' },
   { label: 'Next.js', value: 'next' },
@@ -27,6 +28,7 @@ export const LANGUAGE_LABELS: Readonly<Record<TrainerLanguage, string>> = {
   js: 'JavaScript',
   ts: 'TypeScript',
   go: 'Go',
+  python: 'Python',
   html: 'HTML / CSS',
   react: 'React',
   next: 'Next.js',
@@ -37,6 +39,7 @@ export const MONACO_LANGUAGE: Readonly<Record<TrainerLanguage, string>> = {
   js: 'javascript',
   ts: 'typescript',
   go: 'go',
+  python: 'python',
   html: 'html',
   react: 'typescript',
   next: 'typescript',
@@ -46,7 +49,7 @@ export const CHECK_MODE_OPTIONS: ReadonlyArray<SelectOption<TrainerCheckMode>> =
   { label: 'Сравнение вывода (легаси)', value: 'stdout' },
   { label: 'Юнит-тесты', value: 'unit' },
   { label: 'Проверка типов TypeScript', value: 'types' },
-  { label: 'Go: ввод и вывод программы', value: 'program' },
+  { label: 'Go / Python: ввод и вывод программы', value: 'program' },
   { label: 'Frontend: проверки в браузере', value: 'dom' },
 ] as const
 
@@ -92,6 +95,33 @@ export const TRAINER_TAGS = [
   'generics',
   'web-api',
   'performance',
+  'react',
+  'hooks',
+  'state',
+  'forms',
+  'accessibility',
+  'go',
+  'python',
+  'concurrency',
+  'channels',
+  'context',
+  'mutex',
+  'two-pointers',
+  'sliding-window',
+  'hash-table',
+  'stack',
+  'queue',
+  'binary-search',
+  'sorting',
+  'dynamic-programming',
+  'graph',
+  'tree',
+  'heap',
+  'linked-list',
+  'greedy',
+  'backtracking',
+  'livecoding',
+  'cancelation',
 ] as const
 
 export type TrainerTag = (typeof TRAINER_TAGS)[number]
@@ -118,6 +148,33 @@ export const TAG_LABELS: Readonly<Record<TrainerTag, string>> = {
   generics: 'Дженерики',
   'web-api': 'Web API',
   performance: 'Производительность',
+  'react': 'React',
+  'hooks': 'Хуки React',
+  'state': 'Состояние',
+  'forms': 'Формы',
+  'accessibility': 'Доступность',
+  'go': 'Go',
+  'python': 'Python',
+  'concurrency': 'Конкурентность',
+  'channels': 'Каналы',
+  'context': 'Контекст и отмена',
+  'mutex': 'Мьютексы',
+  'two-pointers': 'Два указателя',
+  'sliding-window': 'Скользящее окно',
+  'hash-table': 'Хеш-таблицы',
+  'stack': 'Стек',
+  'queue': 'Очередь',
+  'binary-search': 'Бинарный поиск',
+  'sorting': 'Сортировка',
+  'dynamic-programming': 'Динамическое программирование',
+  'graph': 'Графы',
+  'tree': 'Деревья',
+  'heap': 'Куча',
+  'linked-list': 'Связный список',
+  'greedy': 'Жадные алгоритмы',
+  'backtracking': 'Поиск с возвратом',
+  'livecoding': 'Лайвкодинг',
+  'cancelation': 'Отмена операций',
 }
 
 export const TAG_OPTIONS: ReadonlyArray<SelectOption<TrainerTag>> = TRAINER_TAGS.map((tag) => ({
@@ -134,6 +191,13 @@ export const TRAINER_COMPANIES = [
   'wildberries',
   'vk',
   'faang',
+  'mts',
+  'google',
+  'meta',
+  'amazon',
+  'microsoft',
+  'uber',
+  'airbnb',
 ] as const
 
 export type TrainerCompany = (typeof TRAINER_COMPANIES)[number]
@@ -147,6 +211,13 @@ export const COMPANY_LABELS: Readonly<Record<TrainerCompany, string>> = {
   wildberries: 'Wildberries',
   vk: 'VK',
   faang: 'FAANG / зарубеж',
+  mts: 'МТС / KION',
+  google: 'Google',
+  meta: 'Meta',
+  amazon: 'Amazon',
+  microsoft: 'Microsoft',
+  uber: 'Uber',
+  airbnb: 'Airbnb',
 }
 
 export const COMPANY_OPTIONS: ReadonlyArray<SelectOption<TrainerCompany>> = TRAINER_COMPANIES.map(
@@ -163,6 +234,7 @@ export const TOPIC_CATEGORIES = [
   'webapi',
   'go',
   'frontend',
+  'python',
 ] as const
 
 export type TrainerTopicCategory = (typeof TOPIC_CATEGORIES)[number]
@@ -176,6 +248,7 @@ export const TOPIC_CATEGORY_LABELS: Readonly<Record<TrainerTopicCategory, string
   patterns: 'Паттерны',
   webapi: 'Web API',
   go: 'Go',
+  python: 'Python',
   frontend: 'HTML, CSS, React и Next.js',
 }
 

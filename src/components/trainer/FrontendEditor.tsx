@@ -163,7 +163,7 @@ export function FrontendEditor({
               {previewHtml === null && previewUrl === null ? (
                 <div className="flex flex-1 items-center justify-center p-6"><p className="max-w-xs text-center text-sm text-muted-foreground">Нажмите «Запустить», чтобы увидеть страницу и проверить её в браузере.</p></div>
               ) : (
-                <iframe title="Предпросмотр решения" src={previewUrl ?? undefined} srcDoc={previewUrl ? undefined : previewHtml ?? undefined} sandbox="allow-scripts" referrerPolicy="no-referrer" className="min-h-[360px] w-full flex-1 border-0 bg-white" />
+                <iframe title="Предпросмотр решения" src={previewUrl ?? undefined} srcDoc={previewUrl ? undefined : previewHtml ?? undefined} sandbox="allow-scripts allow-forms" referrerPolicy="no-referrer" className="min-h-[360px] w-full flex-1 border-0 bg-white" />
               )}
             </section>
           </div>

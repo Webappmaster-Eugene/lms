@@ -311,3 +311,29 @@
   допустима авторизованная панель. Environment остаётся источником конфигурации,
   его не обходить прямой правкой БД Dokploy/.env. Источник: `docs/trainer-runtime.md`,
   фактическая API/SSH-проверка 2026-10-10.
+
+
+## Python и атрибуция задач (2026-10-10)
+
+- Python (`python`, `program`) использует CPython 3.13 и поля
+  starterCodePython/solutionCodePython. Синтаксис проверяется без исполнения,
+  каждый stdin/stdout-кейс — новый контейнер, Python получает пустое окружение.
+  Job image TRAINER_PYTHON_JOB_IMAGE, по умолчанию lms-trainer-python:local.
+  Наличие реализации и Docker-проверок не включает runtime на проде.
+  Источники: docs/trainer-runtime.md, trainer-runtime/python-worker.mjs.
+- Native submit требует sandbox allow-forms: без него React onSubmit не
+  вызывается. HTML/React CSP form-action none и opaque origin сохраняются;
+  Next preview имеет такую же form-action и sandbox-политику. Доступ к родителю,
+  top navigation и same-origin не разрешаются. Реальные проверки проверяют
+  событие submit и CSP-блокировку навигации, а не только строку атрибута.
+  Источники: frontend-worker.mjs, next-worker.mjs, tests/execution.test.mjs.
+- Метки компаний различают official/candidate-report/preparation/unverified.
+  Общая карьерная страница не подтверждает конкретный вопрос, опубликованный
+  пример не доказывает частоту. Все ссылки проверяются по протоколу/credentials;
+  даты — по реальному ISO-календарю. Источники: docs/trainer-interview-sources.md,
+  src/lib/trainer/metadata.ts, src/data/trainer/company-sources.ts.
+- /api/manage/trainer/metadata — административный preview/apply: dryRun,
+  shared request transaction, свежие строки под блокировкой, частичный patch.
+  Коды, условия, проверки, публикация, ID/slug и прогресс не заменяются.
+  Полный seed:trainer для обновления меток на проде не использовать.
+  Источники: metadata-backfill.ts, trainerPythonMetadata.test.ts.

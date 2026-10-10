@@ -1,5 +1,14 @@
 FROM node:22-bookworm-slim AS node
 
+FROM python:3.13-slim-bookworm AS python-job
+RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 libatomic1
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+WORKDIR /runtime
+COPY python-worker.mjs ./
+ENV HOME=/tmp
+USER 10001:10001
+ENTRYPOINT ["/usr/bin/timeout", "--signal=KILL", "180s", "node", "/runtime/python-worker.mjs"]
+
 FROM golang:1.25-bookworm AS go-job
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 WORKDIR /runtime

@@ -1,23 +1,17 @@
 import type { TrainerTopicSeed } from './types'
 
-/**
- * Тема 13. Задачи конкретных компаний.
- *
- * Собрано из разборов реальных собеседований: Яндекс, Озон, Авито, Т-Банк,
- * Сбер, Wildberries. Формулировки приведены к проверяемому виду, но суть
- * и подвохи сохранены.
- */
+/** Историческая подборка. Метки компаний без источников обозначены как неподтверждённые. */
 export const companies: TrainerTopicSeed = {
   slug: 'company-tasks',
   title: 'Задачи компаний',
-  description: 'Что реально спрашивают в Яндексе, Озоне, Авито, Т-Банке, Сбере и WB',
+  description: 'Практические задачи для подготовки; происхождение и источники каждой метки указаны отдельно',
   category: 'companies',
   icon: '🏢',
   order: 13,
   tasks: [
     {
       slug: 'yandex-tickets-route',
-      title: 'Яндекс: маршрут по билетам',
+      title: 'маршрут по билетам',
       difficulty: 'medium',
       checkMode: 'unit',
       languages: ['js'],
@@ -135,7 +129,7 @@ buildRoute([['Москва', 'Казань'], ['Сочи', 'Москва'], ['К
 
     {
       slug: 'tbank-rate-limiter',
-      title: 'Т-Банк: rate limiter',
+      title: 'rate limiter',
       difficulty: 'hard',
       checkMode: 'unit',
       languages: ['js'],
@@ -295,7 +289,7 @@ test('на длинной дистанции лимит соблюдается',
 
     {
       slug: 'ozon-equal-arrays',
-      title: 'Озон: сделать массивы равными',
+      title: 'сделать массивы равными',
       difficulty: 'medium',
       checkMode: 'unit',
       languages: ['js'],
@@ -354,8 +348,9 @@ minOperations([1, 2], [1, 2])       // 0
 Один проход на подсчёт, второй на сопоставление — O(n) времени и O(n) памяти.
 
 Стоит уточнить у интервьюера, учитывается ли порядок. Если да — задача
-превращается в поиск наибольшей общей подпоследовательности и решается совсем
-иначе.`,
+при тех же операциях замены достаточно посчитать несовпадающие позиции.
+Например, [1,2] → [2,1] требует двух замен; общая подпоследовательность здесь
+не определяет число замен.`,
       hints: [
         'Считайте не заменяемые элементы, а те, что можно оставить.',
         'Set не подойдёт: важны количества, а не сам факт наличия числа.',
@@ -374,7 +369,7 @@ minOperations([1, 2], [1, 2])       // 0
 
     {
       slug: 'avito-event-bus',
-      title: 'Авито: шина событий',
+      title: 'шина событий',
       difficulty: 'medium',
       checkMode: 'unit',
       languages: ['js'],
@@ -621,7 +616,7 @@ test('аргументы доходят до обработчика', function (
 
     {
       slug: 'sber-vdom-diff',
-      title: 'Сбер: упрощённый Virtual DOM diff',
+      title: 'упрощённый Virtual DOM diff',
       difficulty: 'hard',
       checkMode: 'unit',
       languages: ['js'],
@@ -810,7 +805,7 @@ test('путь не портится между ветвями', function () {
 
     {
       slug: 'wb-intersection-lazy-load',
-      title: 'Wildberries: ленивая загрузка картинок',
+      title: 'ленивая загрузка картинок',
       difficulty: 'medium',
       checkMode: 'unit',
       languages: ['js'],
@@ -1032,7 +1027,7 @@ test('disconnect прекращает наблюдение', function () {
 
     {
       slug: 'vk-deep-freeze',
-      title: 'VK: глубокая заморозка объекта',
+      title: 'глубокая заморозка объекта',
       difficulty: 'medium',
       checkMode: 'unit',
       languages: ['js'],
@@ -1178,7 +1173,7 @@ test('символьные свойства обходятся', function () {
 
     {
       slug: 'ozon-batch-requests',
-      title: 'Озон: склейка одинаковых запросов',
+      title: 'склейка одинаковых запросов',
       difficulty: 'hard',
       checkMode: 'unit',
       languages: ['js'],

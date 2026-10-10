@@ -38,7 +38,7 @@ try {
     let timer
     try {
       const checked = async () => {
-        await page.setContent('<style>html,body{margin:0;width:100%;height:100%}iframe{border:0;width:100%;height:100%}</style><iframe id="solution" sandbox="allow-scripts"></iframe>')
+        await page.setContent('<style>html,body{margin:0;width:100%;height:100%}iframe{border:0;width:100%;height:100%}</style><iframe id="solution" sandbox="allow-scripts allow-forms"></iframe>')
         await page.locator('#solution').evaluate((frame, document) => { frame.srcdoc = document }, html)
         const frame = page.frameLocator('#solution')
         const readStyle = createNativeStyleReader(context, page)
@@ -46,6 +46,7 @@ try {
           const locator = frame.locator(check.selector)
           if (check.action === 'click') await locator.click()
           if (check.action === 'fill') await locator.fill(check.value ?? '')
+          if (check.action === 'press') await locator.press(check.value)
           // Poll assertions: React updates and fonts/layout settle asynchronously.
           const deadline = caseStarted + job.timeLimitMs
           let error

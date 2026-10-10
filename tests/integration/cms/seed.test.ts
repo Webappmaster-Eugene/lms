@@ -7,7 +7,7 @@ import type { Payload } from 'payload'
 import { TRAINER_CATALOG } from '@/data/trainer'
 import { flattenCatalog, POINTS_BY_DIFFICULTY, toCaseSpecs } from '@/data/trainer/types'
 import { collectAllPages } from '@/lib/paginate'
-import { isFrontendLanguage, runtimeCases } from '@/lib/trainer/runtime-spec'
+import { isFrontendLanguage, isProgramLanguage, runtimeCases } from '@/lib/trainer/runtime-spec'
 import { solutionCodeFor, starterCodeFor, taskLanguages } from '@/lib/trainer/spec'
 import { runSolution } from '@/server/trainer/sandbox'
 import type { TrainerTask, TrainerTopic } from '@/payload-types'
@@ -131,12 +131,16 @@ describe('каталог в базе: сохранность всех языко
           descriptionMd: expected.descriptionMd, entryName: expected.entryName ?? null,
           setupCode: expected.setupCode ?? null, setupTypes: expected.setupTypes ?? null,
           starterCode: expected.starterCode, starterCodeTs: expected.starterCodeTs ?? null,
+          starterCodePython: expected.starterCodePython ?? null,
           starterCodeGo: expected.starterCodeGo ?? null,
           solutionCode: expected.solutionCode, solutionCodeTs: expected.solutionCodeTs ?? null,
+          solutionCodePython: expected.solutionCodePython ?? null,
           solutionCodeGo: expected.solutionCodeGo ?? null,
           solutionNotes: expected.solutionNotes ?? null, testCode: expected.testCode ?? null,
           typeHarness: expected.typeHarness ?? null, expectedOutput: expected.expectedOutput ?? null,
           timeLimitMs: expected.timeLimitMs ?? 5000, sourceUrl: expected.sourceUrl ?? null,
+          interviewFormat: expected.interviewFormat ?? null, recommendedMinutes: expected.recommendedMinutes ?? null,
+          companyEvidence: expected.companyEvidence ?? [],
           leetcodeNumber: expected.leetcodeNumber ?? null,
           pointsReward: expected.pointsReward ?? POINTS_BY_DIFFICULTY[expected.difficulty], isPublished: true,
         })
@@ -166,7 +170,7 @@ describe('каталог в базе: сохранность всех языко
         (task.checkMode === 'program' && runtimeCases(task).length > 0 && runtimeCases(task).every((row) => typeof row.input === 'string' && typeof row.expected === 'string')) ||
         (task.checkMode === 'dom' && runtimeCases(task).length > 0 && runtimeCases(task).every((row) => (row.checks?.length ?? 0) > 0))
       expect(hasCheck, `${task.slug}: нет тестов`).toBe(true)
-      if (task.checkMode === 'program') expect(taskLanguages(task), task.slug).toEqual(['go'])
+      if (task.checkMode === 'program') expect(taskLanguages(task).every(isProgramLanguage), task.slug).toBe(true)
       else if (task.checkMode === 'dom') expect(taskLanguages(task).every(isFrontendLanguage), task.slug).toBe(true)
       else expect(taskLanguages(task).every((language) => language === 'js' || language === 'ts'), task.slug).toBe(true)
       for (const language of taskLanguages(task)) {

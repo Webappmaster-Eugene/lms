@@ -5,14 +5,14 @@ import type { RuntimeCase } from '@/lib/trainer/runtime-spec'
 import type { TrainerRunResult } from '@/lib/trainer/types'
 import { TrainerRunnerError } from './pool'
 
-type RuntimeLanguage = 'go' | 'html' | 'react' | 'next'
+type RuntimeLanguage = 'go' | 'python' | 'html' | 'react' | 'next'
 type RuntimeInput = { language: RuntimeLanguage; code: string; timeLimitMs: number }
 export type RuntimePreview = { html?: string; leaseToken?: string; expiresAt?: number; previewPath?: string }
 
 async function requestRuntime(route: '/run' | '/preview', input: RuntimeInput & { cases?: RuntimeCase[]; allowNoTests?: boolean; includePreview?: boolean }): Promise<unknown> {
   const endpoint = process.env.TRAINER_RUNTIME_URL
   const token = process.env.TRAINER_RUNTIME_TOKEN
-  if (!endpoint || !token || token.length < 32) throw new TrainerRunnerError('Runtime Go и frontend не настроен. Обратитесь к администратору')
+  if (!endpoint || !token || token.length < 32) throw new TrainerRunnerError('Runtime Go, Python и frontend не настроен. Обратитесь к администратору')
   let url: URL
   try {
     url = new URL(route, endpoint)

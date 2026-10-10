@@ -57,6 +57,7 @@ export function interviewLanguage(input: unknown): TrainerLanguage {
 }
 
 export function interviewStarter(language: TrainerLanguage): string {
+  if (language === 'python') return 'print("Готов к собеседованию")\n'
   if (language === 'go') return 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("Готов к собеседованию")\n}\n'
   if (language === 'html') return JSON.stringify({
     'index.html': '<!doctype html>\n<html lang="ru">\n<head><meta charset="utf-8"><link rel="stylesheet" href="styles.css"></head>\n<body><h1>Готов к собеседованию</h1></body>\n</html>',

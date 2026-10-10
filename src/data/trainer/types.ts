@@ -7,6 +7,7 @@
  * доезжает — сборка падает раньше.
  */
 
+import type { CompanyEvidence, InterviewFormat } from '@/lib/trainer/metadata'
 import type { RuntimeCase } from '@/lib/trainer/runtime-spec'
 import { toArgsLiteral, toLiteral } from '@/lib/trainer/literal'
 import type { TrainerCompany, TrainerTag, TrainerTopicCategory } from '@/lib/trainer/constants'
@@ -52,12 +53,14 @@ export type TrainerTaskSeed = {
   setupTypes?: string
   starterCode: string
   starterCodeTs?: string
+  starterCodePython?: string
   starterCodeGo?: string
   starterFiles?: Record<string, string>
   solutionFiles?: Record<string, string>
   runtimeCases?: RuntimeCase[]
   solutionCode: string
   solutionCodeTs?: string
+  solutionCodePython?: string
   solutionCodeGo?: string
   solutionNotes?: string
   cases?: TrainerCaseInput[]
@@ -68,6 +71,9 @@ export type TrainerTaskSeed = {
   tags?: TrainerTag[]
   companies?: TrainerCompany[]
   sourceUrl?: string
+  interviewFormat?: InterviewFormat
+  recommendedMinutes?: number
+  companyEvidence?: CompanyEvidence[]
   leetcodeNumber?: number
   pointsReward?: number
   timeLimitMs?: number

@@ -1,5 +1,6 @@
-export const LANGUAGES = ['go', 'html', 'react', 'next']
+export const LANGUAGES = ['go', 'python', 'html', 'react', 'next']
 export const MAX_CODE_LENGTH = 20_000
+const PRESS_KEYS = ['Enter', 'Escape', 'Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Tab']
 
 export class InputError extends Error {}
 
@@ -21,7 +22,8 @@ export function parseFiles(code) {
 
 function validateCheck(check) {
   if (!check || typeof check !== 'object' || typeof check.selector !== 'string' || check.selector.length === 0 || check.selector.length > 500) throw new InputError('У проверки должен быть CSS-селектор')
-  if (check.action !== undefined && !['click', 'fill'].includes(check.action)) throw new InputError('Неизвестное действие проверки')
+  if (check.action !== undefined && !['click', 'fill', 'press'].includes(check.action)) throw new InputError('Неизвестное действие проверки')
+  if (check.action === 'press' && !PRESS_KEYS.includes(check.value)) throw new InputError('Недопустимая клавиша проверки')
   for (const key of ['value', 'text']) {
     if (check[key] !== undefined && (typeof check[key] !== 'string' || check[key].length > 4000)) throw new InputError('Недопустимое значение проверки')
   }
@@ -36,16 +38,17 @@ export function validateRequest(raw, preview = false) {
   if (!raw || typeof raw !== 'object' || !LANGUAGES.includes(raw.language)) throw new InputError('Неизвестный язык')
   if (typeof raw.code !== 'string' || raw.code.length > MAX_CODE_LENGTH) throw new InputError('Код превышает 20 000 символов')
   const timeLimitMs = raw.timeLimitMs ?? 2000
+  const isProgram = raw.language === 'go' || raw.language === 'python'
   if (!Number.isInteger(timeLimitMs) || timeLimitMs < 100 || timeLimitMs > 10000) throw new InputError('Лимит времени должен быть от 100 до 10000 мс')
-  if (preview && raw.language === 'go') throw new InputError('Предпросмотр доступен для frontend')
-  if (raw.language !== 'go') parseFiles(raw.code)
+  if (preview && isProgram) throw new InputError('Предпросмотр доступен для frontend')
+  if (!isProgram) parseFiles(raw.code)
   if (!preview) {
-    if (!Array.isArray(raw.cases) || raw.cases.length > 50 || (raw.cases.length === 0 && !(raw.allowNoTests === true && raw.language === 'go'))) throw new InputError('Нужен хотя бы один тест, максимум 50')
+    if (!Array.isArray(raw.cases) || raw.cases.length > 50 || (raw.cases.length === 0 && !(raw.allowNoTests === true && isProgram))) throw new InputError('Нужен хотя бы один тест, максимум 50')
     for (const item of raw.cases) {
       if (!item || typeof item !== 'object' || typeof item.name !== 'string' || item.name.length > 200 || typeof item.hidden !== 'boolean') throw new InputError('Недопустимый тест')
       if (item.viewport !== undefined && (!item.viewport || !Number.isInteger(item.viewport.width) || !Number.isInteger(item.viewport.height) || item.viewport.width < 320 || item.viewport.width > 1920 || item.viewport.height < 240 || item.viewport.height > 1200)) throw new InputError('Недопустимый размер viewport')
-      if (raw.language === 'go') {
-        if (typeof item.expected !== 'string' || item.expected.length > 20000 || (item.input !== undefined && (typeof item.input !== 'string' || item.input.length > 20000))) throw new InputError('Go-тест содержит stdin и ожидаемый stdout')
+      if (isProgram) {
+        if (typeof item.expected !== 'string' || item.expected.length > 20000 || (item.input !== undefined && (typeof item.input !== 'string' || item.input.length > 20000))) throw new InputError('Тест программы содержит stdin и ожидаемый stdout')
       } else {
         if (!Array.isArray(item.checks) || item.checks.length === 0 || item.checks.length > 50) throw new InputError('Frontend-тест должен содержать от 1 до 50 проверок')
         item.checks.forEach(validateCheck)

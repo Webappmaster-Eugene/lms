@@ -39,7 +39,9 @@ describe('Next.js capability-предпросмотр', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     expect(response.headers.get('Set-Cookie')).toBeNull()
     expect(response.headers.get('X-Frame-Options')).toBeNull()
-    expect(response.headers.get('Content-Security-Policy')).toContain('sandbox allow-scripts')
+    const policy = response.headers.get('Content-Security-Policy') ?? ''
+    expect(policy.split('; ').find((directive) => directive.startsWith('sandbox '))).toBe('sandbox allow-scripts allow-forms')
+    expect(policy.split('; ')).toContain("form-action 'none'")
     expect(response.headers.get('Content-Security-Policy')).not.toContain('allow-same-origin')
     expect(response.headers.get('Referrer-Policy')).toBe('no-referrer')
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('null')

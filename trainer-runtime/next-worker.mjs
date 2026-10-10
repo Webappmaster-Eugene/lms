@@ -8,7 +8,7 @@ import { createNativeStyleReader } from './native-style.mjs'
 
 const MAX_REQUEST_BODY = 2 * 1024 * 1024
 const MAX_RESPONSE_BODY = 8 * 1024 * 1024
-const PREVIEW_CSP = "default-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'; sandbox allow-scripts"
+const PREVIEW_CSP = "default-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'; sandbox allow-scripts allow-forms"
 const hardTimer = setTimeout(() => { nextProcess?.kill('SIGKILL'); process.exit(124) }, 180_000)
 hardTimer.unref()
 const input = createInterface({ input: process.stdin, crlfDelay: Infinity })
@@ -161,7 +161,7 @@ async function browserJob(job) {
         const request = route.request()
         const url = new URL(request.url())
         if (url.href === 'http://preview.invalid/__harness') {
-          await route.fulfill({ contentType: 'text/html', body: '<style>html,body{margin:0}#solution{display:block;width:100vw;height:100vh;border:0}</style><iframe id="solution" sandbox="allow-scripts"></iframe>' })
+          await route.fulfill({ contentType: 'text/html', body: '<style>html,body{margin:0}#solution{display:block;width:100vw;height:100vh;border:0}</style><iframe id="solution" sandbox="allow-scripts allow-forms"></iframe>' })
           return
         }
         if (url.hostname !== 'preview.invalid' || !(url.pathname === job.basePath || url.pathname.startsWith(job.basePath + '/'))) { await route.abort(); return }
@@ -208,6 +208,7 @@ async function browserJob(job) {
             const locator = frame.locator(check.selector)
             if (check.action === 'click') await locator.click()
             if (check.action === 'fill') await locator.fill(check.value ?? '')
+            if (check.action === 'press') await locator.press(check.value)
             let error
             do {
               error = await mismatch(locator, check, readStyle)

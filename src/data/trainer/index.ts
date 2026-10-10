@@ -6,6 +6,7 @@
  * и TypeScript.
  */
 
+import { enrichTrainerMetadata } from './enrich-metadata'
 import type { TrainerTopicSeed } from './types'
 
 import { jsCore } from './01-js-core'
@@ -28,8 +29,12 @@ import { webApi } from './17-web-api'
 import { goTopic } from './19-go'
 import { frontendTopic } from './20-frontend'
 import { practical } from './18-practical'
+import { jsInterviewTopic } from './21-interviews-js'
+import { goInterviewTopic } from './22-interviews-go'
+import { pythonTopic } from './24-python'
+import { reactInterviewTopic } from './23-interviews-react'
 
-export const TRAINER_CATALOG: readonly TrainerTopicSeed[] = [jsCore, hof, asyncTopic, collections, arrayPolyfills, functionPolyfills, strings, dataStructures, algorithms, leetcodeEasy, leetcodeMedium, leetcodeHard, companies, patterns, typescriptTypes, typescriptApplied, webApi, practical, goTopic, frontendTopic]
+export const TRAINER_CATALOG: readonly TrainerTopicSeed[] = [jsCore, hof, asyncTopic, collections, arrayPolyfills, functionPolyfills, strings, dataStructures, algorithms, leetcodeEasy, leetcodeMedium, leetcodeHard, companies, patterns, typescriptTypes, typescriptApplied, webApi, practical, goTopic, frontendTopic, jsInterviewTopic, goInterviewTopic, reactInterviewTopic, pythonTopic].map(enrichTrainerMetadata)
 
 export { flattenCatalog } from './types'
 export type { TrainerTaskSeed, TrainerTopicSeed } from './types'

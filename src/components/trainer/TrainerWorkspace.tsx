@@ -218,7 +218,7 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
         }
         const response = await fetch('/api/trainer/run', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-          body: JSON.stringify({ taskId: task.id, language, code, ...(language === 'go' ? { customCases: programCases } : {}) }),
+          body: JSON.stringify({ taskId: task.id, language, code, ...((language === 'go' || language === 'python') ? { customCases: programCases } : {}) }),
         })
         const data = await response.json() as { result?: TrainerRunResult; preview?: { html?: string; previewPath?: string; leaseToken?: string }; error?: string }
         if (!response.ok || !data.result) throw new Error(data.error ?? 'Не удалось запустить решение')
@@ -482,7 +482,7 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
           onChange={(cases) => setCustomTests({ taskId: task.id, cases })} />
       )}
 
-      {language === 'go' && <CustomProgramCases exampleCase={task.runtimeCases?.find((item) => !item.hidden)} cases={programCases} disabled={busy} onChange={(cases) => setProgramTests({ taskId: task.id, cases })} />}
+      {(language === 'go' || language === 'python') && <CustomProgramCases language={language} exampleCase={task.runtimeCases?.find((item) => !item.hidden)} cases={programCases} disabled={busy} onChange={(cases) => setProgramTests({ taskId: task.id, cases })} />}
 
       {/* Решено — следующий шаг сразу под результатом, а не кнопкой «Далее» в шапке. */}
       {completed && !busy && (nextTask || topicHref) && (

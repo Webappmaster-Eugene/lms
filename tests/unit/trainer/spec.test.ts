@@ -34,7 +34,15 @@ describe('spec: языки и шаблоны', () => {
   })
 
   it('мусор в языках отфильтровывается', () => {
-    expect(taskLanguages({ languages: ['ts', 'python', null] })).toEqual(['ts'])
+    expect(taskLanguages({ languages: ['ts', 'ruby', null] })).toEqual(['ts'])
+  })
+
+  it('Python использует собственные шаблон и защищённый эталон', () => {
+    const task = { languages: ['python'], starterCode: 'legacy', starterCodePython: 'print(None)', solutionCode: 'legacy', solutionCodePython: 'print(42)' }
+    expect(taskLanguages(task)).toEqual(['python'])
+    expect(supportsLanguage(task, 'python')).toBe(true)
+    expect(starterCodeFor(task, 'python')).toBe('print(None)')
+    expect(solutionCodeFor(task, 'python')).toBe('print(42)')
   })
 
   it('поддержка языка', () => {

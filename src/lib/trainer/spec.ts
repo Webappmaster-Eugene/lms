@@ -22,12 +22,14 @@ export type TrainerTaskLike = {
   setupTypes?: string | null
   starterCode?: string | null
   starterCodeTs?: string | null
+  starterCodePython?: string | null
   starterCodeGo?: string | null
   starterFiles?: unknown
   solutionFiles?: unknown
   runtimeCases?: unknown
   solutionCode?: string | null
   solutionCodeTs?: string | null
+  solutionCodePython?: string | null
   solutionCodeGo?: string | null
   testCode?: string | null
   typeHarness?: string | null
@@ -61,7 +63,7 @@ export function taskLanguages(task: TrainerTaskLike): TrainerLanguage[] {
     : task.languages
       ? [task.languages]
       : []
-  const languages = raw.filter((item): item is TrainerLanguage => item === 'js' || item === 'ts' || item === 'go' || item === 'html' || item === 'react' || item === 'next')
+  const languages = raw.filter((item): item is TrainerLanguage => item === 'js' || item === 'ts' || item === 'go' || item === 'python' || item === 'html' || item === 'react' || item === 'next')
   return languages.length > 0 ? languages : ['js']
 }
 
@@ -72,6 +74,7 @@ export function supportsLanguage(task: TrainerTaskLike, language: TrainerLanguag
 /** Стартовый шаблон под выбранный язык. Для TS откатываемся на JS-шаблон. */
 export function starterCodeFor(task: TrainerTaskLike, language: TrainerLanguage): string {
   if (language === 'ts') return task.starterCodeTs ?? task.starterCode ?? ''
+  if (language === 'python') return task.starterCodePython ?? task.starterCode ?? ''
   if (language === 'go') return task.starterCodeGo ?? task.starterCode ?? ''
   if (language === 'html' || language === 'react' || language === 'next') return task.starterFiles ? JSON.stringify(task.starterFiles) : task.starterCode ?? ''
   return task.starterCode ?? ''
@@ -82,6 +85,7 @@ export function solutionCodeFor(
   task: TrainerTaskLike,
   language: TrainerLanguage,
 ): string | undefined {
+  if (language === 'python') return task.solutionCodePython ?? task.solutionCode ?? undefined
   if (language === 'go') return task.solutionCodeGo ?? task.solutionCode ?? undefined
   if (language === 'html' || language === 'react' || language === 'next') return task.solutionFiles ? JSON.stringify(task.solutionFiles) : task.solutionCode ?? undefined
   const code = language === 'ts' ? (task.solutionCodeTs ?? task.solutionCode) : task.solutionCode
@@ -134,7 +138,7 @@ export function buildExecSpec(
   language: TrainerLanguage,
   userCode: string,
 ): TrainerExecSpec {
-  if (task.checkMode === 'program' || task.checkMode === 'dom') throw new TrainerSpecError('Эта задача выполняется в отдельной среде Go/frontend')
+  if (task.checkMode === 'program' || task.checkMode === 'dom') throw new TrainerSpecError('Эта задача выполняется в отдельной среде Go/Python/frontend')
   const checkMode =
     task.checkMode === 'unit' || task.checkMode === 'types' ? task.checkMode : 'stdout'
 

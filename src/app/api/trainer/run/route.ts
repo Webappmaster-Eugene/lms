@@ -4,7 +4,7 @@ import config from '@payload-config'
 
 import { readTrainerBody, TrainerInputError } from '@/lib/trainer/request-body'
 import { TRAINER_LIMITS } from '@/lib/trainer/constants'
-import { isRuntimeLanguage, isFrontendLanguage, parseFrontendFiles, runtimeCases } from '@/lib/trainer/runtime-spec'
+import { isRuntimeLanguage, isProgramLanguage, isFrontendLanguage, parseFrontendFiles, runtimeCases } from '@/lib/trainer/runtime-spec'
 import { parseTaskId } from '@/lib/trainer/task-id'
 import { supportsLanguage, TrainerSpecError } from '@/lib/trainer/spec'
 import { getTrainerAccess } from '@/server/trainer-access'
@@ -34,11 +34,11 @@ export async function POST(request: Request): Promise<Response> {
   const found = await payload.find({ collection: 'trainer-tasks', where: { id: { equals: taskId }, isPublished: { equals: true } }, limit: 1, depth: 0, overrideAccess: true })
   const task = found.docs[0]
   if (!task) return NextResponse.json({ error: 'Задача не найдена' }, { status: 404 })
-  if (!supportsLanguage(task, language) || (language === 'go' ? task.checkMode !== 'program' : task.checkMode !== 'dom')) return NextResponse.json({ error: 'Язык не соответствует этой задаче' }, { status: 400 })
+  if (!supportsLanguage(task, language) || (isProgramLanguage(language) ? task.checkMode !== 'program' : task.checkMode !== 'dom')) return NextResponse.json({ error: 'Язык не соответствует этой задаче' }, { status: 400 })
   try {
     if (isFrontendLanguage(language)) parseFrontendFiles(body.code)
     const cases = runtimeCases(task, true)
-    if (language === 'go' && body.customCases !== undefined) {
+    if (isProgramLanguage(language) && body.customCases !== undefined) {
       const custom = runtimeCases({ runtimeCases: body.customCases }, true)
       if (custom.length > 10 || custom.some((item) => item.expected === undefined || item.checks || item.path || item.viewport || (item.input?.length ?? 0) + (item.expected?.length ?? 0) > 2000)) throw new TrainerSpecError('Добавьте до 10 собственных проверок: ввод и ожидаемый вывод до 2000 символов')
       if (cases.length + custom.length > 50) throw new TrainerSpecError('За один запуск можно проверить до 50 тестов')

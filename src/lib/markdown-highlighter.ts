@@ -12,9 +12,10 @@ const languages: Record<string, () => Promise<LanguageInput>> = {
   sql: () => import('shiki/langs/sql.mjs').then((module) => module.default),
   yaml: () => import('shiki/langs/yaml.mjs').then((module) => module.default),
   markdown: () => import('shiki/langs/markdown.mjs').then((module) => module.default),
+  python: () => import('shiki/langs/python.mjs').then((module) => module.default),
   go: () => import('shiki/langs/go.mjs').then((module) => module.default),
 }
-const aliases: Record<string, string> = { js: 'javascript', ts: 'typescript', sh: 'bash', yml: 'yaml', md: 'markdown', golang: 'go' }
+const aliases: Record<string, string> = { js: 'javascript', ts: 'typescript', sh: 'bash', yml: 'yaml', md: 'markdown', golang: 'go', py: 'python' }
 let shared: Promise<HighlighterCore> | undefined
 const loading = new Map<string, Promise<void>>()
 

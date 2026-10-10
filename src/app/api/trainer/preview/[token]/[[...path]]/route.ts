@@ -7,7 +7,7 @@ const CSP = [
   "default-src 'none'", "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline'", "img-src 'self' data: blob:",
   "font-src 'self' data:", "connect-src 'self'", "frame-ancestors 'self'",
-  "base-uri 'none'", "form-action 'self'", 'sandbox allow-scripts',
+  "base-uri 'none'", "form-action 'none'", 'sandbox allow-scripts allow-forms',
 ].join('; ')
 
 /** Короткоживущий capability: создаётся только авторизованным запуском задачи/комнаты. */

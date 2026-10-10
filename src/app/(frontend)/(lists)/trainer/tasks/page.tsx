@@ -6,13 +6,14 @@ import type { Where } from 'payload'
 
 import { getPayload } from '@/lib/payload'
 import { TaskFilters, type TaskFilterValues } from '@/components/trainer/TaskFilters'
-import { COMPANY_LABELS, DIFFICULTY_LABELS, TAG_LABELS, LANGUAGE_LABELS } from '@/lib/trainer/constants'
+import { DIFFICULTY_LABELS, LANGUAGE_LABELS } from '@/lib/trainer/constants'
 import { taskLanguages } from '@/lib/trainer/spec'
 import { cn } from '@/lib/utils'
 import { TrainerCatalogLink } from '@/components/trainer/TrainerCatalogLink'
 import { getTrainerAccess } from '@/server/trainer-access'
 import { collectAllPages } from '@/lib/paginate'
-import type { TrainerCompany, TrainerTag } from '@/lib/trainer/constants'
+import { TaskMetadata } from '@/components/trainer/TaskMetadata'
+import { INTERVIEW_FORMAT_OPTIONS } from '@/lib/trainer/metadata'
 import type { TrainerDifficulty } from '@/lib/trainer/types'
 
 export const metadata: Metadata = {
@@ -40,6 +41,7 @@ function readParam(
 
 export default async function AllTasksPage({ searchParams }: Props) {
   const params = await searchParams
+  const requestedFormat = readParam(params, 'format')
   const filters: TaskFilterValues = {
     q: readParam(params, 'q'),
     language: readParam(params, 'language'),
@@ -48,6 +50,7 @@ export default async function AllTasksPage({ searchParams }: Props) {
     company: readParam(params, 'company'),
     topic: readParam(params, 'topic'),
     status: readParam(params, 'status'),
+    format: INTERVIEW_FORMAT_OPTIONS.some((option) => option.value === requestedFormat) ? requestedFormat : '',
   }
 
   const payload = await getPayload()
@@ -77,6 +80,7 @@ export default async function AllTasksPage({ searchParams }: Props) {
   if (filters.language) conditions.push({ languages: { contains: filters.language } })
   if (filters.tag) conditions.push({ tags: { contains: filters.tag } })
   if (filters.company) conditions.push({ companies: { contains: filters.company } })
+  if (filters.format) conditions.push({ interviewFormat: { equals: filters.format } })
 
   const selectedTopic = filters.topic ? topicBySlug.get(filters.topic) : undefined
   if (selectedTopic) conditions.push({ topic: { equals: selectedTopic.id } })
@@ -86,7 +90,7 @@ export default async function AllTasksPage({ searchParams }: Props) {
       payload.find({
         collection: 'trainer-tasks',
         where: { and: conditions },
-        select: { title: true, slug: true, topic: true, difficulty: true, tags: true, companies: true, languages: true },
+        select: { title: true, slug: true, topic: true, difficulty: true, tags: true, companies: true, languages: true, interviewFormat: true, recommendedMinutes: true, companyEvidence: true },
         depth: 0,
         sort: ['topic', 'order', 'id'],
         page,
@@ -136,7 +140,7 @@ export default async function AllTasksPage({ searchParams }: Props) {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Все задачи</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Задачи с реальных собеседований: JavaScript, TypeScript, алгоритмы
+            Подготовка к собеседованиям: языки, алгоритмы и интерфейсы
           </p>
         </div>
         <Link
@@ -164,8 +168,6 @@ export default async function AllTasksPage({ searchParams }: Props) {
                 ? String(task.topic.id)
                 : String(task.topic)
               const topic = topicById.get(topicId)
-              const tags = (task.tags ?? []) as TrainerTag[]
-              const companies = (task.companies ?? []) as TrainerCompany[]
 
               if (!topic) return null
 
@@ -203,30 +205,12 @@ export default async function AllTasksPage({ searchParams }: Props) {
                       ))}
                     </span>
 
-                    <span className="hidden shrink-0 gap-1 md:flex">
-                      {companies.slice(0, 2).map((company) => (
-                        <span
-                          key={company}
-                          className="rounded bg-info/10 px-1.5 py-0.5 text-[11px] text-info"
-                        >
-                          {COMPANY_LABELS[company] ?? company}
-                        </span>
-                      ))}
-                      {tags.slice(0, 2).map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary"
-                        >
-                          {TAG_LABELS[tag] ?? tag}
-                        </span>
-                      ))}
-                    </span>
-
                     <span
                       className={cn('w-16 shrink-0 text-right text-xs font-medium', DIFFICULTY_CLASS[difficulty])}
                     >
                       {DIFFICULTY_LABELS[difficulty]}
                     </span>
+                    <TaskMetadata task={task} compact className="basis-full pl-9 sm:pl-[3.25rem]" />
                   </TrainerCatalogLink>
                 </li>
               )

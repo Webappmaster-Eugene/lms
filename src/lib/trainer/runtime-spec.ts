@@ -3,10 +3,10 @@ import { TrainerSpecError } from './spec'
 import type { TrainerLanguage } from './types'
 
 export type FrontendLanguage = 'html' | 'react' | 'next'
-export type RuntimeLanguage = 'go' | FrontendLanguage
+export type RuntimeLanguage = 'go' | 'python' | FrontendLanguage
 export type BrowserCheck = {
   selector: string
-  action?: 'click' | 'fill'
+  action?: 'click' | 'fill' | 'press'
   value?: string
   text?: string
   count?: number
@@ -32,8 +32,12 @@ export function isFrontendLanguage(value: unknown): value is FrontendLanguage {
   return value === 'html' || value === 'react' || value === 'next'
 }
 
+export function isProgramLanguage(value: unknown): value is 'go' | 'python' {
+  return value === 'go' || value === 'python'
+}
+
 export function isRuntimeLanguage(value: unknown): value is RuntimeLanguage {
-  return value === 'go' || isFrontendLanguage(value)
+  return isProgramLanguage(value) || isFrontendLanguage(value)
 }
 
 export function validFrontendPath(path: string): boolean {
@@ -62,7 +66,7 @@ function parseCheck(value: unknown): BrowserCheck {
   if (!record(value) || typeof value.selector !== 'string' || !value.selector || value.selector.length > 500) {
     throw new TrainerSpecError('Для проверки интерфейса нужен CSS-селектор')
   }
-  if (value.action !== undefined && value.action !== 'click' && value.action !== 'fill') throw new TrainerSpecError('Неизвестное действие проверки')
+  if (value.action !== undefined && value.action !== 'click' && value.action !== 'fill' && value.action !== 'press') throw new TrainerSpecError('Неизвестное действие проверки')
   for (const key of ['value', 'text']) {
     if (value[key] !== undefined && typeof value[key] !== 'string') throw new TrainerSpecError('Некорректное значение проверки интерфейса')
   }
@@ -70,6 +74,7 @@ function parseCheck(value: unknown): BrowserCheck {
   if (value.visible !== undefined && typeof value.visible !== 'boolean') throw new TrainerSpecError('Некорректная проверка видимости')
   if (value.css !== undefined && (!record(value.css) || Object.values(value.css).some((item) => typeof item !== 'string'))) throw new TrainerSpecError('Некорректная проверка CSS')
   if (value.attribute !== undefined && (!record(value.attribute) || typeof value.attribute.name !== 'string' || typeof value.attribute.value !== 'string')) throw new TrainerSpecError('Некорректная проверка атрибута')
+  if (value.action === 'press' && !['Enter', 'Escape', 'Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Tab'].includes(String(value.value))) throw new TrainerSpecError('Неизвестная клавиша проверки интерфейса')
   if (value.action === 'fill' && typeof value.value !== 'string') throw new TrainerSpecError('Для ввода нужен текст')
   if (value.action === undefined && value.text === undefined && value.count === undefined && value.visible === undefined && value.css === undefined && value.attribute === undefined) {
     throw new TrainerSpecError('Проверка должна содержать действие или ожидаемое свойство элемента')

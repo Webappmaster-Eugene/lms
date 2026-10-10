@@ -657,7 +657,8 @@ export interface TrainerTopic {
     | 'patterns'
     | 'webapi'
     | 'go'
-    | 'frontend';
+    | 'frontend'
+    | 'python';
   /**
    * Emoji или имя иконки lucide (например: "code", "braces", "terminal")
    */
@@ -682,10 +683,10 @@ export interface TrainerTask {
   order?: number | null;
   difficulty: 'easy' | 'medium' | 'hard';
   /**
-   * stdout — сравнение вывода; unit — JS/TS; types — типы TS; program — Go; dom — frontend
+   * stdout — сравнение вывода; unit — JS/TS; types — типы TS; program — Go/Python; dom — frontend
    */
   checkMode: 'stdout' | 'unit' | 'types' | 'program' | 'dom';
-  languages: ('js' | 'ts' | 'go' | 'html' | 'react' | 'next')[];
+  languages: ('js' | 'ts' | 'go' | 'python' | 'html' | 'react' | 'next')[];
   /**
    * Оставлено для старых задач. Для новых заполняйте «Условие (Markdown)».
    */
@@ -720,6 +721,11 @@ export interface TrainerTask {
    * Используется, когда пользователь выбрал TypeScript.
    */
   starterCodeTs?: string | null;
+  /**
+   * Python 3: чтение stdin и вывод ответа в stdout. Только стандартная библиотека.
+   */
+  starterCodePython?: string | null;
+  solutionCodePython?: string | null;
   /**
    * Полная программа package main, которая читает stdin и пишет в stdout.
    */
@@ -861,9 +867,71 @@ export interface TrainerTask {
         | 'generics'
         | 'web-api'
         | 'performance'
+        | 'react'
+        | 'hooks'
+        | 'state'
+        | 'forms'
+        | 'accessibility'
+        | 'go'
+        | 'python'
+        | 'concurrency'
+        | 'channels'
+        | 'context'
+        | 'mutex'
+        | 'two-pointers'
+        | 'sliding-window'
+        | 'hash-table'
+        | 'stack'
+        | 'queue'
+        | 'binary-search'
+        | 'sorting'
+        | 'dynamic-programming'
+        | 'graph'
+        | 'tree'
+        | 'heap'
+        | 'linked-list'
+        | 'greedy'
+        | 'backtracking'
+        | 'livecoding'
+        | 'cancelation'
       )[]
     | null;
-  companies?: ('yandex' | 'ozon' | 'avito' | 'tbank' | 'sber' | 'wildberries' | 'vk' | 'faang')[] | null;
+  companies?:
+    | (
+        | 'yandex'
+        | 'ozon'
+        | 'avito'
+        | 'tbank'
+        | 'sber'
+        | 'wildberries'
+        | 'vk'
+        | 'faang'
+        | 'mts'
+        | 'google'
+        | 'meta'
+        | 'amazon'
+        | 'microsoft'
+        | 'uber'
+        | 'airbnb'
+      )[]
+    | null;
+  interviewFormat?: ('livecoding' | 'algorithms' | 'debugging' | 'language' | 'frontend' | 'type-system') | null;
+  /**
+   * Рекомендация платформы, не фактическая длительность интервью компании.
+   */
+  recommendedMinutes?: number | null;
+  /**
+   * Компания, kind, url, note, checkedAt. official — опубликованный пример; candidate-report — рассказ кандидата; preparation — адаптация для подготовки; unverified — историческая метка без подтверждения.
+   */
+  companyEvidence?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   /**
    * Ссылка на первоисточник задачи.
    */
@@ -1250,7 +1318,7 @@ export interface UserTrainerProgress {
   task: number | TrainerTask;
   isCompleted?: boolean | null;
   userCode?: string | null;
-  language?: ('js' | 'ts' | 'go' | 'html' | 'react' | 'next') | null;
+  language?: ('js' | 'ts' | 'go' | 'python' | 'html' | 'react' | 'next') | null;
   /**
    * Считаются все отправки, не прошедшие тесты.
    */
@@ -1304,7 +1372,7 @@ export interface InterviewRoom {
   setupCode?: string | null;
   setupTypes?: string | null;
   code?: string | null;
-  language: 'js' | 'ts' | 'go' | 'html' | 'react' | 'next';
+  language: 'js' | 'ts' | 'go' | 'python' | 'html' | 'react' | 'next';
   version: number;
   endedAt?: string | null;
   updatedAt: string;
@@ -2132,6 +2200,8 @@ export interface TrainerTasksSelect<T extends boolean = true> {
   entryName?: T;
   starterCode?: T;
   starterCodeTs?: T;
+  starterCodePython?: T;
+  solutionCodePython?: T;
   starterCodeGo?: T;
   starterFiles?: T;
   solutionCodeGo?: T;
@@ -2175,6 +2245,9 @@ export interface TrainerTasksSelect<T extends boolean = true> {
   solutionNotes?: T;
   tags?: T;
   companies?: T;
+  interviewFormat?: T;
+  recommendedMinutes?: T;
+  companyEvidence?: T;
   sourceUrl?: T;
   leetcodeNumber?: T;
   pointsReward?: T;
