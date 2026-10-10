@@ -67,8 +67,10 @@ function create() {
   for (const [key, a] of Object.entries(accounts)) {
     const { salt, hash } = hashPassword(a.password)
     const id = sql(
-      `INSERT INTO users (first_name, last_name, role, email, salt, hash, is_active)
-       VALUES ('${a.first}', '${a.last}', '${a.role}', '${a.email}', '${salt}', '${hash}', true) RETURNING id;`,
+      `INSERT INTO users (first_name, last_name, role, email, salt, hash, is_active,
+                         learning_access_mode, learning_catalog_visibility, trainer_access_mode)
+       VALUES ('${a.first}', '${a.last}', '${a.role}', '${a.email}', '${salt}', '${hash}', true,
+               'all', 'catalog', 'all') RETURNING id;`,
     )
     if (!/^\d+$/.test(id)) throw new Error(`Не удалось создать ${key}: вместо id пришло «${id}»`)
     ids[key] = id

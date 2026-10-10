@@ -118,7 +118,7 @@ test('заметки: Ctrl+Enter, общая страница, выгрузка,
   await card.getByRole('link', { name: /./ }).filter({ hasNotText: '1:05' }).first().click()
   await expect(page).toHaveURL(new RegExp(`${firstLesson}$`))
   await page.getByRole('button', { name: /Мои заметки/ }).click()
-  await page.getByRole('button', { name: 'Удалить' }).click()
+  await page.getByRole('button', { name: /Мои заметки/ }).locator('..').getByRole('button', { name: 'Удалить', exact: true }).click()
   await expect(page.getByText('Заметка удалена')).toBeVisible()
 })
 
