@@ -18,8 +18,10 @@ test('персонализация: имя, Telegram и аватар сохра�
   await expect(page.getByLabel('Имя', { exact: true })).toBeVisible()
   const originalFirst = await page.getByLabel('Имя', { exact: true }).inputValue()
   const originalLast = await page.getByLabel('Фамилия', { exact: true }).inputValue()
-  const initial = await (await page.request.get('/api/profile')).json() as { profile: { id: number } }
-  const admin = await playwright.request.newContext({ baseURL: PROD_URL, storageState: stateOf('admin') })
+  const initialResponse = await page.request.get('/api/profile', { headers: { Origin: PROD_URL } })
+  expect(initialResponse.status()).toBe(200)
+  const initial = await initialResponse.json() as { profile: { id: number } }
+  const admin = await playwright.request.newContext({ baseURL: PROD_URL, storageState: stateOf('admin'), extraHTTPHeaders: { Origin: PROD_URL } })
   try {
     await page.getByLabel('Имя', { exact: true }).fill('Проверка')
     await page.getByLabel('Фамилия', { exact: true }).fill('Профиля')
@@ -27,7 +29,7 @@ test('персонализация: имя, Telegram и аватар сохра�
     await page.getByLabel('О себе', { exact: true }).fill(MARK)
     await page.getByLabel('Изменить аватар', { exact: true }).setInputFiles({ name: 'prod-test-avatar.png', mimeType: 'image/png', buffer: png })
     await saveProfile(page)
-    const saved = await (await page.request.get('/api/profile')).json() as { profile: { avatar: { id: number } | null; telegram: string } }
+    const saved = await (await page.request.get('/api/profile', { headers: { Origin: PROD_URL } })).json() as { profile: { avatar: { id: number } | null; telegram: string } }
     expect(saved.profile.avatar?.id).toBeGreaterThan(0)
     expect(saved.profile.telegram).toBe('https://t.me/lms_test_profile')
     await page.reload({ waitUntil: 'domcontentloaded' })
@@ -67,7 +69,7 @@ test('персонализация: свой комментарий меняет
   expect(published.status()).toBe(201)
   const root = await published.json() as { doc: { id: number; lesson: number | { id: number } } }
   const lesson = typeof root.doc.lesson === 'number' ? root.doc.lesson : root.doc.lesson.id
-  const mentor = await browser.newContext({ baseURL: PROD_URL, storageState: stateOf('admin') })
+  const mentor = await browser.newContext({ baseURL: PROD_URL, storageState: stateOf('admin'), extraHTTPHeaders: { Origin: PROD_URL } })
   try {
     expect((await mentor.request.post('/api/comments', { data: { lesson, parentComment: root.doc.id, content: answer } })).status()).toBe(201)
     await page.reload({ waitUntil: 'domcontentloaded' })
@@ -96,6 +98,7 @@ test('персонализация: порядок меню и инструкц�
   const labels = ['Дашборд', 'Роадмапы', 'Курсы', 'Тренажёр', 'История обучения', 'Сертификаты', 'Заметки', 'Вопросы', 'Сохранённое', 'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь']
   await expect(page.locator('aside').getByRole('navigation', { name: 'Меню платформы', exact: true }).getByRole('link')).toHaveText(labels)
   await page.setViewportSize({ width: 375, height: 844 })
+  await page.reload({ waitUntil: 'domcontentloaded' })
   await page.getByRole('button', { name: 'Ещё', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Меню платформы', exact: true }).getByRole('navigation', { name: 'Меню платформы', exact: true }).getByRole('link')).toHaveText(labels)
   await page.goto('/trainer/js-interview-practice/interview-js-equal-range', { waitUntil: 'domcontentloaded' })
