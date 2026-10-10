@@ -22,6 +22,8 @@ vi.mock('@/components/layout/MobileSearchOverlay', () => ({
 
 const auth = vi.fn()
 const find = vi.fn()
+const getProfileAvatar = vi.fn()
+vi.mock('@/server/profile/read', () => ({ getProfileAvatar: (...args: unknown[]) => getProfileAvatar(...args) }))
 vi.mock('@/lib/payload', () => ({ getPayload: async () => ({ auth, find }) }))
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }))
 
@@ -39,6 +41,7 @@ describe('нижняя навигация', () => {
   it('содержит основные разделы', () => {
     render(<BottomNav />)
 
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Главная', 'Роадмапы', 'Курсы', 'Тренажёр'])
     for (const label of ['Главная', 'Курсы', 'Тренажёр', 'Роадмапы']) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }
@@ -109,6 +112,7 @@ describe('шапка', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     auth.mockResolvedValue({ user })
+    getProfileAvatar.mockResolvedValue(null)
     find.mockResolvedValue({ docs: [{ currentStreak: 12, lastActivityDate: new Date().toISOString().slice(0, 10) }] })
   })
 
@@ -118,6 +122,45 @@ describe('шапка', () => {
     expect(screen.getByText('Алексей Морозов')).toBeInTheDocument()
     expect(screen.getByText('1625')).toBeInTheDocument()
     expect(screen.getByText(/12/)).toBeInTheDocument()
+  })
+
+  it('имя и аватар ведут к настройке профиля, ссылка доступна и без текста на телефоне', async () => {
+    render(await Header())
+    const link = screen.getByRole('link', { name: 'Настроить профиль: Алексей Морозов' })
+    expect(link).toHaveAttribute('href', '/profile/edit')
+    expect(link).toHaveTextContent('АМ')
+    expect(link).toHaveTextContent('Алексей Морозов')
+    expect(getProfileAvatar).not.toHaveBeenCalled()
+  })
+
+  it('показывает проверенный аватар и не использует URL из непроверенной auth-связи', async () => {
+    auth.mockResolvedValue({ user: { ...user, avatar: { id: 4, url: '/api/media/file/private-course.png' } } })
+    getProfileAvatar.mockResolvedValue({ id: 4, url: '/api/media/file/my-avatar.png', alt: 'Фото' })
+    const { container } = render(await Header())
+    expect(container.querySelector('img')).toHaveAttribute('src', '/api/media/file/my-avatar.png')
+    expect(getProfileAvatar).toHaveBeenCalledOnce()
+  })
+
+  it('не подставляет непроверенный аватар, если проверка доступа вернула null', async () => {
+    auth.mockResolvedValue({ user: { ...user, avatar: { id: 4, url: '/api/media/file/private-course.png' } } })
+    getProfileAvatar.mockResolvedValue(null)
+    const { container } = render(await Header())
+    expect(container.querySelector('img')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Настроить профиль: Алексей Морозов' })).toHaveTextContent('АМ')
+  })
+
+  it('если аватар недоступен или чтение падает, инициалы и ссылка продолжают работать', async () => {
+    auth.mockResolvedValue({ user: { ...user, avatar: 4 } })
+    getProfileAvatar.mockRejectedValue(new Error('БД недоступна'))
+    const { container } = render(await Header())
+    expect(container.querySelector('img')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Настроить профиль: Алексей Морозов' })).toHaveTextContent('АМ')
+  })
+
+  it('пустое имя не скрывает вход в профиль', async () => {
+    auth.mockResolvedValue({ user: { ...user, firstName: '', lastName: '' } })
+    render(await Header())
+    expect(screen.getByRole('link', { name: 'Настроить профиль: Мой профиль' })).toHaveAttribute('href', '/profile/edit')
   })
 
   it('нулевая серия не показывается — пустой огонёк выглядит поломкой', async () => {

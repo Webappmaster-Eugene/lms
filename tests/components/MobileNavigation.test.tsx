@@ -110,7 +110,12 @@ describe('мобильные панели', () => {
     await userEvent.click(more)
     const dialog = screen.getByRole('dialog', { name: 'Меню платформы' })
     expect(more).toHaveAttribute('aria-expanded', 'true')
-    const settings = within(dialog).getByRole('link', { name: 'Приложение и уведомления' })
+    expect(within(dialog).getByRole('link', { name: 'Приложение' })).toHaveAttribute('href', '/settings/app')
+    expect(within(dialog).getAllByRole('link').map((link) => link.textContent)).toEqual([
+      'Дашборд', 'Роадмапы', 'Курсы', 'Тренажёр', 'Сертификаты', 'Заметки', 'Вопросы',
+      'Сохранённое', 'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь',
+    ])
+    const settings = within(dialog).getByRole('link', { name: 'Уведомления' })
     expect(settings).toHaveAttribute('href', '/settings/notifications')
     await userEvent.click(settings)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()

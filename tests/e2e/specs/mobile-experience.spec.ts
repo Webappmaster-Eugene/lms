@@ -40,7 +40,8 @@ for (const width of [320, 390]) {
         await more.click()
         const menu = page.getByRole('dialog', { name: 'Меню платформы' })
         await expect(menu).toBeVisible()
-        await expect(menu.getByRole('link', { name: 'Приложение и уведомления' })).toBeVisible()
+        await expect(menu.getByRole('link', { name: 'Приложение', exact: true })).toHaveAttribute('href', '/settings/app')
+        await expect(menu.getByRole('link', { name: 'Уведомления', exact: true })).toHaveAttribute('href', '/settings/notifications')
         for (let index = 0; index < 18; index++) {
           await page.keyboard.press('Tab')
           expect(await menu.evaluate((dialog) => dialog.contains(document.activeElement))).toBe(true)

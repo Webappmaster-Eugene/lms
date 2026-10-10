@@ -27,8 +27,8 @@ RUN corepack enable pnpm \
     && pnpm i --frozen-lockfile
 
 # Пакеты, которые нужны песочнице тренажёра в рантайме, но которых нет в
-# standalone-выводе Next: они помечены serverExternalPackages и подгружаются
-# уже отдельным процессом-раннером.
+# standalone-выводе Next: компилятор/изолят подгружаются отдельным раннером,
+# а официальный SDK проверки пароля — нативным динамическим import.
 #
 # Копируется каталог пакета ИЗ СТОРА pnpm целиком: рядом с самим пакетом там
 # лежат и его зависимости (isolated-vm подгружает node-gyp-build уже в рантайме).
@@ -36,6 +36,7 @@ RUN corepack enable pnpm \
 RUN mkdir -p /runtime-deps \
     && cp -RL node_modules/.pnpm/isolated-vm@*/node_modules/. /runtime-deps/ \
     && cp -RL node_modules/.pnpm/typescript@*/node_modules/. /runtime-deps/ \
+    && cp -RL node_modules/.pnpm/payload@*/node_modules/. /runtime-deps/ \
     && rm -f /runtime-deps/isolated-vm/*.tgz
 
 # ──────────────────────────────────────────────
@@ -120,6 +121,15 @@ require('node:fs').accessSync('/app/src/server/trainer/runner-child.mjs'); \
 require('node:fs').accessSync('/app/src/server/trainer/typescript-service.mjs'); \
 require('node:fs').accessSync('/app/public/monaco/vs'); \
 console.log('Песочница тренажёра и ассеты Monaco на месте')"
+
+# Динамический import SDK не виден трассировке Next. Проверяем его именно
+# в standalone-образе, где нет node_modules исходного репозитория.
+RUN node --input-type=module -e "\
+import { createRequire } from 'node:module'; \
+import { pathToFileURL } from 'node:url'; \
+const sdkURL = new URL('./auth/strategies/local/authenticate.js', pathToFileURL(createRequire('/app/package.json').resolve('payload'))); \
+const { authenticateLocalStrategy } = await import(sdkURL.href); \
+if (await authenticateLocalStrategy({ doc: { id: 1, salt: 'build-check', hash: '00' }, password: 'build-check' })) { throw new Error('SDK принимает неверный пароль') }"
 
 # Media directory for Payload uploads (mounted as Docker volume)
 RUN mkdir -p media \

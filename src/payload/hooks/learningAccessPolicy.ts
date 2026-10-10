@@ -58,7 +58,7 @@ export const reflectLearningAccessPolicy: CollectionAfterReadHook = async ({ doc
 
 export const normalizeLearningLoginIdentity: CollectionBeforeLoginHook = async ({ user, req }) => {
   const current = await req.payload.db.findOne({ collection: 'users', where: { id: { equals: user.id } }, req })
-  if (!current || ('isActive' in current && current.isActive === false) || !('hash' in current) || !('salt' in current) || current.hash !== user.hash || current.salt !== user.salt) throw new AuthenticationError(req.t)
+  if (!current || ('isActive' in current && current.isActive === false) || !('hash' in current) || !('salt' in current) || current.hash !== user.hash || current.salt !== user.salt || !('email' in current) || current.email !== user.email) throw new AuthenticationError(req.t)
   clearAuthoritativeLearningMode(req)
   const actual = await getAuthoritativeLearningPolicy(req.payload, user.id, req)
   return { ...user, role: actual.role, learningAccessMode: actual.mode, learningCatalogVisibility: actual.catalogVisibility, trainerAccessMode: actual.trainerMode }

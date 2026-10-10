@@ -364,7 +364,7 @@ export default async function LessonPage({ params }: Props) {
 
         {/* Обсуждение */}
         <div className="border-t border-border pt-8">
-          <LessonComments lessonId={lesson.id} />
+          <LessonComments lessonId={lesson.id} userId={user.id} />
         </div>
       </div>
     </div>

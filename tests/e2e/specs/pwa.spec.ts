@@ -136,7 +136,7 @@ test('notification preferences persist after reload without asking for push perm
   const baseline = (await baselineResponse.json()).preferences as PushPreferences
   try {
     await page.goto('/settings/notifications')
-    await expect(page.getByRole('heading', { name: 'Приложение и уведомления' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Уведомления', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Сохранить настройки' })).toBeEnabled()
     expect(await page.evaluate(() => (window as Window & { __pwaPermissionRequests?: number }).__pwaPermissionRequests)).toBe(0)
     await page.getByRole('checkbox', { name: /Напоминать, если я давно не учился/ }).setChecked(false)
@@ -161,7 +161,7 @@ test('notification preferences persist after reload without asking for push perm
 
 test('phone browser and simulated standalone mode give appropriate installation guidance', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/settings/notifications')
+  await page.goto('/settings/app')
   await expect(page.getByText(/Android:/)).toBeVisible()
   await expect(page.getByText(/iPhone:/)).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
@@ -170,5 +170,5 @@ test('phone browser and simulated standalone mode give appropriate installation 
   await expect(page.getByText('Вы уже открыли установленное приложение')).toBeVisible()
   // This verifies application UI in a browser simulation, not OS installation or physical push delivery.
   await expect(page.getByText(/Android:/)).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Сохранить настройки' })).toBeEnabled()
+  await expect(page.getByRole('link', { name: 'Настроить уведомления' })).toHaveAttribute('href', '/settings/notifications')
 })

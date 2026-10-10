@@ -82,7 +82,7 @@ export function NotificationInbox({ userId }: { userId: number }) {
         </div>
         <button type="button" onClick={reload} disabled={marking} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-muted-foreground hover:bg-accent disabled:opacity-50"><RefreshCw aria-hidden="true" className="h-4 w-4" />Обновить</button>
       </div>
-      <Link href="/settings/notifications" className="inline-flex min-h-11 max-w-full items-center gap-2 text-sm text-primary hover:underline"><Settings aria-hidden="true" className="h-4 w-4 shrink-0" /><span className="min-w-0 break-words">Приложение и напоминания</span></Link>
+      <Link href="/settings/notifications" className="inline-flex min-h-11 max-w-full items-center gap-2 text-sm text-primary hover:underline"><Settings aria-hidden="true" className="h-4 w-4 shrink-0" /><span className="min-w-0 break-words">Настройки уведомлений</span></Link>
       {loadError && <div role="alert" className="rounded-xl border border-destructive/30 p-4 text-sm text-destructive"><p>{loadError}</p><button type="button" onClick={reload} className="mt-2 min-h-11 font-medium text-primary underline">Повторить загрузку</button></div>}
       {mutationError && <p role="alert" className="text-sm text-destructive">{mutationError}</p>}
       {(loading || awaitingPage && !loadError) && <p role="status" className="py-8 text-center text-muted-foreground">Загружаем уведомления…</p>}

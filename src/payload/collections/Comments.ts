@@ -6,9 +6,11 @@ import { assignOwner } from '@/payload/hooks/assignOwner'
 import { notifyCommentThread, restrictCommentThread } from '@/payload/hooks/commentThread'
 import { guardLearningLessonWrite } from '@/payload/hooks/learningLessonWrite'
 import { learningStateRead } from '@/payload/access/learningStateRead'
+import { guardCommentMutation, removeOwnedComment } from '@/payload/hooks/commentMutation'
 
 export const Comments: CollectionConfig = {
   slug: 'comments',
+  endpoints: [{ path: '/:id/remove', method: 'delete', handler: removeOwnedComment }],
   admin: {
     defaultColumns: ['user', 'lesson', 'content', 'createdAt'],
     group: 'Коммуникация',
@@ -25,11 +27,18 @@ export const Comments: CollectionConfig = {
     delete: isAdmin,
   },
   hooks: {
-    beforeValidate: [restrictCommentThread],
+    beforeValidate: [guardCommentMutation, restrictCommentThread],
     beforeChange: [assignOwner, guardLearningLessonWrite],
     afterChange: [notifyCommentThread],
   },
   fields: [
+    {
+      name: 'deletedAt',
+      type: 'date',
+      label: 'Удалён автором',
+      access: { create: () => false, update: () => false },
+      admin: { readOnly: true },
+    },
     {
       name: 'user',
       type: 'relationship',

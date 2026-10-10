@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState, useSyncExternalStore } from 'react'
-import { BellRing, CheckCircle2, Download, Smartphone } from 'lucide-react'
-import { currentInstallPrompt, isInstalledPwa, isIosDevice, rememberInstallPrompt, vapidBytes } from '@/lib/pwa-client'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { BellRing } from 'lucide-react'
+import { vapidBytes } from '@/lib/pwa-client'
+import { usePwaCapabilities } from './use-pwa-capabilities'
 
 interface Preferences {
   remindersEnabled: boolean
@@ -56,31 +58,13 @@ function settingsDto(value: unknown): PushSettings {
   return value as PushSettings
 }
 
-function subscribeToCapabilities(callback: () => void) {
-  window.addEventListener('lms:install-ready', callback)
-  return () => window.removeEventListener('lms:install-ready', callback)
-}
-
-function capabilities() {
-  const installed = isInstalledPwa()
-  const ios = isIosDevice()
-  const push = window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
-  const denied = 'Notification' in window && Notification.permission === 'denied'
-  return (push ? 1 : 0) | (installed ? 2 : 0) | (ios && !installed ? 4 : 0) | (currentInstallPrompt() ? 8 : 0) | (denied ? 16 : 0)
-}
-
 export function NotificationSettings() {
   const [settings, setSettings] = useState<PushSettings | null>(null)
   const [preferences, setPreferences] = useState<Preferences | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const environment = useSyncExternalStore(subscribeToCapabilities, capabilities, () => 0)
-  const supported = Boolean(environment & 1)
-  const installed = Boolean(environment & 2)
-  const needsHomeScreen = Boolean(environment & 4)
-  const canInstall = Boolean(environment & 8)
-  const denied = Boolean(environment & 16)
+  const { supported, needsHomeScreen, denied } = usePwaCapabilities()
   const [subscribed, setSubscribed] = useState(false)
 
   async function load() {
@@ -145,21 +129,13 @@ export function NotificationSettings() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <header><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Приложение и уведомления</h1><p className="mt-2 text-sm leading-relaxed text-muted-foreground">Продолжайте обучение с телефона и выбирайте, когда получать напоминания.</p></header>
+      <header><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Уведомления</h1><p className="mt-2 text-sm leading-relaxed text-muted-foreground">Выбирайте, какие уведомления получать и когда напоминать об учёбе.</p><Link href="/settings/app" className="mt-3 inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring">Установка и настройки приложения</Link></header>
       {error && <div role="alert" className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm"><p>{error}</p>{!settings && <button type="button" className={secondaryClass + ' mt-3'} disabled={busy} onClick={() => void action(load)}>Попробовать снова</button>}</div>}
       {notice && <p role="status" className="rounded-xl border border-border bg-accent p-4 text-sm">{notice}</p>}
-      <section className="rounded-2xl border border-border bg-card p-5 sm:p-6" aria-labelledby="install-heading">
-        <h2 id="install-heading" className="flex items-center gap-3 text-lg font-semibold"><Smartphone className="h-5 w-5 shrink-0" aria-hidden="true" />Приложение на телефоне</h2>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">Те же курсы, уроки, заметки и место остановки — с иконкой на домашнем экране и без панели браузера.</p>
-        {installed ? <p className="mt-4 flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4" aria-hidden="true" />Вы уже открыли установленное приложение</p> : canInstall ? <button type="button" disabled={busy} className={buttonClass + ' mt-4'} onClick={() => void action(async () => { const prompt = currentInstallPrompt(); if (!prompt) return; await prompt.prompt(); const choice = await prompt.userChoice; rememberInstallPrompt(null); if (choice.outcome === 'accepted') setNotice('Приложение установлено. Откройте MentorCareer с домашнего экрана.'); })}><Download className="h-4 w-4" aria-hidden="true" />Установить приложение</button> : (
-          <div className="mt-4 space-y-3 text-sm leading-relaxed"><p><strong>Android:</strong> откройте меню браузера и выберите «Установить приложение» или «Добавить на главный экран».</p><p><strong>iPhone:</strong> нажмите «Поделиться» → «На экран Домой», затем откройте приложение с новой иконки. Для push требуется iOS 16.4 или новее.</p></div>
-        )}
-        <p className="mt-4 text-xs leading-relaxed text-muted-foreground">Для новых уроков и синхронизации нужен интернет. Вход сохраняется на 30 дней, место остановки переносится между устройствами.</p>
-      </section>
       <section className="rounded-2xl border border-border bg-card p-5 sm:p-6" aria-labelledby="push-heading">
         <h2 id="push-heading" className="flex items-center gap-3 text-lg font-semibold"><BellRing className="h-5 w-5 shrink-0" aria-hidden="true" />Уведомления на этом устройстве</h2>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">Ответы ментора, достижения, сертификаты и учебные напоминания могут приходить, даже когда приложение закрыто.</p>
-        {!settings ? <p className="mt-4 text-sm" role="status">Загружаем настройки…</p> : !settings.pushConfigured ? <p className="mt-4 text-sm text-muted-foreground">Уведомления на телефон ещё настраиваются. Все сообщения доступны в колокольчике на сайте.</p> : needsHomeScreen ? <p className="mt-4 text-sm">Сначала добавьте приложение на экран «Домой» и откройте его с иконки.</p> : !supported ? <p className="mt-4 text-sm">Этот браузер не поддерживает push. Используйте современный браузер или установленное приложение.</p> : denied ? <p className="mt-4 text-sm">Уведомления запрещены в настройках браузера или телефона. Разрешите их для MentorCareer и обновите страницу.</p> : (
+        {!settings ? <p className="mt-4 text-sm" role="status">Загружаем настройки…</p> : !settings.pushConfigured ? <p className="mt-4 text-sm text-muted-foreground">Уведомления на телефон ещё настраиваются. Все сообщения доступны в колокольчике на сайте.</p> : needsHomeScreen ? <p className="mt-4 text-sm">Сначала добавьте приложение на экран «Домой» и откройте его с иконки. <Link href="/settings/app" className="text-primary underline underline-offset-4">Как установить приложение</Link></p> : !supported ? <p className="mt-4 text-sm">Этот браузер не поддерживает push. Используйте современный браузер или установленное приложение.</p> : denied ? <p className="mt-4 text-sm">Уведомления запрещены в настройках браузера или телефона. Разрешите их для MentorCareer и обновите страницу.</p> : (
           <div className="mt-4 flex flex-wrap gap-3">
             <button type="button" disabled={busy} className={subscribed ? secondaryClass : buttonClass} onClick={subscribed ? disableDevice : enablePush}>{subscribed ? 'Отключить на этом устройстве' : 'Включить уведомления'}</button>
             {subscribed && <button type="button" disabled={busy || !preferences?.pushEnabled} className={secondaryClass} onClick={() => void action(async () => { await request('/api/push/test', 'POST', {}); setNotice('Проверочное уведомление поставлено в очередь. Оно появится на устройстве после отправки.'); })}>Отправить проверочное уведомление</button>}

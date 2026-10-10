@@ -1,4 +1,6 @@
-import type { CollectionConfig, PayloadRequest } from 'payload'
+import { APIError, type CollectionConfig, type PayloadRequest } from 'payload'
+import { normalizeTelegram } from '@/lib/profile'
+import { captureProfileCredentials, protectProfileCredentials } from '@/payload/hooks/protectProfileCredentials'
 import { validateStudentAvatar } from '@/payload/hooks/validateStudentAvatar'
 import { rejectForeignLoginOrigin } from '@/payload/hooks/rejectForeignLoginOrigin'
 
@@ -54,10 +56,10 @@ export const Users: CollectionConfig = {
     group: 'Пользователи',
   },
   hooks: {
-    beforeOperation: [rejectForeignLoginOrigin, captureRawCollectionPatch, lockSdkAuthOperation],
+    beforeOperation: [rejectForeignLoginOrigin, captureRawCollectionPatch, captureProfileCredentials, lockSdkAuthOperation],
     beforeLogin: [normalizeLearningLoginIdentity],
     afterLogin: [recordStudentLogin],
-    beforeChange: [lockLearningModeChange, validateStudentAvatar],
+    beforeChange: [lockLearningModeChange, protectProfileCredentials, validateStudentAvatar],
     afterChange: [createLearningAccessPolicy, sendInviteEmail, auditLearningAccessMode],
     afterRead: [reflectLearningAccessPolicy, filterRevokedAuthSessions],
     afterLogout: [revokeAuthenticatedSessions, recordStudentLogout],
@@ -106,12 +108,14 @@ export const Users: CollectionConfig = {
       type: 'text',
       required: true,
       label: 'Имя',
+      maxLength: 100,
     },
     {
       name: 'lastName',
       type: 'text',
       required: true,
       label: 'Фамилия',
+      maxLength: 100,
     },
     {
       name: 'role',
@@ -132,6 +136,17 @@ export const Users: CollectionConfig = {
       type: 'upload',
       relationTo: 'media',
       label: 'Аватар',
+    },
+    {
+      name: 'telegram',
+      type: 'text',
+      label: 'Telegram',
+      maxLength: 64,
+      hooks: { beforeValidate: [({ value }) => {
+        try { return normalizeTelegram(value === undefined ? null : value) }
+        catch (error) { throw new APIError(error instanceof Error ? error.message : 'Некорректный Telegram', 400) }
+      }] },
+      validate: (value: unknown) => { try { normalizeTelegram(value); return true } catch (error) { return error instanceof Error ? error.message : 'Некорректный Telegram' } },
     },
     {
       name: 'bio',

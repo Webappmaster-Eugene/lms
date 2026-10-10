@@ -30,7 +30,7 @@ describe('полный список уведомлений', () => {
   it('показывает сообщения, настройки и подтверждённое индивидуальное прочтение', async () => {
     render(<NotificationInbox userId={34} />)
     expect(await screen.findByText('Уведомление 1')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Приложение и напоминания' })).toHaveAttribute('href', '/settings/notifications')
+    expect(screen.getByRole('link', { name: 'Настройки уведомлений' })).toHaveAttribute('href', '/settings/notifications')
     await userEvent.click(screen.getByRole('button', { name: 'Прочитано: Уведомление 1' }))
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Прочитано: Уведомление 1' })).not.toBeInTheDocument())
     expect(screen.getByRole('button', { name: 'Прочитано: Уведомление 2' })).toBeInTheDocument()

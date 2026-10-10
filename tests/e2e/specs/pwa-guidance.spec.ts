@@ -39,7 +39,7 @@ test('первый мобильный вход объясняет установ
   await page.goto('/')
   const explanation = page.getByRole('dialog', { name: 'Учиться удобнее с телефона' })
   await expect(explanation).toBeVisible()
-  await expect(explanation.getByRole('link', { name: 'Приложение и уведомления' })).toHaveAttribute('href', '/settings/notifications')
+  await expect(explanation.getByRole('link', { name: 'Установка приложения' })).toHaveAttribute('href', '/settings/app')
   expect(await page.evaluate(() => (window as Window & { __permissionRequests?: number }).__permissionRequests)).toBe(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   const accessibility = await new AxeBuilder({ page }).include('dialog').withTags(['wcag2a', 'wcag2aa']).analyze()

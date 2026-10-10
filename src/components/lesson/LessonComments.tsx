@@ -5,12 +5,13 @@ import { CheckCircle2, CornerDownRight, Loader2, MessageSquare, Send } from 'luc
 import { useAsyncData } from '@/hooks/use-async-data'
 import { useToast } from '@/components/ui/Toast'
 import { markAnswersRead } from '@/lib/answer-notifications'
-import { authorName, groupThreads, isMentorReply, threadStatus, STATUS_LABELS, type CommentDoc, type Thread, type ThreadStatus } from '@/lib/comment-threads'
+import { authorId, authorName, groupThreads, isMentorReply, threadStatus, STATUS_LABELS, type CommentDoc, type Thread, type ThreadStatus } from '@/lib/comment-threads'
 import { cn, formatDate } from '@/lib/utils'
 
 type Props = {
   /** Числовой id — Payload отвергает строковые id в relationship-полях. */
   lessonId: number
+  userId?: number
 }
 
 const PAGE_SIZE = 100
@@ -29,7 +30,7 @@ async function postComment(body: Record<string, unknown>) {
   if (!res.ok) throw new Error(`POST /api/comments → ${res.status}`)
 }
 
-export function LessonComments({ lessonId }: Props) {
+export function LessonComments({ lessonId, userId }: Props) {
   const [newComment, setNewComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const { toast } = useToast()
@@ -79,7 +80,7 @@ export function LessonComments({ lessonId }: Props) {
     if (!newComment.trim()) return
     setSubmitting(true)
     try {
-      await postComment({ lesson: lessonId, content: newComment })
+      await postComment({ lesson: lessonId, content: newComment.trim() })
       setNewComment('')
       toast('Вопрос отправлен ментору', 'success')
       reload()
@@ -140,7 +141,7 @@ export function LessonComments({ lessonId }: Props) {
       ) : (
         <ul className="space-y-3">
           {threads.map((thread) => (
-            <ThreadItem key={thread.question.id} thread={thread} lessonId={lessonId} onPosted={reload} />
+            <ThreadItem key={thread.question.id} thread={thread} lessonId={lessonId} userId={userId} onPosted={reload} />
           ))}
         </ul>
       )}
@@ -148,7 +149,7 @@ export function LessonComments({ lessonId }: Props) {
   )
 }
 
-function ThreadItem({ thread, lessonId, onPosted }: { thread: Thread; lessonId: number; onPosted: () => void }) {
+function ThreadItem({ thread, lessonId, userId, onPosted }: { thread: Thread; lessonId: number; userId?: number; onPosted: () => void }) {
   const { question, replies } = thread
   const status = threadStatus(thread)
   const [replying, setReplying] = useState(false)
@@ -160,7 +161,7 @@ function ThreadItem({ thread, lessonId, onPosted }: { thread: Thread; lessonId: 
     if (!text.trim()) return
     setSending(true)
     try {
-      await postComment({ lesson: lessonId, content: text, parentComment: Number(question.id) })
+      await postComment({ lesson: lessonId, content: text.trim(), parentComment: Number(question.id) })
       setText('')
       setReplying(false)
       toast('Уточнение отправлено', 'success')
@@ -175,7 +176,7 @@ function ThreadItem({ thread, lessonId, onPosted }: { thread: Thread; lessonId: 
 
   return (
     <li id={`comment-${question.id}`} className="scroll-mt-24 space-y-3 rounded-lg border border-border bg-card px-4 py-3">
-      <CommentBody comment={question}>
+      <CommentBody comment={question} userId={userId} onChanged={onPosted}>
         <StatusBadge status={status} />
       </CommentBody>
 
@@ -185,7 +186,7 @@ function ThreadItem({ thread, lessonId, onPosted }: { thread: Thread; lessonId: 
             const mentor = isMentorReply(reply, question)
             return (
               <li key={reply.id} className={cn(mentor && '-ml-2 rounded-md bg-primary/5 p-2')}>
-                <CommentBody comment={reply}>
+                <CommentBody comment={reply} userId={userId} onChanged={onPosted}>
                   {mentor && reply.user && typeof reply.user === 'object' && (
                     <Badge className="bg-primary/10 text-foreground">Ментор</Badge>
                   )}
@@ -231,7 +232,46 @@ function ThreadItem({ thread, lessonId, onPosted }: { thread: Thread; lessonId: 
   )
 }
 
-function CommentBody({ comment, children }: { comment: CommentDoc; children?: React.ReactNode }) {
+function CommentBody({ comment, userId, onChanged, children }: { comment: CommentDoc; userId?: number; onChanged: () => void; children?: React.ReactNode }) {
+  const [editing, setEditing] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [draft, setDraft] = useState(comment.content)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState('')
+  const { toast } = useToast()
+  const mine = userId !== undefined && authorId(comment.user) === String(userId)
+
+  async function mutate(remove: boolean) {
+    if (pending || (!remove && !draft.trim())) return
+    setPending(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/comments/${comment.id}${remove ? '/remove' : ''}`, {
+        method: remove ? 'DELETE' : 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        ...(remove ? {} : { body: JSON.stringify({ content: draft.trim() }) }),
+      })
+      if (!res.ok) throw new Error(`Изменение комментария → ${res.status}`)
+      setEditing(false)
+      setConfirming(false)
+      toast(remove ? 'Комментарий удалён' : 'Комментарий изменён', 'success')
+      onChanged()
+    } catch (err) {
+      console.error('Не удалось изменить комментарий', err)
+      setError(remove ? 'Не удалось удалить комментарий. Попробуйте ещё раз.' : 'Не удалось сохранить изменения. Ваш текст остался в поле — попробуйте ещё раз.')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  function cancel() {
+    setEditing(false)
+    setConfirming(false)
+    setError('')
+    setDraft(comment.content)
+  }
+
+  const buttonClass = 'min-h-11 rounded-md px-2 text-sm font-medium hover:bg-muted disabled:opacity-50'
   return (
     <div className="space-y-1">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -241,7 +281,37 @@ function CommentBody({ comment, children }: { comment: CommentDoc; children?: Re
         </span>
         <span className="text-xs text-muted-foreground">{formatDate(comment.createdAt)}</span>
       </div>
-      <p className="whitespace-pre-wrap text-sm text-foreground [overflow-wrap:anywhere]">{comment.content}</p>
+      {editing ? (
+        <div className="space-y-2">
+          <textarea aria-label="Текст комментария" autoFocus rows={3} maxLength={2000} value={draft}
+            disabled={pending} onChange={(event) => setDraft(event.target.value)}
+            className="w-full resize-y rounded-lg border border-input bg-background p-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={buttonClass} onClick={() => void mutate(false)} disabled={pending || !draft.trim()}>{pending ? 'Сохраняем…' : 'Сохранить'}</button>
+            <button type="button" className={buttonClass} onClick={cancel} disabled={pending}>Отмена</button>
+          </div>
+        </div>
+      ) : (
+        <p className={cn('whitespace-pre-wrap text-sm [overflow-wrap:anywhere]', comment.deletedAt ? 'italic text-muted-foreground' : 'text-foreground')}>
+          {comment.deletedAt ? '(Комментарий удалён)' : comment.content}
+        </p>
+      )}
+      {mine && !comment.deletedAt && !editing && !confirming && (
+        <div className="flex flex-wrap gap-2 text-muted-foreground">
+          <button type="button" className={buttonClass} onClick={() => { setDraft(comment.content); setEditing(true) }}>Изменить</button>
+          <button type="button" className={buttonClass} onClick={() => setConfirming(true)}>Удалить</button>
+        </div>
+      )}
+      {confirming && (
+        <div role="alertdialog" aria-label="Удалить комментарий?" className="space-y-2 rounded-lg border border-border p-3">
+          <p className="text-sm text-foreground">Удалить комментарий? Его текст исчезнет. Ответы и уточнения в ветке сохранятся. Отменить удаление нельзя.</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={cn(buttonClass, 'text-destructive')} onClick={() => void mutate(true)} disabled={pending}>{pending ? 'Удаляем…' : 'Подтвердить удаление'}</button>
+            <button type="button" autoFocus className={buttonClass} onClick={cancel} disabled={pending}>Отмена</button>
+          </div>
+        </div>
+      )}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     </div>
   )
 }

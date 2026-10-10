@@ -30,7 +30,7 @@ function onlyKeys(value: Record<string, unknown>, keys: readonly string[]) {
   if (Object.keys(value).some((key) => !keys.includes(key))) throw new WebVitalsError('Лишние поля показателей страницы')
 }
 
-const staticRoutes = new Set(['/', '/courses', '/roadmaps', '/trainer', '/trainer/interview', '/profile', '/profile/edit', '/achievements', '/certificates', '/notifications', '/settings/notifications', '/notes', '/saved', '/leaderboard', '/help', '/contacts', '/questions', '/manage'])
+const staticRoutes = new Set(['/', '/courses', '/roadmaps', '/trainer', '/trainer/interview', '/profile', '/profile/edit', '/achievements', '/certificates', '/notifications', '/settings/notifications', '/settings/app', '/notes', '/saved', '/leaderboard', '/help', '/contacts', '/questions', '/manage'])
 
 export function webVitalRoute(path: unknown): string {
   if (path === undefined) return 'other'

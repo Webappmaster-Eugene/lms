@@ -42,6 +42,26 @@ describe('боковое меню', () => {
     }
   })
 
+  it('показывает все 14 разделов в согласованном порядке и разделяет настройки', () => {
+    render(<Sidebar isAdmin />)
+    const links = within(desktop()).getAllByRole('link')
+    expect(links.map((link) => link.textContent)).toEqual([
+      'Дашборд', 'Роадмапы', 'Курсы', 'Тренажёр', 'Сертификаты', 'Заметки', 'Вопросы',
+      'Сохранённое', 'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь',
+    ])
+    expect(within(desktop()).getByRole('link', { name: 'Приложение' })).toHaveAttribute('href', '/settings/app')
+    expect(within(desktop()).getByRole('link', { name: 'Уведомления' })).toHaveAttribute('href', '/settings/notifications')
+    expect(within(desktop()).queryByRole('link', { name: 'Админка' })).not.toBeInTheDocument()
+  })
+
+  it('при выключенном тренажёре сохраняет порядок остальных пунктов', () => {
+    render(<Sidebar trainerEnabled={false} />)
+    expect(within(desktop()).getAllByRole('link').map((link) => link.textContent)).toEqual([
+      'Дашборд', 'Роадмапы', 'Курсы', 'Сертификаты', 'Заметки', 'Вопросы', 'Сохранённое',
+      'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь',
+    ])
+  })
+
   it('текущий раздел подсвечен', () => {
     pathname.current = '/courses'
     render(<Sidebar />)

@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { AppSettings } from '@/components/pwa/AppSettings'
 import { NotificationSettings } from '@/components/pwa/NotificationSettings'
 import { PwaProvider } from '@/components/pwa/PwaProvider'
 import { currentInstallPrompt, rememberInstallPrompt, type InstallPromptEvent } from '@/lib/pwa-client'
@@ -171,7 +172,51 @@ describe('notification settings: consent and device subscriptions', () => {
     navigatorProperty('standalone', true)
     render(<NotificationSettings />)
     expect(await screen.findByRole('button', { name: 'Включить уведомления' })).toBeEnabled()
+    expect(screen.queryByText('Вы уже открыли установленное приложение')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Установка и настройки приложения' })).toHaveAttribute('href', '/settings/app')
+  })
+})
+
+describe('application installation is separate from notification consent', () => {
+  it('shows installation guidance without loading push settings or asking permission', () => {
+    render(<AppSettings />)
+    expect(screen.getByRole('heading', { level: 1, name: 'Приложение' })).toBeInTheDocument()
+    expect(screen.getByText(/откройте меню браузера/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Настроить уведомления' })).toHaveAttribute('href', '/settings/notifications')
+    expect(screen.getByRole('link', { name: 'Выбрать тему оформления' })).toHaveAttribute('href', '/profile/edit#appearance')
+    expect(api).not.toHaveBeenCalled()
+    expect(requestPermission).not.toHaveBeenCalled()
+  })
+
+  it('installs only after the explicit click and clears the consumed prompt', async () => {
+    const prompt = vi.fn(async () => undefined)
+    const event = Object.assign(new Event('beforeinstallprompt'), { prompt, userChoice: Promise.resolve({ outcome: 'accepted' as const }) }) as InstallPromptEvent
+    rememberInstallPrompt(event)
+    render(<AppSettings />)
+    expect(prompt).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Установить приложение' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Приложение установлено')
+    expect(prompt).toHaveBeenCalledOnce()
+    expect(currentInstallPrompt()).toBeNull()
+    expect(requestPermission).not.toHaveBeenCalled()
+  })
+
+  it('failed native installation gives browser guidance and never requests push', async () => {
+    const prompt = vi.fn(async () => { throw new Error('Browser refused') })
+    const event = Object.assign(new Event('beforeinstallprompt'), { prompt, userChoice: Promise.resolve({ outcome: 'dismissed' as const }) }) as InstallPromptEvent
+    rememberInstallPrompt(event)
+    render(<AppSettings />)
+    await userEvent.click(screen.getByRole('button', { name: 'Установить приложение' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Попробуйте добавить приложение через меню браузера')
+    expect(currentInstallPrompt()).toBeNull()
+    expect(requestPermission).not.toHaveBeenCalled()
+  })
+
+  it('recognizes an installed application without offering installation again', () => {
+    navigatorProperty('standalone', true)
+    render(<AppSettings />)
     expect(screen.getByText('Вы уже открыли установленное приложение')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Установить приложение' })).not.toBeInTheDocument()
   })
 })
 

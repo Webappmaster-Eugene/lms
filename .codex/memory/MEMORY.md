@@ -1,5 +1,28 @@
 # Память проекта LMS
 
+## Профиль и комментарии (2026-10-10)
+
+- Настройки профиля открываются по имени/аватару в шапке: `/profile/edit`.
+  Собственные email/пароль меняются через `/api/profile` и
+  `/api/profile/password` с текущим паролем; сохраняется текущая сессия,
+  остальные отзываются. Прямой и массовый API пользователей не обходят проверку.
+- Проверка пароля использует официальный SDK Payload без создания сессии.
+  `createRequire` загружается нативным динамическим import с `webpackIgnore`:
+  статический импорт позволял Webpack заменить `require.resolve('payload')`
+  числовым ID, вызывая TypeError только в собранном приложении. Проверять
+  чувствительные операции нужно в production build/standalone, не только Vitest.
+- Автор редактирует свой комментарий или удаляет через
+  `DELETE /api/comments/:id/remove`; текст заменяется отметкой, ответы сохраняются.
+  Сервер сериализует изменение с удалением и запрещает восстановление через PATCH.
+- «Приложение» (`/settings/app`) и «Уведомления» (`/settings/notifications`)
+  разделены. Порядок всех 14 пользовательских пунктов описан в
+  `docs/account-settings.md`; административная группа отдельная.
+- Добавочная миграция `20261010_132320_account_comments_settings` содержит
+  nullable `users.telegram` и `comments.deleted_at`; новых env нет.
+  Источники: `docs/account-settings.md`, `src/server/profile/account.ts`,
+  `src/payload/hooks/protectProfileCredentials.ts`,
+  `src/payload/hooks/commentMutation.ts` и интеграционные тесты этих сценариев.
+
 Проверено 2026-09-21. Только устойчивые факты; текущие проверки перепроверять.
 
 - Workspace: 107.lms; Git, pnpm и весь код находятся в app/. Родительская папка не Git.

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Редактирование профиля',
+  title: 'Настройки профиля',
 }
 
 export default function ProfileEditLayout({ children }: { children: React.ReactNode }) {

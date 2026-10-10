@@ -7,6 +7,7 @@ export type CommentDoc = {
   parentComment?: { id: number | string } | number | string | null
   createdAt: string
   isResolved?: boolean | null
+  deletedAt?: string | null
 }
 
 export type Thread = {

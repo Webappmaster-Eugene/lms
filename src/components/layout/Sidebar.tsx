@@ -20,6 +20,7 @@ import {
   Bell,
   User,
   LogOut,
+  Smartphone,
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { MobileSheet } from './MobileSheet'
@@ -31,16 +32,17 @@ import { disconnectDevicePush } from '@/lib/pwa-client'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Дашборд', icon: LayoutDashboard },
-  { href: '/courses', label: 'Курсы', icon: GraduationCap },
   { href: '/roadmaps', label: 'Роадмапы', icon: Map },
+  { href: '/courses', label: 'Курсы', icon: GraduationCap },
   { href: '/trainer', label: 'Тренажёр', icon: Code2 },
-  { href: '/leaderboard', label: 'Лидерборд', icon: Trophy },
   { href: '/certificates', label: 'Сертификаты', icon: Award },
   { href: '/notes', label: 'Заметки', icon: StickyNote },
   { href: '/questions', label: 'Вопросы', icon: MessagesSquare },
   { href: '/saved', label: 'Сохранённое', icon: Bookmark },
+  { href: '/leaderboard', label: 'Лидерборд', icon: Trophy },
   { href: '/profile', label: 'Профиль', icon: User },
-  { href: '/settings/notifications', label: 'Приложение и уведомления', icon: Bell },
+  { href: '/settings/app', label: 'Приложение', icon: Smartphone },
+  { href: '/settings/notifications', label: 'Уведомления', icon: Bell },
   { href: '/contacts', label: 'Контакты', icon: MessageCircle },
   { href: '/help', label: 'Помощь', icon: HelpCircle },
 ] as const

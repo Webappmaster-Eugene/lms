@@ -129,7 +129,7 @@ export const recordStudentDomainEvent: CollectionAfterChangeHook = async ({ doc,
 async function observedTarget(req: PayloadRequest, user: User, path: string): Promise<{ course: number | null; lesson: number | null }> {
   const match = /^\/(lessons|courses|roadmaps)\/([a-zA-Z0-9_-]+)$/.exec(path)
   if (!match) {
-    if (!new Set(['/', '/admin', '/courses', '/roadmaps', '/trainer', '/trainer/interview', '/profile', '/profile/edit', '/achievements', '/certificates', '/notifications', '/settings/notifications', '/notes', '/saved', '/leaderboard', '/help', '/contacts', '/questions']).has(path) && !/^\/trainer\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)?$/.test(path) && !/^\/certificates\/\d+$/.test(path)) throw new StudentAnalyticsError('Страница не отслеживается')
+    if (!new Set(['/', '/admin', '/courses', '/roadmaps', '/trainer', '/trainer/interview', '/profile', '/profile/edit', '/achievements', '/certificates', '/notifications', '/settings/notifications', '/settings/app', '/notes', '/saved', '/leaderboard', '/help', '/contacts', '/questions']).has(path) && !/^\/trainer\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)?$/.test(path) && !/^\/certificates\/\d+$/.test(path)) throw new StudentAnalyticsError('Страница не отслеживается')
     return { course: null, lesson: null }
   }
   const collection = match[1] === 'lessons' ? 'lessons' : match[1] === 'courses' ? 'courses' : 'roadmaps'

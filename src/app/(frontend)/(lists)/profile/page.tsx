@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { getPayload } from '@/lib/payload'
+import { getProfileDTO } from '@/server/profile/read'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -23,7 +24,8 @@ export default async function ProfilePage() {
   if (!user) redirect('/login')
 
   // Загружаем данные параллельно
-  const [progressData, achievementsData, recentTransactions, activeAchievements, unlockedDocs, trainerSolved, completionBonuses, streaks] = await Promise.all([
+  const [profile, progressData, achievementsData, recentTransactions, activeAchievements, unlockedDocs, trainerSolved, completionBonuses, streaks] = await Promise.all([
+    getProfileDTO(payload, user),
     collectAllPages(({ page, limit }) => payload.find({
       collection: 'user-progress', depth: 0, select: { lesson: true }, sort: 'id', page, limit,
       where: { user: { equals: user.id }, isCompleted: { equals: true } },
@@ -145,36 +147,43 @@ export default async function ProfilePage() {
     },
   )
 
+  const telegram = profile.telegram && /^https:\/\/t\.me\/[a-zA-Z][a-zA-Z0-9_]{4,31}$/.test(profile.telegram) ? profile.telegram : null
+
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       {/* Профиль */}
       <div className="rounded-xl border border-border bg-card p-6">
         <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:gap-6 sm:text-left">
-          {user.avatar && typeof user.avatar === 'object' && user.avatar.url ? (
+          {profile.avatar && typeof profile.avatar === 'object' && profile.avatar.url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={user.avatar.url}
+              src={profile.avatar.url}
               alt="Аватар"
               className="h-20 w-20 rounded-2xl object-cover"
             />
           ) : (
             <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 text-2xl font-bold text-primary">
-              {user.firstName?.[0]}
-              {user.lastName?.[0]}
+              {profile.firstName?.[0]}
+              {profile.lastName?.[0]}
             </div>
           )}
-          <div>
-            <h1 className="text-xl font-bold text-foreground sm:text-2xl">
-              {user.firstName} {user.lastName}
+          <div className="min-w-0">
+            <h1 className="break-words text-xl font-bold text-foreground sm:text-2xl">
+              {profile.firstName} {profile.lastName}
             </h1>
-            <p className="text-sm text-muted-foreground">{user.email}</p>
-            {user.bio && <p className="mt-2 text-sm text-muted-foreground">{user.bio}</p>}
+            <p className="break-all text-sm text-muted-foreground">{profile.email}</p>
+            {telegram && (
+              <a href={telegram} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex min-h-11 items-center break-all text-sm text-primary hover:underline focus-visible:outline-2 focus-visible:outline-ring">
+                Telegram: @{telegram.split('/').at(-1)}
+              </a>
+            )}
+            {profile.bio && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-muted-foreground">{profile.bio}</p>}
             <Link
               href="/profile/edit"
-              className="mt-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <Pencil className="h-3.5 w-3.5" />
-              Редактировать профиль
+              Настроить профиль
             </Link>
           </div>
         </div>

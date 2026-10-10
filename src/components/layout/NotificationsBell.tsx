@@ -121,7 +121,7 @@ export function NotificationsBell({ userId }: { userId?: number }) {
           <div className="shrink-0 space-y-1 border-t border-border px-4 py-2">
             {!sessionExpired && data.docs.some((notification) => !notification.isRead) && <button type="button" disabled={marking} onClick={() => void read(data.docs)} className="min-h-11 text-sm font-medium text-primary disabled:opacity-50">{marking ? 'Сохраняем…' : 'Прочитать показанные'}</button>}
             <Link href="/notifications" onClick={() => setOpen(false)} className="flex min-h-11 items-center text-sm font-medium text-primary">Все уведомления</Link>
-            <Link href="/settings/notifications" onClick={() => setOpen(false)} className="flex min-h-11 items-center text-xs text-muted-foreground">Приложение и напоминания</Link>
+            <Link href="/settings/notifications" onClick={() => setOpen(false)} className="flex min-h-11 items-center text-xs text-muted-foreground">Настройки уведомлений</Link>
           </div>
         </div>
       )}

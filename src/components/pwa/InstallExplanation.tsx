@@ -85,7 +85,7 @@ export function InstallExplanation({ paused = false }: { paused?: boolean }) {
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         <div className="space-y-2">
           {canInstall && <button type="button" disabled={busy} onClick={() => void install()} className={actionClass + ' bg-primary text-primary-foreground disabled:opacity-50'}><Download className="h-4 w-4" aria-hidden="true" />{busy ? 'Открываем установку…' : 'Установить приложение'}</button>}
-          <Link href="/settings/notifications" onClick={dismiss} className={actionClass + ' border border-border'}>Приложение и уведомления</Link>
+          <Link href="/settings/app" onClick={dismiss} className={actionClass + ' border border-border'}>Установка приложения</Link>
           <button type="button" onClick={dismiss} className={actionClass + ' text-muted-foreground'}>Продолжить в браузере</button>
         </div>
       </div>

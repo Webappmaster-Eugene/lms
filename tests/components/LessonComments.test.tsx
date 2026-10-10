@@ -19,6 +19,7 @@ type Comment = {
   parentComment?: number | null
   createdAt: string
   isResolved?: boolean
+  deletedAt?: string | null
 }
 
 const me = { id: 7, firstName: 'Алексей', lastName: 'Морозов' }
@@ -240,6 +241,102 @@ describe('вопросы к уроку', () => {
       await waitFor(() => expect(posted).toHaveLength(1))
       expect(posted[0]).toEqual({ lesson: 42, content: 'А если без StrictMode?', parentComment: 5 })
       expect(toast).toHaveBeenCalledWith('Уточнение отправлено', 'success')
+    })
+  })
+
+  describe('управление своим комментарием', () => {
+    it('кнопки есть у собственного вопроса и уточнения, но не у ответа ментора', async () => {
+      mockApi({ pages: [[comment(1), comment(2, { parentComment: 1 }), comment(3, { user: 9, parentComment: 1 })]] })
+      render(<LessonComments lessonId={42} userId={7} />)
+      await screen.findByText('Вопрос 3')
+      expect(screen.getAllByRole('button', { name: 'Изменить' })).toHaveLength(2)
+      expect(screen.getAllByRole('button', { name: 'Удалить' })).toHaveLength(2)
+      const mentorReply = screen.getByText('Вопрос 3').closest('li') as HTMLElement
+      expect(within(mentorReply).queryByRole('button', { name: 'Изменить' })).not.toBeInTheDocument()
+    })
+
+    it('редактирование предзаполнено, сохраняет только обрезанный текст', async () => {
+      mockApi({ pages: [[comment(1)]] })
+      const user = userEvent.setup()
+      render(<LessonComments lessonId={42} userId={7} />)
+      await user.click(await screen.findByRole('button', { name: 'Изменить' }))
+      const input = screen.getByRole('textbox', { name: 'Текст комментария' })
+      expect(input).toHaveValue('Вопрос 1')
+      await user.clear(input)
+      await user.type(input, '  Исправленный вопрос  ')
+      await user.click(screen.getByRole('button', { name: 'Сохранить' }))
+      await waitFor(() => expect(toast).toHaveBeenCalledWith('Комментарий изменён', 'success'))
+      const call = vi.mocked(fetch).mock.calls.find(([url, init]) => String(url) === '/api/comments/1' && init?.method === 'PATCH')
+      expect(JSON.parse(String(call?.[1]?.body))).toEqual({ content: 'Исправленный вопрос' })
+    })
+
+    it('отмена редактирования не отправляет запрос, пробелы сохранить нельзя', async () => {
+      mockApi({ pages: [[comment(1)]] })
+      const user = userEvent.setup()
+      render(<LessonComments lessonId={42} userId={7} />)
+      await user.click(await screen.findByRole('button', { name: 'Изменить' }))
+      await user.clear(screen.getByRole('textbox', { name: 'Текст комментария' }))
+      await user.type(screen.getByRole('textbox', { name: 'Текст комментария' }), '   ')
+      expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled()
+      await user.click(screen.getByRole('button', { name: 'Отмена' }))
+      expect(screen.getByText('Вопрос 1')).toBeInTheDocument()
+      expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'PATCH')).toBe(false)
+    })
+
+    it('удаление требует подтверждения и объясняет сохранение ответов', async () => {
+      mockApi({ pages: [[comment(1)]] })
+      const user = userEvent.setup()
+      render(<LessonComments lessonId={42} userId={7} />)
+      await user.click(await screen.findByRole('button', { name: 'Удалить' }))
+      expect(screen.getByRole('alertdialog')).toHaveTextContent('Ответы и уточнения в ветке сохранятся')
+      expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
+      await user.click(screen.getByRole('button', { name: 'Отмена' }))
+      await user.click(screen.getByRole('button', { name: 'Удалить' }))
+      await user.click(screen.getByRole('button', { name: 'Подтвердить удаление' }))
+      await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/comments/1/remove', expect.objectContaining({ method: 'DELETE' })))
+    })
+
+    it('удалённый текст скрыт и кнопок изменений нет', async () => {
+      mockApi({ pages: [[comment(1, { deletedAt: '2026-10-10T10:00:00Z', content: 'Старый секрет' })]] })
+      render(<LessonComments lessonId={42} userId={7} />)
+      await screen.findByText('(Комментарий удалён)')
+      expect(screen.queryByText('Старый секрет')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Изменить' })).not.toBeInTheDocument()
+    })
+
+    it('ошибка сохранения оставляет черновик и позволяет повторить запрос', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockApi({ pages: [[comment(1)]] })
+      const original = global.fetch
+      global.fetch = vi.fn(async (input, init) => init?.method === 'PATCH' && String(input) === '/api/comments/1'
+        ? new Response(null, { status: 500 }) : original(input, init))
+      const user = userEvent.setup()
+      render(<LessonComments lessonId={42} userId={7} />)
+      await user.click(await screen.findByRole('button', { name: 'Изменить' }))
+      await user.type(screen.getByRole('textbox', { name: 'Текст комментария' }), ' важное')
+      await user.click(screen.getByRole('button', { name: 'Сохранить' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent('Ваш текст остался в поле')
+      expect(screen.getByRole('textbox', { name: 'Текст комментария' })).toHaveValue('Вопрос 1 важное')
+      expect(screen.getByRole('button', { name: 'Сохранить' })).toBeEnabled()
+    })
+
+    it('пока идёт удаление, подтверждение и отмена заблокированы, после ошибки можно повторить', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockApi({ pages: [[comment(1)]] })
+      const original = global.fetch
+      let release: ((response: Response) => void) | undefined
+      global.fetch = vi.fn(async (input, init) => init?.method === 'DELETE'
+        ? new Promise<Response>((resolve) => { release = resolve }) : original(input, init))
+      const user = userEvent.setup()
+      render(<LessonComments lessonId={42} userId={7} />)
+      await user.click(await screen.findByRole('button', { name: 'Удалить' }))
+      await user.click(screen.getByRole('button', { name: 'Подтвердить удаление' }))
+      expect(screen.getByRole('button', { name: 'Удаляем…' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Отмена' })).toBeDisabled()
+      release?.(new Response(null, { status: 500 }))
+      expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось удалить')
+      expect(screen.getByRole('button', { name: 'Подтвердить удаление' })).toBeEnabled()
+      expect(screen.getByText('Вопрос 1')).toBeInTheDocument()
     })
   })
 })

@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import type { CollectionAfterLogoutHook, CollectionBeforeChangeHook, Payload } from 'payload'
 
+import { POST as changeProfilePassword } from '@/app/api/profile/password/route'
 import { GET, PUT } from '@/app/api/manage/learning-access/route'
 import type { AssignmentSnapshot } from '@/components/learning-access/contracts'
 import { createAdmin, createCourseTree, createStudent, getTestPayload, login, rest, type CourseTree, type TestUser } from '../helpers/payload'
@@ -58,12 +59,12 @@ describe('PATCH с устаревшим fallback не восстанавлива
     expect(await canAccessLesson(payload, { id: student.id, role: student.role, learningAccessMode: null }, tree.lessons[0].id)).toBe(false)
   })
 
-  it('обычный REST пароль реально меняется и timestamps/XP сохраняют работу после fresh merge', async () => {
+  it('подтверждённый пароль профиля реально меняется и timestamps/XP сохраняют работу после fresh merge', async () => {
     const student = await createStudent(payload, { learningAccessMode: 'all' })
     const token = await login(payload, student)
     const current = await payload.findByID({ collection: 'users', id: student.id })
     const password = 'Updated-Test-Pass-2'
-    const updated = await rest('PATCH', `/users/${student.id}`, { token, body: { password } })
+    const updated = await changeProfilePassword(new Request('http://lms.test/api/profile/password', { method: 'POST', headers: { Authorization: `JWT ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword: student.password, newPassword: password }) }))
     expect(updated.status).toBe(200)
     await expect(payload.login({ collection: 'users', data: { email: student.email, password: student.password } })).rejects.toMatchObject({ status: 401 })
     const newToken = await login(payload, { email: student.email, password })

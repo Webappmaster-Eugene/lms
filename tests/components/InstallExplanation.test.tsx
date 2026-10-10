@@ -58,7 +58,7 @@ describe('mobile PWA explanation', () => {
     await reveal()
     const dialog = screen.getByRole('dialog', { name: 'Учиться удобнее с телефона' })
     expect(dialog).toHaveAttribute('aria-modal', 'true')
-    expect(screen.getByRole('link', { name: 'Приложение и уведомления' })).toHaveAttribute('href', '/settings/notifications')
+    expect(screen.getByRole('link', { name: 'Установка приложения' })).toHaveAttribute('href', '/settings/app')
     expect(screen.getByText(/Уведомления включаются отдельно/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Продолжить в браузере' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -123,7 +123,7 @@ describe('mobile PWA explanation', () => {
     await reveal()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Установить приложение' })) })
     expect(screen.getByRole('alert')).toHaveTextContent('Откройте меню браузера')
-    expect(screen.getByRole('link', { name: 'Приложение и уведомления' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Установка приложения' })).toBeInTheDocument()
   })
 
   it('closes the explanation if the application was installed from the browser menu', async () => {

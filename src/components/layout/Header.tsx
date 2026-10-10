@@ -1,10 +1,13 @@
 import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
+import Link from 'next/link'
+import Image from 'next/image'
 import { Star } from 'lucide-react'
 import { NotificationsBell } from './NotificationsBell'
 import { SearchBar } from './SearchBar'
 import { MobileSearchOverlay } from './MobileSearchOverlay'
 import { streakView } from '@/lib/streak'
+import { getProfileAvatar } from '@/server/profile/read'
 
 export async function Header({ trainerEnabled = true }: { trainerEnabled?: boolean } = {}) {
   const payload = await getPayload()
@@ -13,6 +16,7 @@ export async function Header({ trainerEnabled = true }: { trainerEnabled?: boole
   let isAuthenticated = false
   let userId: number | undefined
   let userName = ''
+  let avatarUrl: string | null = null
   let totalPoints = 0
   let streakDays = 0
 
@@ -21,7 +25,14 @@ export async function Header({ trainerEnabled = true }: { trainerEnabled?: boole
     if (user) {
       isAuthenticated = true
       userId = user.id
-      userName = `${user.firstName} ${user.lastName}`
+      userName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || 'Мой профиль'
+      if (user.avatar) {
+        try {
+          avatarUrl = (await getProfileAvatar(payload, user))?.url ?? null
+        } catch (error) {
+          console.error('Шапка: не удалось загрузить аватар', error)
+        }
+      }
       totalPoints = user.totalPoints ?? 0
 
       // Загружаем streak
@@ -73,9 +84,14 @@ export async function Header({ trainerEnabled = true }: { trainerEnabled?: boole
             коллекцию по таймеру, и без сессии это бесконечные 403 */}
         {isAuthenticated && <NotificationsBell userId={userId} />}
 
-        {/* User name */}
+        {/* Профиль доступен и на телефоне, где имя скрыто. */}
         {userName && (
-          <span className="hidden max-w-48 truncate text-sm font-medium text-foreground sm:block" title={userName}>{userName}</span>
+          <Link href="/profile/edit" aria-label={`Настроить профиль: ${userName}`} title={userName} className="flex min-h-11 min-w-11 max-w-56 shrink-0 items-center gap-2 rounded-lg px-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-xs font-semibold text-primary" aria-hidden="true">
+              {avatarUrl ? <Image src={avatarUrl} alt="" width={32} height={32} unoptimized className="h-full w-full object-cover" /> : userName.split(/\s+/).slice(0, 2).map((part) => part.charAt(0)).join('').toLocaleUpperCase('ru')}
+            </span>
+            <span className="hidden min-w-0 truncate sm:block">{userName}</span>
+          </Link>
         )}
       </div>
     </header>

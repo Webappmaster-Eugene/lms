@@ -211,6 +211,7 @@ export interface User {
   lastName: string;
   role: 'admin' | 'student';
   avatar?: (number | null) | Media;
+  telegram?: string | null;
   bio?: string | null;
   totalPoints?: number | null;
   /**
@@ -1031,6 +1032,7 @@ export interface Bookmark {
  */
 export interface Comment {
   id: number;
+  deletedAt?: string | null;
   user: number | User;
   lesson: number | Lesson;
   content: string;
@@ -1525,6 +1527,7 @@ export interface UsersSelect<T extends boolean = true> {
   lastName?: T;
   role?: T;
   avatar?: T;
+  telegram?: T;
   bio?: T;
   totalPoints?: T;
   isActive?: T;
@@ -1920,6 +1923,7 @@ export interface BookmarksSelect<T extends boolean = true> {
  * via the `definition` "comments_select".
  */
 export interface CommentsSelect<T extends boolean = true> {
+  deletedAt?: T;
   user?: T;
   lesson?: T;
   content?: T;
