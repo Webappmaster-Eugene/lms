@@ -1,6 +1,7 @@
 import { createLocalReq, type Payload } from 'payload'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { POST } from '@/app/api/vitals/route'
+import { logger } from '@/lib/telemetry'
 import { cleanupWebVitals, getUserWebVitals, recordWebVitals, webVitalReportKey } from '@/server/web-vitals'
 import { createAdmin, createStudent, getTestPayload, login, rest, type TestUser } from '../helpers/payload'
 
@@ -85,6 +86,44 @@ describe('Web Vitals RUM: authenticated real SID and database storage', () => {
       { path: '/lessons/course?token=synthetic-private' }, { user: other.id },
       { metric: { name: 'LCP', value: 1, id: 'x', entries: ['private notes'] } },
     ]) expect((await POST(request('forged', 'LCP', 1, token, overrides))).status).toBe(400)
+  })
+
+  it.each(['aborted', 'AbortError', 'signal'])('treats interrupted beacon request bodies (%s) as client errors without storing a report', async (kind) => {
+    const before = (await payload.count({ collection: 'web-vitals-reports', where: { user: { equals: student.id } } })).totalDocs
+    const failure = new Error(kind === 'aborted' ? 'aborted' : 'Stream interrupted')
+    if (kind === 'AbortError') failure.name = 'AbortError'
+    const cancellation = new AbortController()
+    if (kind === 'signal') cancellation.abort()
+    const body = new ReadableStream<Uint8Array>({ start(controller) { controller.error(failure) } })
+    const init: RequestInit & { duplex: 'half' } = {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` }, body, duplex: 'half', signal: cancellation.signal,
+    }
+    const errorLog = vi.spyOn(logger, 'error')
+    try {
+      const result = await POST(new Request('http://lms.test/api/vitals', init))
+      expect(result.status).toBe(400)
+      expect(await result.json()).toMatchObject({ error: 'Передача показателей страницы прервана' })
+      expect((await payload.count({ collection: 'web-vitals-reports', where: { user: { equals: student.id } } })).totalDocs).toBe(before)
+      expect(errorLog).not.toHaveBeenCalled()
+    } finally {
+      errorLog.mockRestore()
+    }
+  })
+
+  it('preserves server errors for unexpected body reading failures', async () => {
+    const failure = new Error('Unexpected internal stream failure')
+    const body = new ReadableStream<Uint8Array>({ start(controller) { controller.error(failure) } })
+    const init: RequestInit & { duplex: 'half' } = {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` }, body, duplex: 'half',
+    }
+    const errorLog = vi.spyOn(logger, 'error').mockImplementation(() => {})
+    try {
+      const result = await POST(new Request('http://lms.test/api/vitals', init))
+      expect(result.status).toBe(500)
+      expect(errorLog).toHaveBeenCalledWith('Web vitals recording failed', failure)
+    } finally {
+      errorLog.mockRestore()
+    }
   })
 
   it('blocks raw REST access for students/admins and internal overrides without the capability', async () => {
