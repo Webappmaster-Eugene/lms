@@ -75,7 +75,7 @@ export const seed = async (payload: Payload) => {
       contacts: {
         telegramChannel: 'https://t.me/eugene_nadtocheev',
         telegramGroup: 'https://t.me/mentorcareer_chat',
-        website: 'https://promo.mentorcareer.ru',
+        website: 'https://nadtocheev.ru',
         email: 'support@mentorcareer.ru',
       },
     },

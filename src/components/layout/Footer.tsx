@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { readSiteContacts } from '@/lib/site-settings'
-import { AUTHOR_NAME, AUTHOR_URL, PROMO_URL } from '@/lib/site-links'
+import { AUTHOR_NAME, AUTHOR_URL, GUIDE_URL } from '@/lib/site-links'
 
 const SECTIONS = [
   { href: '/courses', label: 'Курсы' },
@@ -20,7 +20,7 @@ export async function Footer({ trainerEnabled = true }: { trainerEnabled?: boole
   const external = [
     { href: contacts.telegramChannel, label: 'Telegram-канал', blank: true },
     { href: contacts.telegramGroup, label: 'Чат учеников', blank: true },
-    { href: PROMO_URL, label: 'Инструкция по платформе', blank: true },
+    { href: GUIDE_URL, label: 'Инструкция по платформе', blank: true },
     { href: contacts.website || AUTHOR_URL, label: 'Сайт автора', blank: true },
     ...(contacts.links ?? []).map((contact) => ({ href: contact.url, label: contact.title, blank: true })),
     // Почтовый клиент открывается на месте, новая вкладка останется пустой.
@@ -78,7 +78,7 @@ export async function Footer({ trainerEnabled = true }: { trainerEnabled?: boole
 
       <div className="flex items-center justify-between gap-3 lg:hidden">
         <Link href="/help" className="inline-flex min-h-11 items-center text-muted-foreground hover:text-foreground">Нужна помощь?</Link>
-        <a href={PROMO_URL} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-muted-foreground hover:text-foreground">Как пользоваться</a>
+        <a href={GUIDE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-muted-foreground hover:text-foreground">Как пользоваться</a>
       </div>
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 pt-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between lg:mt-8 lg:border-t lg:border-border lg:pt-5 lg:text-sm">
         <p>MentorCareer © {year}</p>

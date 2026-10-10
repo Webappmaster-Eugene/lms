@@ -64,7 +64,7 @@ await payload.updateGlobal({
     contacts: {
       telegramChannel: 'https://t.me/e2e_channel',
       telegramGroup: 'https://t.me/e2e_group',
-      website: 'https://promo.mentorcareer.ru',
+      website: 'https://nadtocheev.ru',
       email: 'support@lms.test',
     },
   },

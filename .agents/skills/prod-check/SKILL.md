@@ -1,6 +1,6 @@
 ---
 name: prod-check
-description: "Диагностика прода LMS (learn.mentorcareer.ru / promo.mentorcareer.ru) через SSH — Dokploy, контейнеры, Traefik, логи, БД. Используй когда «прод не открывается», «сайт лежит», «проверь логи LMS», «404 на проде»."
+description: "Диагностика прода LMS (learn.mentorcareer.ru / info.mentorcareer.ru) через SSH — Dokploy, контейнеры, Traefik, логи, БД. Используй когда «прод не открывается», «сайт лежит», «проверь логи LMS», «404 на проде»."
 ---
 
 Прочитай [оригинальный workflow](../../../.claude/skills/prod-check/SKILL.md) целиком и выполни его с адаптацией ниже. Пути src/, tests/, landing/ и команды pnpm/git относятся к корню репозитория app. $ARGUMENTS означает запрос пользователя, не shell-переменную.

@@ -34,11 +34,8 @@ screens.json и координаты меток. Инструкция отраж
 
 ## Домены
 
-Оба домена подключены к одному `lms-mentor-landing:80` в Dokploy:
-`info.mentorcareer.ru` отдаёт инструкцию, `promo.mentorcareer.ru` отвечает
-301 на новый домен с исходными путём и query string. Редирект реализован
-в `landing/nginx.conf`, поэтому старый домен нельзя удалять из Dokploy.
-LMS остаётся на `learn.mentorcareer.ru`.
+Инструкция открывается на `info.mentorcareer.ru` (`lms-mentor-landing:80` в Dokploy),
+LMS — на `learn.mentorcareer.ru`.
 
 DNS info должен указывать на сервер Dokploy. Для HTTPS используется
 Let's Encrypt. API ключи не сохраняются в репозитории.

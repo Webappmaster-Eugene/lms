@@ -6,4 +6,4 @@ export const AUTHOR_NAME = 'Евгений Надточеев'
 export const AUTHOR_URL = 'https://nadtocheev.ru'
 
 /** Инструкция по платформе. */
-export const PROMO_URL = 'https://info.mentorcareer.ru'
+export const GUIDE_URL = 'https://info.mentorcareer.ru'

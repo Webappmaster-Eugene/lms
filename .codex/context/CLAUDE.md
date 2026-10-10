@@ -148,7 +148,7 @@ pnpm seed:trainer             # каталог задач тренажёра, и
 | Сервер | Dokploy на `root@217.199.254.38` |
 | Приложение | compose `lms-mentor-<hash>`, хеш меняется при пересоздании |
 | Сервисы | `lms-mentor-app` (3000), `lms-mentor-db` (postgres:16), `lms-mentor-landing` (80) |
-| Домены | `learn.mentorcareer.ru`, `promo.mentorcareer.ru` |
+| Домены | `learn.mentorcareer.ru`, `info.mentorcareer.ru` |
 | Тома | `…_lms-pgdata`, `…_lms-media` |
 
 Имена контейнеров находить динамически. На сервере живут чужие стеки — фильтровать

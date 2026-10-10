@@ -11,7 +11,7 @@ const { Footer } = await import('@/components/layout/Footer')
 const CONTACTS = {
   telegramChannel: 'https://t.me/eugene_nadtocheev',
   telegramGroup: 'https://t.me/mentorcareer_chat',
-  website: 'https://promo.mentorcareer.ru',
+  website: 'https://nadtocheev.ru',
   email: 'support@mentorcareer.ru',
 }
 
