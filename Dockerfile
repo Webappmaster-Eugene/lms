@@ -42,11 +42,9 @@ RUN mkdir -p /runtime-deps \
 # ──────────────────────────────────────────────
 # Stage 3: builder — build Next.js + Payload CMS
 # ──────────────────────────────────────────────
-FROM base AS builder
+FROM deps AS builder
 
 WORKDIR /app
-
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Ensure public dir exists even if git doesn't track it (no files inside)
