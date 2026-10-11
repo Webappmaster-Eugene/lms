@@ -34,7 +34,7 @@ ENTRYPOINT ["/usr/bin/timeout", "--signal=KILL", "180s", "node", "/runtime/front
 FROM node:22-alpine AS gateway
 RUN apk add --no-cache docker-cli
 WORKDIR /runtime
-COPY server.mjs gateway.mjs validation.mjs next-runtime.mjs runtime-limits.mjs ./
+COPY server.mjs gateway.mjs validation.mjs next-runtime.mjs runtime-limits.mjs auth-token.mjs ./
 ENV NODE_ENV=production PORT=3100
 EXPOSE 3100
 CMD ["node", "server.mjs"]

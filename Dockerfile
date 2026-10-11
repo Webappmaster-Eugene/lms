@@ -148,4 +148,7 @@ ENV HOSTNAME=0.0.0.0
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -sf http://localhost:3000/api/health || exit 1
 
-CMD ["node", "server.js"]
+COPY --chown=nextjs:nodejs scripts/trainer-app-start.mjs ./scripts/trainer-app-start.mjs
+COPY --chown=nextjs:nodejs trainer-runtime/auth-token.mjs ./trainer-runtime/auth-token.mjs
+
+CMD ["node", "scripts/trainer-app-start.mjs"]

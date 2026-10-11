@@ -40,7 +40,7 @@ Payload не подменяются. Этот полный набор запус
 `TRAINER_RUNTIME_TOKEN` (случайный токен минимум 32 символа). Gateway
 слушает порт 3100, принимает этот токен и ограничивает одновременные запуски.
 `TRAINER_MAX_CONCURRENT` принимает 1 или 2 и ограничивает также число активных
-сессий Next.js. Opt-in Compose по умолчанию использует 1 для экономии памяти;
+сессий Next.js. Compose по умолчанию использует 1 для экономии памяти;
 увеличивайте лимит только после проверки ресурсов Docker-хоста.
 Для локальной разработки gateway можно запустить `node trainer-runtime/server.mjs`
 с тем же токеном, а URL приложения направить на `http://127.0.0.1:3100`.
@@ -48,19 +48,39 @@ Payload не подменяются. Этот полный набор запус
 
 ## Подключение в Dokploy
 
-Это отдельный согласованный выкат: локальные изменения не включают runtime
-на проде. В Environment Dokploy задайте общий `TRAINER_RUNTIME_TOKEN` и
-URL `http://lms-mentor-trainer-runtime:3100`, используйте Compose-файлы
-`docker-compose.yml` и `docker-compose.trainer-runtime.yml`.
+Runtime входит в основной `docker-compose.yml` и выкатывается штатно из Git.
+Приложение ждёт healthy gateway; gateway ждёт успешного создания ключа и
+завершения контейнеров, гарантировавших сборку всех четырёх job images.
+Эти подготовительные контейнеры сразу завершаются и не выполняют решения.
+Семантика зависимостей описана в [документации Compose](https://docs.docker.com/compose/how-tos/startup-order/).
+
+При первом запуске init создаёт отдельный случайный ключ (32 байта) в закрытом
+томе `lms-trainer-auth`: `/trainer-auth/token`, владелец `1001:1001`, права `0440`.
+Публикация файла атомарная; повторный выкат сохраняет прежний ключ.
+Приложение и gateway монтируют том только для чтения. Приложение загружает ключ
+в `TRAINER_RUNTIME_TOKEN` до запуска Next; gateway читает тот же файл.
+Gateway работает как `0:1001` без capabilities: группа позволяет читать ключ,
+UID 0 нужен для доступа к Docker socket. Init имеет только CHOWN/FOWNER.
+Ключ, том и socket не передаются контейнерам решений.
+Порт gateway не опубликован; связь с приложением идёт через отдельную
+[внутреннюю сеть](https://docs.docker.com/reference/compose-file/networks/#internal).
+
+Для этого подключения API-ключ панели Dokploy не требуется. Environment
+может переопределить URL и общий токен при использовании своего gateway;
+непустой `TRAINER_RUNTIME_TOKEN` имеет приоритет над файлом у обеих сторон.
+Старый дополнительный `docker-compose.trainer-runtime.yml` совместим с основным
+файлом, но отдельное включение runtime больше не нужно.
 После миграции и проверки работающего приложения новые задачи нужно загрузить
 из кодового каталога через авторизованный Payload API либо `pnpm seed:trainer`
 на явно выбранной БД. Последний выполняет upsert всего каталога и перезаписывает
 CMS-правки каталожных задач; перед запуском учитывайте это.
 
-До выката соберите три job image на Docker-хосте, на котором работает gateway:
+При самостоятельном запуске gateway вне Compose соберите четыре job image
+на Docker-хосте, на котором он работает:
 
 ```sh
 docker build --target go-job -t lms-trainer-go:local trainer-runtime
+docker build --target python-job -t lms-trainer-python:local trainer-runtime
 docker build --target frontend-job -t lms-trainer-frontend:local trainer-runtime
 docker build -f trainer-runtime/Dockerfile.next -t lms-trainer-next:local trainer-runtime
 ```
@@ -138,7 +158,7 @@ HTTP между ними передаётся доверенным RPC без о
 после авторизованного запуска как короткоживущий
 непредсказуемый токен. `/api/trainer/preview/<token>/` передаёт только запросы
 к соответствующему контейнеру, не пересылает cookies/авторизацию LMS и
-не принимает внешний URL. Ответы имеют CSP `sandbox allow-scripts`,
+не принимает внешний URL. Ответы имеют CSP `sandbox allow-scripts allow-forms` и `form-action 'none'`,
 iframe также не получает `allow-same-origin`. После истечения ссылки
 нажмите «Запустить» повторно. Прокси не сохраняет прогресс.
 

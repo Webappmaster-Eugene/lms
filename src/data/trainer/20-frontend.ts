@@ -143,7 +143,7 @@ a:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 4px; }
           name: 'Структура карточки', hidden: false,
           checks: [
             { selector: 'main', count: 1 },
-            { selector: 'main > h1', text: 'Команда', count: 1 },
+            { selector: 'main h1', text: 'Команда', count: 1 },
             { selector: 'article.profile', count: 1, attribute: { name: 'aria-labelledby', value: 'profile-name' } },
             { selector: 'article.profile h2#profile-name', text: 'Анна Смирнова' },
             { selector: 'article.profile p', text: 'Frontend-разработчик' },
@@ -469,7 +469,7 @@ export default function Favorite({ courseId }) {
         {
           name: 'Каталог и избранное', hidden: false, path: '/',
           checks: [
-            { selector: 'main > h1', text: 'Каталог курсов' },
+            { selector: 'main h1', text: 'Каталог курсов' },
             { selector: '#courses > li', count: 3 },
             { selector: 'button[data-course="react"]', text: 'В избранное', attribute: { name: 'aria-pressed', value: 'false' } },
             { selector: 'button[data-course="react"]', action: 'click' },
@@ -480,7 +480,7 @@ export default function Favorite({ courseId }) {
           name: 'Фильтрация на серверной странице', hidden: false, path: '/?q=react',
           checks: [
             { selector: '#courses > li', count: 1 },
-            { selector: 'li[data-course="react"] > span', text: 'React' },
+            { selector: 'li[data-course="react"]:text-is("React"), li[data-course="react"] :text-is("React")', visible: true },
             { selector: '#empty', count: 0 },
           ],
         },
@@ -488,7 +488,7 @@ export default function Favorite({ courseId }) {
           name: 'Нормализация запроса', hidden: true, path: '/?q=%20GO%20',
           checks: [
             { selector: '#courses > li', count: 1 },
-            { selector: 'li[data-course="go"] > span', text: 'Go' },
+            { selector: 'li[data-course="go"]:text-is("Go"), li[data-course="go"] :text-is("Go")', visible: true },
           ],
         },
         {

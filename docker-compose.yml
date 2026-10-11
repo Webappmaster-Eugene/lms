@@ -1,3 +1,17 @@
+x-trainer-image: &trainer-image
+  restart: "no"
+  entrypoint: ["node", "-e", "process.exit(0)"]
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  network_mode: none
+  labels:
+    - traefik.enable=false
+  deploy:
+    resources:
+      limits:
+        memory: 64M
+
 services:
   lms-mentor-db:
     image: postgres:16-alpine
@@ -62,11 +76,14 @@ services:
         condition: service_healthy
       lms-mentor-otel:
         condition: service_started
+      lms-mentor-trainer-runtime:
+        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://lms:${DB_PASSWORD:-changeme}@lms-mentor-db:5432/lms_platform
       - PAYLOAD_SECRET=${PAYLOAD_SECRET}
-      - TRAINER_RUNTIME_URL=${TRAINER_RUNTIME_URL:-}
+      - TRAINER_RUNTIME_URL=${TRAINER_RUNTIME_URL:-http://lms-mentor-trainer-runtime:3100}
       - TRAINER_RUNTIME_TOKEN=${TRAINER_RUNTIME_TOKEN:-}
+      - TRAINER_RUNTIME_TOKEN_FILE=/trainer-auth/token
       - REDIS_URL=${REDIS_URL-redis://lms-mentor-redis:6379}
       - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-https://learn.mentorcareer.ru}
       # Initial admin (required on first launch with empty DB)
@@ -89,9 +106,11 @@ services:
     volumes:
       - lms-media:/app/media
       - lms-geoip:/geoip:ro
+      - lms-trainer-auth:/trainer-auth:ro
     networks:
       - dokploy-network
       - lms-cache
+      - lms-trainer
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:3000/api/health || exit 1"]
       interval: 30s
@@ -107,6 +126,111 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+
+  # Эти контейнеры только гарантируют сборку job images и сразу завершаются.
+  lms-mentor-trainer-go-image:
+    <<: *trainer-image
+    image: ${TRAINER_GO_JOB_IMAGE:-lms-trainer-go:local}
+    build:
+      context: ./trainer-runtime
+      target: go-job
+
+  lms-mentor-trainer-python-image:
+    <<: *trainer-image
+    image: ${TRAINER_PYTHON_JOB_IMAGE:-lms-trainer-python:local}
+    build:
+      context: ./trainer-runtime
+      target: python-job
+
+  lms-mentor-trainer-frontend-image:
+    <<: *trainer-image
+    image: ${TRAINER_FRONTEND_JOB_IMAGE:-lms-trainer-frontend:local}
+    build:
+      context: ./trainer-runtime
+      target: frontend-job
+
+  lms-mentor-trainer-next-image:
+    <<: *trainer-image
+    image: ${TRAINER_NEXT_JOB_IMAGE:-lms-trainer-next:local}
+    build:
+      context: ./trainer-runtime
+      dockerfile: Dockerfile.next
+
+  lms-mentor-trainer-auth:
+    build:
+      context: ./trainer-runtime
+      target: gateway
+    restart: "no"
+    user: "0:1001"
+    entrypoint: ["node", "/runtime/auth-token.mjs", "init"]
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, FOWNER]
+    security_opt: [no-new-privileges:true]
+    environment:
+      - TRAINER_RUNTIME_TOKEN_FILE=/trainer-auth/token
+    volumes:
+      - lms-trainer-auth:/trainer-auth
+    network_mode: none
+    labels:
+      - traefik.enable=false
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  lms-mentor-trainer-runtime:
+    build:
+      context: ./trainer-runtime
+      target: gateway
+    restart: unless-stopped
+    user: "0:1001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      lms-mentor-trainer-auth:
+        condition: service_completed_successfully
+      lms-mentor-trainer-go-image:
+        condition: service_completed_successfully
+      lms-mentor-trainer-python-image:
+        condition: service_completed_successfully
+      lms-mentor-trainer-frontend-image:
+        condition: service_completed_successfully
+      lms-mentor-trainer-next-image:
+        condition: service_completed_successfully
+    environment:
+      - TRAINER_RUNTIME_TOKEN=${TRAINER_RUNTIME_TOKEN:-}
+      - TRAINER_RUNTIME_TOKEN_FILE=/trainer-auth/token
+      - TRAINER_GO_JOB_IMAGE=${TRAINER_GO_JOB_IMAGE:-lms-trainer-go:local}
+      - TRAINER_PYTHON_JOB_IMAGE=${TRAINER_PYTHON_JOB_IMAGE:-lms-trainer-python:local}
+      - TRAINER_FRONTEND_JOB_IMAGE=${TRAINER_FRONTEND_JOB_IMAGE:-lms-trainer-frontend:local}
+      - TRAINER_NEXT_JOB_IMAGE=${TRAINER_NEXT_JOB_IMAGE:-lms-trainer-next:local}
+      - TRAINER_MAX_CONCURRENT=${TRAINER_MAX_CONCURRENT:-1}
+    # Docker socket доступен только доверенному gateway, не LMS и не решениям.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - lms-trainer-auth:/trainer-auth:ro
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    networks: [lms-trainer]
+    labels:
+      - traefik.enable=false
+    healthcheck:
+      test: ["CMD", "node", "--input-type=module", "-e", "import {readRuntimeToken} from '/runtime/auth-token.mjs';const token=process.env.TRAINER_RUNTIME_TOKEN||readRuntimeToken(process.env.TRAINER_RUNTIME_TOKEN_FILE);fetch('http://127.0.0.1:3100/health',{headers:{authorization:'Bearer '+token}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   lms-mentor-geoip:
     image: node:22-alpine
@@ -236,9 +360,12 @@ volumes:
   lms-pgdata:
   lms-media:
   lms-geoip:
+  lms-trainer-auth:
 
 networks:
   lms-cache:
+    internal: true
+  lms-trainer:
     internal: true
   dokploy-network:
     external: true

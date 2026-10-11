@@ -162,7 +162,10 @@ describe('режим сборки Next', () => {
     expect(NEXT_CONFIG).toMatch(/output:\s*'standalone'/)
     expect(DOCKERFILE).toMatch(/\.next\/standalone/)
     expect(DOCKERFILE).toMatch(/\.next\/static/)
-    expect(DOCKERFILE).toMatch(/CMD \["node", "server\.js"\]/)
+    expect(DOCKERFILE).toMatch(/CMD \["node", "scripts\/trainer-app-start\.mjs"\]/)
+    expect(DOCKERFILE).toContain('scripts/trainer-app-start.mjs ./scripts/trainer-app-start.mjs')
+    expect(DOCKERFILE).toContain('trainer-runtime/auth-token.mjs ./trainer-runtime/auth-token.mjs')
+    expect(read('../../scripts/trainer-app-start.mjs')).toContain("await import('../server.js')")
   })
 
   it('контейнер работает не от root', () => {
