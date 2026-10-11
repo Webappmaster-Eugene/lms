@@ -264,7 +264,12 @@ export default async function DashboardPage() {
       <RecentLearningCourses entries={learningCourses} />
 
       {/* Статистика — горизонтальный скролл на мобильных */}
-      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide sm:grid sm:grid-cols-5 sm:gap-4 sm:overflow-visible sm:pb-0">
+      <div
+        role="region"
+        aria-label="Статистика обучения"
+        tabIndex={0}
+        className="flex gap-3 overflow-x-auto rounded-xl pb-2 scrollbar-hide focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:grid sm:grid-cols-5 sm:gap-4 sm:overflow-visible sm:pb-0"
+      >
         <StatCard icon={BookOpen} color="info" value={completedLessons} label="Уроков" />
         <StatCard icon={Star} color="warning" value={user.totalPoints ?? 0} label="Баллов" />
         <StatCard icon={Flame} color="streak" value={streak.days} label="Дней подряд" />
