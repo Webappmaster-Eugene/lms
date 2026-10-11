@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { InputError, validateRequest } from './validation.mjs'
 import { InfrastructureError, runJob } from './gateway.mjs'
 import { runtimeConcurrency } from './runtime-limits.mjs'
+import { readRuntimeToken } from './auth-token.mjs'
 
 export function createRuntimeServer({ token, run = runJob, maxConcurrent = 2 } = {}) {
   if (typeof token !== 'string' || token.length < 32) throw new Error('TRAINER_RUNTIME_TOKEN должен содержать минимум 32 символа')
@@ -53,7 +54,8 @@ export function createRuntimeServer({ token, run = runJob, maxConcurrent = 2 } =
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const server = createRuntimeServer({ token: process.env.TRAINER_RUNTIME_TOKEN, maxConcurrent: runtimeConcurrency() })
+  const token = process.env.TRAINER_RUNTIME_TOKEN || (process.env.TRAINER_RUNTIME_TOKEN_FILE ? readRuntimeToken(process.env.TRAINER_RUNTIME_TOKEN_FILE) : undefined)
+  const server = createRuntimeServer({ token, maxConcurrent: runtimeConcurrency() })
   server.requestTimeout = 180000
   server.headersTimeout = 10000
   server.listen(Number(process.env.PORT || 3100), '0.0.0.0')
