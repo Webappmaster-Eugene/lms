@@ -10,10 +10,10 @@ describe('границы запросов библиотеки собеседо�
     expect(uploadInput(input)).toMatchObject({ title: 'React', extension: 'mp4', size: 128 })
     for (const changed of [{ size: MAX_RECORDING_BYTES + 1 }, { size: 0 }, { size: 1.5 }, { directionId: '1' }, { title: 'a'.repeat(201) }, { fileName: 'test.html', mimeType: 'text/html' }, { mimeType: 'video/webm' }, { description: 'a'.repeat(2001) }]) expect(() => uploadInput({ ...input, ...changed })).toThrow()
   })
-  it('вакансия и имя имеют пределы; неизвестные поля не передаются анализатору', () => {
-    expect(analysisInput({ candidateName: ' Иван ', owner: 999, publicKey: 'private' })).toEqual({ candidateName: 'Иван', candidateSpeaker: '', vacancyText: '' })
-    expect(() => analysisInput({ vacancyText: 'x'.repeat(20001) })).toThrow()
-    expect(() => analysisInput({ candidateSpeaker: { wrong: true } })).toThrow()
+  it('Checkfrod требует согласие и корректную область кандидата; клиент не задаёт владельца', () => {
+    expect(analysisInput({ consent: true, roiSpec: 'auto', owner: 999, url: 'private' })).toEqual({ consent: true, roiSpec: 'auto' })
+    expect(analysisInput({ consent: true, roiSpec: '10,20,200,100' })).toEqual({ consent: true, roiSpec: '10,20,200,100' })
+    for (const bad of [{}, { consent: false }, { consent: true, roiSpec: '0,0,1,10' }, { consent: true, roiSpec: '-1,0,20,20' }, { consent: true, roiSpec: '0,0,99999,99' }]) expect(() => analysisInput(bad)).toThrow()
   })
   it('cookie мутации требуют нашего Origin, а явный токен не принимает чужой Origin', () => {
     vi.stubEnv('NEXT_PUBLIC_SERVER_URL', 'https://learn.mentorcareer.ru')

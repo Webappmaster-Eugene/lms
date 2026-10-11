@@ -226,13 +226,8 @@ const interviewTrack = (await payload.find({ collection: 'interview-directions',
 for (const [owner, title] of [[created.student, 'Мой тестовый React собес'], [created.leader, 'Чужая личная запись']] as const) {
   const own = await payload.create({ collection: 'interview-recordings', data: {
     title, direction: interviewTrack.id, category: 'personal', owner, status: 'ready', size: 1024, mimeType: 'video/mp4', analysisStatus: 'completed',
-    analysisTranscript: '[00:00:02] Спикер 1: Я объясняю замыкания на примере функции.',
-    analysisModel: 'test-fixture',
-    analysisCriteria: [{ id: 'js', name: 'JavaScript', description: 'Понимание языка', kind: 'must', weight: 3 }],
-    analysisScore: { overall: 75, coverage: 1, verdict: 'yes', failedMust: [], uncheckedMust: [], borderline: false },
-    analysisReport: { candidateSpeaker: 'Спикер 1', hrSummary: 'Понятные ответы, стоит подробнее объяснять компромиссы.', grade: null, extraneous: [],
-      criteria: [{ criterionId: 'js', score: 4, comment: 'Приведён рабочий пример.', evidence: [{ quote: 'Я объясняю замыкания на примере функции.', timestamp: '00:00:02', verified: true }] }],
-      communication: { clarity: 4, confidence: 4, structure: 3, comment: 'Добавьте вывод после примера.' }, resumeCheck: [], strengths: ['Объясняет на примерах'], risks: [], growthAreas: ['Озвучивать компромиссы'], openQuestions: [], limitations: ['Код на экране не анализировался'] },
+    analysisBackend: 'checkfrod', analysisRemoteJobId: 'fixture-report',
+    analysisReport: { duration_s: 120, episodes: [{ confidence: 'high' }, { confidence: 'info' }], quality: { gaze: 'head_only' }, attention: { iris_s: 0, head_only_s: 120, no_face_s: 0, frozen_s: 0, moments: [{ time: 2 }] } },
   } })
   await payload.update({ collection: 'interview-recordings', id: own.id, data: { diskPath: `disk:/LMS interviews/${owner}/${own.id}-12345678-1234-4123-8123-123456789012.mp4` } })
 }

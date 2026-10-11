@@ -1429,6 +1429,10 @@ export interface InterviewRecording {
   analysisStatus: 'idle' | 'queued' | 'processing' | 'completed' | 'failed';
   analysisProgress?: string | null;
   analysisError?: string | null;
+  analysisBackend?: string | null;
+  analysisRemoteJobId?: string | null;
+  analysisRemoteKey?: string | null;
+  analysisSubmissionStartedAt?: string | null;
   analysisInput?:
     | {
         [k: string]: unknown;
@@ -2442,6 +2446,10 @@ export interface InterviewRecordingsSelect<T extends boolean = true> {
   analysisStatus?: T;
   analysisProgress?: T;
   analysisError?: T;
+  analysisBackend?: T;
+  analysisRemoteJobId?: T;
+  analysisRemoteKey?: T;
+  analysisSubmissionStartedAt?: T;
   analysisInput?: T;
   analysisReport?: T;
   analysisScore?: T;

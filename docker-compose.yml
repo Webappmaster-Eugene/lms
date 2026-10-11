@@ -65,13 +65,10 @@ services:
     environment:
       - DATABASE_URL=postgresql://lms:${DB_PASSWORD:-changeme}@lms-mentor-db:5432/lms_platform
       - PAYLOAD_SECRET=${PAYLOAD_SECRET}
+      - CHECKFROD_API_URL=${CHECKFROD_API_URL:-https://checkfrod.nadtocheev.ru}
+      - CHECKFROD_API_KEY=${CHECKFROD_API_KEY:-}
       - YANDEX_DISK_TOKEN=${YANDEX_DISK_TOKEN:-}
       - YANDEX_INTERVIEWS_ROOT=${YANDEX_INTERVIEWS_ROOT:-disk:/LMS interviews}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - MEETING_STT_MODEL=${MEETING_STT_MODEL:-google/gemini-3.1-pro-preview}
-      - MEETING_STT_MODEL_FALLBACKS=${MEETING_STT_MODEL_FALLBACKS:-google/gemini-2.5-pro,google/gemini-2.5-flash}
-      - STT_PIN_VERTEX_AI=${STT_PIN_VERTEX_AI:-true}
-      - INTERVIEW_EVAL_MODEL=${INTERVIEW_EVAL_MODEL:-anthropic/claude-sonnet-5.5}
       - TRAINER_RUNTIME_URL=${TRAINER_RUNTIME_URL:-}
       - TRAINER_RUNTIME_TOKEN=${TRAINER_RUNTIME_TOKEN:-}
       - REDIS_URL=${REDIS_URL-redis://lms-mentor-redis:6379}

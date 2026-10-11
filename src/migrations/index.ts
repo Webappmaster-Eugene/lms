@@ -23,6 +23,7 @@ import * as migration_20261010_151210_learning_history_index from './20261010_15
 import * as migration_20261010_184804_trainer_python_interview_metadata from './20261010_184804_trainer_python_interview_metadata';
 import * as migration_20261010_211458_interview_library from './20261010_211458_interview_library';
 import * as migration_20261010_212032_interview_analysis_usage from './20261010_212032_interview_analysis_usage';
+import * as migration_20261011_074547_checkfrod_interview_integration from './20261011_074547_checkfrod_interview_integration';
 
 export const migrations = [
   {
@@ -148,6 +149,11 @@ export const migrations = [
   {
     up: migration_20261010_212032_interview_analysis_usage.up,
     down: migration_20261010_212032_interview_analysis_usage.down,
-    name: '20261010_212032_interview_analysis_usage'
+    name: '20261010_212032_interview_analysis_usage',
+  },
+  {
+    up: migration_20261011_074547_checkfrod_interview_integration.up,
+    down: migration_20261011_074547_checkfrod_interview_integration.down,
+    name: '20261011_074547_checkfrod_interview_integration'
   },
 ];

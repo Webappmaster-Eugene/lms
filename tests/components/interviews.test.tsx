@@ -5,7 +5,7 @@ import type { InterviewListDTO, InterviewRecordingDTO } from '@/lib/interviews/t
 import { InterviewLibrary } from '@/components/interviews/InterviewLibrary'
 import { InterviewDetail, type InterviewDetailsDTO } from '@/components/interviews/InterviewDetail'
 import { InterviewUpload } from '@/components/interviews/InterviewUpload'
-import { InterviewReportView, timestampSeconds, type InterviewAnalysisDTO } from '@/components/interviews/InterviewReportView'
+import { InterviewReportView, type InterviewAnalysisDTO } from '@/components/interviews/InterviewReportView'
 
 vi.mock('next/link', async () => (await import('../helpers/component-mocks')).linkMock())
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }))
@@ -16,10 +16,9 @@ const list: InterviewListDTO = { directions: [direction, { id: 2, slug: 'nodejs'
 const details: InterviewDetailsDTO = { recording, analysis: null, analysisAvailable: true }
 
 const analysis: InterviewAnalysisDTO = {
-  score: { overall: 65, coverage: 0.75, verdict: 'maybe', failedMust: [], uncheckedMust: [], borderline: false },
-  criteria: [{ id: 'react', name: 'React', description: 'Знание React', weight: 3, kind: 'must' }],
-  report: { candidateSpeaker: 'SPEAKER_00', hrSummary: 'Разбор ответов', criteria: [{ criterionId: 'react', score: 3, comment: 'Нужно повторить хуки', evidence: [{ quote: 'Подтверждённая цитата', timestamp: '00:01:20', verified: true }, { quote: 'Неподтверждённая цитата', timestamp: '00:01:30', verified: false }] }], communication: { clarity: 3, confidence: null, structure: 2, comment: 'Структурируйте ответы' }, resumeCheck: [], strengths: ['Понимает компоненты'], risks: [], growthAreas: ['Повторить useEffect'], openQuestions: [], limitations: ['Слышимость ограничена'] },
-  transcript: 'SPEAKER_00: Подтверждённая цитата', model: 'test',
+  provider: 'checkfrod',
+  summary: { durationS: 3363, episodes: 3, moments: 8, gaze: 'good', irisMinutes: 21, headOnlyMinutes: 23, noFaceMinutes: 11, frozenMinutes: 0 },
+  report: { duration_s: 3363, episodes: [{ kind: 'reading', confidence: 'medium' }], attention: { moments: [] } },
 }
 
 beforeEach(() => { vi.stubGlobal('fetch', vi.fn()); window.history.replaceState(null, '', '/interviews') })
@@ -55,14 +54,14 @@ describe('библиотека собеседований', () => {
 describe('просмотр и личный анализ', () => {
   it('сохраняет готовый отчёт без предложения повторного платного разбора', () => {
     render(<InterviewDetail initial={{ ...details, recording: { ...recording, analysisStatus: 'completed' }, analysis }} />)
-    expect(screen.getByText('Разбор ответов')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Открыть полный отчёт Checkfrod' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /разбор|Анализировать|Повторить анализ/ })).not.toBeInTheDocument()
     expect(fetch).not.toHaveBeenCalled()
   })
 
   it('не показывает анализ и удаление для чужой записи даже при переданном отчёте', () => {
     render(<InterviewDetail initial={{ ...details, recording: { ...recording, category: 'community', isOwner: false }, analysis }} />)
-    expect(screen.queryByText('Разбор ответов')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Открыть полный отчёт Checkfrod' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Анализировать/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Удалить запись' })).not.toBeInTheDocument()
     expect(document.querySelector('video')).toHaveAttribute('src', '/api/interviews/4/stream')
@@ -74,22 +73,46 @@ describe('просмотр и личный анализ', () => {
     render(<InterviewDetail initial={details} />)
     await userEvent.click(screen.getByRole('button', { name: 'Анализировать мой собес' }))
     expect(fetch).not.toHaveBeenCalled()
-    expect(screen.getByRole('dialog')).toHaveTextContent('звук записи будет передан')
-    await userEvent.type(screen.getByLabelText('Ваше имя, необязательно'), 'Анна')
-    await userEvent.click(screen.getByRole('button', { name: 'Передать запись и начать анализ' }))
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/interviews/4/analyze', expect.objectContaining({ method: 'POST', body: expect.stringContaining('Анна') })))
+    expect(screen.getByRole('dialog')).toHaveTextContent('Видеозапись будет передана внешнему сервису Checkfrod')
+    expect(screen.getByRole('button', { name: 'Передать видео в Checkfrod' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('checkbox'))
+    await userEvent.click(screen.getByRole('button', { name: 'Передать видео в Checkfrod' }))
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/interviews/4/analyze', expect.objectContaining({ method: 'POST', body: JSON.stringify({ consent: true, roiSpec: 'auto' }) })))
     expect(await screen.findByText('Разбор в очереди')).toBeInTheDocument()
   })
 
   it('показывает отсутствие конфигурации анализа', () => {
     render(<InterviewDetail initial={{ ...details, analysisAvailable: false }} />)
     expect(screen.getByRole('button', { name: 'Анализировать мой собес' })).toBeDisabled()
-    expect(screen.getByText(/подключить сервис распознавания и оценки/)).toBeInTheDocument()
+    expect(screen.getByText(/подключить Checkfrod/)).toBeInTheDocument()
+  })
+
+  it('отправляет выбранную область лица, не собирая имя или текст вакансии', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ analysisStatus: 'queued' })))
+    render(<InterviewDetail initial={details} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Анализировать мой собес' }))
+    expect(screen.queryByRole('textbox', { name: /имя|вакансии/i })).not.toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Область лица кандидата' }), 'custom')
+    await userEvent.type(screen.getByLabelText(/Координаты области в пикселях/), '100,50,640,480')
+    await userEvent.click(screen.getByRole('checkbox'))
+    await userEvent.click(screen.getByRole('button', { name: 'Передать видео в Checkfrod' }))
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/interviews/4/analyze', expect.objectContaining({ body: JSON.stringify({ consent: true, roiSpec: '100,50,640,480' }) })))
+  })
+
+  it('отвергает слишком маленькую область до передачи видео', async () => {
+    render(<InterviewDetail initial={details} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Анализировать мой собес' }))
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Область лица кандидата' }), 'custom')
+    await userEvent.type(screen.getByLabelText(/Координаты области в пикселях/), '0,0,15,480')
+    await userEvent.click(screen.getByRole('checkbox'))
+    await userEvent.click(screen.getByRole('button', { name: 'Передать видео в Checkfrod' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('от 16 до 32768')
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('показывает ошибки фонового анализа без ложного отчёта', () => {
-    render(<InterviewDetail initial={{ ...details, recording: { ...recording, analysisStatus: 'failed', analysisError: 'Речь не распознана' } }} />)
-    expect(screen.getByRole('alert')).toHaveTextContent('Речь не распознана')
+    render(<InterviewDetail initial={{ ...details, recording: { ...recording, analysisStatus: 'failed', analysisError: 'Checkfrod временно недоступен' } }} />)
+    expect(screen.getByRole('alert')).toHaveTextContent('Checkfrod временно недоступен')
     expect(screen.getByRole('button', { name: 'Повторить анализ' })).toBeEnabled()
   })
 
@@ -105,21 +128,34 @@ describe('просмотр и личный анализ', () => {
   })
 })
 
-describe('доказательства отчёта', () => {
-  it('переходит только к подтверждённым таймкодам и показывает ограничения аудиоанализа', async () => {
-    const seek = vi.fn()
-    render(<InterviewReportView analysis={analysis} onSeek={seek} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Перейти к 00:01:20' }))
-    expect(seek).toHaveBeenCalledWith(80)
-    expect(screen.queryByRole('button', { name: 'Перейти к 00:01:30' })).not.toBeInTheDocument()
-    expect(screen.getByText(/Цитата не подтверждена/)).toBeInTheDocument()
-    expect(screen.getByText(/код на экране не оцениваются/)).toBeInTheDocument()
+describe('сводка Checkfrod', () => {
+  it('показывает факты сервиса без собственных оценок и открывает точный отчёт через приватный API', () => {
+    render(<InterviewReportView analysis={analysis} recordingId={4} />)
+    expect(screen.getByText('Сигналы сервиса')).toBeInTheDocument()
+    expect(screen.getByText('Моменты для просмотра')).toBeInTheDocument()
+    expect(screen.getByText('21 мин')).toBeInTheDocument()
+    expect(screen.getByText(/не устанавливает факт списывания/)).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: 'Открыть полный отчёт Checkfrod' })
+    expect(link).toHaveAttribute('href', '/api/interviews/4/report')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(link).toHaveAttribute('referrerpolicy', 'no-referrer')
+    expect(screen.queryByText(/Уровень по записи|Итог по критериям|Сильные стороны/)).not.toBeInTheDocument()
   })
 
-  it('отвергает невалидные таймкоды', () => {
-    expect(timestampSeconds('00:60:00')).toBeNull()
-    expect(timestampSeconds('javascript:1')).toBeNull()
-    expect(timestampSeconds('01:02:03')).toBe(3723)
+  it('не выдаёт статичное видео за проверку взгляда и объясняет отсутствие сигналов', () => {
+    render(<InterviewReportView analysis={{ ...analysis, summary: { ...analysis.summary, gaze: 'static', episodes: 0 } }} recordingId={4} />)
+    expect(screen.queryByText('По радужке и голове')).not.toBeInTheDocument()
+    expect(screen.queryByText('Только по повороту головы')).not.toBeInTheDocument()
+    expect(screen.getByText(/отсутствие сигналов ничего не говорит/)).toBeInTheDocument()
+  })
+
+  it('обозначает застывшие непроверенные части и недостаточную точность по глазам', () => {
+    render(<InterviewReportView analysis={{ ...analysis, summary: { ...analysis.summary, gaze: 'head_only', irisMinutes: 0.5, frozenMinutes: 34 } }} recordingId={4} />)
+    expect(screen.getByText('30 с')).toBeInTheDocument()
+    expect(screen.getByText('Видео застывало, не проверялось')).toBeInTheDocument()
+    expect(screen.getByText('34 мин')).toBeInTheDocument()
+    expect(screen.getByText(/Глаза в записи мелкие/)).toBeInTheDocument()
   })
 })
 

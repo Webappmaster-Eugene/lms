@@ -1,4 +1,5 @@
 import 'server-only'
+import { getCheckfrodReportLink, CheckfrodClientError } from '@/server/interviews/checkfrod-client'
 import { logger } from '@/lib/telemetry'
 import { createLocalReq } from 'payload'
 import { getPayload } from '@/lib/payload'
@@ -8,7 +9,7 @@ import { uploadPrivateFile, InterviewStorageError } from '@/server/interviews/di
 import { streamRecordingMedia } from '@/server/interviews/media'
 
 const response = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } })
-type Action = 'list' | 'detail' | 'create' | 'upload' | 'finish' | 'delete' | 'analyze' | 'stream' | 'import'
+type Action = 'list' | 'detail' | 'create' | 'upload' | 'finish' | 'delete' | 'analyze' | 'stream' | 'import' | 'report'
 export function validInterviewOrigin(request: Request): boolean {
   const origin = request.headers.get('origin')
   const allowed = new Set([new URL(request.url).origin])
@@ -18,7 +19,7 @@ export function validInterviewOrigin(request: Request): boolean {
   return /^(?:JWT|Bearer) \S+$/.test(request.headers.get('authorization') ?? '')
 }
 export async function interviewRoute(request: Request, action: Action, id?: number): Promise<Response> {
-  const write = !['list', 'detail', 'stream'].includes(action)
+  const write = !['list', 'detail', 'stream', 'report'].includes(action)
   try {
     if (write && !validInterviewOrigin(request)) return response({ error: 'Откройте раздел на платформе' }, 403)
     const payload = await getPayload()
@@ -43,6 +44,12 @@ export async function interviewRoute(request: Request, action: Action, id?: numb
       case 'delete': return response(await deleteInterviewRecording(payload, user, recordId))
       case 'analyze': return response(await queueInterviewAnalysis(payload, user, recordId, analysisInput(await readBoundedJson(request, 24000))), 202)
       case 'import': return response(await importInterviewSources(payload, user))
+      case 'report': {
+        const doc = await accessibleRecording(payload, user, recordId, true)
+        if (doc.analysisStatus !== 'completed' || doc.analysisBackend !== 'checkfrod' || !doc.analysisRemoteJobId) throw new InterviewLibraryError('Отчёт ещё не готов', 409)
+        const link = await getCheckfrodReportLink(user.id, doc.analysisRemoteJobId)
+        return new Response(null, { status: 302, headers: { Location: link.url, 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer' } })
+      }
       case 'stream': {
         const doc = await accessibleRecording(payload, user, recordId)
         if (doc.status !== 'ready') throw new InterviewLibraryError('Видео ещё не загружено', 409)
@@ -59,6 +66,7 @@ export async function interviewRoute(request: Request, action: Action, id?: numb
     }
   } catch (error) {
     if (error instanceof InterviewLibraryError) return response({ error: error.message }, error.status)
+    if (error instanceof CheckfrodClientError) return response({ error: error.message }, error.statusCode)
     if (error instanceof RequestBodyError) return response({ error: error.message }, error.status)
     if (error instanceof InterviewStorageError) return response({ error: error.message }, error.statusCode)
     // Provider errors can contain signed URLs or private transcripts; log no raw error.

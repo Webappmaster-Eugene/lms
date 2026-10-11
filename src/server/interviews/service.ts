@@ -9,8 +9,9 @@ import { collectAllPages } from '@/lib/paginate'
 import { MAX_RECORDING_BYTES, type InterviewDirectionDTO, type InterviewListDTO, type InterviewRecordingDTO, type RecordingCategory } from '@/lib/interviews/types'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import { createUpload, finishUpload, removePrivateFile, fetchSharedRecordings } from '@/server/interviews/disk'
-import { isInterviewAnalysisConfigured } from '@/server/interviews/analyzer'
-import type { InterviewCriterion, InterviewReport, InterviewScore } from '@/lib/interviews/analysis/types'
+import { isCheckfrodConfigured, summarizeCheckfrodReport, deleteCheckfrodJob, listCheckfrodJobs } from '@/server/interviews/checkfrod-client'
+import { checkfrodSourceFilename } from '@/server/interviews/capability'
+import type { CheckfrodAnalysisDTO } from '@/lib/interviews/checkfrod-types'
 
 export class InterviewLibraryError extends Error {
   constructor(message: string, readonly status = 400) { super(message) }
@@ -72,14 +73,15 @@ export async function getInterviewLibrary(payload: Payload, user: User, params: 
     getAuthoritativeLearningPolicy(payload, user.id),
   ])
   const dtos = tracks.map(directionDTO)
-  return { directions: dtos, recordings: found.docs.flatMap((doc) => { const track = dtos.find((d) => d.id === relationId(doc.direction)); return track ? [recordingDTO(doc, track, user)] : [] }), page: found.page ?? 1, totalPages: found.totalPages, totalDocs: found.totalDocs, uploadAvailable: Boolean(process.env.YANDEX_DISK_TOKEN), analysisAvailable: isInterviewAnalysisConfigured(), isAdmin: policy.role === 'admin' }
+  return { directions: dtos, recordings: found.docs.flatMap((doc) => { const track = dtos.find((d) => d.id === relationId(doc.direction)); return track ? [recordingDTO(doc, track, user)] : [] }), page: found.page ?? 1, totalPages: found.totalPages, totalDocs: found.totalDocs, uploadAvailable: Boolean(process.env.YANDEX_DISK_TOKEN), analysisAvailable: isCheckfrodConfigured(), isAdmin: policy.role === 'admin' }
 }
 export async function getInterviewDetails(payload: Payload, user: User, id: number) {
   const doc = await accessibleRecording(payload, user, id)
   const track = await payload.findByID({ collection: 'interview-directions', id: relationId(doc.direction) ?? -1, depth: 0, overrideAccess: true })
-  const analysis = isOwnRecording(doc, user) && doc.analysisStatus === 'completed' && doc.analysisReport && doc.analysisScore
-    ? { report: doc.analysisReport as unknown as InterviewReport, score: doc.analysisScore as unknown as InterviewScore, criteria: doc.analysisCriteria as unknown as InterviewCriterion[], transcript: doc.analysisTranscript ?? '', model: doc.analysisModel ?? '' } : null
-  return { recording: recordingDTO(doc, directionDTO(track), user), analysis, analysisAvailable: isInterviewAnalysisConfigured() }
+  const report = doc.analysisReport && typeof doc.analysisReport === 'object' && !Array.isArray(doc.analysisReport) ? doc.analysisReport as Record<string, unknown> : null
+  const analysis: CheckfrodAnalysisDTO | null = isOwnRecording(doc, user) && doc.analysisStatus === 'completed' && doc.analysisBackend === 'checkfrod' && report
+    ? { provider: 'checkfrod', summary: summarizeCheckfrodReport(report), report: {} } : null
+  return { recording: recordingDTO(doc, directionDTO(track), user), analysis, analysisAvailable: isCheckfrodConfigured() }
 }
 
 export function uploadInput(value: unknown) {
@@ -143,24 +145,40 @@ export async function completeInterviewUpload(payload: Payload, user: User, id: 
   })
   return (await getInterviewDetails(payload, user, id)).recording
 }
+async function removeCheckfrodAttempt(userId: number, doc: InterviewRecording): Promise<void> {
+  if (doc.analysisBackend !== 'checkfrod') return
+  let remoteId = doc.analysisRemoteJobId
+  if (!remoteId && doc.analysisSubmissionStartedAt && doc.analysisRemoteKey) {
+    const remote = await listCheckfrodJobs(userId)
+    remoteId = remote.find((job) => job.filename === checkfrodSourceFilename(doc))?.id
+  }
+  if (remoteId) await deleteCheckfrodJob(userId, remoteId)
+}
 export async function deleteInterviewRecording(payload: Payload, user: User, id: number) {
   await interviewTransaction(payload, user.id, async (req) => {
     const doc = await accessibleRecording(payload, user, id, true, req)
     if (doc.analysisStatus === 'queued' || doc.analysisStatus === 'processing') throw new InterviewLibraryError('Дождитесь завершения анализа', 409)
     if (doc.uploadLeaseUntil && Date.parse(doc.uploadLeaseUntil) > Date.now()) throw new InterviewLibraryError('Остановите загрузку и дождитесь её завершения', 409)
     // Keep the row if storage deletion fails, so students can retry without orphaning their file.
+    await removeCheckfrodAttempt(user.id, doc)
     if (doc.diskPath) await removePrivateFile(doc.diskPath)
     await payload.delete({ collection: 'interview-recordings', id, req, overrideAccess: true })
   })
   return { deleted: true }
 }
 export function analysisInput(value: unknown) {
-  const d = value && typeof value === 'object' ? value as Record<string, unknown> : {}
-  const text = (name: string, max: number) => { const v = d[name]; if (v !== undefined && (typeof v !== 'string' || v.length > max)) throw new InterviewLibraryError('Слишком длинные или некорректные данные анализа'); return typeof v === 'string' ? v.trim() : '' }
-  return { candidateName: text('candidateName', 100), candidateSpeaker: text('candidateSpeaker', 100), vacancyText: text('vacancyText', 20000) }
+  if (!value || typeof value !== 'object') throw new InterviewLibraryError('Подтвердите передачу записи в Checkfrod')
+  const d = value as Record<string, unknown>
+  if (d.consent !== true) throw new InterviewLibraryError('Подтвердите, что участники предупреждены о записи и её анализе')
+  const roiSpec = d.roiSpec ?? 'auto'
+  if (roiSpec === 'auto' || roiSpec === 'none') return { consent: true as const, roiSpec }
+  if (typeof roiSpec !== 'string' || !/^\d{1,5},\d{1,5},\d{1,5},\d{1,5}$/.test(roiSpec)) throw new InterviewLibraryError('Укажите область кандидата в формате x,y,w,h')
+  const [x, y, w, h] = roiSpec.split(',').map(Number)
+  if (w < 16 || h < 16 || Math.max(x, y, w, h) > 32768) throw new InterviewLibraryError('Область кандидата должна быть не меньше 16 × 16 пикселей')
+  return { consent: true as const, roiSpec }
 }
 export async function queueInterviewAnalysis(payload: Payload, user: User, id: number, input: ReturnType<typeof analysisInput>) {
-  if (!isInterviewAnalysisConfigured()) throw new InterviewLibraryError('Анализ записей временно недоступен', 503)
+  if (!isCheckfrodConfigured()) throw new InterviewLibraryError('Анализ записей временно недоступен', 503)
   return interviewTransaction(payload, user.id, async (req) => {
     const doc = await accessibleRecording(payload, user, id, true, req)
     if (doc.status !== 'ready') throw new InterviewLibraryError('Сначала загрузите видео полностью', 409)
@@ -171,9 +189,10 @@ export async function queueInterviewAnalysis(payload: Payload, user: User, id: n
     const row = usage.docs[0]
     const used = row?.day === day ? row.requests : 0
     if (used >= 3 || (doc.analysisAttempts ?? 0) >= 3) throw new InterviewLibraryError('Лимит анализа: 3 запуска в сутки и 3 попытки на запись', 429)
+    if (doc.analysisStatus === 'failed') await removeCheckfrodAttempt(user.id, doc)
     if (row) await payload.update({ collection: 'interview-analysis-usage', id: row.id, data: { day, requests: used + 1 }, req, overrideAccess: true })
     else await payload.create({ collection: 'interview-analysis-usage', data: { owner: user.id, day, requests: 1 }, req, overrideAccess: true })
-    await payload.update({ collection: 'interview-recordings', id, data: { analysisStatus: 'queued', analysisProgress: 'Ожидает анализа', analysisError: null, analysisInput: input, analysisRequestedAt: new Date().toISOString(), analysisAttempts: (doc.analysisAttempts ?? 0) + 1 }, req, overrideAccess: true })
+    await payload.update({ collection: 'interview-recordings', id, data: { analysisStatus: 'queued', analysisProgress: 'Ожидает анализа', analysisError: null, analysisInput: input, analysisBackend: 'checkfrod', analysisRemoteJobId: null, analysisRemoteKey: randomUUID(), analysisSubmissionStartedAt: null, analysisRequestedAt: new Date().toISOString(), analysisAttempts: (doc.analysisAttempts ?? 0) + 1 }, req, overrideAccess: true })
     return { analysisStatus: 'queued' as const }
   })
 }
