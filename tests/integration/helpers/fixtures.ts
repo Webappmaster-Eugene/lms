@@ -17,6 +17,7 @@ export type FixtureContext = {
   topicId: number
   taskId: number
   achievementId: number
+  interviewDirectionId: number
 }
 
 export const lexical = (text: string) => ({
@@ -64,6 +65,9 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   }),
   streaks: (ctx) => ({ user: ctx.studentId }),
   'interview-rooms': (ctx) => ({ token: uid('room'), sourceTaskKnown: true, owner: ctx.studentId, members: [ctx.studentId], title: 'Собеседование фикстуры' }),
+  'interview-directions': () => ({ title: `Направление ${uid()}`, slug: uid('direction') }),
+  'interview-recordings': (ctx) => ({ title: 'Запись фикстуры', direction: ctx.interviewDirectionId, category: 'mentor', status: 'ready', size: 100, sourceKey: uid('recording-source') }),
+  'interview-analysis-usage': (ctx) => ({ owner: ctx.studentId, day: '2026-10-11', requests: 0 }),
   'trainer-topics': () => ({ title: `Тема ${uid()}` }),
   'trainer-tasks': (ctx) => ({ title: `Задача ${uid()}`, topic: ctx.topicId, starterCode: '// код' }),
   'user-trainer-progress': (ctx) => ({ user: ctx.studentId, task: ctx.taskId }),
@@ -88,9 +92,10 @@ export async function buildFixtureContext(payload: Payload): Promise<FixtureCont
     collection: 'achievements',
     data: { title: 'Ачивка фикстур', description: 'Не выдаётся', criteriaType: 'lesson_count', criteriaValue: 100000, isActive: false },
   })
+  const direction = await payload.create({ collection: 'interview-directions', data: { title: 'Направление фикстур', slug: uid('direction') } })
   return {
     userId: admin.id, studentId: student.id, lessonId: tree.lessons[0].id, courseId: tree.course.id,
-    roadmapId: tree.roadmap.id, nodeId: node.id, topicId: topic.id, taskId: task.id, achievementId: achievement.id,
+    roadmapId: tree.roadmap.id, nodeId: node.id, topicId: topic.id, taskId: task.id, achievementId: achievement.id, interviewDirectionId: direction.id,
   }
 }
 
@@ -110,6 +115,7 @@ export async function makeValid(payload: Payload, slug: string, ctx: FixtureCont
     data.target = { relationTo: 'lessons', value: lesson.id }
   }
   if (slug === 'interview-rooms' && owner !== undefined) { data.owner = owner; data.members = [owner] }
+  if (slug === 'interview-analysis-usage') data.owner = owner ?? (await createStudent(payload)).id
   if ('user' in data) {
     if (owner !== undefined) data.user = owner
     else if (UNIQUE_PER_USER.has(slug)) data.user = (await createStudent(payload)).id

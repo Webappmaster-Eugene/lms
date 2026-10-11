@@ -7,6 +7,7 @@ import { onCLS, onINP, onLCP, type Metric } from 'web-vitals'
 function observedPath(path: string): string {
   if (path.startsWith('/admin')) return '/admin'
   if (path.startsWith('/trainer/interview/')) return '/trainer/interview'
+  if (path.startsWith('/interviews/')) return '/interviews'
   return path.slice(0, 240)
 }
 

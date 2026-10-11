@@ -36,6 +36,9 @@ const MATRIX: Record<string, Matrix> = {
   'web-vitals-reports': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
   achievements: CONTENT,
   'interview-rooms': { create: 'nobody', read: 'member', update: 'nobody', delete: 'nobody' },
+  'interview-directions': CONTENT,
+  'interview-recordings': CONTENT,
+  'interview-analysis-usage': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
   'trainer-topics': PUBLISHABLE,
   'trainer-tasks': PUBLISHABLE,
   'faq-items': { create: 'admin', read: 'public', update: 'admin', delete: 'admin' },
@@ -76,6 +79,9 @@ const PATCH: Record<string, Record<string, unknown>> = {
   'web-vitals-reports': { value: 2000 },
   achievements: { pointsReward: 7 },
   'interview-rooms': { title: 'обновлено' },
+  'interview-directions': { order: 7 },
+  'interview-recordings': { description: 'обновлено' },
+  'interview-analysis-usage': { requests: 1 },
   'trainer-topics': { order: 7 },
   'trainer-tasks': { order: 7 },
   'faq-items': { order: 7 },
@@ -129,6 +135,10 @@ function allowed(rule: Rule, who: Who): boolean {
 /** Документ, которым владеет owner (для users — сам owner). */
 async function ownedDoc(slug: string, overrides: Record<string, unknown> = {}): Promise<number> {
   if (slug === 'users') return owner.id
+  if (slug === 'interview-analysis-usage') {
+    const existing = await payload.find({ collection: slug, where: { owner: { equals: owner.id } }, limit: 1, depth: 0 })
+    if (existing.docs[0]) return existing.docs[0].id
+  }
   if (slug === 'learning-access-policies') {
     const policies = await payload.find({ collection: 'learning-access-policies', where: { user: { equals: owner.id } }, limit: 1, depth: 0 })
     if (!policies.docs[0]) throw new Error('Фабрика пользователя не создала политику доступа')

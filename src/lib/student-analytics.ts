@@ -57,7 +57,7 @@ export function activityInput(value: unknown): { path: string; timezone: string 
     try { timezone = new Intl.DateTimeFormat('en', { timeZone: input.timezone }).resolvedOptions().timeZone } catch { throw new StudentAnalyticsError('Некорректный часовой пояс') }
   }
   if (input.standalone !== undefined && typeof input.standalone !== 'boolean') throw new StudentAnalyticsError('Некорректный режим приложения')
-  const path = input.path.startsWith('/trainer/interview/') ? '/trainer/interview' : input.path.startsWith('/admin/') ? '/admin' : input.path
+  const path = input.path.startsWith('/trainer/interview/') ? '/trainer/interview' : input.path.startsWith('/interviews/') ? '/interviews' : input.path.startsWith('/admin/') ? '/admin' : input.path
   return { path, timezone, standalone: typeof input.standalone === 'boolean' ? input.standalone : null }
 }
 

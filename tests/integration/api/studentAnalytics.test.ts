@@ -59,6 +59,35 @@ afterAll(async () => {
 })
 
 describe('protected admin analytics with real Payload sessions and PostgreSQL', () => {
+  it.each([
+    ['/interviews', '/interviews'],
+    ['/learning-history', '/learning-history'],
+    ['/interviews/12345', '/interviews'],
+  ])('records the first visit to %s without retaining private recording IDs or awarding progress', async (path, storedPath) => {
+    const visitor = await createStudent(payload)
+    try {
+      const auth = await login(payload, visitor)
+      const response = await activityPOST(apiRequest('activity', auth, { path, expectedUserId: visitor.id }))
+      expect(response.status).toBe(200)
+      expect(await response.json()).toEqual({ recorded: true })
+      expect(await sessionRow(auth)).toMatchObject({ path: storedPath, course: null, lesson: null })
+      const events = await payload.find({ collection: 'student-learning-events', where: { user: { equals: visitor.id }, type: { equals: 'page_view' } }, depth: 0 })
+      expect(events.docs).toHaveLength(1)
+      expect(events.docs[0]).toMatchObject({ path: storedPath, source: 'observed', course: null, lesson: null })
+      expect(JSON.stringify(events.docs)).not.toContain('12345')
+      expect((await payload.findByID({ collection: 'users', id: visitor.id, depth: 0 })).totalPoints).toBe(visitor.totalPoints)
+      expect((await payload.count({ collection: 'user-progress', where: { user: { equals: visitor.id } } })).totalDocs).toBe(0)
+    } finally { await payload.delete({ collection: 'users', id: visitor.id }) }
+  })
+  it('still rejects an unknown page on a fresh session without recording a page view', async () => {
+    const visitor = await createStudent(payload)
+    try {
+      const auth = await login(payload, visitor)
+      expect((await activityPOST(apiRequest('activity', auth, { path: '/unknown-private-page' }))).status).toBe(400)
+      expect((await payload.count({ collection: 'student-learning-events', where: { user: { equals: visitor.id }, type: { equals: 'page_view' } } })).totalDocs).toBe(0)
+      expect((await sessionRow(auth)).path).toBeNull()
+    } finally { await payload.delete({ collection: 'users', id: visitor.id }) }
+  })
   it('records two independent signed login sessions without copying raw SID/JWT into the admin DTO', async () => {
     const view = await snapshot()
     expect(view.activeSessionCount).toBe(2)

@@ -11,6 +11,7 @@ describe('bounded observational activity', () => {
   })
   it('never retains interview access tokens as pathname telemetry', () => {
     expect(activityInput({ path: '/trainer/interview/private-room-token' }).path).toBe('/trainer/interview')
+    expect(activityInput({ path: '/interviews/12345' }).path).toBe('/interviews')
     expect(activityInput({ path: '/admin/collections/users/34' }).path).toBe('/admin')
     expect(activityInput({ path: '/trainer/node/task' }).path).toBe('/trainer/node/task')
   })
