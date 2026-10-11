@@ -1,4 +1,4 @@
-import { beforeAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import type { Payload } from 'payload'
 import { createLocalReq } from 'payload'
 import { createStudent, createAdmin, getTestPayload, login, type TestUser } from '../helpers/payload'
@@ -6,9 +6,11 @@ import { accessibleRecording, beginInterviewUpload, completeInterviewUpload, del
 import { interviewRoute } from '@/server/interviews/route'
 import * as media from '@/server/interviews/media'
 import { InterviewStorageError } from '@/server/interviews/disk'
-import { createCheckfrodSource, checkfrodSourceFilename } from '@/server/interviews/capability'
+import { createInterviewSource, interviewSourceFilename } from '@/server/interviews/capability'
 import { GET as sourceGET } from '@/app/api/internal/interviews/[id]/[file]/route'
-import { summarizeCheckfrodReport } from '@/server/interviews/checkfrod-client'
+import { InterviewAnalysisClientError } from '@/server/interviews/analysis-client'
+import type { InterviewAnalysisJob } from '@/lib/interviews/analysis-types'
+import { interviewContext, interviewResult } from '../../fixtures/interview-analysis'
 import { runInterviewAnalysisJobs } from '@/server/interviews/jobs'
 
 const mocks = vi.hoisted(() => ({
@@ -16,15 +18,13 @@ const mocks = vi.hoisted(() => ({
   finishUpload: vi.fn(async () => ({ size: 1024, mimeType: 'video/mp4' })),
   removePrivateFile: vi.fn(async () => {}),
   resolveRecordingHref: vi.fn(async () => 'https://downloader.disk.yandex.ru/private-capability'),
-  createCheckfrodImport: vi.fn(async () => 'remote-job'),
-  getCheckfrodJob: vi.fn(async () => ({ id: 'remote-job', status: 'queued', phase: 'queued', progress: 0, episodes: null, duration: null, gaze: null, error: null })),
-  getCheckfrodReport: vi.fn(async () => ({ duration_s: 120, episodes: [{ confidence: 'high' }, { confidence: 'info' }], quality: { gaze: 'head_only' }, attention: { head_only_s: 120, moments: [] } })),
-  listCheckfrodJobs: vi.fn(async () => [] as { id: string; filename: string; status: string }[]),
-  getCheckfrodReportLink: vi.fn(async () => ({ url: 'https://checkfrod.nadtocheev.ru/r/r1.fixture.signature', expiresInS: 86400 })),
-  deleteCheckfrodJob: vi.fn(async () => {}),
+  createInterviewAnalysis: vi.fn(async (_ownerId: number, id: string): Promise<InterviewAnalysisJob> => ({ id, status: 'queued', progress: 'Ожидает' })),
+  getInterviewAnalysis: vi.fn(async (_ownerId: number, id: string): Promise<InterviewAnalysisJob> => ({ id, status: 'processing', progress: 'Оцениваем ответы' })),
+  deleteInterviewAnalysis: vi.fn(async () => {}),
+  isInterviewAnalysisConfigured: vi.fn(() => true),
 }))
 vi.mock('@/server/interviews/disk', () => ({ ...mocks, InterviewStorageError: class extends Error { constructor(message: string, readonly statusCode = 502) { super(message) } }, fetchSharedRecordings: vi.fn(async () => []), uploadPrivateFile: vi.fn() }))
-vi.mock('@/server/interviews/checkfrod-client', async (actual) => ({ ...await actual<typeof import('@/server/interviews/checkfrod-client')>(), ...mocks, isCheckfrodConfigured: () => true }))
+vi.mock('@/server/interviews/analysis-client', async (actual) => ({ ...await actual<typeof import('@/server/interviews/analysis-client')>(), ...mocks }))
 let payload: Payload
 let student: TestUser
 let other: TestUser
@@ -38,7 +38,10 @@ beforeAll(async () => {
   admin = await createAdmin(payload)
   direction = (await payload.find({ collection: 'interview-directions', where: { slug: { equals: 'react' } }, limit: 1 })).docs[0].id
 })
+beforeEach(() => { vi.stubEnv('NEXT_PUBLIC_SERVER_URL', 'https://learn.mentorcareer.ru'); mocks.isInterviewAnalysisConfigured.mockReturnValue(true) })
 afterEach(async () => { vi.unstubAllEnvs(); vi.clearAllMocks() })
+const analysisInput = { consent: true, targetGrade: 'middle', vacancyText: 'Разрабатывать React-приложения', interviewFormat: 'mixed' } as const
+const expireLease = (id: number) => payload.update({ collection: 'interview-recordings', id, data: { analysisLeaseUntil: new Date(Date.now() - 1000).toISOString() } })
 async function recording(owner = student, status: 'ready' | 'uploading' = 'ready', category: 'personal' | 'mentor' = 'personal') {
   const doc = await payload.create({ collection: 'interview-recordings', data: { title: 'Личная запись', direction, owner: owner.id, category, status, analysisStatus: 'idle', size: 1024, mimeType: 'video/mp4', diskPath: `disk:/LMS interviews/${owner.id}/111-12345678-1234-4123-8123-123456789012.mp4` } })
   ownedIds.push(doc.id)
@@ -134,122 +137,147 @@ describe('видеособеседования: приватность, загр
   it('повторные параллельные клики ставят один анализ; чужие и общие записи нельзя анализировать', async () => {
     const fresh = await createStudent(payload)
     const doc = await recording(fresh)
-    const results = await Promise.all([queueInterviewAnalysis(payload, fresh, doc.id, { consent: true, roiSpec: 'auto' }), queueInterviewAnalysis(payload, fresh, doc.id, { consent: true, roiSpec: 'auto' })])
+    const results = await Promise.all([queueInterviewAnalysis(payload, fresh, doc.id, analysisInput), queueInterviewAnalysis(payload, fresh, doc.id, analysisInput)])
     expect(results.every((r) => r.analysisStatus === 'queued')).toBe(true)
     expect((await payload.findByID({ collection: 'interview-recordings', id: doc.id })).analysisAttempts).toBe(1)
-    await expect(queueInterviewAnalysis(payload, other, doc.id, { consent: true, roiSpec: 'auto' })).rejects.toMatchObject({ status: 404 })
+    await expect(queueInterviewAnalysis(payload, other, doc.id, analysisInput)).rejects.toMatchObject({ status: 404 })
+    const shared = await recording(fresh, 'ready', 'mentor')
+    await expect(queueInterviewAnalysis(payload, fresh, shared.id, analysisInput)).rejects.toMatchObject({ status: 404 })
+    const uploading = await recording(fresh, 'uploading')
+    await expect(queueInterviewAnalysis(payload, fresh, uploading.id, analysisInput)).rejects.toMatchObject({ status: 409 })
     await expect(deleteInterviewRecording(payload, fresh, doc.id)).rejects.toMatchObject({ status: 409 })
     await payload.update({ collection: 'interview-recordings', id: doc.id, data: { analysisStatus: 'failed' } })
   })
-  it('два воркера не создают два разбора; прогресс и готовый отчёт получаются из Checkfrod', async () => {
-    vi.stubEnv('NEXT_PUBLIC_SERVER_URL', 'https://learn.mentorcareer.ru')
+  it('два воркера создают одну оценку, сохраняют контекст и полный семантический отчёт', async () => {
     const fresh = await createStudent(payload)
     const doc = await recording(fresh)
-    await queueInterviewAnalysis(payload, fresh, doc.id, { consent: true, roiSpec: 'auto' })
+    await queueInterviewAnalysis(payload, fresh, doc.id, analysisInput)
+    const queued = await payload.findByID({ collection: 'interview-recordings', id: doc.id })
     let release: () => void = () => {}
     const gate = new Promise<void>((resolve) => { release = resolve })
-    mocks.getCheckfrodJob.mockImplementationOnce(async () => { await gate; return { id: 'remote-job', status: 'queued', phase: 'queued', progress: 0, episodes: null, duration: null, gaze: null, error: null } })
+    mocks.createInterviewAnalysis.mockImplementationOnce(async (_ownerId, id) => { await gate; return { id, status: 'queued', progress: 'Ожидает' } })
     const first = runInterviewAnalysisJobs(payload)
-    await vi.waitFor(() => expect(mocks.getCheckfrodJob).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(mocks.createInterviewAnalysis).toHaveBeenCalledTimes(1))
     expect(await runInterviewAnalysisJobs(payload)).toEqual({ skipped: true })
     release()
     expect(await first).toMatchObject({ pending: 1 })
-    expect(mocks.createCheckfrodImport).toHaveBeenCalledTimes(1)
-    await payload.update({ collection: 'interview-recordings', id: doc.id, data: { analysisLeaseUntil: new Date(Date.now() - 1000).toISOString() } })
-    mocks.getCheckfrodJob.mockResolvedValueOnce({ id: 'remote-job', status: 'done', phase: 'done', progress: 1, episodes: null, duration: null, gaze: null, error: null })
+    expect(mocks.createInterviewAnalysis).toHaveBeenCalledWith(fresh.id, queued.analysisRemoteKey, expect.stringContaining(`/interviews/${doc.id}/`), { ...interviewContext, direction: expect.any(String) }, expect.any(AbortSignal))
+    await expireLease(doc.id)
+    mocks.getInterviewAnalysis.mockResolvedValueOnce({ id: queued.analysisRemoteKey ?? '', status: 'completed', progress: 'Готово', report: interviewResult })
     expect(await runInterviewAnalysisJobs(payload)).toMatchObject({ completed: 1 })
-    expect(mocks.createCheckfrodImport).toHaveBeenCalledTimes(1)
+    expect(mocks.createInterviewAnalysis).toHaveBeenCalledTimes(1)
+    const stored = await payload.findByID({ collection: 'interview-recordings', id: doc.id })
+    expect(stored.analysisReport).toEqual(interviewResult)
+    expect(stored.analysisScore).toEqual(interviewResult.score)
     const details = await getInterviewDetails(payload, fresh, doc.id)
-    expect(details.analysis).toMatchObject({ provider: 'checkfrod', summary: { durationS: 120, episodes: 1, gaze: 'head_only' } })
-    expect(JSON.stringify(details)).not.toContain('remote-job')
+    expect(details.analysis).toMatchObject({ provider: 'sovetnik', report: interviewResult, context: { targetGrade: 'middle', vacancyText: analysisInput.vacancyText, interviewFormat: 'mixed' } })
+    expect(JSON.stringify(details)).not.toContain(queued.analysisRemoteKey)
     await expect(getInterviewDetails(payload, other, doc.id)).rejects.toMatchObject({ status: 404 })
   })
-  it('удаление записей не сбрасывает суточный лимит платных анализов', async () => {
+  it('удаление записей не сбрасывает суточный лимит анализов', async () => {
     const fresh = await createStudent(payload)
     for (let i = 0; i < 3; i++) {
       const doc = await recording(fresh)
-      await queueInterviewAnalysis(payload, fresh, doc.id, { consent: true, roiSpec: 'auto' })
+      await queueInterviewAnalysis(payload, fresh, doc.id, analysisInput)
       await payload.update({ collection: 'interview-recordings', id: doc.id, data: { analysisStatus: 'failed' } })
       await deleteInterviewRecording(payload, fresh, doc.id)
     }
     const next = await recording(fresh)
-    await expect(queueInterviewAnalysis(payload, fresh, next.id, { consent: true, roiSpec: 'auto' })).rejects.toMatchObject({ status: 429 })
+    await expect(queueInterviewAnalysis(payload, fresh, next.id, analysisInput)).rejects.toMatchObject({ status: 429 })
     expect((await payload.find({ collection: 'interview-analysis-usage', where: { owner: { equals: fresh.id } } })).docs[0].requests).toBe(3)
   })
-  it('после рестарта продолжает известную задачу Checkfrod без повторного POST', async () => {
+  it('после рестарта опрашивает известную задачу без повторной отправки видео', async () => {
     const fresh = await createStudent(payload)
     const doc = await recording(fresh)
-    await queueInterviewAnalysis(payload, fresh, doc.id, { consent: true, roiSpec: 'auto' })
-    await payload.update({ collection: 'interview-recordings', id: doc.id, data: { analysisStatus: 'processing', analysisRemoteJobId: 'known-job', analysisLeaseUntil: new Date(Date.now() - 1000).toISOString() } })
+    await queueInterviewAnalysis(payload, fresh, doc.id, analysisInput)
+    const latest = await payload.findByID({ collection: 'interview-recordings', id: doc.id })
+    await payload.update({ collection: 'interview-recordings', id: doc.id, data: { analysisStatus: 'processing', analysisRemoteJobId: latest.analysisRemoteKey, analysisLeaseUntil: new Date(Date.now() - 1000).toISOString() } })
     expect(await runInterviewAnalysisJobs(payload)).toMatchObject({ pending: 1 })
-    expect(mocks.createCheckfrodImport).not.toHaveBeenCalled()
-    expect(mocks.getCheckfrodJob).toHaveBeenCalledWith(fresh.id, 'known-job', expect.any(AbortSignal))
+    expect(mocks.createInterviewAnalysis).not.toHaveBeenCalled()
+    expect(mocks.getInterviewAnalysis).toHaveBeenCalledWith(fresh.id, latest.analysisRemoteKey, expect.any(AbortSignal))
     await payload.update({ collection: 'interview-recordings', id: doc.id, data: { analysisStatus: 'failed' } })
   })
-  it('потерянный ответ создания восстанавливает remoteId по имени источника без второго POST', async () => {
+  it('потерянный ответ POST повторяет ту же UUID и подписанный источник, не тратит новую попытку', async () => {
     const fresh = await createStudent(payload)
     const doc = await recording(fresh)
-    await queueInterviewAnalysis(payload, fresh, doc.id, { consent: true, roiSpec: 'auto' })
-    const latest = await payload.update({ collection: 'interview-recordings', id: doc.id, data: { analysisSubmissionStartedAt: new Date().toISOString() } })
-    mocks.listCheckfrodJobs.mockResolvedValueOnce([{ id: 'recovered-job', filename: checkfrodSourceFilename(latest), status: 'queued' }])
+    await queueInterviewAnalysis(payload, fresh, doc.id, analysisInput)
+    mocks.createInterviewAnalysis.mockRejectedValueOnce(new InterviewAnalysisClientError('Нет ответа', 502, true))
     expect(await runInterviewAnalysisJobs(payload)).toMatchObject({ pending: 1 })
-    expect(mocks.createCheckfrodImport).not.toHaveBeenCalled()
-    expect((await payload.findByID({ collection: 'interview-recordings', id: doc.id })).analysisRemoteJobId).toBe('recovered-job')
+    const original = mocks.createInterviewAnalysis.mock.calls[0]
+    await expireLease(doc.id)
+    expect(await runInterviewAnalysisJobs(payload)).toMatchObject({ pending: 1 })
+    expect(mocks.createInterviewAnalysis.mock.calls[1].slice(0, 4)).toEqual(original.slice(0, 4))
+    const latest = await payload.findByID({ collection: 'interview-recordings', id: doc.id })
+    expect(latest.analysisRemoteJobId).toBe(original[1])
+    expect(latest.analysisAttempts).toBe(1)
     await payload.update({ collection: 'interview-recordings', id: doc.id, data: { analysisStatus: 'failed' } })
   })
   it('подписанный источник ограничен записью/владельцем/попыткой и отзывается после окончания', async () => {
-    vi.stubEnv('NEXT_PUBLIC_SERVER_URL', 'https://learn.mentorcareer.ru')
     const fresh = await createStudent(payload)
     const doc = await recording(fresh)
-    await queueInterviewAnalysis(payload, fresh, doc.id, { consent: true, roiSpec: 'auto' })
+    await queueInterviewAnalysis(payload, fresh, doc.id, analysisInput)
     const latest = await payload.findByID({ collection: 'interview-recordings', id: doc.id, depth: 0 })
-    const source = new URL(createCheckfrodSource(latest))
-    const context = { params: Promise.resolve({ id: String(doc.id), file: checkfrodSourceFilename(latest) }) }
+    const source = new URL(createInterviewSource(latest))
+    const context = { params: Promise.resolve({ id: String(doc.id), file: interviewSourceFilename(latest) }) }
     const stream = vi.spyOn(media, 'streamRecordingMedia').mockResolvedValue(new Response('video'))
     try {
       expect((await sourceGET(new Request(source), context)).status).toBe(200)
       source.searchParams.set('token', '0'.repeat(64))
       expect((await sourceGET(new Request(source), context)).status).toBe(404)
-      source.searchParams.set('token', new URL(createCheckfrodSource(latest)).searchParams.get('token') ?? '')
+      source.searchParams.set('token', new URL(createInterviewSource(latest)).searchParams.get('token') ?? '')
       await payload.update({ collection: 'interview-recordings', id: doc.id, data: { analysisStatus: 'completed' } })
       expect((await sourceGET(new Request(source), context)).status).toBe(404)
     } finally { stream.mockRestore() }
   })
-  it('повтор сначала удаляет прежнюю задачу, а отказ сервиса сохраняет связь и попытку', async () => {
+  it('повтор сначала удаляет прежнюю задачу, отказ сервиса сохраняет связь и попытку', async () => {
     const fresh = await createStudent(payload)
     const doc = await recording(fresh)
-    await queueInterviewAnalysis(payload, fresh, doc.id, { consent: true, roiSpec: 'auto' })
-    await payload.update({ collection: 'interview-recordings', id: doc.id, data: { analysisStatus: 'failed', analysisRemoteJobId: 'previous-job' } })
-    mocks.deleteCheckfrodJob.mockRejectedValueOnce(new Error('busy'))
-    await expect(queueInterviewAnalysis(payload, fresh, doc.id, { consent: true, roiSpec: 'auto' })).rejects.toThrow('busy')
-    expect((await payload.findByID({ collection: 'interview-recordings', id: doc.id })).analysisRemoteJobId).toBe('previous-job')
-    await queueInterviewAnalysis(payload, fresh, doc.id, { consent: true, roiSpec: 'auto' })
-    expect(mocks.deleteCheckfrodJob).toHaveBeenLastCalledWith(fresh.id, 'previous-job')
+    await queueInterviewAnalysis(payload, fresh, doc.id, analysisInput)
+    const queued = await payload.findByID({ collection: 'interview-recordings', id: doc.id })
+    await payload.update({ collection: 'interview-recordings', id: doc.id, data: { analysisStatus: 'failed', analysisRemoteJobId: queued.analysisRemoteKey } })
+    mocks.deleteInterviewAnalysis.mockRejectedValueOnce(new Error('busy'))
+    await expect(queueInterviewAnalysis(payload, fresh, doc.id, analysisInput)).rejects.toThrow('busy')
+    const failed = await payload.findByID({ collection: 'interview-recordings', id: doc.id })
+    expect(failed.analysisRemoteJobId).toBe(queued.analysisRemoteKey)
+    expect(failed.analysisAttempts).toBe(1)
+    await queueInterviewAnalysis(payload, fresh, doc.id, analysisInput)
+    expect(mocks.deleteInterviewAnalysis).toHaveBeenLastCalledWith(fresh.id, queued.analysisRemoteKey)
     const latest = await payload.findByID({ collection: 'interview-recordings', id: doc.id })
     expect(latest.analysisRemoteJobId).toBeNull()
+    expect(latest.analysisRemoteKey).not.toBe(queued.analysisRemoteKey)
     expect(latest.analysisAttempts).toBe(2)
     await payload.update({ collection: 'interview-recordings', id: doc.id, data: { analysisStatus: 'failed' } })
   })
-  it('удаление после неопределённой отправки находит и удаляет приватную внешнюю задачу', async () => {
+  it('удаление после неопределённой отправки удаляет задачу по сохранённой UUID', async () => {
     const fresh = await createStudent(payload)
     const doc = await recording(fresh)
-    await queueInterviewAnalysis(payload, fresh, doc.id, { consent: true, roiSpec: 'auto' })
+    await queueInterviewAnalysis(payload, fresh, doc.id, analysisInput)
     const failed = await payload.update({ collection: 'interview-recordings', id: doc.id, data: { analysisStatus: 'failed', analysisSubmissionStartedAt: new Date().toISOString() } })
-    mocks.listCheckfrodJobs.mockResolvedValueOnce([{ id: 'unconfirmed-job', filename: checkfrodSourceFilename(failed), status: 'failed' }])
     await deleteInterviewRecording(payload, fresh, doc.id)
-    expect(mocks.deleteCheckfrodJob).toHaveBeenCalledWith(fresh.id, 'unconfirmed-job')
+    expect(mocks.deleteInterviewAnalysis).toHaveBeenCalledWith(fresh.id, failed.analysisRemoteKey)
   })
-  it('оригинальный отчёт выдаётся новой ссылкой только владельцу', async () => {
+  it('сохранённый отчёт доступен только владельцу даже при отключении сервиса оценки', async () => {
     const doc = await recording()
-    const report = await mocks.getCheckfrodReport()
-    expect(summarizeCheckfrodReport(report).episodes).toBe(1)
-    await payload.update({ collection: 'interview-recordings', id: doc.id, data: { analysisStatus: 'completed', analysisBackend: 'checkfrod', analysisRemoteJobId: 'report-job', analysisReport: report } })
+    await payload.update({ collection: 'interview-recordings', id: doc.id, data: { analysisStatus: 'completed', analysisBackend: 'sovetnik', analysisInput: { ...analysisInput, direction: interviewContext.direction }, analysisReport: interviewResult } })
+    mocks.isInterviewAnalysisConfigured.mockReturnValue(false)
     const jwt = await login(payload, student)
     const response = await interviewRoute(new Request(`http://lms.test/api/interviews/${doc.id}/report`, { headers: { Authorization: `JWT ${jwt}` } }), 'report', doc.id)
-    expect(response.status).toBe(302)
-    expect(response.headers.get('location')).toContain('https://checkfrod.nadtocheev.ru/r/')
-    const otherJwt = await login(payload, other)
-    expect((await interviewRoute(new Request(`http://lms.test/api/interviews/${doc.id}/report`, { headers: { Authorization: `JWT ${otherJwt}` } }), 'report', doc.id)).status).toBe(404)
-    expect(mocks.getCheckfrodReportLink).toHaveBeenCalledTimes(1)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
+    expect(response.headers.get('content-disposition')).toContain('attachment;')
+    expect(await response.json()).toMatchObject({ provider: 'sovetnik', report: interviewResult })
+    for (const user of [other, admin]) {
+      const token = await login(payload, user)
+      expect((await interviewRoute(new Request(`http://lms.test/api/interviews/${doc.id}/report`, { headers: { Authorization: `JWT ${token}` } }), 'report', doc.id)).status).toBe(404)
+    }
+    expect(mocks.getInterviewAnalysis).not.toHaveBeenCalled()
+    expect(mocks.createInterviewAnalysis).not.toHaveBeenCalled()
+  })
+  it('повреждённый или старый фрод-отчёт не выдаётся за оценку качества ответов', async () => {
+    const doc = await recording()
+    await payload.update({ collection: 'interview-recordings', id: doc.id, data: { analysisStatus: 'completed', analysisBackend: 'sovetnik', analysisReport: { duration_s: 10, episodes: [] } } })
+    expect((await getInterviewDetails(payload, student, doc.id)).analysis).toBeNull()
+    const jwt = await login(payload, student)
+    expect((await interviewRoute(new Request(`http://lms.test/api/interviews/${doc.id}/report`, { headers: { Authorization: `JWT ${jwt}` } }), 'report', doc.id)).status).toBe(409)
   })
 })

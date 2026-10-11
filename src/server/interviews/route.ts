@@ -1,5 +1,5 @@
 import 'server-only'
-import { getCheckfrodReportLink, CheckfrodClientError } from '@/server/interviews/checkfrod-client'
+import { InterviewAnalysisClientError } from '@/server/interviews/analysis-client'
 import { logger } from '@/lib/telemetry'
 import { createLocalReq } from 'payload'
 import { getPayload } from '@/lib/payload'
@@ -42,13 +42,13 @@ export async function interviewRoute(request: Request, action: Action, id?: numb
       case 'create': return response(await beginInterviewUpload(payload, user, uploadInput(await readBoundedJson(request, 8192))), 201)
       case 'finish': return response(await completeInterviewUpload(payload, user, recordId))
       case 'delete': return response(await deleteInterviewRecording(payload, user, recordId))
-      case 'analyze': return response(await queueInterviewAnalysis(payload, user, recordId, analysisInput(await readBoundedJson(request, 24000))), 202)
+      case 'analyze': return response(await queueInterviewAnalysis(payload, user, recordId, analysisInput(await readBoundedJson(request, 80 * 1024))), 202)
       case 'import': return response(await importInterviewSources(payload, user))
       case 'report': {
-        const doc = await accessibleRecording(payload, user, recordId, true)
-        if (doc.analysisStatus !== 'completed' || doc.analysisBackend !== 'checkfrod' || !doc.analysisRemoteJobId) throw new InterviewLibraryError('Отчёт ещё не готов', 409)
-        const link = await getCheckfrodReportLink(user.id, doc.analysisRemoteJobId)
-        return new Response(null, { status: 302, headers: { Location: link.url, 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer' } })
+        const details = await getInterviewDetails(payload, user, recordId)
+        if (!details.recording.isOwner) throw new InterviewLibraryError('Запись не найдена', 404)
+        if (!details.analysis) throw new InterviewLibraryError('Отчёт ещё не готов', 409)
+        return Response.json(details.analysis, { headers: { 'Cache-Control': 'private, no-store', 'Content-Disposition': `attachment; filename="interview-${recordId}-report.json"`, 'X-Content-Type-Options': 'nosniff' } })
       }
       case 'stream': {
         const doc = await accessibleRecording(payload, user, recordId)
@@ -66,7 +66,7 @@ export async function interviewRoute(request: Request, action: Action, id?: numb
     }
   } catch (error) {
     if (error instanceof InterviewLibraryError) return response({ error: error.message }, error.status)
-    if (error instanceof CheckfrodClientError) return response({ error: error.message }, error.statusCode)
+    if (error instanceof InterviewAnalysisClientError) return response({ error: error.message }, error.statusCode)
     if (error instanceof RequestBodyError) return response({ error: error.message }, error.status)
     if (error instanceof InterviewStorageError) return response({ error: error.message }, error.statusCode)
     // Provider errors can contain signed URLs or private transcripts; log no raw error.

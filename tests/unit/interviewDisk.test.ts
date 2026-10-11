@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { MAX_RECORDING_BYTES } from '@/lib/interviews/types'
 
 const publicHref = vi.fn()
 const invalidateHref = vi.fn()
@@ -75,7 +76,7 @@ describe('private uploads', () => {
     await expect(createUpload({ ownerId: 23, recordingId: 45, size: 5, mimeType: 'video/mp4', extension: 'mp4' })).rejects.toMatchObject({ statusCode: 503 })
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
-  it.each([-1, 0, 2 * 1024 ** 3 + 1, 4.5])('rejects invalid expected size %s before external access', async (size) => {
+  it.each([-1, 0, MAX_RECORDING_BYTES + 1, 4.5])('rejects invalid expected size %s before external access', async (size) => {
     await expect(createUpload({ ownerId: 23, recordingId: 45, size, mimeType: 'video/mp4', extension: 'mp4' })).rejects.toMatchObject({ statusCode: 400 })
     expect(fetchMock).not.toHaveBeenCalled()
   })

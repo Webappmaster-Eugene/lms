@@ -20,8 +20,8 @@ test('библиотека и личный отчёт на телефоне: ф�
     await page.screenshot({ path: testInfo.outputPath('interviews-320-dark.png'), fullPage: true })
     await page.getByRole('link', { name: /Мой тестовый React собес/ }).click()
     await expect(page.getByRole('heading', { name: 'Мой тестовый React собес', exact: true })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Что удалось проанализировать' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Открыть полный отчёт Checkfrod' })).toHaveAttribute('href', /\/api\/interviews\/\d+\/report/)
+    await expect(page.getByRole('heading', { name: 'Итог разбора' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Скачать отчёт' })).toHaveAttribute('href', /\/api\/interviews\/\d+\/report/)
     await expect(page.getByRole('button', { name: /Сделать новый разбор|Анализировать мой собес/ })).toHaveCount(0)
     expect(await page.locator('video').getAttribute('playsinline')).not.toBeNull()
     await page.evaluate(() => document.documentElement.classList.remove('dark'))
@@ -30,6 +30,11 @@ test('библиотека и личный отчёт на телефоне: ф�
     const privateId = Number(new URL(detailUrl).pathname.split('/').at(-1))
     expect((await stranger.request.get(`/api/interviews/${privateId}`)).status()).toBe(404)
     expect((await stranger.request.get(`/api/interviews/${privateId}/stream`)).status()).toBe(404)
+    expect((await stranger.request.get(`/api/interviews/${privateId}/report`)).status()).toBe(404)
+    const report = await learner.request.get(`/api/interviews/${privateId}/report`)
+    expect(report.status()).toBe(200)
+    expect((await report.json()).provider).toBe('sovetnik')
+    expect(report.headers()['cache-control']).toBe('private, no-store')
     await page.getByRole('button', { name: 'Ещё', exact: true }).click()
     await expect(page.getByRole('dialog').getByRole('link', { name: 'Собеседования', exact: true })).toBeVisible()
     await page.getByRole('dialog').getByRole('link', { name: 'Собеседования', exact: true }).click()
@@ -39,8 +44,8 @@ test('библиотека и личный отчёт на телефоне: ф�
   } finally { await Promise.all([learner.close(), stranger.close()]) }
 })
 
-// Local dummy Checkfrod config enables the queue UI; no external job is created.
-test('Checkfrod: явное согласие и настоящая постановка личной записи в очередь', async ({ browser }) => {
+// Local dummy semantic evaluator config enables the queue UI; no external job is created.
+test('Оценка ответов: явное согласие и настоящая постановка личной записи в очередь', async ({ browser }) => {
   const learner = await browser.newContext({ baseURL: APP_URL, extraHTTPHeaders: { Origin: APP_URL }, storageState: storageStateOf('student'), viewport: { width: 390, height: 844 } })
   try {
     const page = await learner.newPage()
@@ -48,20 +53,26 @@ test('Checkfrod: явное согласие и настоящая постан�
     await page.goto('/interviews?direction=react&category=personal')
     await page.getByRole('link', { name: /Мой новый собес/ }).click()
     const button = page.getByRole('button', { name: 'Анализировать мой собес', exact: true })
-    if (await button.isDisabled()) { test.skip(true, 'Сервис Checkfrod не настроен в тестовом окружении'); return }
+    if (await button.isDisabled()) { test.skip(true, 'Сервис оценки собеседований не настроен в тестовом окружении'); return }
     await button.click()
     const dialog = page.getByRole('dialog')
     const consent = dialog.getByRole('checkbox')
-    const submit = dialog.getByRole('button', { name: 'Передать видео в Checkfrod', exact: true })
+    const submit = dialog.getByRole('button', { name: 'Получить разбор', exact: true })
     await expect(submit).toBeDisabled()
     await expect(dialog).toBeVisible()
     await expect(consent).not.toBeChecked()
+    await dialog.getByLabel('Целевой грейд').selectOption('senior')
+    await dialog.getByLabel('Формат собеседования').selectOption('live_coding')
+    // UTF-8 text fits the character limit while exceeding the old 24 KiB HTTP body bound.
+    const vacancy = `React, TypeScript, архитектура\n${'я'.repeat(14000)}`
+    await dialog.getByLabel('Вакансия или требования (необязательно)').fill(`  ${vacancy}  `)
+    await dialog.getByLabel('Как вас называют в записи (необязательно)').fill('  Александр  ')
     await consent.check()
     const submitted = page.waitForResponse((response) => response.url().endsWith('/analyze') && response.request().method() === 'POST')
     await submit.click()
     const result = await submitted
     expect(result.status()).toBe(202)
-    expect(result.request().postDataJSON()).toEqual({ consent: true, roiSpec: 'auto' })
+    expect(result.request().postDataJSON()).toEqual({ consent: true, targetGrade: 'senior', interviewFormat: 'live_coding', vacancyText: vacancy, candidateName: 'Александр' })
     await expect(dialog).toHaveCount(0)
     await expect(page.getByText('Разбор в очереди', { exact: true })).toBeVisible()
     const id = new URL(page.url()).pathname.split('/').at(-1)

@@ -1,6 +1,6 @@
 import { getPayload } from '@/lib/payload'
 import { relationId } from '@/lib/relation-id'
-import { validCheckfrodSource } from '@/server/interviews/capability'
+import { validInterviewSource } from '@/server/interviews/capability'
 import { streamRecordingMedia } from '@/server/interviews/media'
 
 export const runtime = 'nodejs'
@@ -14,7 +14,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const payload = await getPayload()
     const found = await payload.find({ collection: 'interview-recordings', where: { id: { equals: recordId } }, limit: 1, depth: 0, overrideAccess: true })
     const doc = found.docs[0]
-    if (!doc || !validCheckfrodSource(doc, file, new URL(request.url).searchParams)) return denied()
+    if (!doc || !validInterviewSource(doc, file, new URL(request.url).searchParams)) return denied()
     const ownerId = relationId(doc.owner)
     if (!ownerId) return denied()
     return await streamRecordingMedia(request, doc, ownerId)

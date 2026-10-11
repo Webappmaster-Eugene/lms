@@ -9,9 +9,9 @@ import { collectAllPages } from '@/lib/paginate'
 import { MAX_RECORDING_BYTES, type InterviewDirectionDTO, type InterviewListDTO, type InterviewRecordingDTO, type RecordingCategory } from '@/lib/interviews/types'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import { createUpload, finishUpload, removePrivateFile, fetchSharedRecordings } from '@/server/interviews/disk'
-import { isCheckfrodConfigured, summarizeCheckfrodReport, deleteCheckfrodJob, listCheckfrodJobs } from '@/server/interviews/checkfrod-client'
-import { checkfrodSourceFilename } from '@/server/interviews/capability'
-import type { CheckfrodAnalysisDTO } from '@/lib/interviews/checkfrod-types'
+import { isInterviewAnalysisConfigured, deleteInterviewAnalysis } from '@/server/interviews/analysis-client'
+import { analysisContextInputSchema, analysisResultSchema } from '@/server/interviews/analysis-schema'
+import type { InterviewAnalysisDTO, InterviewAnalysisContext } from '@/lib/interviews/analysis-types'
 
 export class InterviewLibraryError extends Error {
   constructor(message: string, readonly status = 400) { super(message) }
@@ -73,15 +73,15 @@ export async function getInterviewLibrary(payload: Payload, user: User, params: 
     getAuthoritativeLearningPolicy(payload, user.id),
   ])
   const dtos = tracks.map(directionDTO)
-  return { directions: dtos, recordings: found.docs.flatMap((doc) => { const track = dtos.find((d) => d.id === relationId(doc.direction)); return track ? [recordingDTO(doc, track, user)] : [] }), page: found.page ?? 1, totalPages: found.totalPages, totalDocs: found.totalDocs, uploadAvailable: Boolean(process.env.YANDEX_DISK_TOKEN), analysisAvailable: isCheckfrodConfigured(), isAdmin: policy.role === 'admin' }
+  return { directions: dtos, recordings: found.docs.flatMap((doc) => { const track = dtos.find((d) => d.id === relationId(doc.direction)); return track ? [recordingDTO(doc, track, user)] : [] }), page: found.page ?? 1, totalPages: found.totalPages, totalDocs: found.totalDocs, uploadAvailable: Boolean(process.env.YANDEX_DISK_TOKEN), analysisAvailable: isInterviewAnalysisConfigured(), isAdmin: policy.role === 'admin' }
 }
 export async function getInterviewDetails(payload: Payload, user: User, id: number) {
   const doc = await accessibleRecording(payload, user, id)
   const track = await payload.findByID({ collection: 'interview-directions', id: relationId(doc.direction) ?? -1, depth: 0, overrideAccess: true })
-  const report = doc.analysisReport && typeof doc.analysisReport === 'object' && !Array.isArray(doc.analysisReport) ? doc.analysisReport as Record<string, unknown> : null
-  const analysis: CheckfrodAnalysisDTO | null = isOwnRecording(doc, user) && doc.analysisStatus === 'completed' && doc.analysisBackend === 'checkfrod' && report
-    ? { provider: 'checkfrod', summary: summarizeCheckfrodReport(report), report: {} } : null
-  return { recording: recordingDTO(doc, directionDTO(track), user), analysis, analysisAvailable: isCheckfrodConfigured() }
+  const parsed = analysisResultSchema.safeParse(doc.analysisReport)
+  const analysis: InterviewAnalysisDTO | null = isOwnRecording(doc, user) && doc.analysisStatus === 'completed' && doc.analysisBackend === 'sovetnik' && parsed.success
+    ? { provider: 'sovetnik', context: storedAnalysisContext(doc.analysisInput), report: parsed.data } : null
+  return { recording: recordingDTO(doc, directionDTO(track), user), analysis, analysisAvailable: isInterviewAnalysisConfigured() }
 }
 
 export function uploadInput(value: unknown) {
@@ -93,7 +93,7 @@ export function uploadInput(value: unknown) {
   const types: Record<string, string[]> = { mp4: ['video/mp4'], webm: ['video/webm'], mov: ['video/quicktime'], mkv: ['video/x-matroska'] }
   const mimeType = typeof d.mimeType === 'string' && d.mimeType ? d.mimeType : types[extension]?.[0]
   if (!title || title.length > 200 || !Number.isSafeInteger(d.directionId)) throw new InterviewLibraryError('Укажите название и направление')
-  if (!Number.isSafeInteger(d.size) || typeof d.size !== 'number' || d.size <= 0 || d.size > MAX_RECORDING_BYTES) throw new InterviewLibraryError('Выберите видео размером до 2 ГБ', 413)
+  if (!Number.isSafeInteger(d.size) || typeof d.size !== 'number' || d.size <= 0 || d.size > MAX_RECORDING_BYTES) throw new InterviewLibraryError('Выберите видео размером до 5 ГБ', 413)
   if (!mimeType || !types[extension]?.includes(mimeType)) throw new InterviewLibraryError('Поддерживаются MP4, WebM, MOV и MKV')
   if (d.description !== undefined && (typeof d.description !== 'string' || d.description.length > 2000)) throw new InterviewLibraryError('Описание должно быть короче 2000 символов')
   return { title, directionId: d.directionId as number, size: d.size, mimeType, extension, description: typeof d.description === 'string' ? d.description.trim() : '' }
@@ -145,14 +145,10 @@ export async function completeInterviewUpload(payload: Payload, user: User, id: 
   })
   return (await getInterviewDetails(payload, user, id)).recording
 }
-async function removeCheckfrodAttempt(userId: number, doc: InterviewRecording): Promise<void> {
-  if (doc.analysisBackend !== 'checkfrod') return
-  let remoteId = doc.analysisRemoteJobId
-  if (!remoteId && doc.analysisSubmissionStartedAt && doc.analysisRemoteKey) {
-    const remote = await listCheckfrodJobs(userId)
-    remoteId = remote.find((job) => job.filename === checkfrodSourceFilename(doc))?.id
-  }
-  if (remoteId) await deleteCheckfrodJob(userId, remoteId)
+async function removeAnalysisAttempt(userId: number, doc: InterviewRecording): Promise<void> {
+  if (doc.analysisBackend !== 'sovetnik') return
+  const remoteId = doc.analysisRemoteJobId ?? (doc.analysisSubmissionStartedAt ? doc.analysisRemoteKey : null)
+  if (remoteId) await deleteInterviewAnalysis(userId, remoteId)
 }
 export async function deleteInterviewRecording(payload: Payload, user: User, id: number) {
   await interviewTransaction(payload, user.id, async (req) => {
@@ -160,25 +156,26 @@ export async function deleteInterviewRecording(payload: Payload, user: User, id:
     if (doc.analysisStatus === 'queued' || doc.analysisStatus === 'processing') throw new InterviewLibraryError('Дождитесь завершения анализа', 409)
     if (doc.uploadLeaseUntil && Date.parse(doc.uploadLeaseUntil) > Date.now()) throw new InterviewLibraryError('Остановите загрузку и дождитесь её завершения', 409)
     // Keep the row if storage deletion fails, so students can retry without orphaning their file.
-    await removeCheckfrodAttempt(user.id, doc)
+    await removeAnalysisAttempt(user.id, doc)
     if (doc.diskPath) await removePrivateFile(doc.diskPath)
     await payload.delete({ collection: 'interview-recordings', id, req, overrideAccess: true })
   })
   return { deleted: true }
 }
 export function analysisInput(value: unknown) {
-  if (!value || typeof value !== 'object') throw new InterviewLibraryError('Подтвердите передачу записи в Checkfrod')
-  const d = value as Record<string, unknown>
-  if (d.consent !== true) throw new InterviewLibraryError('Подтвердите, что участники предупреждены о записи и её анализе')
-  const roiSpec = d.roiSpec ?? 'auto'
-  if (roiSpec === 'auto' || roiSpec === 'none') return { consent: true as const, roiSpec }
-  if (typeof roiSpec !== 'string' || !/^\d{1,5},\d{1,5},\d{1,5},\d{1,5}$/.test(roiSpec)) throw new InterviewLibraryError('Укажите область кандидата в формате x,y,w,h')
-  const [x, y, w, h] = roiSpec.split(',').map(Number)
-  if (w < 16 || h < 16 || Math.max(x, y, w, h) > 32768) throw new InterviewLibraryError('Область кандидата должна быть не меньше 16 × 16 пикселей')
-  return { consent: true as const, roiSpec }
+  const parsed = analysisContextInputSchema.safeParse(value)
+  if (!parsed.success) throw new InterviewLibraryError('Подтвердите согласие и укажите грейд, формат и корректное описание вакансии')
+  return parsed.data
+}
+export function storedAnalysisContext(value: unknown): InterviewAnalysisContext {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new InterviewLibraryError('Контекст оценки не найден', 503)
+  const { direction, ...rest } = value as Record<string, unknown>
+  if (typeof direction !== 'string' || !direction.trim() || direction.length > 100) throw new InterviewLibraryError('Направление оценки не найдено', 503)
+  const { consent: _consent, ...context } = analysisInput(rest)
+  return { direction, ...context }
 }
 export async function queueInterviewAnalysis(payload: Payload, user: User, id: number, input: ReturnType<typeof analysisInput>) {
-  if (!isCheckfrodConfigured()) throw new InterviewLibraryError('Анализ записей временно недоступен', 503)
+  if (!isInterviewAnalysisConfigured()) throw new InterviewLibraryError('Анализ записей временно недоступен', 503)
   return interviewTransaction(payload, user.id, async (req) => {
     const doc = await accessibleRecording(payload, user, id, true, req)
     if (doc.status !== 'ready') throw new InterviewLibraryError('Сначала загрузите видео полностью', 409)
@@ -189,10 +186,11 @@ export async function queueInterviewAnalysis(payload: Payload, user: User, id: n
     const row = usage.docs[0]
     const used = row?.day === day ? row.requests : 0
     if (used >= 3 || (doc.analysisAttempts ?? 0) >= 3) throw new InterviewLibraryError('Лимит анализа: 3 запуска в сутки и 3 попытки на запись', 429)
-    if (doc.analysisStatus === 'failed') await removeCheckfrodAttempt(user.id, doc)
+    if (doc.analysisStatus === 'failed') await removeAnalysisAttempt(user.id, doc)
+    const direction = await payload.findByID({ collection: 'interview-directions', id: relationId(doc.direction) ?? -1, depth: 0, req, overrideAccess: true })
     if (row) await payload.update({ collection: 'interview-analysis-usage', id: row.id, data: { day, requests: used + 1 }, req, overrideAccess: true })
     else await payload.create({ collection: 'interview-analysis-usage', data: { owner: user.id, day, requests: 1 }, req, overrideAccess: true })
-    await payload.update({ collection: 'interview-recordings', id, data: { analysisStatus: 'queued', analysisProgress: 'Ожидает анализа', analysisError: null, analysisInput: input, analysisBackend: 'checkfrod', analysisRemoteJobId: null, analysisRemoteKey: randomUUID(), analysisSubmissionStartedAt: null, analysisRequestedAt: new Date().toISOString(), analysisAttempts: (doc.analysisAttempts ?? 0) + 1 }, req, overrideAccess: true })
+    await payload.update({ collection: 'interview-recordings', id, data: { analysisStatus: 'queued', analysisProgress: 'Ожидает анализа', analysisError: null, analysisInput: { ...input, direction: direction.title }, analysisBackend: 'sovetnik', analysisRemoteJobId: null, analysisRemoteKey: randomUUID(), analysisSubmissionStartedAt: null, analysisRequestedAt: new Date().toISOString(), analysisReport: null, analysisScore: null, analysisCriteria: null, analysisModel: null, analysisAttempts: (doc.analysisAttempts ?? 0) + 1 }, req, overrideAccess: true })
     return { analysisStatus: 'queued' as const }
   })
 }

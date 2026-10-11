@@ -81,8 +81,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://lms:${DB_PASSWORD:-changeme}@lms-mentor-db:5432/lms_platform
       - PAYLOAD_SECRET=${PAYLOAD_SECRET}
-      - CHECKFROD_API_URL=${CHECKFROD_API_URL:-https://checkfrod.nadtocheev.ru}
-      - CHECKFROD_API_KEY=${CHECKFROD_API_KEY:-}
+      - INTERVIEW_ANALYSIS_API_URL=${INTERVIEW_ANALYSIS_API_URL:-}
+      - INTERVIEW_ANALYSIS_API_TOKEN=${INTERVIEW_ANALYSIS_API_TOKEN:-}
       - YANDEX_DISK_TOKEN=${YANDEX_DISK_TOKEN:-}
       - YANDEX_INTERVIEWS_ROOT=${YANDEX_INTERVIEWS_ROOT:-disk:/LMS interviews}
       - TRAINER_RUNTIME_URL=${TRAINER_RUNTIME_URL:-http://lms-mentor-trainer-runtime:3100}

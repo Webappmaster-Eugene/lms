@@ -1,3 +1,4 @@
+import { interviewResult, interviewContext } from '../../fixtures/interview-analysis'
 /**
  * Детерминированный сид для e2e и скриншотных тестов.
  *
@@ -226,8 +227,8 @@ const interviewTrack = (await payload.find({ collection: 'interview-directions',
 for (const [owner, title] of [[created.student, 'Мой тестовый React собес'], [created.leader, 'Чужая личная запись']] as const) {
   const own = await payload.create({ collection: 'interview-recordings', data: {
     title, direction: interviewTrack.id, category: 'personal', owner, status: 'ready', size: 1024, mimeType: 'video/mp4', analysisStatus: 'completed',
-    analysisBackend: 'checkfrod', analysisRemoteJobId: 'fixture-report',
-    analysisReport: { duration_s: 120, episodes: [{ confidence: 'high' }, { confidence: 'info' }], quality: { gaze: 'head_only' }, attention: { iris_s: 0, head_only_s: 120, no_face_s: 0, frozen_s: 0, moments: [{ time: 2 }] } },
+    analysisBackend: 'sovetnik', analysisRemoteJobId: 'fixture-report',
+    analysisInput: { consent: true, ...interviewContext }, analysisReport: interviewResult,
   } })
   await payload.update({ collection: 'interview-recordings', id: own.id, data: { diskPath: `disk:/LMS interviews/${owner}/${own.id}-12345678-1234-4123-8123-123456789012.mp4` } })
 }

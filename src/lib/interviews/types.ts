@@ -40,4 +40,4 @@ export const RECORDING_CATEGORIES = {
   personal: 'Мои собесы',
 } as const
 
-export const MAX_RECORDING_BYTES = 2 * 1024 * 1024 * 1024
+export const MAX_RECORDING_BYTES = 5 * 1024 * 1024 * 1024

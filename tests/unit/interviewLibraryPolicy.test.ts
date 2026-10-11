@@ -10,10 +10,15 @@ describe('границы запросов библиотеки собеседо�
     expect(uploadInput(input)).toMatchObject({ title: 'React', extension: 'mp4', size: 128 })
     for (const changed of [{ size: MAX_RECORDING_BYTES + 1 }, { size: 0 }, { size: 1.5 }, { directionId: '1' }, { title: 'a'.repeat(201) }, { fileName: 'test.html', mimeType: 'text/html' }, { mimeType: 'video/webm' }, { description: 'a'.repeat(2001) }]) expect(() => uploadInput({ ...input, ...changed })).toThrow()
   })
-  it('Checkfrod требует согласие и корректную область кандидата; клиент не задаёт владельца', () => {
-    expect(analysisInput({ consent: true, roiSpec: 'auto', owner: 999, url: 'private' })).toEqual({ consent: true, roiSpec: 'auto' })
-    expect(analysisInput({ consent: true, roiSpec: '10,20,200,100' })).toEqual({ consent: true, roiSpec: '10,20,200,100' })
-    for (const bad of [{}, { consent: false }, { consent: true, roiSpec: '0,0,1,10' }, { consent: true, roiSpec: '-1,0,20,20' }, { consent: true, roiSpec: '0,0,99999,99' }]) expect(() => analysisInput(bad)).toThrow()
+  it('принимает длинную MOV-запись размером 3,6 ГБ без загрузки содержимого в память', () => {
+    const size = Math.floor(3.6 * 1024 ** 3)
+    expect(uploadInput({ title: 'Длинный собес', directionId: 1, size, fileName: 'recording.mov', mimeType: 'video/quicktime' })).toMatchObject({ size, extension: 'mov', mimeType: 'video/quicktime' })
+  })
+  it('оценка требует согласие, грейд и формат; клиент не задаёт владельца или направление', () => {
+    const input = { consent: true, targetGrade: 'middle', interviewFormat: 'technical' }
+    expect(analysisInput(input)).toEqual({ ...input, vacancyText: '' })
+    expect(analysisInput({ ...input, vacancyText: '  React-разработчик  ', candidateName: '  Анна  ' })).toEqual({ ...input, vacancyText: 'React-разработчик', candidateName: 'Анна' })
+    for (const bad of [{}, { ...input, consent: false }, { ...input, targetGrade: 'expert' }, { ...input, interviewFormat: 'fraud' }, { ...input, owner: 999 }, { ...input, direction: 'Подменённое направление' }, { ...input, url: 'https://foreign.test/video.mp4' }, { ...input, roiSpec: 'auto' }]) expect(() => analysisInput(bad)).toThrow()
   })
   it('cookie мутации требуют нашего Origin, а явный токен не принимает чужой Origin', () => {
     vi.stubEnv('NEXT_PUBLIC_SERVER_URL', 'https://learn.mentorcareer.ru')

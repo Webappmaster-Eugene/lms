@@ -61,7 +61,7 @@ export function recordingFormat(extension: string, mimeType: string): { extensio
 
 function sizeAllowed(size: number): void {
   if (!Number.isSafeInteger(size) || size < 1 || size > MAX_RECORDING_BYTES) {
-    throw new InterviewStorageError('Размер видео должен быть от 1 байта до 2 ГБ', 400)
+    throw new InterviewStorageError('Размер видео должен быть от 1 байта до 5 ГБ', 400)
   }
 }
 

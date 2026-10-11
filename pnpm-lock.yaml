@@ -143,6 +143,9 @@ importers:
       web-vitals:
         specifier: ^6.2.3
         version: 6.2.3
+      zod:
+        specifier: 4.6.2
+        version: 4.6.2
     devDependencies:
       '@axe-core/playwright':
         specifier: 4.13.0
