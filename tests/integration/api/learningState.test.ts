@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Payload } from 'payload'
 import { GET, POST } from '@/app/api/learning-state/route'
 import { learningVideos } from '@/lib/learning-state'
@@ -41,6 +41,36 @@ describe('серверное место остановки', () => {
     expect((await GET(request(tree.lessons[0].id, ''))).status).toBe(401)
     expect((await GET(request(tree.lessons[0].id))).status).toBe(200)
     expect((await payload.count({ collection: 'lesson-learning-states', where: { user: { equals: student.id } } })).totalDocs).toBe(0)
+  })
+
+  it.each(['aborted', 'AbortError', 'signal'])('прерванное чтение позиции (%s) не создаёт состояние и не даёт серверную ошибку', async (kind) => {
+    const failure = new Error(kind === 'aborted' ? 'aborted' : 'Stream interrupted')
+    if (kind === 'AbortError') failure.name = 'AbortError'
+    const cancellation = new AbortController()
+    if (kind === 'signal') cancellation.abort()
+    const body = new ReadableStream<Uint8Array>({ start(controller) { controller.error(failure) } })
+    const init: RequestInit & { duplex: 'half' } = {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` }, body, duplex: 'half', signal: cancellation.signal,
+    }
+    const errorLog = vi.spyOn(payload.logger, 'error')
+    try {
+      const result = await POST(new Request('http://lms.test/api/learning-state', init))
+      expect(result.status).toBe(400)
+      expect(await result.json()).toMatchObject({ error: 'Передача данных запроса прервана' })
+      expect((await payload.count({ collection: 'lesson-learning-states', where: { user: { equals: student.id } } })).totalDocs).toBe(0)
+      expect(errorLog).not.toHaveBeenCalled()
+    } finally { errorLog.mockRestore() }
+  })
+
+  it('неизвестная ошибка чтения позиции остаётся серверной', async () => {
+    const failure = new Error('Unexpected internal stream failure')
+    const body = new ReadableStream<Uint8Array>({ start(controller) { controller.error(failure) } })
+    const init: RequestInit & { duplex: 'half' } = { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` }, body, duplex: 'half' }
+    const errorLog = vi.spyOn(payload.logger, 'error').mockImplementation(() => {})
+    try {
+      expect((await POST(new Request('http://lms.test/api/learning-state', init))).status).toBe(500)
+      expect(errorLog).toHaveBeenCalledWith({ err: failure }, 'Не удалось сохранить место остановки')
+    } finally { errorLog.mockRestore() }
   })
 
   it('помнит точную позицию включая первые секунды; другой браузер читает её без localStorage', async () => {

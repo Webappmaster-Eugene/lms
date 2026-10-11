@@ -7,6 +7,7 @@ import { GET as analyticsGET } from '@/app/api/manage/student-analytics/route'
 import { POST as learningPOST } from '@/app/api/learning-state/route'
 import { authSessionHash } from '@/payload/hooks/authSessionRevocations'
 import { childReq } from '@/lib/payload-req'
+import { logger } from '@/lib/telemetry'
 import { learningVideos } from '@/lib/learning-state'
 import type { StudentAnalyticsSnapshot } from '@/lib/student-analytics'
 import { cleanupStudentAnalytics } from '@/server/student-analytics'
@@ -81,6 +82,37 @@ describe('protected admin analytics with real Payload sessions and PostgreSQL', 
     expect((await activityPOST(apiRequest('activity', token, { path: '/?token=secret' }))).status).toBe(400)
     expect((await activityPOST(apiRequest('activity', token, { path: '/', expectedUserId: restricted.id }))).status).toBe(403)
   })
+  it.each(['aborted', 'AbortError', 'signal'])('interrupted activity body (%s) does not record activity or log a server failure', async (kind) => {
+    const before = (await payload.count({ collection: 'student-learning-events', where: { user: { equals: student.id } } })).totalDocs
+    const failure = new Error(kind === 'aborted' ? 'aborted' : 'Stream interrupted')
+    if (kind === 'AbortError') failure.name = 'AbortError'
+    const cancellation = new AbortController()
+    if (kind === 'signal') cancellation.abort()
+    const body = new ReadableStream<Uint8Array>({ start(controller) { controller.error(failure) } })
+    const init: RequestInit & { duplex: 'half' } = {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` }, body, duplex: 'half', signal: cancellation.signal,
+    }
+    const errorLog = vi.spyOn(logger, 'error')
+    try {
+      const result = await activityPOST(new Request('http://lms.test/api/activity', init))
+      expect(result.status).toBe(400)
+      expect(await result.json()).toMatchObject({ error: 'Передача данных запроса прервана' })
+      expect((await payload.count({ collection: 'student-learning-events', where: { user: { equals: student.id } } })).totalDocs).toBe(before)
+      expect(errorLog).not.toHaveBeenCalled()
+    } finally { errorLog.mockRestore() }
+  })
+
+  it('unexpected activity body failure remains a server error', async () => {
+    const failure = new Error('Unexpected internal stream failure')
+    const body = new ReadableStream<Uint8Array>({ start(controller) { controller.error(failure) } })
+    const init: RequestInit & { duplex: 'half' } = { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` }, body, duplex: 'half' }
+    const errorLog = vi.spyOn(logger, 'error').mockImplementation(() => {})
+    try {
+      expect((await activityPOST(new Request('http://lms.test/api/activity', init))).status).toBe(500)
+      expect(errorLog).toHaveBeenCalledWith('Student activity recording failed', failure)
+    } finally { errorLog.mockRestore() }
+  })
+
   it('observes an allowed lesson once per minute without completion, points or resetting learning reminders', async () => {
     const before = await snapshot()
     const request = () => apiRequest('activity', token, { path: `/lessons/${tree.lessons[0].slug}`, timezone: 'Europe/Moscow', standalone: true, userId: restricted.id, eventType: 'certificate_issued' })

@@ -1,7 +1,7 @@
 import { getPayload } from '@/lib/payload'
 import { StudentAnalyticsError } from '@/lib/student-analytics'
 import { logger } from '@/lib/telemetry'
-import { readBoundedJson, RequestBodyError } from '@/server/read-json-body'
+import { readRequestJson, RequestBodyError } from '@/server/read-json-body'
 import { recordStudentActivity } from '@/server/student-analytics'
 
 export const dynamic = 'force-dynamic'
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const canonical = payload.config.serverURL ? new URL(payload.config.serverURL).origin : new URL(request.url).origin
     const permittedOrigins = new Set([canonical, new URL(request.url).origin])
     if ((!authorization && !origin) || (origin && !permittedOrigins.has(origin)) || ['cross-site', 'same-site'].includes(headers.get('sec-fetch-site') ?? '')) return response({ error: 'Доступ запрещён' }, 403)
-    const body = await readBoundedJson(request, 2048)
+    const body = await readRequestJson(request, 2048)
     if (body && typeof body === 'object' && 'expectedUserId' in body && body.expectedUserId !== user.id) return response({ error: 'Аккаунт изменился. Обновите страницу' }, 403)
     return response(await recordStudentActivity(payload, user, headers, body))
   } catch (error) {
