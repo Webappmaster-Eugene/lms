@@ -232,4 +232,7 @@ for (const [owner, title] of [[created.student, 'Мой тестовый React �
   await payload.update({ collection: 'interview-recordings', id: own.id, data: { diskPath: `disk:/LMS interviews/${owner}/${own.id}-12345678-1234-4123-8123-123456789012.mp4` } })
 }
 
+const idleInterview = await payload.create({ collection: 'interview-recordings', data: { title: 'Мой новый собес', direction: interviewTrack.id, owner: created.student, category: 'personal', status: 'ready', size: 1024, mimeType: 'video/mp4', analysisStatus: 'idle' } })
+await payload.update({ collection: 'interview-recordings', id: idleInterview.id, data: { diskPath: `disk:/LMS interviews/${created.student}/${idleInterview.id}-12345678-1234-4123-8123-123456789012.mp4` } })
+
 process.exit(0)
