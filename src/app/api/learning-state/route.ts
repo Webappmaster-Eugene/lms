@@ -2,7 +2,7 @@ import { createLocalReq } from 'payload'
 import { getPayload } from '@/lib/payload'
 import { accessibleLearningLesson, getLearningState, learningMutation, LearningStateError, saveLearningState } from '@/server/learning-state'
 import { recordLearningAccess, withLearningSpan } from '@/lib/learning-observability'
-import { readBoundedJson, RequestBodyError } from '@/server/read-json-body'
+import { readRequestJson, RequestBodyError } from '@/server/read-json-body'
 
 export const dynamic = 'force-dynamic'
 const response = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } })
@@ -31,7 +31,7 @@ async function handle(request: Request, write: boolean) {
     if ((authorization === null && !origin) || (origin && !origins.has(origin)) || fetchSite === 'cross-site' || fetchSite === 'same-site') return response({ error: 'Доступ запрещён' }, 403)
   }
   try {
-    const body: unknown = write ? await readBoundedJson(request, 16 * 1024) : { lessonId: Number(new URL(request.url).searchParams.get('lessonId')), at: Date.now() }
+    const body: unknown = write ? await readRequestJson(request, 16 * 1024) : { lessonId: Number(new URL(request.url).searchParams.get('lessonId')), at: Date.now() }
     const expectedUserId = write && body && typeof body === 'object' && 'expectedUserId' in body ? body.expectedUserId : new URL(request.url).searchParams.get('expectedUserId')
     if (expectedUserId !== undefined && expectedUserId !== null && Number(expectedUserId) !== user.id) return response({ error: 'Аккаунт изменился. Обновите страницу' }, 403)
     const { lessonId, mutation } = learningMutation(body)

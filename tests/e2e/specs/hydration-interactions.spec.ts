@@ -90,6 +90,33 @@ test('поиск после загрузки скриптов сохраняет
   } finally { await scripts.close() }
 })
 
+test('свой тест добавляется с первого нажатия после загрузки тренажёра и сохраняет введённые данные', async ({ page }) => {
+  const scripts = await holdClientScripts(page)
+  try {
+    await page.goto(`/trainer/${CONTENT.topic.slug}/${CONTENT.task.slug}`, { waitUntil: 'commit' })
+    const help = page.locator('details').filter({ has: page.locator('summary').filter({ hasText: 'Свои тесты' }) })
+    await help.locator('summary').click()
+    const add = help.getByRole('button', { name: 'Добавить свой тест', exact: true })
+    await expect(add).toBeVisible()
+    await expect(add).toBeDisabled()
+    scripts.release()
+    await expect(add).toBeEnabled()
+    await add.click()
+    const args = help.getByRole('textbox', { name: 'Аргументы теста 1', exact: true })
+    const expected = help.getByRole('textbox', { name: 'Ожидаемый результат теста 1', exact: true })
+    await args.fill('2, 3')
+    await expected.fill('5')
+    // Ещё одно изменение состояния не должно сбросить первый созданный тест.
+    await add.click()
+    await expect(help.getByRole('textbox', { name: 'Аргументы теста 2', exact: true })).toBeVisible()
+    await expect(args).toHaveValue('2, 3')
+    await expect(expected).toHaveValue('5')
+    await help.getByRole('button', { name: 'Удалить свой тест 2', exact: true }).click()
+    await expect(help.getByRole('textbox', { name: 'Аргументы теста 2', exact: true })).toHaveCount(0)
+    await expect(args).toHaveValue('2, 3')
+  } finally { await scripts.close() }
+})
+
 test.describe('публичные формы', () => {
   test.use({ storageState: { cookies: [], origins: [] } })
 

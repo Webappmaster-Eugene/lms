@@ -2,6 +2,19 @@ export class RequestBodyError extends Error {
   constructor(message: string, readonly status: 400 | 413 | 415 = 400) { super(message) }
 }
 
+/** A page closing during body transfer is a client error, before any domain write. */
+export async function readRequestJson(request: Request, maxBytes: number): Promise<unknown> {
+  try {
+    return await readBoundedJson(request, maxBytes)
+  } catch (error) {
+    if (error instanceof RequestBodyError) throw error
+    if (request.signal.aborted || error instanceof Error && (error.name === 'AbortError' || error.message === 'aborted')) {
+      throw new RequestBodyError('Передача данных запроса прервана')
+    }
+    throw error
+  }
+}
+
 /** Enforce the limit while reading; Content-Length can be missing or forged. */
 export async function readBoundedJson(request: Request, maxBytes: number): Promise<unknown> {
   if (request.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {

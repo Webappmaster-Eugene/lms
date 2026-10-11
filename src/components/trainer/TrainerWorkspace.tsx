@@ -478,11 +478,11 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
       {hiddenNote && <p className="text-xs text-muted-foreground">{hiddenNote}</p>}
 
       {task.checkMode === 'unit' && task.entryName && (
-        <CustomTestCases exampleCase={task.publicCases.find((item) => !item.hidden)} cases={customCases} disabled={busy} entryName={task.entryName}
+        <CustomTestCases exampleCase={task.publicCases.find((item) => !item.hidden)} cases={customCases} disabled={busy || !ready} entryName={task.entryName}
           onChange={(cases) => setCustomTests({ taskId: task.id, cases })} />
       )}
 
-      {(language === 'go' || language === 'python') && <CustomProgramCases language={language} exampleCase={task.runtimeCases?.find((item) => !item.hidden)} cases={programCases} disabled={busy} onChange={(cases) => setProgramTests({ taskId: task.id, cases })} />}
+      {(language === 'go' || language === 'python') && <CustomProgramCases language={language} exampleCase={task.runtimeCases?.find((item) => !item.hidden)} cases={programCases} disabled={busy || !ready} onChange={(cases) => setProgramTests({ taskId: task.id, cases })} />}
 
       {/* Решено — следующий шаг сразу под результатом, а не кнопкой «Далее» в шапке. */}
       {completed && !busy && (nextTask || topicHref) && (
