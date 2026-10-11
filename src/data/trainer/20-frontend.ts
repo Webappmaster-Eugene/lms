@@ -66,7 +66,7 @@ export const frontendTopic: TrainerTopicSeed = {
       title: 'Доступная адаптивная карточка',
       difficulty: 'easy',
       languages: ['html'],
-      descriptionMd: `Сверстайте карточку разработчика в index.html и style.css. Файлы уже открыты в редакторе: выберите нужную вкладку и измените код. Стили подключаются обычным <link rel="stylesheet" href="style.css">.
+      descriptionMd: `Сверстайте карточку разработчика в index.html и style.css. Файлы уже открыты в редакторе: выберите нужную вкладку и измените код. Стили подключаются обычным \`<link rel="stylesheet" href="style.css">\`.
 
 Требования:
 - На странице один main с заголовком h1 «Команда». Карточка — article с классом profile и aria-labelledby="profile-name".

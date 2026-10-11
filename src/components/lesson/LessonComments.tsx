@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { CheckCircle2, CornerDownRight, Loader2, MessageSquare, Send } from 'lucide-react'
 import { useAsyncData } from '@/hooks/use-async-data'
+import { useHydrated } from '@/hooks/use-hydrated'
 import { useToast } from '@/components/ui/Toast'
 import { markAnswersRead } from '@/lib/answer-notifications'
 import { authorId, authorName, groupThreads, isMentorReply, threadStatus, STATUS_LABELS, type CommentDoc, type Thread, type ThreadStatus } from '@/lib/comment-threads'
@@ -31,6 +32,7 @@ async function postComment(body: Record<string, unknown>) {
 }
 
 export function LessonComments({ lessonId, userId }: Props) {
+  const hydrated = useHydrated()
   const [newComment, setNewComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const { toast } = useToast()
@@ -107,6 +109,7 @@ export function LessonComments({ lessonId, userId }: Props) {
 
       <div className="flex gap-3">
         <textarea
+          disabled={!hydrated}
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           aria-label="Вопрос к уроку"
@@ -118,7 +121,7 @@ export function LessonComments({ lessonId, userId }: Props) {
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={submitting || !newComment.trim()}
+          disabled={!hydrated || submitting || !newComment.trim()}
           aria-label={submitting ? 'Отправляем вопрос' : 'Отправить вопрос'}
           className="flex h-11 w-11 shrink-0 items-center justify-center self-end rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
         >

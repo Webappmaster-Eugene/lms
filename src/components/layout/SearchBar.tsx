@@ -5,6 +5,7 @@ import { Search, Loader2, BookOpen, Code2, GraduationCap, Map } from 'lucide-rea
 import { useRouter } from 'next/navigation'
 
 import { cn } from '@/lib/utils'
+import { useHydrated } from '@/hooks/use-hydrated'
 
 type ResultType = 'roadmap' | 'course' | 'lesson' | 'task'
 
@@ -57,6 +58,7 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 export function SearchBar({ autoFocus, onNavigate, hotkey, trainerEnabled = true }: SearchBarProps = {}) {
+  const hydrated = useHydrated()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   // Запрос, по которому получены results: «ничего не найдено» показывается только для него.
@@ -192,6 +194,7 @@ export function SearchBar({ autoFocus, onNavigate, hotkey, trainerEnabled = true
         <input
           ref={inputRef}
           type="text"
+          disabled={!hydrated}
           role="combobox"
           aria-label={trainerEnabled ? 'Поиск по курсам, урокам и задачам' : 'Поиск по курсам и урокам'}
           aria-expanded={expanded}
