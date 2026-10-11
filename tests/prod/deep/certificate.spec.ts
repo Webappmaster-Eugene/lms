@@ -50,7 +50,7 @@ test('самый короткий курс от первого урока до �
       continue
     }
     // После отметки кнопка перерисовывается (router.refresh) — переходим по адресу, а не кликом.
-    const next = page.getByRole('link', { name: /Следующий урок:/ })
+    const next = page.getByTitle('Следующий урок (→)', { exact: true })
     if (await next.isVisible()) {
       await page.goto((await next.getAttribute('href')) as string)
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()

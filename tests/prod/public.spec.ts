@@ -21,7 +21,7 @@ for (const path of ['/admin/questions', '/admin/import-yandex']) {
   test(`${path} без входа — настоящий редирект, а не страница с кодом 200`, async ({ request }) => {
     const response = await request.get(path, { maxRedirects: 0 })
     expect(response.status()).toBe(307)
-    expect(new URL(response.headers().location ?? '', 'https://x').pathname).toBe('/')
+    expect(new URL(response.headers().location ?? '', 'https://x').pathname).toBe('/login')
   })
 }
 

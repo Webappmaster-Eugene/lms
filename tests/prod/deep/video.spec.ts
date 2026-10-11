@@ -40,10 +40,16 @@ test('видео продолжается с места остановки, «С
     )
   test.skip(!loaded, 'метаданные ролика не пришли за 25 с — продолжение не проверить')
 
-  await page.locator('video').first().evaluate((video: HTMLVideoElement) => {
-    video.currentTime = 65
-    video.dispatchEvent(new Event('pause'))
+  const saved = page.waitForResponse((response) => {
+    if (new URL(response.url()).pathname !== '/api/learning-state' || response.request().method() !== 'POST') return false
+    const body = response.request().postDataJSON() as { seconds?: number }
+    return body.seconds === 65
   })
+  await page.locator('video').first().evaluate((video: HTMLVideoElement) => new Promise<void>((resolve) => {
+    video.addEventListener('seeked', () => { video.pause(); resolve() }, { once: true })
+    video.currentTime = 65
+  }))
+  expect((await saved).ok()).toBe(true)
   await page.reload()
   await expect(page.getByText('Продолжили с 1:05')).toBeVisible({ timeout: 30_000 })
 

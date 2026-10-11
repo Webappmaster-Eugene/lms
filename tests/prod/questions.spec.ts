@@ -30,7 +30,7 @@ test('вопрос ученика, ответ ментора, уведомлен
   const mentor = await browser.newContext({ baseURL: PROD_URL, storageState: stateOf('admin') })
   const mentorPage = await mentor.newPage()
   await mentorPage.goto('/')
-  await expect(mentorPage.locator('aside').last().getByRole('link', { name: 'Вопросы учеников' })).toBeVisible()
+  await expect(mentorPage.getByRole('link', { name: 'Админка', exact: true })).toBeVisible()
   await mentorPage.goto('/admin/questions')
   const card = mentorPage.locator(`#comment-${questionId}`)
   await expect(card).toContainText(question)
