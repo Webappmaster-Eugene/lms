@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Code2, GraduationCap, LayoutDashboard, Map, Menu } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useHydrated } from '@/hooks/use-hydrated'
 import { useSidebar } from './SidebarContext'
 
 type Tab = {
@@ -21,6 +22,7 @@ const TABS: readonly Tab[] = [
 ]
 
 export function BottomNav({ trainerEnabled = true }: { trainerEnabled?: boolean } = {}) {
+  const hydrated = useHydrated()
   const pathname = usePathname()
   const { mobileOpen, toggleMobile } = useSidebar()
 
@@ -50,11 +52,12 @@ export function BottomNav({ trainerEnabled = true }: { trainerEnabled?: boolean 
         {/* More button — opens sidebar */}
         <button
           type="button"
+          disabled={!hydrated}
           onClick={toggleMobile}
           aria-expanded={mobileOpen}
           aria-haspopup="dialog"
           aria-controls={mobileOpen ? 'platform-mobile-menu' : undefined}
-          className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium text-muted-foreground transition-colors focus-visible:outline-2 focus-visible:outline-ring"
+          className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium text-muted-foreground transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
         >
           <span className="flex h-7 w-12 items-center justify-center"><Menu aria-hidden="true" className="h-5 w-5" /></span>
           <span>Ещё</span>

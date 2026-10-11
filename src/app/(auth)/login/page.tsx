@@ -5,8 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { BookOpen, Loader2 } from 'lucide-react'
 import { safeRedirectPath } from '@/lib/safe-redirect'
+import { useHydrated } from '@/hooks/use-hydrated'
 
 export default function LoginPage() {
+  const hydrated = useHydrated()
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = safeRedirectPath(searchParams.get('redirect'))
@@ -72,6 +74,7 @@ export default function LoginPage() {
             <input
               id="email"
               type="email"
+              disabled={!hydrated}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -88,6 +91,7 @@ export default function LoginPage() {
             <input
               id="password"
               type="password"
+              disabled={!hydrated}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -109,7 +113,7 @@ export default function LoginPage() {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={!hydrated || loading}
           className="flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
         >
           {loading ? (

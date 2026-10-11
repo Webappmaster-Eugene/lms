@@ -3,8 +3,10 @@
 import { useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, BookOpen, Loader2, Mail } from 'lucide-react'
+import { useHydrated } from '@/hooks/use-hydrated'
 
 export default function ForgotPasswordPage() {
+  const hydrated = useHydrated()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -79,6 +81,7 @@ export default function ForgotPasswordPage() {
             <input
               id="email"
               type="email"
+              disabled={!hydrated}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -90,7 +93,7 @@ export default function ForgotPasswordPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={!hydrated || loading}
             className="flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
             {loading ? (
