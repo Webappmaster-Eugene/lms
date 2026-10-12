@@ -43,6 +43,7 @@ import { InterviewDirections, InterviewRecordings, InterviewAnalysisUsage } from
 import { InterviewRooms } from '@/payload/collections/InterviewRooms'
 import { FaqItems } from '@/payload/collections/FaqItems'
 import { YandexDiskImports } from '@/payload/collections/YandexDiskImports'
+import { withLessonSourceGuard } from '@/payload/hooks/denyLessonSourceQueries'
 import { SiteSettings } from '@/payload/globals/SiteSettings'
 
 const filename = fileURLToPath(import.meta.url)
@@ -122,7 +123,7 @@ export default buildConfig({
     InterviewAnalysisUsage,
     FaqItems,
     YandexDiskImports,
-  ],
+  ].map(withLessonSourceGuard),
 
   globals: [SiteSettings],
 
