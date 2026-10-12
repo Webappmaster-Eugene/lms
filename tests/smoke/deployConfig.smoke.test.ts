@@ -127,6 +127,17 @@ describe('версии Node', () => {
   it('зависимости в образе ставятся по локфайлу', () => {
     expect(DOCKERFILE).toMatch(/pnpm i --frozen-lockfile/)
   })
+
+  it('установка переживает просадку канала сборщика', () => {
+    // Сборщик на Raspberry Pi качает пакеты по Wi-Fi одновременно с отправкой образов:
+    // с настройками pnpm по умолчанию один не скачавшийся пакет валит выкат.
+    const instructions = DOCKERFILE.replace(/\\\n/g, ' ').split('\n')
+    const install = instructions.find((line) => line.includes('pnpm i --frozen-lockfile')) ?? ''
+    expect(install).toMatch(/^RUN --mount=type=cache,[^\s]*target=\/pnpm-store/)
+    expect(install).toMatch(/--store-dir=\/pnpm-store/)
+    expect(Number(install.match(/--fetch-retries=(\d+)/)?.[1] ?? 0)).toBeGreaterThanOrEqual(5)
+    expect(Number(install.match(/--fetch-timeout=(\d+)/)?.[1] ?? 0)).toBeGreaterThan(60_000)
+  })
 })
 
 describe('контекст сборки', () => {

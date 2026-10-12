@@ -23,8 +23,15 @@ RUN apk add --no-cache python3 make g++ linux-headers
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-RUN corepack enable pnpm \
-    && pnpm i --frozen-lockfile
+# Образ собирается на Raspberry Pi по Wi-Fi, и в те же минуты сборщик отправляет на
+# сервер готовые образы соседних сервисов. Трёх попыток pnpm по умолчанию при такой
+# просадке канала не хватает: 12.10.2026 установка упала по ETIMEDOUT на одном пакете
+# из 1081. Стор лежит в кеше сборщика, поэтому повторная сборка докачивает
+# недостающее, а не начинает заново.
+RUN --mount=type=cache,id=lms-pnpm-store,target=/pnpm-store \
+    corepack enable pnpm \
+    && pnpm i --frozen-lockfile --store-dir=/pnpm-store \
+        --fetch-retries=8 --fetch-timeout=180000 --network-concurrency=8
 
 # Пакеты, которые нужны песочнице тренажёра в рантайме, но которых нет в
 # standalone-выводе Next: компилятор/изолят подгружаются отдельным раннером,
