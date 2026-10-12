@@ -79,6 +79,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Next.js + Payload CMS compilation is very memory-intensive.
 ENV NODE_OPTIONS=--max-old-space-size=2048
 
+# Линтер и проверка типов уже прошли до push (`pnpm smoke`, CI). На сборщике под
+# эмуляцией этот шаг занимал ~40 минут и исчерпывал память: 13.10.2026 сборщик завис
+# на нём, и выкат упал. Причина и условие — в next.config.mjs.
+ENV LMS_SKIP_BUILD_CHECKS=1
+
 RUN npx next build
 
 # ──────────────────────────────────────────────

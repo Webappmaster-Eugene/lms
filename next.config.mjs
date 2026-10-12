@@ -1,8 +1,16 @@
 import { withPayload } from '@payloadcms/next/withPayload'
 
+// Образ собирается на Raspberry Pi под эмуляцией amd64: линтер и проверка типов внутри
+// `next build` идут там около сорока минут и упираются в память сборщика — он зависает,
+// и выкат падает. Обе проверки обязательны до push (`pnpm smoke`) и повторяются в CI,
+// поэтому Dockerfile их отключает; локальная сборка и smoke проверяют всё как раньше.
+const skipBuildChecks = process.env.LMS_SKIP_BUILD_CHECKS === '1'
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  typescript: { ignoreBuildErrors: skipBuildChecks },
+  eslint: { ignoreDuringBuilds: skipBuildChecks },
 
   // OTel обращается к fs/net/tls и подгружает перехватчики динамическим require —
   // через webpack он не проходит: в sdk-trace-base 2.9+ реализация заменена на

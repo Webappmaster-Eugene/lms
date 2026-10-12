@@ -182,6 +182,20 @@ describe('режим сборки Next', () => {
   it('контейнер работает не от root', () => {
     expect(DOCKERFILE).toMatch(/^USER nextjs$/m)
   })
+
+  it('образ пропускает линтер и типы только потому, что их гарантирует smoke до push', () => {
+    // Сборщик на Raspberry Pi не выдерживает этот шаг по памяти. Пропуск допустим, пока
+    // те же проверки стоят в smoke и CI: если их оттуда убрать, ошибка типов уедет в прод.
+    expect(DOCKERFILE).toMatch(/^ENV LMS_SKIP_BUILD_CHECKS=1$/m)
+    expect(DOCKERFILE.indexOf('ENV LMS_SKIP_BUILD_CHECKS=1')).toBeLessThan(DOCKERFILE.indexOf('RUN npx next build'))
+    expect(NEXT_CONFIG).toMatch(/const skipBuildChecks = process\.env\.LMS_SKIP_BUILD_CHECKS === '1'/)
+    expect(NEXT_CONFIG).toMatch(/typescript:\s*\{\s*ignoreBuildErrors:\s*skipBuildChecks\s*\}/)
+    expect(NEXT_CONFIG).toMatch(/eslint:\s*\{\s*ignoreDuringBuilds:\s*skipBuildChecks\s*\}/)
+    expect(PACKAGE.scripts.smoke).toMatch(/pnpm lint && pnpm typecheck/)
+    const ci = read('../../.github/workflows/ci.yml')
+    expect(ci).toMatch(/run: pnpm lint/)
+    expect(ci).toMatch(/run: pnpm typecheck/)
+  })
 })
 
 describe('инструментирование', () => {
