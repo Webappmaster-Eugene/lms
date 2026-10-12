@@ -196,5 +196,39 @@ describe('содержимое урока', () => {
 
       expect(screen.queryByText('В этом уроке пока нет контента')).not.toBeInTheDocument()
     })
+
+    describe('код', () => {
+      const code = (text: string) => ({ type: 'text', text, format: 16 })
+      const paragraph = (...children: unknown[]) => ({ blockType: 'text', content: { root: { children: [{ type: 'paragraph', children }] } } })
+
+      it('абзац, целиком набранный кодом, выводится листингом с переносами и отступами', () => {
+        const { container } = renderBlocks([paragraph(code('def greeting(name):'), { type: 'linebreak' }, code("    return f'Hello, {name}!'"))])
+
+        // Отступ второй строки — смысл программы на Python: построчные плашки его теряли.
+        expect(container.querySelector('pre')?.textContent).toBe("def greeting(name):\n    return f'Hello, {name}!'")
+        expect(container.querySelectorAll('pre code')).toHaveLength(1)
+        expect(container.querySelector('p')).toBeNull()
+      })
+
+      it('одна строка кода без остального текста — тоже листинг', () => {
+        const { container } = renderBlocks([paragraph(code('pnpm test'))])
+
+        expect(container.querySelector('pre')?.textContent).toBe('pnpm test')
+      })
+
+      it('код внутри предложения остаётся в строке', () => {
+        const { container } = renderBlocks([paragraph({ type: 'text', text: 'Обратите внимание на ' }, code('wraps'), { type: 'text', text: ' из functools.' })])
+
+        expect(container.querySelector('pre')).toBeNull()
+        expect(screen.getByText('wraps').tagName).toBe('CODE')
+        expect(container.querySelector('p')).toHaveTextContent('Обратите внимание на wraps из functools.')
+      })
+
+      it('абзац из одних переносов строк листингом не становится', () => {
+        const { container } = renderBlocks([paragraph({ type: 'linebreak' }, { type: 'linebreak' })])
+
+        expect(container.querySelector('pre')).toBeNull()
+      })
+    })
   })
 })

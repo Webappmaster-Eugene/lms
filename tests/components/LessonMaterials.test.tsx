@@ -107,6 +107,26 @@ describe('Материалы урока в LMS', () => {
     await waitFor(() => expect(changed.mock.lastCall?.[0].root.children[0]).toMatchObject({ children: [{ type: 'link', fields: { linkType: 'custom', url: 'https://nodejs.org' }, children: [{ text: 'Документация Node.js', format: 1 }] }] }))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
+
+  it('кнопка «Код» помечает выделенный текст кодом, и текст остаётся редактируемым', async () => {
+    const user = userEvent.setup()
+    const changed = vi.fn()
+    const rich = { ...emptyRichText(), root: { ...emptyRichText().root, children: [{ type: 'paragraph', children: [{ type: 'text', text: 'pnpm test', format: 0, detail: 0, mode: 'normal', style: '', version: 1 }], direction: null, format: '', indent: 0, version: 1 }] } } as NonNullable<Course['description']>
+    render(<RichTextEditor id="code-rich" label="Текст" value={rich} onChange={changed} />)
+    const textbox = screen.getByRole('textbox', { name: 'Текст' })
+    await act(async () => {
+      textbox.focus()
+      const range = document.createRange()
+      range.selectNodeContents(screen.getByText('pnpm test'))
+      window.getSelection()?.removeAllRanges()
+      window.getSelection()?.addRange(range)
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+    await user.click(screen.getByRole('button', { name: 'Код' }))
+    await waitFor(() => expect(changed.mock.lastCall?.[0].root.children[0]).toMatchObject({ children: [{ format: 16, text: 'pnpm test' }] }))
+    // Урок с кодом должен открываться в этом же редакторе, а не уходить в «сложные элементы».
+    expect(canEditRichText(changed.mock.lastCall?.[0])).toBe(true)
+  })
 })
 
 describe('Выбор и загрузка файлов', () => {

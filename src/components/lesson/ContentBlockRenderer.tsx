@@ -186,9 +186,21 @@ function renderFileBlock(block: ContentBlock) {
  */
 /** Извлекает текст из Lexical-нода рекурсивно. */
 function extractText(node: LexicalNode): string {
-  if (node.type === 'text') return node.text ?? ''
+  if (node.type === 'text' || node.type === 'tab') return node.text ?? ''
   if (node.type === 'linebreak') return '\n'
   return (node.children ?? []).map(extractText).join('')
+}
+
+const CODE_LISTING = 'overflow-x-auto rounded-xl border border-border bg-secondary p-4'
+
+/**
+ * Абзац, целиком набранный форматом «код», — это листинг: отдельного блока кода в редакторе
+ * LMS нет. Построчные плашки теряли бы отступы, а в Python и YAML они несут смысл.
+ */
+function isCodeListing(node: LexicalNode): boolean {
+  const children = node.children ?? []
+  return children.some((child) => child.type === 'text' && (child.text ?? '').trim() !== '')
+    && children.every((child) => child.type === 'linebreak' || child.type === 'tab' || (child.type === 'text' && ((child.format ?? 0) & 16) === 16))
 }
 
 function LexicalContent({ data }: { data: Record<string, unknown> }) {
@@ -217,7 +229,8 @@ function LexicalNode({ node }: { node: LexicalNode }) {
 
     // Format bitmask: 1=bold, 2=italic, 4=strikethrough, 8=underline, 16=code
     if (node.format) {
-      if (node.format & 16) content = <code className="rounded bg-secondary px-1.5 py-0.5 text-sm">{content}</code>
+      // prose дорисовывает коду обратные кавычки; ученик принимал их за часть команды.
+      if (node.format & 16) content = <code className="rounded bg-secondary px-1.5 py-0.5 text-sm before:content-none after:content-none">{content}</code>
       if (node.format & 1) content = <strong>{content}</strong>
       if (node.format & 2) content = <em>{content}</em>
       if (node.format & 4) content = <s>{content}</s>
@@ -231,6 +244,7 @@ function LexicalNode({ node }: { node: LexicalNode }) {
 
   switch (node.type) {
     case 'paragraph':
+      if (isCodeListing(node)) return <pre className={CODE_LISTING}><code>{extractText(node)}</code></pre>
       return <p>{children}</p>
     case 'heading': {
       const tag = (node.tag ?? 'h2') as string
@@ -269,7 +283,7 @@ function LexicalNode({ node }: { node: LexicalNode }) {
       const codeText = extractText(node)
       const lang = node.language ?? ''
       return (
-        <pre className="overflow-x-auto rounded-xl border border-border bg-secondary p-4">
+        <pre className={CODE_LISTING}>
           <code className={lang ? `language-${lang}` : ''}>{codeText}</code>
         </pre>
       )

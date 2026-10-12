@@ -111,6 +111,7 @@ function Tools({ disabled }: { disabled: boolean }) {
     <div className="flex flex-wrap items-center gap-1 border-b p-2" role="group" aria-label="Форматирование текста" onMouseDown={(event) => { if ((event.target as HTMLElement).closest('button')) event.preventDefault() }}>
       <button type="button" disabled={disabled} className={toolClass} onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')}>Жирный</button>
       <button type="button" disabled={disabled} className={toolClass} onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')}>Курсив</button>
+      <button type="button" disabled={disabled} className={toolClass} onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code')}>Код</button>
       <button type="button" disabled={disabled} className={toolClass} onClick={() => editor.update(() => { const selection = $getSelection(); if ($isRangeSelection(selection)) $setBlocksType(selection, () => $createHeadingNode('h2')) })}>Заголовок</button>
       <button type="button" disabled={disabled} className={toolClass} onClick={() => editor.update(() => { const selection = $getSelection(); if ($isRangeSelection(selection)) $setBlocksType(selection, () => $createParagraphNode()) })}>Абзац</button>
       <button type="button" disabled={disabled} className={toolClass} onClick={() => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined)}>Список</button>
