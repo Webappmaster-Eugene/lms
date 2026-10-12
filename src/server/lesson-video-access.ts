@@ -1,7 +1,7 @@
 import type { Payload } from 'payload'
 
 import type { User } from '@/payload-types'
-import { blockVideoId, blockVideoSource, mediaFilePath } from '@/lib/lesson-video-source'
+import { blockVideoId, blockVideoSource, mediaFilePath, wholeResourceUrl } from '@/lib/lesson-video-source'
 import { parsePublicResourceUrl, type PublicResourceRef } from '@/lib/yandex-disk-url'
 import { canAccessLesson } from '@/server/learning-access'
 import { lessonAssetToken } from '@/lib/lesson-asset-source'
@@ -79,7 +79,9 @@ export async function resolveLessonVideoSource(
 
 function materialSource(value: unknown, token: string | null): string | null {
   if (typeof value === 'string') {
-    const urls = value.match(/(?:https?:\/\/[^\s<>"'()[\]]+|\/api\/media\/file\/[^\s<>"'()[\]]+)/gi) ?? []
+    // Тот же разбор, что и при выдаче ученику: иначе ID материала не совпадёт с адресом из блока.
+    const whole = wholeResourceUrl(value)
+    const urls = whole ? [whole] : value.match(/(?:https?:\/\/[^\s<>"'()[\]]+|\/api\/media\/file\/[^\s<>"'()[\]]+)/gi) ?? []
     return urls.find((url) => (parsePublicResourceUrl(url) || mediaFilePath(url)) && (!token || lessonAssetToken(url) === token)) ?? null
   }
   if (Array.isArray(value)) {

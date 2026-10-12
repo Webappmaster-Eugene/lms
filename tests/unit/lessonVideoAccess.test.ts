@@ -143,6 +143,27 @@ describe('данные, переданные ученику', () => {
     expect(JSON.stringify(raw)).toContain(ROOT)
   })
 
+  it('вложение из папки со скобками и апострофом в имени остаётся рабочей ссылкой, а не обрывком адреса', async () => {
+    const { lessonAssetToken } = await import('@/lib/lesson-asset-source')
+    const file = `${ROOT}/SQL%20(2021)/%5BSLIV.ONE%5D%20O'Reilly/index.html`
+    const safe = protectLessonVideoSources({ id: 42, content: [{ id: 'f1', blockType: 'link' as const, title: 'index.html', url: file, platform: 'other' as const }] })
+    const link = safe.content?.[0]
+    expect(link?.blockType === 'link' && link.url).toBe(`/api/learning-assets?lesson=42&block=f1&asset=${lessonAssetToken(file)}`)
+    expect(JSON.stringify(safe)).not.toContain('Материалы курса доступны в уроках LMS')
+    expect(JSON.stringify(safe)).not.toContain('disk.yandex')
+
+    const doc = lesson()
+    doc.content = [{ id: 'f1', blockType: 'link', url: file, title: 'index.html', displayMode: 'embed' } as never]
+    findByID.mockResolvedValue(doc)
+    const assetParams = new URLSearchParams({ lesson: '42', block: 'f1', asset: lessonAssetToken(file) })
+    expect(await resolveLessonVideoSource(payload, student, assetParams, true)).toEqual({ kind: 'yandex', ref: { publicKey: ROOT, path: "/SQL (2021)/[SLIV.ONE] O'Reilly/index.html" } })
+  })
+
+  it('адрес в скобках внутри обычного текста по-прежнему вырезается без закрывающей скобки', () => {
+    const safe = protectLessonVideoSources({ id: 42, description: `Конспект (${ROOT}/notes.pdf) и сайт (https://nextjs.org/docs).`, content: [] })
+    expect(safe.description).toMatch(/^Конспект \(\/api\/learning-assets\?lesson=42&block=description&asset=[a-z\d]+\) и сайт \(https:\/\/nextjs\.org\/docs\)\.$/)
+  })
+
   it('повторная защита сохраняет стабильные ID и URL', () => {
     const once = protectLessonVideoSources({ id: 42, content: content() })
     expect(protectLessonVideoSources(once)).toEqual(once)

@@ -6,6 +6,7 @@ import { CourseLessonItem } from '@/components/course/CourseLessonItem'
 import { ShareButton } from '@/components/ui/ShareButton'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, ChevronDown, Clock, Lock, PartyPopper } from 'lucide-react'
+import { routeSlug } from '@/lib/route-slug'
 import { collectAllPages } from '@/lib/paginate'
 import { relationKey } from '@/lib/course-lessons'
 import { pluralize } from '@/lib/utils'
@@ -19,7 +20,7 @@ type Props = {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params
+  const slug = routeSlug((await params).slug)
   const { payload, user, req } = await getLearningRequest()
   if (!user) return { title: 'Вход' }
   const access = await getLearningAccess(payload, user, req)
@@ -37,7 +38,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function CourseDetailPage({ params }: Props) {
-  const { slug } = await params
+  const slug = routeSlug((await params).slug)
   const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login')
   const access = await getLearningAccess(payload, user, req)

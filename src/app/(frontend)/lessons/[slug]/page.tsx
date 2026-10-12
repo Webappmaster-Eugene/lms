@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Clock } from 'lucide-react'
 import { LessonLearningProvider } from '@/components/lesson/LessonLearningProvider'
+import { routeSlug } from '@/lib/route-slug'
 import { learningVideos } from '@/lib/learning-state'
 import { ContentBlockRenderer } from '@/components/lesson/ContentBlockRenderer'
 import { CompletionButton } from '@/components/lesson/CompletionButton'
@@ -29,7 +30,7 @@ type Props = {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params
+  const slug = routeSlug((await params).slug)
   const { payload, user, req } = await getLearningRequest()
   if (!user) return { title: 'Урок' }
   const result = await payload.find({
@@ -46,7 +47,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function LessonPage({ params }: Props) {
-  const { slug } = await params
+  const slug = routeSlug((await params).slug)
   const { payload, user, req } = await getLearningRequest()
   if (!user) redirect(`/login?redirect=${encodeURIComponent(`/lessons/${slug}`)}`)
   const policy = await getLearningAccess(payload, user, req)

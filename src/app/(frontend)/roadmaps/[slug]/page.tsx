@@ -3,6 +3,7 @@ import { getLearningRequest } from '@/server/learning-request'
 import { notFound, redirect } from 'next/navigation'
 import { getLearningAccess } from '@/server/learning-access'
 import { getRoadmapContent } from '@/server/learning-catalog'
+import { routeSlug } from '@/lib/route-slug'
 import { orderRoadmapNodes } from '@/lib/roadmap-sequence'
 import { groupCoursesByNode, summarizeNode } from '@/lib/roadmap-node-courses'
 import {
@@ -30,7 +31,7 @@ type Props = {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params
+  const slug = routeSlug((await params).slug)
   const { payload, user, req } = await getLearningRequest()
   if (!user) return { title: 'Вход' }
   const access = await getLearningAccess(payload, user, req)
@@ -48,7 +49,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function RoadmapDetailPage({ params }: Props) {
-  const { slug } = await params
+  const slug = routeSlug((await params).slug)
   const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login')
   const access = await getLearningAccess(payload, user, req)

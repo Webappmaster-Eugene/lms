@@ -6,19 +6,37 @@ type ContentBlock = NonNullable<Lesson['content']>[number]
 const VIDEO_EXTENSION = /\.(?:mp4|m4v|webm|mov|mkv|avi|ts|flv|wmv)$/i
 const MATERIALS_NOTICE = 'Материалы курса доступны в уроках LMS'
 
+const URL_IN_TEXT = /https?:\/\/[^\s<>"'()[\]]+/gi
+
+/**
+ * Поле-ссылка хранит адрес целиком, а в пути Диска скобки и апострофы — часть имени
+ * («Курс (2024)/урок.pdf»). Правило для прозы обрезало бы такой адрес на первой скобке.
+ */
+export function wholeResourceUrl(value: string): string | null {
+  const candidate = value.trim()
+  return /^https?:\/\/\S+$/i.test(candidate) && (parsePublicResourceUrl(candidate) || mediaFilePath(candidate)) ? candidate : null
+}
+
+function urlsInText(value: string): string[] {
+  const whole = wholeResourceUrl(value)
+  return whole ? [whole] : value.match(URL_IN_TEXT) ?? []
+}
+
 export function isYandexCatalogUrl(rawUrl: string): boolean {
   const ref = parsePublicResourceUrl(rawUrl)
   return !!ref && new URL(ref.publicKey).pathname.startsWith('/d/') && (!ref.path || !/\.[a-z\d]{1,8}$/i.test(ref.path))
 }
 
 function redactResourceText(value: string, replacements: Map<string, string> = new Map()): string {
-  return value.replace(/https?:\/\/[^\s<>"'()[\]]+/gi, (url) => {
+  const redact = (url: string): string => {
     const replacement = replacements.get(url)
     if (replacement) return replacement
     if (isYandexCatalogUrl(url)) return MATERIALS_NOTICE
     if (parsePublicResourceUrl(url)) return MATERIALS_NOTICE
     return isLessonVideoUrl(url) ? 'Видео доступно в плеере урока' : url
-  })
+  }
+  const whole = wholeResourceUrl(value)
+  return whole ? redact(whole) : value.replace(URL_IN_TEXT, redact)
 }
 
 export function protectProgramText(value: string): string {
@@ -94,8 +112,7 @@ export function protectLessonVideoSources<T extends Pick<Lesson, 'id' | 'content
   const replacements = new Map<string, string>()
   const collectAssetLinks = (value: unknown, blockId: string): void => {
     if (typeof value === 'string') {
-      for (const match of value.matchAll(/https?:\/\/[^\s<>"'()[\]]+/gi)) {
-        const url = match[0]
+      for (const url of urlsInText(value)) {
         if (parsePublicResourceUrl(url) && !isYandexCatalogUrl(url) && !isLessonVideoUrl(url)) {
           replacements.set(url, lessonAssetUrl(lesson.id, blockId, url))
         }
