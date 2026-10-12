@@ -7,6 +7,7 @@ import {
 } from 'payload'
 import config from '@payload-config'
 import { ContentError, canonicalContent, contentCollection, contentId, validateContentInput, type ContentCollection } from './validation'
+import { SlidesError } from '@/server/slides-folder'
 
 interface Executor {
   execute: (query: ReturnType<typeof sql>) => Promise<unknown>
@@ -150,6 +151,8 @@ async function validateMedia(req: PayloadRequest, data: Record<string, unknown>)
 
 function errorResponse(error: unknown): Response {
   if (error instanceof ContentError) return Response.json({ error: error.message }, { status: error.status })
+  // Текст написан для администратора: без него «проверьте поля» не объясняет, что не так с папкой Диска.
+  if (error instanceof SlidesError) return Response.json({ error: error.message }, { status: 400 })
   const status = error instanceof Error && 'status' in error && typeof error.status === 'number' ? error.status : 500
   if (status === 404) return Response.json({ error: 'Материал не найден' }, { status: 404 })
   if (status === 403 || status === 401) return Response.json({ error: 'Недостаточно прав для изменения контента' }, { status })

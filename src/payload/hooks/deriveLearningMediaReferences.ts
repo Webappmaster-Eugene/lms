@@ -1,7 +1,7 @@
 import type { CollectionBeforeChangeHook, PayloadRequest } from 'payload'
 import { sql } from '@payloadcms/db-postgres'
 
-import { mediaFilePath } from '@/lib/lesson-video-source'
+import { mediaFilePath, wholeMediaPath } from '@/lib/lesson-video-source'
 import { collectAllPages } from '@/lib/paginate'
 import type { Lesson } from '@/payload-types'
 import { consumeRawCollectionPatch } from '@/payload/hooks/rawCollectionPatch'
@@ -16,7 +16,9 @@ export async function deriveMediaReferenceIds(req: PayloadRequest, lesson: Pick<
   const filenames = new Set<string>()
   const scan = (value: unknown) => {
     if (typeof value === 'string') {
-      const urls = value.match(/(?:https?:\/\/[^\s<>"'()[\]]+|\/api\/media\/file\/[^\s<>"'()[\]]+)/gi) ?? []
+      // Правило для прозы обрывает адрес на скобке; поле-адрес берётся целиком.
+      const whole = wholeMediaPath(value)
+      const urls = whole ? [whole] : value.match(/(?:https?:\/\/[^\s<>"'()[\]]+|\/api\/media\/file\/[^\s<>"'()[\]]+)/gi) ?? []
       for (const url of urls) {
         const pathname = mediaFilePath(url)
         if (!pathname) continue

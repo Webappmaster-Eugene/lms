@@ -46,6 +46,25 @@ describe('содержимое урока', () => {
   })
 
   describe('виды блоков', () => {
+    it('презентация показывается листалкой со своим названием и описанием', () => {
+      renderBlocks([{
+        blockType: 'slides', id: 'deck', title: 'Как фильтруют резюме', description: 'Семь слайдов о воронке найма',
+        items: [
+          { id: 's1', url: '/api/learning-assets?lesson=7&block=deck&asset=a1', fileName: '1.png', caption: 'Воронка' },
+          { id: 's2', url: '/api/learning-assets?lesson=7&block=deck&asset=a2', fileName: '2.png' },
+        ],
+      }])
+      expect(screen.getByRole('heading', { name: 'Как фильтруют резюме' })).toBeInTheDocument()
+      expect(screen.getByText('Семь слайдов о воронке найма')).toBeInTheDocument()
+      expect(screen.getByRole('group', { name: 'Как фильтруют резюме' })).toBeInTheDocument()
+      expect(screen.getByRole('img', { name: 'Воронка' })).toHaveAttribute('src', '/api/learning-assets?lesson=7&block=deck&asset=a1')
+    })
+
+    it('презентация без списка файлов не роняет урок', () => {
+      renderBlocks([{ blockType: 'slides', id: 'deck', title: 'Скоро' }])
+      expect(screen.getByText('В этой презентации пока нет файлов.')).toBeInTheDocument()
+    })
+
     it('показывает Payload-ссылку из редактора LMS и сохраняет режим вкладки', () => {
       renderBlocks([{ blockType: 'text', content: { root: { children: [{ type: 'paragraph', children: [{ type: 'link', version: 3, fields: { linkType: 'custom', url: 'https://nodejs.org', newTab: false }, children: [{ type: 'text', text: 'Документация Node.js', format: 1 }] }] }] } } }])
       const link = screen.getByRole('link', { name: 'Документация Node.js' })

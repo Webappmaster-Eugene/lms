@@ -24,6 +24,7 @@ import * as migration_20261010_184804_trainer_python_interview_metadata from './
 import * as migration_20261010_211458_interview_library from './20261010_211458_interview_library';
 import * as migration_20261010_212032_interview_analysis_usage from './20261010_212032_interview_analysis_usage';
 import * as migration_20261011_074547_checkfrod_interview_integration from './20261011_074547_checkfrod_interview_integration';
+import * as migration_20261012_170329_slides_block from './20261012_170329_slides_block';
 
 export const migrations = [
   {
@@ -154,6 +155,11 @@ export const migrations = [
   {
     up: migration_20261011_074547_checkfrod_interview_integration.up,
     down: migration_20261011_074547_checkfrod_interview_integration.down,
-    name: '20261011_074547_checkfrod_interview_integration'
+    name: '20261011_074547_checkfrod_interview_integration',
+  },
+  {
+    up: migration_20261012_170329_slides_block.up,
+    down: migration_20261012_170329_slides_block.down,
+    name: '20261012_170329_slides_block'
   },
 ];

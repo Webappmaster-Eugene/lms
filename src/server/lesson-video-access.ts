@@ -1,6 +1,6 @@
 import type { Payload } from 'payload'
 
-import type { User } from '@/payload-types'
+import type { Lesson, User } from '@/payload-types'
 import { blockVideoId, blockVideoSource, mediaFilePath, wholeResourceUrl } from '@/lib/lesson-video-source'
 import { parsePublicResourceUrl, type PublicResourceRef } from '@/lib/yandex-disk-url'
 import { canAccessLesson } from '@/server/learning-access'
@@ -52,9 +52,11 @@ export async function resolveLessonVideoSource(
       if (!await canAccessLesson(payload, user, lesson)) throw new LessonVideoAccessError('Видео недоступно', 403)
     }
     const block = lesson.content?.find((candidate, index) => blockVideoId(candidate, index) === blockId)
-    const source = allowMaterial
-      ? materialSource(blockId === 'description' ? lesson.description : block, asset)
-      : block ? blockVideoSource(block) : null
+    const source = !allowMaterial
+      ? block ? blockVideoSource(block) : null
+      : block?.blockType === 'slides'
+        ? slideSource(block, asset)
+        : materialSource(blockId === 'description' ? lesson.description : block, asset)
     if (!source) throw new LessonVideoAccessError('Видео не найдено', 404)
     rawUrl = source
   } else {
@@ -75,6 +77,15 @@ export async function resolveLessonVideoSource(
   const path = mediaFilePath(rawUrl)
   if (path) return { kind: 'media', path }
   throw new LessonVideoAccessError('Источник видео не поддерживается', 400)
+}
+
+/**
+ * Файл презентации ищется только в списке файлов и только по своему идентификатору:
+ * общий обход блока без идентификатора вернул бы первый адрес — папку целиком.
+ */
+function slideSource(block: Extract<NonNullable<Lesson['content']>[number], { blockType: 'slides' }>, token: string | null): string | null {
+  if (!token) return null
+  return block.items?.find((item) => lessonAssetToken(item.url) === token)?.url ?? null
 }
 
 function materialSource(value: unknown, token: string | null): string | null {

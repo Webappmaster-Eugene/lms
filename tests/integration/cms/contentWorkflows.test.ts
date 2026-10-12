@@ -71,6 +71,48 @@ describe('практические операции lms-content через REST 
     expect((await rest('PATCH', `/lessons/${lesson.id}`, { token: studentToken, body: { title: 'Чужая правка' } })).status).toBe(403)
   })
 
+  it('хранит презентацию в уроке: имена файлов вычисляет сервер, ученик не видит ссылок Диска', async () => {
+    const folder = 'https://disk.yandex.com/d/integration-key/guide'
+    const roadmap = await create('roadmaps', { title: `Карта ${uid('slides')}`, isPublished: true })
+    const course = await create('courses', { title: `Курс ${uid('slides')}`, roadmap: roadmap.id, isPublished: true })
+    const lesson = await create('lessons', {
+      title: `Гайд ${uid('slides')}`, course: course.id, isPublished: true,
+      content: [{
+        blockType: 'slides', title: 'Легенда', folderUrl: folder,
+        items: [{ url: `${folder}/2.png`, caption: ' Второй ', fileName: 'подмена.pdf' }, { url: `${folder}/guide.pdf` }],
+      }],
+    })
+    const saved = await rest('GET', `/lessons/${lesson.id}?depth=0`, { token: adminToken })
+    expect(saved.json).toMatchObject({ content: [{
+      blockType: 'slides', title: 'Легенда', folderUrl: folder,
+      items: [{ url: `${folder}/2.png`, fileName: '2.png', caption: 'Второй' }, { url: `${folder}/guide.pdf`, fileName: 'guide.pdf' }],
+    }] })
+
+    const seen = await rest('GET', `/lessons/${lesson.id}?depth=0`, { token: studentToken })
+    expect(seen.status).toBe(200)
+    expect(JSON.stringify(seen.json)).not.toContain('disk.yandex')
+    expect(seen.json).toMatchObject({ content: [{
+      blockType: 'slides', folderUrl: null,
+      items: [
+        { fileName: '2.png', caption: 'Второй', url: expect.stringMatching(new RegExp(`^/api/learning-assets\\?lesson=${lesson.id}&block=[^&]+&asset=[a-z\\d]+$`)) },
+        { fileName: 'guide.pdf', url: expect.stringContaining('/api/learning-assets?') },
+      ],
+    }] })
+
+    // Порядок и состав задаёт администратор: правка заменяет список целиком.
+    const blocks = saved.json.content
+    if (!Array.isArray(blocks)) throw new Error('Нет блоков урока')
+    await patch('lessons', lesson.id, { slug: lesson.slug, content: [{ ...blocks[0], items: [{ url: `${folder}/guide.pdf` }] }] })
+    const trimmed = await rest('GET', `/lessons/${lesson.id}?depth=0`, { token: adminToken })
+    expect(trimmed.json).toMatchObject({ content: [{ items: [{ fileName: 'guide.pdf' }] }] })
+
+    for (const items of [[{ url: 'https://example.com/a.png' }], [{ url: `${folder}/video.mp4` }]]) {
+      const rejected = await rest('PATCH', `/lessons/${lesson.id}`, { token: adminToken, body: { slug: lesson.slug, content: [{ blockType: 'slides', title: 'Легенда', items }] } })
+      expect(rejected.status).toBe(400)
+    }
+    expect((await rest('GET', `/lessons/${lesson.id}?depth=0`, { token: adminToken })).json).toMatchObject({ content: [{ items: [{ fileName: 'guide.pdf' }] }] })
+  })
+
   it('изменяет карту с числовыми связями и привязкой курса, сохраняя граф', async () => {
     const key = uid('graph')
     const roadmap = await create('roadmaps', { title: `Карта ${key}`, slug: key })

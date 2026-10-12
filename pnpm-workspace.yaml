@@ -9,3 +9,8 @@ allowBuilds:
   # Готовых бинарников под все связки Node/ABI нет — собирается из исходников,
   # поэтому в Dockerfile для стадии deps добавлены python3/make/g++.
   isolated-vm: true
+
+# pdfjs-dist рисует PDF в браузере ученика. Его необязательный @napi-rs/canvas нужен только
+# для рендера в Node и тянул бы в образ лишний нативный бинарник.
+ignoredOptionalDependencies:
+  - '@napi-rs/canvas'

@@ -4,9 +4,11 @@ import { VideoPlayer } from './VideoPlayer'
 import { MiroEmbed } from './MiroEmbed'
 import { ExternalLinkBlock } from './ExternalLink'
 import { MarkdownRenderer } from './MarkdownRenderer'
+import { SlidesBlock } from './SlidesBlock'
 import { FileDown } from 'lucide-react'
 import type { LearningVideo } from '@/lib/learning-state'
 import type { Lesson } from '@/payload-types'
+import type { SlideItem } from '@/lib/slides'
 
 type ContentBlock = {
   id?: string | null
@@ -58,6 +60,14 @@ function renderBlock(block: ContentBlock, memoryId?: string) {
       return renderMiroBlock(block)
     case 'file':
       return renderFileBlock(block)
+    case 'slides':
+      return (
+        <SlidesBlock
+          title={block.title as string}
+          description={block.description as string | null}
+          items={Array.isArray(block.items) ? block.items as SlideItem[] : []}
+        />
+      )
     default:
       return null
   }

@@ -65,6 +65,33 @@ describe('Валидация управления учебным контент�
     expect(() => validateContentInput('lessons', { title: 'Урок', course: 1, content: [{ blockType: 'miro', title: 'Доска', embedUrl: 'https://evil.test/app/embed/a' }] })).toThrow('miro.com')
   })
 
+  it('презентация принимает файлы Диска и медиатеки или одну ссылку на папку', () => {
+    const lesson = (block: Record<string, unknown>) => ({ title: 'Урок', course: 1, content: [{ blockType: 'slides', title: 'Гайд', ...block }] })
+    const file = 'https://disk.yandex.ru/d/key/%D0%93%D0%B0%D0%B9%D0%B4/1.png'
+    expect(() => validateContentInput('lessons', lesson({ items: [{ id: 'a', url: file, fileName: '1.png', caption: 'Начало' }, { url: '/api/media/file/scheme.png' }] }))).not.toThrow()
+    expect(() => validateContentInput('lessons', lesson({ folderUrl: 'https://disk.yandex.ru/d/key/guide', items: [] }))).not.toThrow()
+    expect(() => validateContentInput('lessons', lesson({ description: 'Слайды', folderUrl: '', items: [{ url: 'https://disk.yandex.ru/i/single' }] }))).not.toThrow()
+  })
+
+  it.each<[string, Record<string, unknown>, string]>([
+    ['нет ни файлов, ни папки', { items: [], folderUrl: ' ' }, 'добавьте файлы или ссылку на папку'],
+    ['чужой сайт', { items: [{ url: 'https://example.com/a.png' }] }, 'файл 1: нужна ссылка на файл на Яндекс Диске'],
+    ['видео', { items: [{ url: 'https://disk.yandex.ru/d/key/a.png' }, { url: 'https://disk.yandex.ru/d/key/lesson.mp4' }] }, 'файл 2: видео добавляйте блоком «Видео»'],
+    ['папка в списке файлов', { items: [{ url: 'https://disk.yandex.ru/d/key' }] }, 'ссылка на папку'],
+    ['пробел в адресе', { items: [{ url: 'https://disk.yandex.ru/d/key/a b.png' }] }, 'недопустимые символы'],
+    ['папка не ссылкой', { folderUrl: 'guide', items: [] }, 'публичная ссылка Яндекс Диска'],
+    ['в поле папки ссылка на отдельный файл', { folderUrl: 'https://disk.yandex.ru/i/AbCdEf123', items: [] }, 'ссылка на отдельный файл'],
+    ['лишнее поле файла', { items: [{ url: '/api/media/file/a.png', html: '<b>' }] }, 'нельзя изменять'],
+    ['слишком длинная подпись', { items: [{ url: '/api/media/file/a.png', caption: 'x'.repeat(301) }] }, '300'],
+    ['больше 300 файлов', { items: Array.from({ length: 301 }, (_, index) => ({ url: `/api/media/file/${index}.png` })) }, 'не более 300'],
+  ])('презентация: %s — отказ с объяснением', (_label, block, message) => {
+    expect(() => validateContentInput('lessons', { title: 'Урок', course: 1, content: [{ blockType: 'slides', title: 'Гайд', ...block }] })).toThrow(message)
+  })
+
+  it('презентация без названия не сохраняется', () => {
+    expect(() => validateContentInput('lessons', { title: 'Урок', course: 1, content: [{ blockType: 'slides', title: ' ', items: [{ url: '/api/media/file/a.png' }] }] })).toThrow('Название блока')
+  })
+
   it('не принимает неожиданные поля блока или повторные IDs', () => {
     expect(() => validateContentInput('lessons', { title: 'Урок', course: 1, content: [{ blockType: 'text', content: richText, html: '<script>' }] })).toThrow('нельзя изменять')
     expect(() => validateContentInput('lessons', { title: 'Урок', course: 1, content: [{ blockType: 'text', content: richText, id: 'same' }, { blockType: 'text', content: richText, id: 'same' }] })).toThrow('повторяться')

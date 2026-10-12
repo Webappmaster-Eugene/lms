@@ -465,7 +465,7 @@ export interface Lesson {
   order?: number | null;
   isPublished?: boolean | null;
   estimatedMinutes?: number | null;
-  content?: (TextBlock | VideoBlock | ImageBlock | LinkBlock | MiroBlock | FileBlock)[] | null;
+  content?: (TextBlock | VideoBlock | ImageBlock | LinkBlock | MiroBlock | FileBlock | SlidesBlock)[] | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -558,6 +558,35 @@ export interface FileBlock {
   id?: string | null;
   blockName?: string | null;
   blockType: 'file';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "SlidesBlock".
+ */
+export interface SlidesBlock {
+  title: string;
+  description?: string | null;
+  /**
+   * Если список файлов пуст, при сохранении он заполнится файлами этой папки по порядку имён. Чтобы перечитать папку, очистите список и сохраните.
+   */
+  folderUrl?: string | null;
+  /**
+   * Картинки листаются как слайды, PDF — постранично, остальные файлы ученик скачивает.
+   */
+  items?:
+    | {
+        url: string;
+        /**
+         * Определяется по ссылке при сохранении.
+         */
+        fileName?: string | null;
+        caption?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'slides';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1843,6 +1872,7 @@ export interface LessonsSelect<T extends boolean = true> {
         link?: T | LinkBlockSelect<T>;
         miro?: T | MiroBlockSelect<T>;
         file?: T | FileBlockSelect<T>;
+        slides?: T | SlidesBlockSelect<T>;
       };
   updatedAt?: T;
   createdAt?: T;
@@ -1911,6 +1941,25 @@ export interface FileBlockSelect<T extends boolean = true> {
   title?: T;
   file?: T;
   description?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "SlidesBlock_select".
+ */
+export interface SlidesBlockSelect<T extends boolean = true> {
+  title?: T;
+  description?: T;
+  folderUrl?: T;
+  items?:
+    | T
+    | {
+        url?: T;
+        fileName?: T;
+        caption?: T;
+        id?: T;
+      };
   id?: T;
   blockName?: T;
 }

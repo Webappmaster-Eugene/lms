@@ -3,7 +3,7 @@ import { lessonAssetUrl } from '@/lib/lesson-asset-source'
 import type { Course, Lesson } from '@/payload-types'
 
 type ContentBlock = NonNullable<Lesson['content']>[number]
-const VIDEO_EXTENSION = /\.(?:mp4|m4v|webm|mov|mkv|avi|ts|flv|wmv)$/i
+export const VIDEO_EXTENSION = /\.(?:mp4|m4v|webm|mov|mkv|avi|ts|flv|wmv)$/i
 const MATERIALS_NOTICE = 'Материалы курса доступны в уроках LMS'
 
 const URL_IN_TEXT = /https?:\/\/[^\s<>"'()[\]]+/gi
@@ -67,6 +67,12 @@ export function protectCourseSourceLinks<T extends Pick<Course, 'slug' | 'descri
   return { ...course, description: redactResourceTree(course.description, new Map(), `/courses/${course.slug}`) as Course['description'] }
 }
 
+/** Поле, целиком занятое адресом файла медиатеки: в имени файла допустимы скобки и апостроф. */
+export function wholeMediaPath(value: string): string | null {
+  const candidate = value.trim()
+  return /^\/api\/media\/file\/[^\s?#]+$/.test(candidate) ? candidate : null
+}
+
 export function mediaFilePath(rawUrl: string): string | null {
   try {
     const url = new URL(rawUrl, 'https://local.invalid')
@@ -124,7 +130,10 @@ export function protectLessonVideoSources<T extends Pick<Lesson, 'id' | 'content
     }
   }
   collectAssetLinks(lesson.description, 'description')
-  for (const [index, block] of (lesson.content ?? []).entries()) collectAssetLinks(block, blockVideoId(block, index))
+  for (const [index, block] of (lesson.content ?? []).entries()) {
+    // Файлы презентации заменяются ниже по полю, а её папка не должна стать «материалом».
+    if (block.blockType !== 'slides') collectAssetLinks(block, blockVideoId(block, index))
+  }
   const blocks = (lesson.content ?? []).map((block, index): ContentBlock => {
     if (block.blockType === 'link' && isYandexCatalogUrl(block.url)) {
       return {
@@ -135,6 +144,20 @@ export function protectLessonVideoSources<T extends Pick<Lesson, 'id' | 'content
           type: 'root', direction: 'ltr', format: '', indent: 0, version: 1,
           children: [{ type: 'paragraph', version: 1, children: [{ type: 'text', text: MATERIALS_NOTICE, format: 0, detail: 0, mode: 'normal', style: '', version: 1 }] }],
         } },
+      }
+    }
+    if (block.blockType === 'slides') {
+      const blockId = blockVideoId(block, index)
+      return {
+        ...block,
+        // Папка-источник нужна только редактору: ученик получает файлы по одному через прокси.
+        folderUrl: null,
+        // Адрес заменяется по полю, а не поиском в тексте. Всё, что не файл Диска
+        // и не файл медиатеки, ученику не уходит вовсе.
+        items: (block.items ?? []).flatMap((item) => {
+          if (item.url.startsWith('/api/media/file/')) return [item]
+          return parsePublicResourceUrl(item.url) ? [{ ...item, url: lessonAssetUrl(lesson.id, blockId, item.url) }] : []
+        }),
       }
     }
     const source = blockVideoSource(block)

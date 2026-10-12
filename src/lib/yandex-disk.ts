@@ -95,6 +95,26 @@ export async function fetchPublicFolderContents(
   return items
 }
 
+/** Имя и вид публичного ресурса: по ссылке на отдельный файл (`/i/…`) имя иначе не узнать. */
+export async function fetchPublicResourceMeta(
+  ref: PublicResourceRef,
+  options: { token?: string } = {},
+): Promise<{ name: string; type: 'file' | 'dir' }> {
+  const url = new URL(YD_API_BASE)
+  url.searchParams.set('public_key', ref.publicKey)
+  url.searchParams.set('limit', '1')
+  url.searchParams.set('fields', 'name,type')
+  if (ref.path) url.searchParams.set('path', ref.path)
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  if (options.token) headers['Authorization'] = `OAuth ${options.token}`
+  const response = await fetchWithRetry(url.toString(), { headers })
+  const data: Partial<YandexDiskResponse> = await response.json()
+  if (typeof data.name !== 'string' || (data.type !== 'file' && data.type !== 'dir')) {
+    throw new YandexDiskError('Яндекс.Диск не вернул описание файла', 502)
+  }
+  return { name: data.name, type: data.type }
+}
+
 /**
  * Рекурсивно получает всё содержимое папки, включая подпапки.
  */

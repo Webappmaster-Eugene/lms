@@ -1,3 +1,5 @@
+import { slideFolderProblem, slideUrlProblem, SLIDES_LIMIT } from '@/lib/slides'
+
 export type ContentCollection = 'courses' | 'sections' | 'lessons'
 
 export class ContentError extends Error {
@@ -136,6 +138,29 @@ const BLOCK_FIELDS: Record<string, readonly string[]> = {
   text: ['content'], video: ['title', 'videoUrl', 'displayMode', 'description', 'durationMinutes'],
   image: ['image', 'caption', 'altText'], link: ['title', 'url', 'platform', 'description'],
   miro: ['title', 'embedUrl', 'height'], file: ['title', 'file', 'description'],
+  slides: ['title', 'description', 'folderUrl', 'items'],
+}
+
+function validateSlides(block: Record<string, unknown>): void {
+  const folderUrl = typeof block.folderUrl === 'string' ? block.folderUrl.trim() : ''
+  if (block.folderUrl !== undefined && block.folderUrl !== null) {
+    text(block.folderUrl, 'Папка на Яндекс Диске', 4000)
+    const problem = folderUrl ? slideFolderProblem(folderUrl) : null
+    if (problem) throw new ContentError(`Презентация, папка: ${problem}`)
+  }
+  const items: unknown = block.items ?? []
+  if (!Array.isArray(items) || items.length > SLIDES_LIMIT) throw new ContentError(`Презентация: не более ${SLIDES_LIMIT} файлов`)
+  if (!items.length && !folderUrl) throw new ContentError('Презентация: добавьте файлы или ссылку на папку Яндекс Диска')
+  for (const [index, input] of items.entries()) {
+    const item = record(input, 'Файл презентации')
+    allowedFields(item, ['id', 'url', 'fileName', 'caption'])
+    if (item.id !== undefined && item.id !== null) text(item.id, 'ID файла презентации', 100, true)
+    validateContentUrl(item.url, true)
+    const problem = slideUrlProblem(String(item.url))
+    if (problem) throw new ContentError(`Презентация, файл ${index + 1}: ${problem}`)
+    if (item.fileName !== undefined) text(item.fileName, 'Имя файла', 500)
+    if (item.caption !== undefined) text(item.caption, 'Подпись слайда', 300)
+  }
 }
 
 function validateBlocks(value: unknown, existing: unknown): void {
@@ -157,7 +182,8 @@ function validateBlocks(value: unknown, existing: unknown): void {
     for (const key of ['description', 'caption', 'altText']) {
       if (block[key] !== undefined) text(block[key], key, key === 'description' ? 10_000 : 1000)
     }
-    if (['video', 'link', 'miro', 'file'].includes(String(block.blockType))) text(block.title, 'Название блока', 200, true)
+    if (['video', 'link', 'miro', 'file', 'slides'].includes(String(block.blockType))) text(block.title, 'Название блока', 200, true)
+    if (block.blockType === 'slides') validateSlides(block)
     if (block.blockType === 'text') {
       const prior: unknown = typeof block.id === 'string'
         ? previous.find((item: unknown) => item && typeof item === 'object' && 'id' in item && item.id === block.id && 'blockType' in item && item.blockType === 'text')

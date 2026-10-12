@@ -8,10 +8,11 @@ import { contentKey } from '@/lib/content-management/keys'
 import type { Lesson } from '@/payload-types'
 import { emptyRichText, RichTextEditor } from '@/components/content-management/RichTextEditor'
 import { MediaPicker } from '@/components/content-management/MediaPicker'
+import { freshSlides, SlidesEditor } from '@/components/content-management/SlidesEditor'
 
 type Blocks = NonNullable<Lesson['content']>
 type Block = Blocks[number]
-const names: Record<Block['blockType'], string> = { text: 'Текст', video: 'Видео', image: 'Изображение', link: 'Ссылка', miro: 'Miro-доска', file: 'Файл' }
+const names: Record<Block['blockType'], string> = { text: 'Текст', video: 'Видео', image: 'Изображение', link: 'Ссылка', miro: 'Miro-доска', file: 'Файл', slides: 'Презентация' }
 const fieldClass = 'mt-1 min-h-[44px] w-full rounded border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50'
 const buttonClass = 'inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded border px-3 py-2 text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50'
 
@@ -24,6 +25,7 @@ function freshBlock(type: Block['blockType']): Block {
     case 'link': return { id, blockType: type, title: '', url: '', platform: 'other' }
     case 'miro': return { id, blockType: type, title: '', embedUrl: '', height: 600 }
     case 'file': return { id, blockType: type, title: '', file: 0 }
+    case 'slides': return freshSlides()
   }
 }
 
@@ -58,7 +60,7 @@ export function LessonBlocks({ value, onChange, disabled = false }: { value: Blo
   }
   return <section className="space-y-4" aria-labelledby="lesson-materials-label">
     <div><h2 id="lesson-materials-label" className="text-xl font-semibold">Материалы урока</h2><p className="mt-1 text-sm text-muted-foreground">Добавляйте материалы в том порядке, в котором ученик будет их изучать.</p></div>
-    {!value.length && <p className="rounded border border-dashed p-6 text-sm text-muted-foreground">В уроке пока нет материалов. Начните с текста, видео или файла.</p>}
+    {!value.length && <p className="rounded border border-dashed p-6 text-sm text-muted-foreground">В уроке пока нет материалов. Начните с текста, видео, презентации или файла.</p>}
     {value.map((block, index) => {
       const key = block.id ?? index
       const id = `lesson-block-${key}`
@@ -103,6 +105,7 @@ export function LessonBlocks({ value, onChange, disabled = false }: { value: Blo
           <MediaPicker id={`${id}-file`} label="Файл для скачивания" value={typeof block.file === 'number' ? block.file : block.file.id} disabled={disabled} onChange={(file) => update(index, { file: file ?? 0 })} />
           <Description value={block.description} disabled={disabled} onChange={(description) => update(index, { description })} />
         </>}
+        {block.blockType === 'slides' && <SlidesEditor id={id} block={block} disabled={disabled} onChange={(patch) => update(index, patch)} />}
       </article>
     })}
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Добавить материал"><p className="mr-1 text-sm font-medium">Добавить материал:</p>{(Object.keys(names) as Block['blockType'][]).map((type) => <button key={type} type="button" className={buttonClass} disabled={disabled} onClick={() => onChange([...value, freshBlock(type)])}>{names[type]}</button>)}</div>
