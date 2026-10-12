@@ -120,7 +120,8 @@ ID ученика, администратора и ресурса — тольк
 `inherited`, `unrestricted`, `restricted`, `explicit_deny`, `unassigned`,
 `unauthenticated`, `unpublished`, `not_found`, `invalid_request`, `invalid_origin`,
 `invalid_range`, `invalid_source`, `rate_limited`, `upstream_unavailable`,
-`upstream_error`, `upstream_timeout`, `stream_error`, `internal_error`, `other`.
+`upstream_error`, `upstream_timeout`, `upstream_empty`, `stream_error`, `internal_error`,
+`other`.
 
 Разрешённые запросы увеличивают счётчики и добавляют события текущего span;
 они не создают отдельный JSON лог на каждый видео range. Отказы/ошибки

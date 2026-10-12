@@ -88,13 +88,19 @@ describe('видео выбирает плеер по контейнеру', () 
     expect(TS_PLAYER).toContain('Math.min(Math.max(seconds, first)')
   })
 
-  it('отказ нативного плеера переводит на поток, и только потом на карточку', () => {
-    // часть потоков лежит под именем .mp4 — по расширению их не отличить
-    expect(PLAYER).toContain("setMode('stream')")
-    expect(PLAYER).toContain("setMode('link')")
+  it('отказ плеера доходит до разбора причины с кодом ошибки браузера', () => {
     expect(PLAYER).toContain('onFailure={handleNativeFailure}')
-    expect(PLAYER).toContain('onError={onFailure}')
+    expect(PLAYER).toContain('onError={() => onFailure(videoRef.current?.error?.code)}')
     expect(PLAYER).toContain('onFailure={handleStreamFailure}')
+  })
+
+  it('в уроке отказ сначала проверяется по источнику: недоступный файл повторяется, а не уходит в чужой плеер', () => {
+    expect(PLAYER).toContain('checkLessonSource')
+    // часть потоков лежит под именем .mp4 — по расширению их не отличить
+    expect(PLAYER).toContain("check === 'transport-stream'")
+    expect(PLAYER).toContain("start('stream')")
+    expect(PLAYER).toContain('RETRY_DELAYS_MS')
+    expect(PLAYER).toContain('Попробовать снова')
   })
 })
 

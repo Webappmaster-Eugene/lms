@@ -136,12 +136,106 @@ describe('native Range and closed upstream sources', () => {
   it('does not apply the header timeout to a long live video body', async () => {
     vi.useFakeTimers()
     const controller = new AbortController()
-    upstream.mockImplementation(async () => new Response(new ReadableStream({ start() { /* open playback */ } })))
+    upstream.mockImplementation(async () => new Response(new ReadableStream({ start(stream) { stream.enqueue(new Uint8Array([1])) /* then open playback */ } })))
     const response = await upstreamLearningMedia(new Request('https://lms.test/media', { signal: controller.signal }), viewerId, ref)
     await vi.advanceTimersByTimeAsync(60000)
     expect(upstream.mock.calls[0][1].signal.aborted).toBe(false)
     controller.abort()
     await response.body?.cancel()
+    const releases = Array.from({ length: 6 }, () => acquireLearningStream(viewerId))
+    releases.forEach((release) => release())
+  })
+  const slotsAreFree = () => {
+    const releases = Array.from({ length: 6 }, () => acquireLearningStream(viewerId))
+    releases.forEach((release) => release())
+  }
+  const emptyAnswer = { status: 206, headers: { 'Content-Range': 'bytes 0-1/20', 'Content-Length': '2', 'Content-Type': 'video/mp4' } }
+  it.each([
+    ['closes the socket', (stream: ReadableStreamDefaultController<Uint8Array>) => stream.close()],
+    ['breaks the socket', (stream: ReadableStreamDefaultController<Uint8Array>) => stream.error(new Error('other side closed'))],
+  ])('a storage node that sends headers and %s without a byte becomes a clean 502, not a truncated 206', async (_name, end) => {
+    upstream.mockImplementation(async () => new Response(new ReadableStream<Uint8Array>({ start: end }), emptyAnswer))
+    const response = await upstreamLearningMedia(new Request('https://lms.test/media', { headers: { Range: 'bytes=0-1' } }), viewerId, ref)
+    expect(response.status).toBe(502)
+    expect(response.headers.get('Content-Range')).toBeNull()
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+    expect(await response.json()).toEqual({ error: 'Хранилище не отдало файл. Попробуйте позже' })
+    // A fresh link lands on the same storage node: a retry would only spend the shared download API quota.
+    expect(upstream).toHaveBeenCalledOnce()
+    expect(resolveHref).toHaveBeenCalledOnce()
+    expect(invalidateHref).not.toHaveBeenCalled()
+    const { recordLearningAccess } = await import('@/lib/learning-observability')
+    expect(recordLearningAccess).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'error', reason: 'upstream_empty' }))
+    slotsAreFree()
+  })
+  it('an expired link followed by an empty answer is still one refresh and a clean 502', async () => {
+    upstream.mockResolvedValueOnce(new Response('expired', { status: 403 }))
+      .mockResolvedValueOnce(new Response(new ReadableStream<Uint8Array>({ start(stream) { stream.close() } }), emptyAnswer))
+    const response = await upstreamLearningMedia(new Request('https://lms.test/media', { headers: { Range: 'bytes=0-1' } }), viewerId, ref)
+    expect(upstream).toHaveBeenCalledTimes(2)
+    expect(invalidateHref).toHaveBeenCalledOnce()
+    expect(response.status).toBe(502)
+    expect(await response.json()).toEqual({ error: 'Хранилище не отдало файл. Попробуйте позже' })
+    slotsAreFree()
+  })
+  it('a really empty file is not mistaken for a broken storage answer', async () => {
+    upstream.mockResolvedValue(new Response(new Uint8Array(0), { status: 200, headers: { 'Content-Length': '0', 'Content-Type': 'application/pdf' } }))
+    const response = await upstreamLearningMedia(new Request('https://lms.test/media'), viewerId, { ...ref, path: '/empty.pdf' })
+    expect(upstream).toHaveBeenCalledOnce()
+    expect(response.status).toBe(200)
+    expect((await response.arrayBuffer()).byteLength).toBe(0)
+  })
+  it('passes every later chunk in order after the first one it waited for', async () => {
+    const chunks = [[1], [2, 3], [4, 5, 6]]
+    upstream.mockResolvedValue(new Response(new ReadableStream<Uint8Array>({
+      pull(stream) { const next = chunks.shift(); if (next) stream.enqueue(new Uint8Array(next)); else stream.close() },
+    }), { status: 200, headers: { 'Content-Length': '6', 'Content-Type': 'video/mp4' } }))
+    const response = await upstreamLearningMedia(new Request('https://lms.test/media'), viewerId, ref)
+    expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([1, 2, 3, 4, 5, 6])
+    slotsAreFree()
+  })
+  it('a break after the first chunk is reported as a stream error and frees the slot', async () => {
+    let sent = false
+    upstream.mockResolvedValue(new Response(new ReadableStream<Uint8Array>({
+      pull(stream) { if (sent) stream.error(new Error('other side closed')); else { sent = true; stream.enqueue(new Uint8Array([1])) } },
+    }), { status: 200, headers: { 'Content-Length': '9', 'Content-Type': 'video/mp4' } }))
+    const response = await upstreamLearningMedia(new Request('https://lms.test/media'), viewerId, ref)
+    expect(response.status).toBe(200)
+    await expect(response.arrayBuffer()).rejects.toThrow()
+    const { recordLearningAccess } = await import('@/lib/learning-observability')
+    expect(recordLearningAccess).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'error', reason: 'stream_error' }))
+    slotsAreFree()
+  })
+  it('a viewer who stops watching closes the storage connection', async () => {
+    const cancelled = vi.fn()
+    upstream.mockResolvedValue(new Response(new ReadableStream<Uint8Array>({
+      pull(stream) { stream.enqueue(new Uint8Array([1])) },
+      cancel: cancelled,
+    }), { status: 200, headers: { 'Content-Type': 'video/mp4' } }))
+    const response = await upstreamLearningMedia(new Request('https://lms.test/media'), viewerId, ref)
+    const reader = (response.body as ReadableStream<Uint8Array>).getReader()
+    expect((await reader.read()).value).toEqual(new Uint8Array([1]))
+    await reader.cancel()
+    expect(cancelled).toHaveBeenCalledOnce()
+    slotsAreFree()
+  })
+  it('a viewer who leaves while the first byte is still awaited frees the slot at once', async () => {
+    const controller = new AbortController()
+    upstream.mockImplementation(async () => new Response(new ReadableStream<Uint8Array>({ start() { /* storage stalls after headers */ } }), emptyAnswer))
+    const pending = upstreamLearningMedia(new Request('https://lms.test/media', { headers: { Range: 'bytes=0-1' }, signal: controller.signal }), viewerId, ref)
+    const failure = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    controller.abort()
+    await failure
+    slotsAreFree()
+  })
+  it('headers without a first byte within the deadline are a timeout, and the slot is released', async () => {
+    vi.useFakeTimers()
+    upstream.mockImplementation(async () => new Response(new ReadableStream({ start() { /* storage stalls after headers */ } }), { status: 206, headers: { 'Content-Length': '2' } }))
+    const pending = upstreamLearningMedia(new Request('https://lms.test/media', { headers: { Range: 'bytes=0-1' } }), viewerId, ref)
+    const failure = expect(pending).rejects.toMatchObject({ reason: 'upstream_timeout' })
+    await vi.advanceTimersByTimeAsync(15001)
+    await failure
     const releases = Array.from({ length: 6 }, () => acquireLearningStream(viewerId))
     releases.forEach((release) => release())
   })

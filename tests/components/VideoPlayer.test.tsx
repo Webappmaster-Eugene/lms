@@ -3,9 +3,32 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/hooks/use-video-memory', () => ({ useVideoMemory: () => ({}) }))
 vi.mock('@/components/lesson/VideoMemoryBar', () => ({ VideoMemoryBar: () => null }))
-vi.mock('@/components/lesson/TransportStreamPlayer', () => ({ TransportStreamPlayer: ({ src, onFailure }: { src: string; onFailure: () => void }) => <button data-testid="transport-stream" data-src={src} onClick={onFailure}>Ошибка потока</button> }))
+vi.mock('@/components/lesson/TransportStreamPlayer', () => ({ TransportStreamPlayer: ({ src, onFailure }: { src: string; onFailure: (reason?: 'unsupported' | 'network') => void }) => (
+  <>
+    <button data-testid="transport-stream" data-src={src} onClick={() => onFailure()}>Ошибка потока</button>
+    <button onClick={() => onFailure('network')}>Обрыв сети</button>
+    <button onClick={() => onFailure('unsupported')}>Браузер без MediaSource</button>
+  </>
+) }))
 
 const { VideoPlayer } = await import('@/components/lesson/VideoPlayer')
+
+const fetchMock = vi.fn()
+/** Два пакета MPEG-TS: синхробайт 0x47 в начале каждого. */
+const transportStream = (() => { const bytes = new Uint8Array(376); bytes[0] = 0x47; bytes[188] = 0x47; return bytes })()
+const sourceResponse = (bytes: Uint8Array) => new Response(bytes.slice().buffer as ArrayBuffer, { status: 206 })
+/** Начало обычного MP4: бокс ftyp, а не синхробайт потока. */
+const mp4Head = new Uint8Array([0, 0, 0, 32, 102, 116, 121, 112])
+const flush = () => act(async () => { await vi.advanceTimersByTimeAsync(0) })
+const wait = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms) })
+const failNative = async (container: HTMLElement) => {
+  const video = container.querySelector('video')
+  expect(video).not.toBeNull()
+  if (video) fireEvent.error(video)
+  await flush()
+}
+beforeEach(() => { fetchMock.mockReset(); vi.stubGlobal('fetch', fetchMock) })
+afterEach(() => { vi.unstubAllGlobals() })
 
 describe('встроенное воспроизведение видео', () => {
   it('проигрывает видео медиатеки нативно, без iframe и обращения к API Яндекса', () => {
@@ -48,32 +71,224 @@ describe('встроенное воспроизведение видео', () =>
     expect(container.querySelector('iframe')).toHaveAttribute('src', 'https://www.youtube.com/embed/abcdefghijk')
   })
 
-  it('видео ученика всегда остаётся в LMS, даже при link-mode и ошибках обоих плееров', () => {
+  it('видео ученика всегда остаётся в LMS: поток под именем .mp4 уходит в потоковый плеер, а не наружу', async () => {
+    fetchMock.mockImplementation(async () => sourceResponse(transportStream))
     const url = '/api/yandex-disk/stream?lesson=42&block=video-1'
     const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="link" />)
     const video = container.querySelector('video')
     expect(video).toHaveAttribute('src', url)
     expect(video).toHaveAttribute('controlsList', 'nodownload')
     if (video) fireEvent.error(video)
-    expect(screen.getByTestId('transport-stream')).toHaveAttribute('data-src', '/api/yandex-disk/proxy?lesson=42&block=video-1')
-    fireEvent.click(screen.getByTestId('transport-stream'))
-    expect(screen.getByRole('alert')).toHaveTextContent('Видео не удалось загрузить')
+    expect(await screen.findByTestId('transport-stream')).toHaveAttribute('data-src', '/api/yandex-disk/proxy?lesson=42&block=video-1')
+    expect(fetchMock).toHaveBeenCalledWith(url, expect.objectContaining({ headers: { Range: 'bytes=0-375' }, credentials: 'same-origin' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Браузер без MediaSource' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Этот браузер не может воспроизвести запись')
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
     expect(container.querySelector('iframe')).not.toBeInTheDocument()
-  })
-
-  it('Media ученика не отправляется в MPEG-TS и не предлагает скачать исходник', () => {
-    const { container } = render(<VideoPlayer title="Урок" videoUrl="/api/yandex-disk/stream?lesson=42&block=v&source=media" displayMode="embed" />)
-    const video = container.querySelector('video')
-    if (video) fireEvent.error(video)
-    expect(screen.getByRole('alert')).toBeVisible()
-    expect(screen.queryByTestId('transport-stream')).not.toBeInTheDocument()
-    expect(screen.queryByRole('link')).not.toBeInTheDocument()
   })
 
   it('TS по закрытому адресу сразу использует потоковый плеер', () => {
     render(<VideoPlayer title="Урок" videoUrl="/api/yandex-disk/stream?lesson=42&block=v&format=ts" displayMode="embed" />)
     expect(screen.getByTestId('transport-stream')).toHaveAttribute('data-src', '/api/yandex-disk/proxy?lesson=42&block=v&format=ts')
+  })
+})
+
+describe('отказ плеера в уроке', () => {
+  const url = '/api/yandex-disk/stream?lesson=42&block=v'
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('файл приходит, но не играет: один перезапуск на случай разового сбоя, затем объяснение про браузер с кнопкой', async () => {
+    fetchMock.mockImplementation(async () => sourceResponse(mp4Head))
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
+
+    await failNative(container)
+    expect(screen.getByRole('status')).toBeVisible()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await wait(2000)
+    expect(container.querySelector('video')).toHaveAttribute('src', url)
+
+    await failNative(container)
+    expect(screen.getByRole('alert')).toHaveTextContent('Этот браузер не может воспроизвести запись')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Попробовать снова' }))
+    expect(container.querySelector('video')).toHaveAttribute('src', url)
+  })
+
+  it('Media ученика не отправляется в MPEG-TS и не предлагает скачать исходник', async () => {
+    fetchMock.mockImplementation(async () => sourceResponse(transportStream))
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={`${url}&source=media`} displayMode="embed" />)
+    await failNative(container)
+    await wait(2000)
+    await failNative(container)
+    expect(screen.getByRole('alert')).toBeVisible()
+    expect(screen.queryByTestId('transport-stream')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('администратор при неподдерживаемом формате не теряет ссылку на исходник', async () => {
+    const raw = 'https://disk.yandex.ru/d/key/lesson.mkv'
+    fetchMock.mockImplementation(async () => sourceResponse(mp4Head))
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={raw} displayMode="embed" />)
+    await failNative(container)
+    await wait(2000)
+    await failNative(container)
+    expect(screen.getByRole('alert')).toHaveTextContent('Этот браузер не может воспроизвести запись')
+    expect(screen.getByRole('link', { name: /Открыть на Яндекс Диске/ })).toHaveAttribute('href', raw)
+  })
+
+  it('потоковый плеер: ошибка разбора пришедшего файла объясняется браузером, обрыв сети — хранилищем', async () => {
+    fetchMock.mockImplementation(async () => sourceResponse(transportStream))
+    render(<VideoPlayer title="Урок" videoUrl={`${url}&format=ts`} displayMode="embed" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ошибка потока' }))
+    await flush()
+    await wait(2000)
+    fireEvent.click(screen.getByRole('button', { name: 'Ошибка потока' }))
+    await flush()
+    expect(screen.getByRole('alert')).toHaveTextContent('Этот браузер не может воспроизвести запись')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Попробовать снова' }))
+    for (const pause of [2000, 5000]) {
+      fireEvent.click(screen.getByRole('button', { name: 'Обрыв сети' }))
+      await flush()
+      expect(screen.getByRole('status')).toBeVisible()
+      await wait(pause)
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Обрыв сети' }))
+    await flush()
+    expect(screen.getByRole('alert')).toHaveTextContent('Видео сейчас не загружается')
+  })
+
+  it('сбои, разнесённые во времени, — разные происшествия: счёт повторов начинается заново', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 502 }))
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
+    await failNative(container)
+    await wait(2000)
+    await failNative(container)
+    await wait(5000)
+    await wait(180_000)
+    await failNative(container)
+    expect(screen.getByRole('status')).toBeVisible()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('повторяет загрузку сама и только после этого показывает понятное сообщение с кнопкой', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: 'Хранилище не отдало файл. Попробуйте позже' }), { status: 502 }))
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
+
+    await failNative(container)
+    expect(screen.getByRole('status')).toHaveTextContent('пробуем ещё раз')
+    expect(container.querySelector('video')).toBeNull()
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+    expect(container.querySelector('video')).toHaveAttribute('src', url)
+
+    await failNative(container)
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+    expect(container.querySelector('video')).toHaveAttribute('src', url)
+
+    await failNative(container)
+    expect(screen.getByRole('alert')).toHaveTextContent('Видео сейчас не загружается')
+    expect(screen.getByRole('alert')).toHaveTextContent('Текст, файлы и заметки урока доступны')
+    expect(screen.queryByTestId('transport-stream')).not.toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Попробовать снова' }))
+    expect(container.querySelector('video')).toHaveAttribute('src', url)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('пустой ответ и сетевой сбой проверки считаются недоступным источником, а не форматом', async () => {
+    fetchMock.mockResolvedValueOnce(sourceResponse(new Uint8Array())).mockRejectedValueOnce(new TypeError('fetch failed'))
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
+    await failNative(container)
+    expect(screen.getByRole('status')).toBeVisible()
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+    await failNative(container)
+    expect(screen.getByRole('status')).toBeVisible()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('обрыв сети посреди просмотра повторяется, даже если начало файла снова отвечает', async () => {
+    fetchMock.mockImplementation(async () => sourceResponse(new Uint8Array([0, 0, 0, 32, 102, 116, 121, 112])))
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
+    const video = container.querySelector('video') as HTMLVideoElement
+    Object.defineProperty(video, 'error', { value: { code: 2 }, configurable: true })
+    fireEvent.error(video)
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    expect(screen.getByRole('status')).toBeVisible()
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+    expect(container.querySelector('video')).toHaveAttribute('src', url)
+  })
+
+  it('администратор с исходной ссылкой получает те же повторы и ссылку на Диск, а ученик ссылки не видит', async () => {
+    const raw = 'https://disk.yandex.ru/d/key/lesson.mp4'
+    const stream = `/api/yandex-disk/stream?url=${encodeURIComponent(raw)}`
+    fetchMock.mockResolvedValue(new Response(null, { status: 502 }))
+    const { container, unmount } = render(<VideoPlayer title="Урок" videoUrl={raw} displayMode="embed" />)
+
+    await failNative(container)
+    expect(fetchMock).toHaveBeenLastCalledWith(stream, expect.anything())
+    expect(screen.queryByTestId('transport-stream')).not.toBeInTheDocument()
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+    expect(container.querySelector('video')).toHaveAttribute('src', stream)
+    await failNative(container)
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+    await failNative(container)
+    expect(screen.getByRole('alert')).toHaveTextContent('Видео сейчас не загружается')
+    expect(screen.getByRole('link', { name: /Открыть на Яндекс Диске/ })).toHaveAttribute('href', raw)
+    unmount()
+
+    const student = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
+    await failNative(student.container)
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+    await failNative(student.container)
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+    await failNative(student.container)
+    expect(screen.getByRole('alert')).toBeVisible()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('сбой потокового плеера тоже повторяется, а уход со страницы отменяет ожидание', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 502 }))
+    const { unmount } = render(<VideoPlayer title="Урок" videoUrl={`${url}&format=ts`} displayMode="embed" />)
+    fireEvent.click(screen.getByTestId('transport-stream'))
+    await flush()
+    expect(screen.getByRole('status')).toBeVisible()
+    expect(fetchMock).toHaveBeenCalledWith('/api/yandex-disk/proxy?lesson=42&block=v&format=ts', expect.anything())
+    await wait(2000)
+    expect(screen.getByTestId('transport-stream')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('transport-stream'))
+    await flush()
+    expect(vi.getTimerCount()).toBeGreaterThan(0)
+    unmount()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('проверка источника не висит дольше 20 секунд и читает только начало файла', async () => {
+    let pulls = 0
+    let released: AbortSignal | null | undefined
+    fetchMock.mockImplementationOnce((_url: string, init: RequestInit) => new Promise((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+    })).mockImplementationOnce(async (_url: string, init: RequestInit) => {
+      released = init.signal
+      // Сервер проигнорировал Range и отдаёт файл целиком.
+      return new Response(new ReadableStream<Uint8Array>({ pull(stream) { pulls += 1; stream.enqueue(new Uint8Array(1024)) } }), { status: 200 })
+    })
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
+
+    await failNative(container)
+    expect(screen.getByRole('status')).toBeVisible()
+    await wait(20_000)
+    await wait(2000)
+    expect(container.querySelector('video')).toHaveAttribute('src', url)
+
+    await failNative(container)
+    expect(released?.aborted).toBe(true)
+    expect(pulls).toBeLessThan(5)
   })
 })
 

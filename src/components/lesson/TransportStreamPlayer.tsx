@@ -18,7 +18,11 @@ type Props = {
    * считает такое видео бесконечным: нативная шкала пустая и перемотки нет.
    */
   durationMinutes?: number | null
-  onFailure: () => void
+  /**
+   * 'unsupported' — браузер не умеет MediaSource: повторять попытку бессмысленно.
+   * 'network' — файл перестал приходить; без пометки отказ считается ошибкой разбора.
+   */
+  onFailure: (reason?: 'unsupported' | 'network') => void
 }
 
 type PlayerHandle = {
@@ -74,7 +78,7 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
         if (cancelled) return
 
         if (!mpegts.isSupported()) {
-          onFailure()
+          onFailure('unsupported')
           return
         }
 
@@ -105,8 +109,8 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
           },
         )
 
-        player.on(mpegts.Events.ERROR, () => {
-          if (!cancelled) onFailure()
+        player.on(mpegts.Events.ERROR, (errorType: string) => {
+          if (!cancelled) onFailure(errorType === mpegts.ErrorTypes.NETWORK_ERROR ? 'network' : undefined)
         })
 
         player.attachMediaElement(element)
