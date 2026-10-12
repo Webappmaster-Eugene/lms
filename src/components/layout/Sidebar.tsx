@@ -31,25 +31,27 @@ import { SHORTCUTS_OPEN_EVENT } from './KeyboardShortcuts'
 import { cn } from '@/lib/utils'
 import { useSidebar } from './SidebarContext'
 import { disconnectDevicePush } from '@/lib/pwa-client'
+import { PLATFORM_SECTIONS, type PlatformSectionHref } from '@/lib/platform-sections'
 
-const NAV_ITEMS = [
-  { href: '/', label: 'Дашборд', icon: LayoutDashboard },
-  { href: '/roadmaps', label: 'Роадмапы', icon: Map },
-  { href: '/courses', label: 'Курсы', icon: GraduationCap },
-  { href: '/trainer', label: 'Тренажёр', icon: Code2 },
-  { href: '/interviews', label: 'Собеседования', icon: Film },
-  { href: '/learning-history', label: 'История обучения', icon: History },
-  { href: '/certificates', label: 'Сертификаты', icon: Award },
-  { href: '/notes', label: 'Заметки', icon: StickyNote },
-  { href: '/questions', label: 'Вопросы', icon: MessagesSquare },
-  { href: '/saved', label: 'Сохранённое', icon: Bookmark },
-  { href: '/leaderboard', label: 'Лидерборд', icon: Trophy },
-  { href: '/profile', label: 'Профиль', icon: User },
-  { href: '/settings/app', label: 'Приложение', icon: Smartphone },
-  { href: '/settings/notifications', label: 'Уведомления', icon: Bell },
-  { href: '/contacts', label: 'Контакты', icon: MessageCircle },
-  { href: '/help', label: 'Помощь', icon: HelpCircle },
-] as const
+const NAV_ICONS: Record<PlatformSectionHref, typeof LayoutDashboard> = {
+  '/': LayoutDashboard,
+  '/roadmaps': Map,
+  '/courses': GraduationCap,
+  '/trainer': Code2,
+  '/interviews': Film,
+  '/learning-history': History,
+  '/certificates': Award,
+  '/notes': StickyNote,
+  '/questions': MessagesSquare,
+  '/saved': Bookmark,
+  '/leaderboard': Trophy,
+  '/profile': User,
+  '/settings/app': Smartphone,
+  '/settings/notifications': Bell,
+  '/contacts': MessageCircle,
+  '/help': HelpCircle,
+}
+const NAV_ITEMS = PLATFORM_SECTIONS.map((section) => ({ ...section, icon: NAV_ICONS[section.href] }))
 
 export function Sidebar({ isAdmin = false, trainerEnabled = true }: { isAdmin?: boolean; trainerEnabled?: boolean }) {
   const pathname = usePathname()
@@ -78,13 +80,14 @@ export function Sidebar({ isAdmin = false, trainerEnabled = true }: { isAdmin?: 
 
       {/* Navigation */}
       <nav aria-label="Меню платформы" className={cn('flex-1 overflow-y-auto px-3 py-4', mobile ? 'grid grid-cols-1 gap-2 min-[360px]:grid-cols-2' : 'space-y-1')}>
-        {NAV_ITEMS.filter((item) => trainerEnabled || item.href !== '/trainer').map(({ href, label, icon: Icon }) => {
+        {NAV_ITEMS.filter((item) => trainerEnabled || item.href !== '/trainer').map(({ href, label, hint, icon: Icon }) => {
           const isActive = href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)
           return (
             <Link
               key={href}
               href={href}
               aria-current={isActive ? 'page' : undefined}
+              title={hint}
               onClick={() => setMobileOpen(false)}
               className={cn(
                 'flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring',

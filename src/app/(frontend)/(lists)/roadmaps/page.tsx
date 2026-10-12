@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { getLearningRequest } from '@/server/learning-request'
 import Link from 'next/link'
 import { Map as MapIcon } from 'lucide-react'
+import { lexicalPlainText } from '@/lib/lexical-text'
 import { collectAllPages } from '@/lib/paginate'
 import { relationId } from '@/lib/relation-id'
 import { pluralize } from '@/lib/utils'
@@ -24,7 +25,7 @@ export default async function RoadmapsPage() {
         overrideAccess: false,
         req,
         depth: 0,
-        select: { title: true, slug: true },
+        select: { title: true, slug: true, description: true },
         where: { isPublished: { equals: true } },
         sort: ['order', 'id'],
         page,
@@ -111,13 +112,19 @@ export default async function RoadmapsPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <h1 className="text-xl font-bold text-foreground sm:text-2xl">Роадмапы</h1>
+      <div className="space-y-2">
+        <h1 className="text-xl font-bold text-foreground sm:text-2xl">Роадмапы</h1>
+        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          Роадмап — карта направления: темы расположены в том порядке, в котором их стоит изучать, а за каждой темой стоят курсы. Выберите направление и идите по карте сверху вниз — так не придётся гадать, что учить дальше.
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {roadmapDocs.filter((roadmap) => access.canBrowseRoadmap(roadmap.id)).map((roadmap) => {
           const { courses = 0, lessons = 0, done = 0 } = stats.get(roadmap.id) ?? {}
           const percent = lessons > 0 ? Math.round((done / lessons) * 100) : 0
           const status = done === 0 ? 'Не начат' : done === lessons ? 'Пройден' : 'В процессе'
+          const description = lexicalPlainText(roadmap.description)
           return (
             <Link
               key={roadmap.id}
@@ -137,6 +144,7 @@ export default async function RoadmapsPage() {
                   </p>
                 </div>
               </div>
+              {description && <p className="mt-3 line-clamp-4 text-sm leading-relaxed text-muted-foreground">{description}</p>}
               <div className="mt-4 flex items-center gap-3">
                 <div
                   className="h-2 flex-1 overflow-hidden rounded-full bg-secondary"

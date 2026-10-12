@@ -123,6 +123,9 @@ export default async function CoursesListPage() {
         <BookOpen className="h-7 w-7 text-primary" />
         <h1 className="text-xl font-bold text-foreground sm:text-2xl">Курсы</h1>
       </div>
+      <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+        Курс — законченная программа из уроков по одной теме. Откройте карточку, чтобы прочитать, о чём курс и кому он нужен, и посмотреть программу. Не знаете, с чего начать, — выберите направление в разделе «Роадмапы»: там курсы расставлены по порядку.
+      </p>
 
       {coursesWithProgress.length === 0 ? (
         <p className="text-center text-muted-foreground py-12">Администратор ещё не назначил обучение</p>

@@ -3,6 +3,7 @@ import { getLearningRequest } from '@/server/learning-request'
 import { notFound, redirect } from 'next/navigation'
 import { getLearningAccess } from '@/server/learning-access'
 import { getRoadmapContent } from '@/server/learning-catalog'
+import { lexicalPlainText } from '@/lib/lexical-text'
 import { routeSlug } from '@/lib/route-slug'
 import { orderRoadmapNodes } from '@/lib/roadmap-sequence'
 import { groupCoursesByNode, summarizeNode } from '@/lib/roadmap-node-courses'
@@ -62,13 +63,14 @@ export default async function RoadmapDetailPage({ params }: Props) {
     },
     limit: 1,
     depth: 0,
-    select: { title: true, slug: true },
+    select: { title: true, slug: true, description: true },
     overrideAccess: false,
     req,
   })
 
   const roadmap = roadmapResult.docs[0]
   if (!roadmap || !access.canBrowseRoadmap(roadmap.id)) return notFound()
+  const roadmapDescription = lexicalPlainText(roadmap.description)
 
   const content = await getRoadmapContent(payload, roadmap.id, req)
   const nodeDocs = orderRoadmapNodes(content.nodes.filter((node) => access.canBrowseNode(node.id)), roadmap.slug)
@@ -274,6 +276,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
             </div>
           )}
         </div>
+        {roadmapDescription && <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">{roadmapDescription}</p>}
         <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
           <span>{pluralize(coursesWithProgress.length, 'курс', 'курса', 'курсов')}</span>
           <span>{pluralize(totalLessons, 'урок', 'урока', 'уроков')}</span>

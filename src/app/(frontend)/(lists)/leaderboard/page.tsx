@@ -34,7 +34,12 @@ export default async function LeaderboardPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-xl font-bold text-foreground sm:text-2xl">Лидерборд</h1>
+      <div className="space-y-2">
+        <h1 className="text-xl font-bold text-foreground sm:text-2xl">Лидерборд</h1>
+        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          Рейтинг учеников по баллам. Баллы начисляются за пройденные уроки и решённые задачи тренажёра — по таблице видно, как ваш темп выглядит на фоне остальных.
+        </p>
+      </div>
 
       <div className="space-y-2">
         {users.docs.map((user, index) => {

@@ -32,7 +32,12 @@ export default async function CertificatesPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <h1 className="text-xl font-bold text-foreground sm:text-2xl">Мои сертификаты</h1>
+      <div className="space-y-2">
+        <h1 className="text-xl font-bold text-foreground sm:text-2xl">Мои сертификаты</h1>
+        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          Сертификат появляется здесь автоматически, когда вы проходите все уроки курса или роадмапа. Он подтверждает, что программа пройдена целиком, — его можно открыть и показать работодателю.
+        </p>
+      </div>
 
       {docs.length === 0 ? (
         <div className="flex flex-col items-center gap-4 py-16">

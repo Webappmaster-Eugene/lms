@@ -1,16 +1,22 @@
 import type { Metadata } from 'next'
-import { getPayload } from '@/lib/payload'
+import Link from 'next/link'
 import { HelpCircle, MessageSquare } from 'lucide-react'
 import { FaqAccordion } from '@/components/help/FaqAccordion'
 import { SupportForm } from './SupportForm'
 import { collectAllPages } from '@/lib/paginate'
+import { PLATFORM_SECTIONS } from '@/lib/platform-sections'
+import { getLearningRequest } from '@/server/learning-request'
+import { getTrainerAccess } from '@/server/trainer-access'
 
 export const metadata: Metadata = {
   title: 'Помощь',
 }
 
 export default async function HelpPage() {
-  const payload = await getPayload()
+  const { payload, user, req } = await getLearningRequest()
+  // Справка перечисляет те же разделы, что и меню: тренажёр скрыт у тех, кому он не назначен.
+  const trainerEnabled = user ? (await getTrainerAccess(payload, user, req)).hasAccess : false
+  const sections = PLATFORM_SECTIONS.filter((section) => trainerEnabled || section.href !== '/trainer')
 
   const faqDocs = await collectAllPages(
     ({ page, limit }) =>
@@ -50,6 +56,9 @@ export default async function HelpPage() {
         <HelpCircle className="h-7 w-7 text-primary" />
         <h1 className="text-xl font-bold text-foreground sm:text-2xl">Помощь</h1>
       </div>
+      <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+        Здесь — ответы на частые вопросы, краткое описание каждого раздела платформы и форма, через которую можно написать администратору, если что-то не работает или непонятно.
+      </p>
 
       {/* Support channels */}
       <div className="grid gap-4 sm:grid-cols-2">
@@ -78,6 +87,22 @@ export default async function HelpPage() {
       <section>
         <h2 className="text-lg font-semibold text-foreground mb-4">Обратная связь</h2>
         <SupportForm />
+      </section>
+
+      <section aria-labelledby="platform-sections-title">
+        <h2 id="platform-sections-title" className="mb-4 text-lg font-semibold text-foreground">Разделы платформы</h2>
+        <dl className="divide-y divide-border rounded-xl border border-border bg-card">
+          {sections.map((section) => (
+            <div key={section.href} className="grid gap-1 px-5 py-3 sm:grid-cols-[11rem_1fr] sm:gap-4">
+              <dt>
+                <Link href={section.href} className="font-medium text-foreground underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-ring">
+                  {section.label}
+                </Link>
+              </dt>
+              <dd className="text-sm leading-relaxed text-muted-foreground">{section.hint}</dd>
+            </div>
+          ))}
+        </dl>
       </section>
 
       {/* FAQ */}
