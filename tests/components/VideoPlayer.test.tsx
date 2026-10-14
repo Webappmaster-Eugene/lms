@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { StrictMode } from 'react'
 
 vi.mock('@/hooks/use-video-memory', () => ({ useVideoMemory: () => ({}) }))
 vi.mock('@/components/lesson/VideoMemoryBar', () => ({ VideoMemoryBar: () => null }))
@@ -79,7 +80,7 @@ describe('встроенное воспроизведение видео', () =>
     expect(video).toHaveAttribute('src', url)
     expect(video).toHaveAttribute('controlsList', 'nodownload')
     if (video) fireEvent.error(video)
-    expect(await screen.findByTestId('transport-stream')).toHaveAttribute('data-src', '/api/yandex-disk/proxy?lesson=42&block=video-1')
+    expect(await screen.findByTestId('transport-stream')).toHaveAttribute('data-src', '/api/yandex-disk/proxy?lesson=42&block=video-1&playbackAttempt=1')
     expect(fetchMock).toHaveBeenCalledWith(url, expect.objectContaining({ headers: { Range: 'bytes=0-375' }, credentials: 'same-origin' }))
     fireEvent.click(screen.getByRole('button', { name: 'Браузер без MediaSource' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Этот браузер не может воспроизвести запись')
@@ -98,7 +99,40 @@ describe('отказ плеера в уроке', () => {
   beforeEach(() => { vi.useFakeTimers() })
   afterEach(() => { vi.useRealTimers() })
 
-  it('файл приходит, но не играет: один перезапуск на случай разового сбоя, затем объяснение про браузер с кнопкой', async () => {
+  it('останавливает старую загрузку; поздняя ошибка старого видео не отменяет новый запуск', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 502 }))
+    const load = vi.spyOn(HTMLMediaElement.prototype, 'load')
+    const { container, unmount } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
+    const previous = container.querySelector('video')
+    if (!previous) throw new Error('Видео отсутствует')
+    await failNative(container)
+    expect(previous).not.toHaveAttribute('src')
+    expect(load).toHaveBeenCalledOnce()
+    await wait(2000)
+    const current = container.querySelector('video')
+    expect(current).not.toBe(previous)
+    expect(current).toHaveAttribute('src', `${url}&playbackAttempt=1`)
+    fireEvent.error(previous)
+    await flush()
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(container.querySelector('video')).toBe(current)
+    unmount()
+    expect(current).not.toHaveAttribute('src')
+    expect(load).toHaveBeenCalledTimes(2)
+    load.mockRestore()
+  })
+
+  it('StrictMode восстанавливает источник после пробной отмены и сохраняет обработку ошибок', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 502 }))
+    const { container } = render(<StrictMode><VideoPlayer title="Урок" videoUrl={url} displayMode="embed" /></StrictMode>)
+    expect(container.querySelector('video')).toHaveAttribute('src', url)
+    await failNative(container)
+    expect(fetchMock).toHaveBeenCalledOnce()
+    await wait(2000)
+    expect(container.querySelector('video')).toHaveAttribute('src', `${url}&playbackAttempt=1`)
+  })
+
+  it('доступное начало файла не доказывает несовместимость браузера; повтор запрашивает новый ресурс', async () => {
     fetchMock.mockImplementation(async () => sourceResponse(mp4Head))
     const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
 
@@ -106,15 +140,15 @@ describe('отказ плеера в уроке', () => {
     expect(screen.getByRole('status')).toBeVisible()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     await wait(2000)
-    expect(container.querySelector('video')).toHaveAttribute('src', url)
+    expect(container.querySelector('video')).toHaveAttribute('src', `${url}&playbackAttempt=1`)
 
     await failNative(container)
-    expect(screen.getByRole('alert')).toHaveTextContent('Этот браузер не может воспроизвести запись')
+    expect(screen.getByRole('alert')).toHaveTextContent('Не удалось воспроизвести запись')
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Попробовать снова' }))
-    expect(container.querySelector('video')).toHaveAttribute('src', url)
+    expect(container.querySelector('video')).toHaveAttribute('src', `${url}&playbackAttempt=2`)
   })
 
   it('Media ученика не отправляется в MPEG-TS и не предлагает скачать исходник', async () => {
@@ -128,18 +162,18 @@ describe('отказ плеера в уроке', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
   })
 
-  it('администратор при неподдерживаемом формате не теряет ссылку на исходник', async () => {
+  it('администратор при отказе воспроизведения не теряет ссылку на исходник', async () => {
     const raw = 'https://disk.yandex.ru/d/key/lesson.mkv'
     fetchMock.mockImplementation(async () => sourceResponse(mp4Head))
     const { container } = render(<VideoPlayer title="Урок" videoUrl={raw} displayMode="embed" />)
     await failNative(container)
     await wait(2000)
     await failNative(container)
-    expect(screen.getByRole('alert')).toHaveTextContent('Этот браузер не может воспроизвести запись')
+    expect(screen.getByRole('alert')).toHaveTextContent('Не удалось воспроизвести запись')
     expect(screen.getByRole('link', { name: /Открыть на Яндекс Диске/ })).toHaveAttribute('href', raw)
   })
 
-  it('потоковый плеер: ошибка разбора пришедшего файла объясняется браузером, обрыв сети — хранилищем', async () => {
+  it('потоковый плеер различает отказ воспроизведения и подтверждённый обрыв сети', async () => {
     fetchMock.mockImplementation(async () => sourceResponse(transportStream))
     render(<VideoPlayer title="Урок" videoUrl={`${url}&format=ts`} displayMode="embed" />)
 
@@ -148,7 +182,7 @@ describe('отказ плеера в уроке', () => {
     await wait(2000)
     fireEvent.click(screen.getByRole('button', { name: 'Ошибка потока' }))
     await flush()
-    expect(screen.getByRole('alert')).toHaveTextContent('Этот браузер не может воспроизвести запись')
+    expect(screen.getByRole('alert')).toHaveTextContent('Не удалось воспроизвести запись')
 
     fireEvent.click(screen.getByRole('button', { name: 'Попробовать снова' }))
     for (const pause of [2000, 5000]) {
@@ -183,11 +217,11 @@ describe('отказ плеера в уроке', () => {
     expect(screen.getByRole('status')).toHaveTextContent('пробуем ещё раз')
     expect(container.querySelector('video')).toBeNull()
     await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
-    expect(container.querySelector('video')).toHaveAttribute('src', url)
+    expect(container.querySelector('video')).toHaveAttribute('src', `${url}&playbackAttempt=1`)
 
     await failNative(container)
     await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
-    expect(container.querySelector('video')).toHaveAttribute('src', url)
+    expect(container.querySelector('video')).toHaveAttribute('src', `${url}&playbackAttempt=2`)
 
     await failNative(container)
     expect(screen.getByRole('alert')).toHaveTextContent('Видео сейчас не загружается')
@@ -196,7 +230,7 @@ describe('отказ плеера в уроке', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3)
 
     fireEvent.click(screen.getByRole('button', { name: 'Попробовать снова' }))
-    expect(container.querySelector('video')).toHaveAttribute('src', url)
+    expect(container.querySelector('video')).toHaveAttribute('src', `${url}&playbackAttempt=3`)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
@@ -211,6 +245,19 @@ describe('отказ плеера в уроке', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('обрезанное начало с обещанным Content-Length не считается исправным файлом или MPEG-TS', async () => {
+    fetchMock.mockImplementation(async () => new Response(new Uint8Array([0x47]), { status: 206, headers: { 'Content-Length': '376' } }))
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
+    await failNative(container)
+    expect(screen.queryByTestId('transport-stream')).not.toBeInTheDocument()
+    await wait(2000)
+    await failNative(container)
+    expect(screen.getByRole('status')).toBeVisible()
+    await wait(5000)
+    await failNative(container)
+    expect(screen.getByRole('alert')).toHaveTextContent('Видео сейчас не загружается')
+  })
+
   it('обрыв сети посреди просмотра повторяется, даже если начало файла снова отвечает', async () => {
     fetchMock.mockImplementation(async () => sourceResponse(new Uint8Array([0, 0, 0, 32, 102, 116, 121, 112])))
     const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
@@ -220,7 +267,7 @@ describe('отказ плеера в уроке', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(0) })
     expect(screen.getByRole('status')).toBeVisible()
     await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
-    expect(container.querySelector('video')).toHaveAttribute('src', url)
+    expect(container.querySelector('video')).toHaveAttribute('src', `${url}&playbackAttempt=1`)
   })
 
   it('администратор с исходной ссылкой получает те же повторы и ссылку на Диск, а ученик ссылки не видит', async () => {
@@ -233,7 +280,7 @@ describe('отказ плеера в уроке', () => {
     expect(fetchMock).toHaveBeenLastCalledWith(stream, expect.anything())
     expect(screen.queryByTestId('transport-stream')).not.toBeInTheDocument()
     await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
-    expect(container.querySelector('video')).toHaveAttribute('src', stream)
+    expect(container.querySelector('video')).toHaveAttribute('src', `${stream}&playbackAttempt=1`)
     await failNative(container)
     await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
     await failNative(container)
@@ -284,7 +331,7 @@ describe('отказ плеера в уроке', () => {
     expect(screen.getByRole('status')).toBeVisible()
     await wait(20_000)
     await wait(2000)
-    expect(container.querySelector('video')).toHaveAttribute('src', url)
+    expect(container.querySelector('video')).toHaveAttribute('src', `${url}&playbackAttempt=1`)
 
     await failNative(container)
     expect(released?.aborted).toBe(true)

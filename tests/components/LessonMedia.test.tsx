@@ -150,6 +150,20 @@ describe('плеер потока MPEG-TS', () => {
     await waitFor(() => expect(destroy).toHaveBeenCalled())
   })
 
+  it('ошибка запуска освобождает загрузчик сразу и не уничтожает его повторно при уходе', async () => {
+    load.mockImplementationOnce(() => { throw new Error('Запуск загрузчика не удался') })
+    const onFailure = vi.fn()
+    const { unmount } = render(<TransportStreamPlayer
+      src="/api/yandex-disk/proxy?lesson=42&block=v"
+      memoryKey="https://disk.yandex.ru/i/x"
+      onFailure={onFailure}
+    />)
+    await waitFor(() => expect(onFailure).toHaveBeenCalledOnce())
+    expect(destroy).toHaveBeenCalledOnce()
+    unmount()
+    expect(destroy).toHaveBeenCalledOnce()
+  })
+
   it('на экране есть элемент видео', () => {
     const { container } = render(
       <TransportStreamPlayer

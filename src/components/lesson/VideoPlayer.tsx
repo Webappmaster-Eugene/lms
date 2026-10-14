@@ -45,6 +45,11 @@ function getStreamUrl(videoUrl: string): string {
   return `/api/yandex-disk/stream?url=${encodeURIComponent(videoUrl)}`
 }
 
+/** Новый адрес попытки не даёт браузеру переиспользовать сломанный media resource. */
+function playbackUrl(url: string, attempt: number): string {
+  return attempt === 0 ? url : `${url}${url.includes('?') ? '&' : '?'}playbackAttempt=${attempt}`
+}
+
 /** Прокси нужен только там, где плеер читает файл из JS. */
 function getProxyUrl(videoUrl: string): string {
   if (isLessonSource(videoUrl)) return videoUrl.replace('/stream?', '/proxy?')
@@ -177,7 +182,9 @@ async function checkLessonSource(url: string, signal: AbortSignal): Promise<Sour
       length += part.byteLength
     }
     if (length === 0) return 'unavailable'
-    return head[0] === 0x47 && (length <= TS_PACKET_BYTES || head[TS_PACKET_BYTES] === 0x47) ? 'transport-stream' : 'playable'
+    const declaredLength = Number(response.headers.get('content-length'))
+    if (declaredLength > 0 && length < Math.min(declaredLength, HEAD_BYTES)) return 'unavailable'
+    return length === HEAD_BYTES && head[0] === 0x47 && head[TS_PACKET_BYTES] === 0x47 ? 'transport-stream' : 'playable'
   } catch {
     return 'unavailable'
   } finally {
@@ -188,7 +195,7 @@ async function checkLessonSource(url: string, signal: AbortSignal): Promise<Sour
   }
 }
 
-type LessonPlayback = 'native' | 'stream' | 'retrying' | 'unavailable' | 'unsupported'
+type LessonPlayback = 'native' | 'stream' | 'retrying' | 'unavailable' | 'playback-failed' | 'unsupported'
 
 function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }: Omit<Props, 'displayMode'>) {
   const initial: 'native' | 'stream' = isTransportStream(videoUrl) ? 'stream' : 'native'
@@ -231,12 +238,12 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
     if (controller.signal.aborted) return
     // Часть потоков MPEG-TS лежит под именем .mp4: нативный плеер их не понимает, потоковый — да.
     if (failed === 'native' && check === 'transport-stream' && !isMedia) { start('stream'); return }
-    // Файл приходит, сеть не рвалась — похоже на формат. Но так же выглядит разовый сбой хранилища,
-    // прошедший к моменту проверки, поэтому вердикту про браузер предшествует один перезапуск плеера.
+    // Доступное начало файла не доказывает доступность остальных Range или поддержку кодеков.
+    // Повторяем и такой отказ, но не называем его несовместимостью браузера.
     const formatSuspected = check !== 'unavailable' && hint !== 'network'
     const counter = formatSuspected ? formatTries : tries
     const delay = (formatSuspected ? RETRY_DELAYS_MS.slice(0, 1) : RETRY_DELAYS_MS)[counter.current]
-    if (delay === undefined) { setMode(formatSuspected ? 'unsupported' : 'unavailable'); return }
+    if (delay === undefined) { setMode(formatSuspected ? 'playback-failed' : 'unavailable'); return }
     counter.current += 1
     pending.current = { controller, timer: setTimeout(() => { if (!controller.signal.aborted) start(failed) }, delay) }
   }, [cancelPending, isMedia, proxyUrl, start, streamUrl])
@@ -300,24 +307,48 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
           </p>
           {actions}
         </div>
+      ) : mode === 'playback-failed' ? (
+        <div role="alert" className="space-y-3 rounded-xl border border-border bg-card p-6">
+          <p className="font-medium text-foreground">Не удалось воспроизвести запись</p>
+          <p className="text-sm text-muted-foreground">
+            Начало файла доступно, но воспроизведение не запустилось. Повторите загрузку. Если ошибка сохраняется, сообщите название урока в поддержку — нужно проверить запись и её загрузку.
+          </p>
+          {actions}
+        </div>
       ) : mode === 'stream' ? (
         <TransportStreamPlayer
           key={attempt}
-          src={proxyUrl}
+          src={playbackUrl(proxyUrl, attempt)}
           memoryKey={memoryId ?? videoUrl}
           durationMinutes={durationMinutes}
           onFailure={handleStreamFailure}
         />
       ) : (
-        <NativeVideo key={attempt} memoryId={memoryId} videoUrl={videoUrl} direct={protectedSource} onFailure={handleNativeFailure} />
+        <NativeVideo key={attempt} memoryId={memoryId} videoUrl={videoUrl} playbackAttempt={attempt} direct={protectedSource} onFailure={handleNativeFailure} />
       )}
     </div>
   )
 }
 
-function NativeVideo({ memoryId, videoUrl, direct = false, onFailure }: { memoryId?: string; videoUrl: string; direct?: boolean; onFailure: (code?: number) => void }) {
+function NativeVideo({ memoryId, videoUrl, playbackAttempt = 0, direct = false, onFailure }: { memoryId?: string; videoUrl: string; playbackAttempt?: number; direct?: boolean; onFailure: (code?: number) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const memory = useVideoMemory(videoRef, memoryId ?? videoUrl)
+  const source = playbackUrl(direct ? videoUrl : getStreamUrl(videoUrl), playbackAttempt)
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    // Также восстанавливает src после пробного cleanup в React StrictMode.
+    video.setAttribute('src', source)
+    const failed = () => onFailure(video.error?.code)
+    video.addEventListener('error', failed)
+    return () => {
+      video.removeEventListener('error', failed)
+      // Удаление DOM-узла само по себе не гарантирует отмену загрузки и освобождение слота.
+      video.removeAttribute('src')
+      video.load()
+    }
+  }, [source, onFailure])
 
   useEffect(() => {
     const video = videoRef.current
@@ -358,7 +389,7 @@ function NativeVideo({ memoryId, videoUrl, direct = false, onFailure }: { memory
       <div className="overflow-hidden rounded-xl border border-border bg-black">
         <video
           ref={videoRef}
-          src={direct ? videoUrl : getStreamUrl(videoUrl)}
+          src={source}
           className="aspect-video w-full"
           controls
           preload="none"
@@ -366,7 +397,6 @@ function NativeVideo({ memoryId, videoUrl, direct = false, onFailure }: { memory
           disableRemotePlayback
           playsInline
           onContextMenu={(event) => event.preventDefault()}
-          onError={() => onFailure(videoRef.current?.error?.code)}
         />
       </div>
       <VideoMemoryBar {...memory} />

@@ -90,7 +90,7 @@ describe('видео выбирает плеер по контейнеру', () 
 
   it('отказ плеера доходит до разбора причины с кодом ошибки браузера', () => {
     expect(PLAYER).toContain('onFailure={handleNativeFailure}')
-    expect(PLAYER).toContain('onError={() => onFailure(videoRef.current?.error?.code)}')
+    expect(PLAYER).toContain('onFailure(video.error?.code)')
     expect(PLAYER).toContain('onFailure={handleStreamFailure}')
   })
 

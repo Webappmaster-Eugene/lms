@@ -109,6 +109,9 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
           },
         )
 
+        // Даже если attach/load выбросит ошибку, cleanup должен остановить загрузчик и worker.
+        playerRef.current = { destroy: () => player.destroy() }
+
         player.on(mpegts.Events.ERROR, (errorType: string) => {
           if (!cancelled) onFailure(errorType === mpegts.ErrorTypes.NETWORK_ERROR ? 'network' : undefined)
         })
@@ -116,14 +119,10 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
         player.attachMediaElement(element)
         player.load()
 
-        playerRef.current = {
-          destroy: () => {
-            player.destroy()
-          },
-        }
-
         setReady(true)
       } catch {
+        playerRef.current?.destroy()
+        playerRef.current = null
         if (!cancelled) onFailure()
       }
     }

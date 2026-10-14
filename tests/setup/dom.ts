@@ -33,6 +33,9 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {}
 }
 
+// jsdom не выполняет media load; отмену настоящей загрузки проверяет браузерный прогон.
+HTMLMediaElement.prototype.load = () => {}
+
 // jsdom exposes <dialog> without its native modal API. Browser suites verify
 // top-layer focus trapping and inert background; here model opening/canceling.
 if (!HTMLDialogElement.prototype.showModal) {
