@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 import { NOT_FOUND_HEADING } from '../fixtures/data'
-import { APP_URL, LANDING_URL, storageStateOf } from '../fixtures/env'
+import { APP_URL, LANDING_URL, LANDING_USE, storageStateOf } from '../fixtures/env'
 
 /**
  * Битые ссылки. Платформа обходится как студент от дашборда по всем внутренним
@@ -60,7 +60,7 @@ test.describe('платформа (как студент)', () => {
 })
 
 test.describe('лендинг', () => {
-  test.use({ baseURL: LANDING_URL })
+  test.use(LANDING_USE)
 
   test('все локальные ссылки, картинки, стили, скрипты и шрифты отдаются', async ({ page, request }) => {
     await page.goto('/')

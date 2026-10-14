@@ -1,6 +1,6 @@
 import { test } from '@playwright/test'
 
-import { LANDING_URL } from '../fixtures/env'
+import { LANDING_USE } from '../fixtures/env'
 import { snap, WIDTHS } from './stabilize'
 
 /**
@@ -8,7 +8,7 @@ import { snap, WIDTHS } from './stabilize'
  * prefers-color-scheme) — снимаем только её на 375 и 1440.
  */
 test.skip(process.platform !== 'linux', 'эталоны сняты в контейнере Playwright — запускайте pnpm test:visual')
-test.use({ baseURL: LANDING_URL })
+test.use(LANDING_USE)
 
 for (const width of WIDTHS) {
   test.describe(`${width}px`, () => {

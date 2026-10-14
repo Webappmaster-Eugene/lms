@@ -2,7 +2,7 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
 import { CONTENT } from '../fixtures/data'
-import { LANDING_URL, storageStateOf } from '../fixtures/env'
+import { LANDING_USE, storageStateOf } from '../fixtures/env'
 
 /**
  * Доступность (axe-core, WCAG 2.1 A/AA): на ключевых страницах не должно быть
@@ -75,7 +75,7 @@ for (const theme of ['dark', 'light'] as const) {
 }
 
 test.describe('лендинг', () => {
-  test.use({ baseURL: LANDING_URL })
+  test.use(LANDING_USE)
 
   for (const width of [375, 1440]) {
     test(`главная, ${width}px`, async ({ page }) => {

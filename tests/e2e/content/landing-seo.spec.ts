@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { LANDING_URL } from '../fixtures/env'
+import { LANDING_USE } from '../fixtures/env'
 
 /**
  * Лендинг (landing/, Astro): мета-теги, canonical, Open Graph, JSON-LD,
@@ -9,7 +9,7 @@ import { LANDING_URL } from '../fixtures/env'
  */
 const SITE = 'https://info.mentorcareer.ru'
 
-test.use({ baseURL: LANDING_URL })
+test.use(LANDING_USE)
 
 test('title, description, canonical, robots и язык страницы', async ({ page }) => {
   const response = await page.goto('/')

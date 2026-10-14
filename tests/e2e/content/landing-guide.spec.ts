@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 
-import { LANDING_URL } from '../fixtures/env'
+import { LANDING_URL, LANDING_USE } from '../fixtures/env'
 
-test.use({ baseURL: LANDING_URL })
+test.use(LANDING_USE)
 
 test('инструкция ссылается на платформу и сайт автора, сохраняя учебное содержание', async ({ page }) => {
   await page.goto('/')
