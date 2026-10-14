@@ -24,6 +24,7 @@ import { recordLearningAccess } from '@/lib/learning-observability'
 import { loadPublishedProgrammeLessons } from '@/lib/course-completion'
 import { getLearningRequest } from '@/server/learning-request'
 import { getLearningState } from '@/server/learning-state'
+import { metaDescription, titleWithContext } from '@/lib/site-metadata'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -37,13 +38,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     collection: 'lessons',
     where: { slug: { equals: slug }, isPublished: { equals: true } },
     limit: 1,
-    depth: 0,
-    select: { title: true },
+    depth: 1,
+    select: { title: true, description: true, course: true },
+    populate: { courses: { title: true } },
     overrideAccess: false,
     req,
   })
   const lesson = result.docs[0]
-  return { title: lesson?.title ?? 'Урок' }
+  if (!lesson) return { title: 'Урок' }
+  const course = typeof lesson.course === 'object' ? lesson.course : null
+  return {
+    title: titleWithContext(lesson.title, course?.title),
+    description: metaDescription(lesson.description),
+  }
 }
 
 export default async function LessonPage({ params }: Props) {

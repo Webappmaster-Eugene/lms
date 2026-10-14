@@ -1,7 +1,7 @@
 import '@/app/globals.css'
 import '@/app/fonts.css'
 import { FontPreloads } from '@/components/layout/FontPreloads'
-import type { Metadata, Viewport } from 'next'
+import type { Viewport } from 'next'
 import { ThemeProvider } from '@/components/layout/ThemeProvider'
 import { SidebarProvider } from '@/components/layout/SidebarContext'
 import { Sidebar } from '@/components/layout/Sidebar'
@@ -17,17 +17,6 @@ import { redirect } from 'next/navigation'
 import { PwaProvider } from '@/components/pwa/PwaProvider'
 import { StudentActivityBridge } from '@/components/analytics/StudentActivityBridge'
 import { getTrainerAccess } from '@/server/trainer-access'
-
-export const metadata: Metadata = {
-  manifest: '/manifest.webmanifest',
-  appleWebApp: { capable: true, title: 'MentorCareer', statusBarStyle: 'default' },
-  icons: { apple: '/images/pwa/icon-192.png' },
-  title: {
-    template: '%s — MentorCareer LMS',
-    default: 'MentorCareer LMS',
-  },
-  description: 'Платформа обучения MentorCareer — курсы Frontend и Backend с тренажёром кода, геймификацией и сертификатами',
-}
 
 export const viewport: Viewport = {
   width: 'device-width',

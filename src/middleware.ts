@@ -19,6 +19,7 @@ const STATIC_FILES = new Set([
   '/offline.html',
   '/robots.txt',
   '/sitemap.xml',
+  '/llms.txt',
 ])
 
 export function middleware(request: NextRequest) {

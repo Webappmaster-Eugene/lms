@@ -100,6 +100,20 @@ test('sitemap.xml — валидный XML с главной и свежим las
   expect(parsed.lastmod[0]).toMatch(/^\d{4}-\d{2}-\d{2}$/)
 })
 
+test('favicon.ico, SVG-иконка и apple-touch-icon отдаются картинками', async ({ page, request }) => {
+  await page.goto('/')
+  const icons = await page.locator('link[rel="icon"], link[rel="apple-touch-icon"]').evaluateAll((links) =>
+    links.map((link) => link.getAttribute('href')),
+  )
+  // /favicon.ico запрашивают и без ссылки в <head>: Яндекс, старые браузеры, превью мессенджеров.
+  for (const href of new Set(['/favicon.ico', ...icons])) {
+    const response = await request.get(href!)
+    expect(response.status(), href!).toBe(200)
+    expect(response.headers()['content-type'], href!).toMatch(/^image\//)
+  }
+  expect(icons).toEqual(expect.arrayContaining(['/favicon.svg', '/apple-touch-icon.png']))
+})
+
 test('llms.txt доступен и в UTF-8', async ({ request }) => {
   const response = await request.get('/llms.txt')
   expect(response.status()).toBe(200)

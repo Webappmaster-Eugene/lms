@@ -1,25 +1,9 @@
 import type { Metadata, Viewport } from 'next'
+import { ROOT_METADATA } from '@/lib/site-metadata'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata: Metadata = {
-  robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
-  manifest: '/manifest.webmanifest',
-  appleWebApp: { capable: true, title: 'MentorCareer', statusBarStyle: 'default' },
-  icons: { apple: '/images/pwa/icon-192.png' },
-  title: {
-    template: '%s — MentorCareer LMS',
-    default: 'MentorCareer LMS',
-  },
-  description: 'Платформа обучения MentorCareer — курсы Frontend (React, TypeScript) и Backend (Node.js, NestJS) с тренажёром кода, геймификацией и сертификатами',
-  openGraph: {
-    type: 'website',
-    locale: 'ru_RU',
-    siteName: 'MentorCareer LMS',
-    title: 'MentorCareer LMS',
-    description: 'Платформа обучения MentorCareer — курсы Frontend (React, TypeScript) и Backend (Node.js, NestJS) с тренажёром кода, геймификацией и сертификатами',
-  },
-}
+export const metadata: Metadata = ROOT_METADATA
 
 export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover' }
 

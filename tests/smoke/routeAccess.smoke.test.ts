@@ -155,6 +155,8 @@ describe('статика и служебные пути остаются дос�
     '/monaco/vs/loader.js',
     '/favicon.ico',
     '/icon.svg',
+    '/images/og.png',
+    '/llms.txt',
     '/manifest.webmanifest',
     '/api/trainer/submit',
     '/admin',
