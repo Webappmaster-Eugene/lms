@@ -105,6 +105,8 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
     rateRef.current = initialRate
     setRateState(initialRate)
     video.playbackRate = initialRate
+    // Загрузка src и подключение MediaSource возвращают скорость к defaultPlaybackRate.
+    video.defaultPlaybackRate = initialRate
 
     const tryResume = () => {
       const requested = pendingRef.current
@@ -175,6 +177,7 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
       rateRef.current = video.playbackRate
       setRateState(video.playbackRate)
       saveRate(video.playbackRate)
+      video.defaultPlaybackRate = video.playbackRate
       const url = new URL(window.location.href)
       const id = sharedVideoId(key)
       const nextRate = sharedPlaybackRate(String(video.playbackRate))
@@ -234,7 +237,10 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
       rateRef.current = next
       setRateState(next)
       saveRate(next)
-      if (videoRef.current) videoRef.current.playbackRate = next
+      if (videoRef.current) {
+        videoRef.current.playbackRate = next
+        videoRef.current.defaultPlaybackRate = next
+      }
       if (sharedPlaybackRate(String(next)) !== null) {
         const url = new URL(window.location.href)
         const id = sharedVideoId(key)

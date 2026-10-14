@@ -129,9 +129,11 @@ let activeId = ''
 let scrollScheduled = false
 const updateCurrentSection = () => {
   const boundary = (compact.matches ? contentsSummary?.getBoundingClientRect().bottom : header?.getBoundingClientRect().bottom) ?? 0
+  const padding = Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0
+  const activationLine = Math.max(boundary + 24, padding) + 1
   let active = chapters[0]
   for (const chapter of chapters) {
-    if (chapter.getBoundingClientRect().top > boundary + 24) break
+    if (chapter.getBoundingClientRect().top > activationLine) break
     active = chapter
   }
   if (!active || activeId === active.id) return
@@ -155,6 +157,23 @@ window.addEventListener('scroll', scheduleCurrentSection, { passive: true })
 window.addEventListener('resize', scheduleCurrentSection)
 window.addEventListener('hashchange', scheduleCurrentSection)
 updateCurrentSection()
+
+// Шрифты и включение интерактивных шагов меняют высоту разделов после первого перехода по hash.
+const initialHash = window.location.hash
+const initialTarget = document.getElementById(initialHash.slice(1))
+if (initialTarget) {
+  let pending = true
+  const cancel = () => { pending = false }
+  for (const event of ['pointerdown', 'wheel', 'keydown']) window.addEventListener(event, cancel, { once: true, passive: true })
+  void document.fonts.ready.then(() => {
+    requestAnimationFrame(() => {
+      for (const event of ['pointerdown', 'wheel', 'keydown']) window.removeEventListener(event, cancel)
+      if (!pending || window.location.hash !== initialHash) return
+      initialTarget.scrollIntoView({ block: 'start', behavior: 'instant' })
+      updateCurrentSection()
+    })
+  })
+}
 
 const checks = Array.from(document.querySelectorAll<HTMLInputElement>('[data-check]'))
 const count = document.querySelector<HTMLElement>('[data-check-count]')

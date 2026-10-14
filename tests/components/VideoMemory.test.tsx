@@ -138,6 +138,46 @@ describe('память видео', () => {
     expect(window.localStorage.getItem('lms:video-rate')).toBe('1.25')
   })
 
+  it('выбранная скорость переживает сброс при загрузке нового источника', async () => {
+    const { container } = renderPlayer()
+    await userEvent.click(screen.getByRole('button', { name: '1,5×' }))
+    const element = video(container)
+    act(() => {
+      element.playbackRate = element.defaultPlaybackRate
+      fireEvent(element, new Event('ratechange'))
+      loadMetadata(element)
+    })
+    expect(element.playbackRate).toBe(1.5)
+    expect(window.localStorage.getItem('lms:video-rate')).toBe('1.5')
+    expect(screen.getByRole('button', { name: '1,5×' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('сохранённая скорость не теряется при начальной загрузке медиа', () => {
+    window.localStorage.setItem('lms:video-rate', '1.5')
+    const { container } = renderPlayer()
+    const element = video(container)
+    act(() => {
+      element.playbackRate = element.defaultPlaybackRate
+      fireEvent(element, new Event('ratechange'))
+      loadMetadata(element)
+    })
+    expect(element.playbackRate).toBe(1.5)
+    expect(window.localStorage.getItem('lms:video-rate')).toBe('1.5')
+  })
+
+  it('скорость из нативного меню сохраняется при повторной загрузке источника', () => {
+    const { container } = renderPlayer()
+    const element = video(container)
+    act(() => {
+      element.playbackRate = 1.25
+      fireEvent(element, new Event('ratechange'))
+      element.playbackRate = element.defaultPlaybackRate
+      fireEvent(element, new Event('ratechange'))
+    })
+    expect(element.playbackRate).toBe(1.25)
+    expect(window.localStorage.getItem('lms:video-rate')).toBe('1.25')
+  })
+
   it('поток MPEG-TS прыгает на место остановки, только когда оно загрузилось', () => {
     window.localStorage.setItem('lms:video-positions', JSON.stringify({ [URL_A]: { t: 300, at: 1 } }))
     const { container } = render(

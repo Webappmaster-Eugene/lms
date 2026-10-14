@@ -339,7 +339,7 @@ function NativeVideo({ memoryId, videoUrl, playbackAttempt = 0, direct = false, 
     const video = videoRef.current
     if (!video) return
     // Также восстанавливает src после пробного cleanup в React StrictMode.
-    video.setAttribute('src', source)
+    if (video.getAttribute('src') !== source) video.setAttribute('src', source)
     const failed = () => onFailure(video.error?.code)
     video.addEventListener('error', failed)
     return () => {
