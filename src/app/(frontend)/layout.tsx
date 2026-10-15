@@ -16,6 +16,7 @@ import { getLearningRequest } from '@/server/learning-request'
 import { redirect } from 'next/navigation'
 import { PwaProvider } from '@/components/pwa/PwaProvider'
 import { StudentActivityBridge } from '@/components/analytics/StudentActivityBridge'
+import { VideoViewportRecovery } from '@/components/layout/VideoViewportRecovery'
 import { getTrainerAccess } from '@/server/trainer-access'
 
 export const viewport: Viewport = {
@@ -41,6 +42,7 @@ export default async function FrontendLayout({ children }: { children: React.Rea
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           <ToastProvider>
             <PwaProvider />
+            <VideoViewportRecovery />
             <Suspense fallback={null}><StudentActivityBridge userId={user.id} /></Suspense>
             <Suspense fallback={null}>
               <NavigationProgress />
