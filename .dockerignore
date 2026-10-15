@@ -45,6 +45,23 @@ tests/e2e/.auth
 *.md
 LICENSE
 
+# Образу приложения не нужно. Любой файл в контексте сбрасывает кеш `COPY . .`,
+# и правка лендинга, теста или документа пересобирала платформу на Pi (~2 ч).
+# Лендинг собирается из своего контекста landing/ со своим .dockerignore.
+landing
+tests
+docs
+.github
+playwright*.config.ts
+vitest*.config.ts
+scripts/landing-server.mjs
+scripts/e2e-server.mjs
+scripts/test-db.mjs
+scripts/test-trainer-runtime.mjs
+scripts/visual-docker.mjs
+scripts/prod-test-accounts.mjs
+scripts/codex
+
 # Локальная инфраструктура агентов
 .codex
 .agents

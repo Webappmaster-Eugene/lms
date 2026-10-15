@@ -160,11 +160,64 @@ describe('контекст сборки', () => {
     expect(DOCKERIGNORE).toMatch(/^\*\*\/node_modules$/m)
   })
 
+  it('правки лендинга, тестов и документации не пересобирают образ приложения', () => {
+    // Любой файл в контексте сбрасывает кеш `COPY . .`, а сборка на Pi идёт ~2 часа.
+    for (const entry of ['landing', 'tests', 'docs']) {
+      expect(DOCKERIGNORE, `.dockerignore не исключает ${entry}`).toMatch(new RegExp(`^${entry}$`, 'm'))
+    }
+  })
+
+  it('.dockerignore не исключает файлы, которые образ использует', () => {
+    const ignored = new Set(DOCKERIGNORE.split('\n').map((line) => line.trim()).filter((line) => line && !line.startsWith('#')))
+    const used = [
+      ...DOCKERFILE.matchAll(/^RUN node (scripts\/[\w.-]+)/gm),
+      ...DOCKERFILE.matchAll(/&& node (scripts\/[\w.-]+)/g),
+      ...DOCKERFILE.matchAll(/^COPY --chown=\S+ (\S+) /gm),
+    ].map((m) => m[1])
+    expect(used).toEqual(expect.arrayContaining(['scripts/copy-monaco.mjs', 'scripts/build-harness.mjs', 'scripts/trainer-app-start.mjs']))
+    for (const file of used) {
+      const prefixes = file.split('/').map((_, i, parts) => parts.slice(0, i + 1).join('/'))
+      expect(prefixes.filter((prefix) => ignored.has(prefix)), `${file} исключён из контекста`).toEqual([])
+    }
+  })
+
   it('проверка типов приложения не заходит в лендинг', () => {
     // У лендинга свои зависимости (astro): в образе приложения их нет, и next build
     // падает на первом же импорте из astro.
     const tsconfig = JSON.parse(read('../../tsconfig.json')) as { exclude?: string[] }
     expect(tsconfig.exclude).toContain('landing')
+  })
+})
+
+describe('nginx лендинга', () => {
+  const NGINX = read('../../landing/nginx.conf').replace(/#.*$/gm, '')
+
+  /** Тела блоков `location … { … }` с учётом вложенных скобок. */
+  function locationBodies(): string[] {
+    return [...NGINX.matchAll(/\blocation\b[^{]*\{/g)].map((match) => {
+      let depth = 1
+      let end = match.index + match[0].length
+      while (depth > 0 && end < NGINX.length) {
+        if (NGINX[end] === '{') depth += 1
+        if (NGINX[end] === '}') depth -= 1
+        end += 1
+      }
+      return NGINX.slice(match.index, end)
+    })
+  }
+
+  it('заголовки безопасности заданы на уровне server', () => {
+    for (const header of ['X-Frame-Options', 'X-Content-Type-Options', 'Referrer-Policy']) {
+      expect(NGINX, header).toMatch(new RegExp(`^ {4}add_header ${header} .+ always;$`, 'm'))
+    }
+  })
+
+  it('ни один location не отменяет заголовки безопасности своим add_header', () => {
+    // В nginx add_header внутри location отменяет все add_header уровнем выше: так
+    // картинки и скрипты лендинга уходили без X-Content-Type-Options и X-Frame-Options.
+    const bodies = locationBodies()
+    expect(bodies.length).toBeGreaterThan(0)
+    for (const body of bodies) expect(body).not.toMatch(/\badd_header\b/)
   })
 })
 
