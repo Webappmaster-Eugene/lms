@@ -31,6 +31,9 @@ export async function settle(page: Page): Promise<void> {
         img.addEventListener('error', resolve, { once: true })
       })),
     )
+    // При decoding="async" загруженная картинка может ещё не попасть в кадр, и снимок выходит с пустыми скриншотами.
+    // Битую картинку декодировать нечем, её уже учёл обработчик error выше.
+    await Promise.all([...document.images].map((img) => img.decode().catch(() => undefined)))
   })
   await page.addStyleTag({
     content: '*, *::before, *::after { transition: none !important; animation: none !important; caret-color: transparent !important; }',

@@ -24,7 +24,6 @@ import { AUTHOR_URL, LMS_URL } from '../config'
         <nav id="guide-contents" aria-label="Оглавление инструкции">
           <a href="#overview" data-chapter-link>Быстрый старт</a>
           {CHAPTERS.map((chapter, i) => <a href={`#${chapter.id}`} data-chapter-link data-search={`${chapter.nav} ${chapter.title}`}><span aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>{chapter.nav}</a>)}
-          <a href="#shortcuts" data-chapter-link>Горячие клавиши</a>
           <a href="#faq" data-chapter-link>Частые вопросы</a>
           <a href="#checklist" data-chapter-link>Чек-лист первого занятия</a>
         </nav>
@@ -57,7 +56,7 @@ import { AUTHOR_URL, LMS_URL } from '../config'
             <li><a href="#trainer"><span>4</span><strong>Закрепите на практике</strong><small>Проверьте код и отправьте решение</small></a></li>
           </ol>
         </div>
-        <div class="reading-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 3 14 9-7 1-3 7z" /></svg><p><strong>Инструкцию можно нажимать.</strong> Выбирайте шаги под скриншотом или метки на нём. «Показать шаги» по очереди выделит нужные элементы. «Увеличить» поможет прочитать мелкие детали.</p></div>
+        <div class="reading-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 3 14 9-7 1-3 7z" /></svg><p><strong>Скриншоты можно смотреть по шагам.</strong> Нажмите «Показать шаги» — инструкция приблизит нужное место на экране и по очереди объяснит, что делать.</p></div>
         <p class="sample-note">На скриншотах — демонстрационный аккаунт и учебные примеры. Названия ваших курсов и количество материалов могут отличаться.</p>
       </section>
       {CHAPTERS.map((chapter, i) => (
@@ -66,26 +65,12 @@ import { AUTHOR_URL, LMS_URL } from '../config'
           <GuideScreen id={chapter.id} screen={chapter.screen} alt={chapter.alt} steps={chapter.steps} mobile={chapter.id === 'mobile'} />
           {chapter.id === 'courses' && <figure class="extra-screen"><img src="/guide/course.webp" alt="Программа курса «Основы веба» с разделом и тремя уроками" width="1440" height="728" loading="lazy" decoding="async" /><figcaption><span>Внутри курса: раскройте раздел, чтобы увидеть уроки, или начните с кнопки «Начать».</span><button type="button" class="static-zoom" data-zoom-static aria-haspopup="dialog">Увеличить</button></figcaption></figure>}
           {chapter.id === 'notes' && <div class="screen-pair"><figure><img src="/guide/notes.webp" alt="Раздел «Заметки» с конспектом к уроку и скачиванием в Markdown" width="1440" height="680" loading="lazy" decoding="async" /><figcaption><span>Все конспекты собраны в «Заметках».</span><button type="button" class="static-zoom" data-zoom-static aria-haspopup="dialog">Увеличить</button></figcaption></figure><figure><img src="/guide/saved.webp" alt="Раздел «Сохранённое» с закладкой урока «Что такое HTML»" width="1440" height="680" loading="lazy" decoding="async" /><figcaption><span>Закладки ждут вас в «Сохранённом».</span><button type="button" class="static-zoom" data-zoom-static aria-haspopup="dialog">Увеличить</button></figcaption></figure></div>}
-          {chapter.id === 'trainer' && <div class="run-submit"><div><strong>Запустить</strong><p>Проверить публичные тесты и исправить ошибки</p><kbd>Ctrl / ⌘ + Enter</kbd></div><svg viewBox="0 0 40 24" aria-hidden="true"><path d="M2 12h34M27 3l9 9-9 9" /></svg><div><strong>Отправить</strong><p>Пройти серверную проверку и получить зачёт</p><kbd>Ctrl / ⌘ + Shift + Enter</kbd></div></div>}
+          {chapter.id === 'trainer' && <div class="run-submit"><div><strong>Запустить</strong><p>Проверить публичные тесты и исправить ошибки</p></div><svg viewBox="0 0 40 24" aria-hidden="true"><path d="M2 12h34M27 3l9 9-9 9" /></svg><div><strong>Отправить</strong><p>Пройти серверную проверку и получить зачёт</p></div></div>}
           <aside class="tip"><span aria-hidden="true">i</span><p>{chapter.tip}</p></aside>
           <div class="chapter-details">{chapter.details.map(detail => <details><summary>{detail.title}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary><p>{detail.text}</p></details>)}</div>
-          <a class="next-chapter" href={i < CHAPTERS.length - 1 ? `#${CHAPTERS[i + 1].id}` : '#shortcuts'}>Дальше: {i < CHAPTERS.length - 1 ? CHAPTERS[i + 1].nav.toLowerCase() : 'горячие клавиши'} <span aria-hidden="true">↓</span></a>
+          <a class="next-chapter" href={i < CHAPTERS.length - 1 ? `#${CHAPTERS[i + 1].id}` : '#faq'}>Дальше: {i < CHAPTERS.length - 1 ? CHAPTERS[i + 1].nav.toLowerCase() : 'частые вопросы'} <span aria-hidden="true">↓</span></a>
         </section>
       ))}
-      <section class="chapter" id="shortcuts" data-chapter>
-        <h2>Меньше кликов, больше внимания к материалу</h2>
-        <p class="section-intro">На компьютере эти сочетания помогают быстрее искать, переходить между уроками и проверять код.</p>
-        <div class="shortcut-list">
-          <div><span>Открыть поиск</span><kbd>Ctrl / ⌘ + K</kbd></div>
-          <div><span>Выбрать результат поиска</span><kbd>↑ / ↓, затем Enter</kbd></div>
-          <div><span>Закрыть поиск или панель темы</span><kbd>Esc</kbd></div>
-          <div><span>Соседний урок, вне поля ввода</span><kbd>← / →</kbd></div>
-          <div><span>Сохранить заметку, внутри поля</span><kbd>Ctrl / ⌘ + Enter</kbd></div>
-          <div><span>Запустить тесты, в тренажёре</span><kbd>Ctrl / ⌘ + Enter</kbd></div>
-          <div><span>Отправить решение, в тренажёре</span><kbd>Ctrl / ⌘ + Shift + Enter</kbd></div>
-          <div><span>Открыть справку по клавишам</span><kbd>?</kbd></div>
-        </div>
-      </section>
       <section class="chapter" id="faq" data-chapter>
         <h2>Если что-то осталось непонятным</h2>
         <p class="section-intro">Ответы на вопросы, которые чаще всего возникают в начале обучения.</p>
