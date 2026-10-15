@@ -78,6 +78,7 @@ export const sendCompletionEmail: CollectionAfterChangeHook = async ({
           user.firstName ?? '',
           course.title,
           doc.amount ?? 0,
+          course.slug,
         )
         await req.payload.sendEmail({ to: user.email, subject, html, text })
       }
@@ -92,6 +93,7 @@ export const sendCompletionEmail: CollectionAfterChangeHook = async ({
           user.firstName ?? '',
           roadmap.title,
           doc.amount ?? 0,
+          roadmap.slug,
         )
         await req.payload.sendEmail({ to: user.email, subject, html, text })
       }

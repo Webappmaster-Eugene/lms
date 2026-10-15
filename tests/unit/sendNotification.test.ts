@@ -28,8 +28,8 @@ type Doc = Record<string, unknown>
 function makePayload() {
   const entities: Record<string, Record<string, Doc>> = {
     users: { '3': { id: 3, email: 'student@mail.ru', firstName: 'Алексей' } },
-    courses: { '51': { id: 51, title: 'Глубокий React' } },
-    roadmaps: { '2': { id: 2, title: 'Frontend React' } },
+    courses: { '51': { id: 51, title: 'Глубокий React', slug: 'deep-react' } },
+    roadmaps: { '2': { id: 2, title: 'Frontend React', slug: 'frontend-react' } },
     achievements: {
       '9': { id: 9, title: 'Практик', description: 'Решено 10 задач', pointsReward: 30 },
     },
@@ -181,6 +181,7 @@ describe('письмо о завершении', () => {
     const [args] = payload.sendEmail.mock.calls[0]
     expect(args.to).toBe('student@mail.ru')
     expect(String(args.subject)).toContain('Глубокий React')
+    expect(args.text).toContain('/courses/deep-react')
   })
 
   it('за роадмап — с названием роадмапа', async () => {
@@ -188,6 +189,7 @@ describe('письмо о завершении', () => {
 
     const [args] = payload.sendEmail.mock.calls[0]
     expect(String(args.subject)).toContain('Frontend React')
+    expect(args.text).toContain('/roadmaps/frontend-react')
   })
 
   it.each(['lesson_completed', 'trainer_task_completed', 'achievement_unlocked', 'admin_adjustment'])(

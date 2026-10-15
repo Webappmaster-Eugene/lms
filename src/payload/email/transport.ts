@@ -1,5 +1,6 @@
 import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
 import nodemailer from 'nodemailer'
+import { registerTextAlternative } from '@/payload/email/textAlternative'
 
 const IMPLICIT_TLS_PORT = 465
 const DEFAULT_SMTP_PORT = IMPLICIT_TLS_PORT
@@ -131,23 +132,26 @@ export function buildEmailAdapter(): ReturnType<typeof nodemailerAdapter> | unde
 
   const secure = settings.port === IMPLICIT_TLS_PORT
 
+  const transport = nodemailer.createTransport({
+    host: settings.host,
+    port: settings.port,
+    secure,
+    // Без этого nodemailer отправит логин и пароль открытым текстом,
+    // если сервер не анонсирует STARTTLS.
+    requireTLS: !secure,
+    auth: {
+      user: settings.user,
+      pass: settings.pass,
+    },
+    connectionTimeout: CONNECTION_TIMEOUT_MS,
+    greetingTimeout: GREETING_TIMEOUT_MS,
+    socketTimeout: SOCKET_TIMEOUT_MS,
+  })
+  registerTextAlternative(transport)
+
   return nodemailerAdapter({
     defaultFromAddress: settings.fromAddress,
     defaultFromName: settings.fromName,
-    transport: nodemailer.createTransport({
-      host: settings.host,
-      port: settings.port,
-      secure,
-      // Без этого nodemailer отправит логин и пароль открытым текстом,
-      // если сервер не анонсирует STARTTLS.
-      requireTLS: !secure,
-      auth: {
-        user: settings.user,
-        pass: settings.pass,
-      },
-      connectionTimeout: CONNECTION_TIMEOUT_MS,
-      greetingTimeout: GREETING_TIMEOUT_MS,
-      socketTimeout: SOCKET_TIMEOUT_MS,
-    }),
+    transport,
   })
 }

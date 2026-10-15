@@ -207,7 +207,7 @@ describe('колокольчик уведомлений', () => {
       try {
         render(<NotificationsBell userId={34} />)
         expect(await screen.findByText('9+')).toBeInTheDocument()
-        expect(event.mock.calls.some(([value]) => (value as CustomEvent<number>).detail === 42)).toBe(true)
+        await waitFor(() => expect(event.mock.calls.some(([value]) => (value as CustomEvent<number>).detail === 42)).toBe(true))
         expect(vi.mocked(global.fetch).mock.calls.every(([url]) => String(url).includes('where[user][equals]=34'))).toBe(true)
       } finally {
         window.removeEventListener('lms:notification-count', event)

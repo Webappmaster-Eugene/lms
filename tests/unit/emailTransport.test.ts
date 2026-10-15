@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
  * не анонсирует STARTTLS.
  */
 
-const createTransport = vi.fn((config: unknown) => ({ __transport: config }))
+const createTransport = vi.fn((config: unknown) => ({ __transport: config, use: vi.fn() }))
 const nodemailerAdapter = vi.fn((config: unknown) => ({ __adapter: config }))
 
 vi.mock('nodemailer', () => ({ default: { createTransport } }))
@@ -245,6 +245,13 @@ describe('сборка SMTP-транспорта', () => {
   })
 
   describe('таймауты', () => {
+    it('реальный SMTP-транспорт получает обработчик текстовой альтернативы', () => {
+      configureSmtp()
+      buildEmailAdapter()
+
+      expect(createTransport.mock.results[0].value.use).toHaveBeenCalledWith('compile', expect.any(Function))
+    })
+
     it('заданы все три — иначе зависший SMTP держит запрос бесконечно', () => {
       configureSmtp()
       buildEmailAdapter()

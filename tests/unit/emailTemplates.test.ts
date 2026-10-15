@@ -9,10 +9,7 @@ import {
   roadmapCompletedEmail,
 } from '@/payload/emails/templates'
 
-/**
- * Письма ученикам. Текстовая часть обязательна: без неё спам-фильтры Mail.ru
- * и Gmail заметно штрафуют письмо.
- */
+/** Письма ученикам: содержание, безопасные ссылки и текстовая альтернатива. */
 
 const ALL_TEMPLATES = [
   ['приглашение', () => inviteEmail('Алексей', 'a@m.ru', 'tok')],
@@ -28,7 +25,7 @@ describe('письма: общие требования', () => {
 
     expect(subject.trim().length).toBeGreaterThan(0)
     expect(html).toContain('<!DOCTYPE html>')
-    expect(text.trim().length, 'без text письмо штрафуется спам-фильтрами').toBeGreaterThan(0)
+    expect(text.trim().length, 'текстовая версия нужна почтовым клиентам без HTML').toBeGreaterThan(0)
   })
 
   it.each(ALL_TEMPLATES)('%s — html закрыт корректно', (_name, build) => {
@@ -165,6 +162,59 @@ describe('баллы в письме', () => {
     const { html } = achievementUnlockedEmail('Алексей', 'Практик', 'описание', 0)
 
     expect(html).not.toContain('Бонус:')
+  })
+
+  it.each([0, -10, Number.NaN, Number.POSITIVE_INFINITY])('не обещает начисление при некорректном или нулевом бонусе %s', (points) => {
+    for (const message of [courseCompletedEmail('Анна', 'Курс', points), roadmapCompletedEmail('Анна', 'Путь', points)]) {
+      expect(message.text).not.toContain('Награда за завершение')
+      expect(message.html).not.toContain('+0')
+      expect(message.html).not.toContain('NaN')
+      expect(message.html).not.toContain('Infinity')
+    }
+  })
+
+  it.each([[1, 'балл'], [2, 'балла'], [11, 'баллов'], [21, 'балл'], [24, 'балла'], [111, 'баллов']])('склоняет %i %s', (points, noun) => {
+    expect(courseCompletedEmail('Анна', 'Курс', Number(points)).text).toContain(`+${points} ${noun}.`)
+  })
+
+  it('не округляет дробную награду до другого начисления', () => {
+    expect(courseCompletedEmail('Анна', 'Курс', 1.5).text).toContain('+1,5 балла')
+  })
+})
+
+describe('содержание и переходы', () => {
+  it('приглашение объясняет первые шаги и как обновить устаревшую ссылку', () => {
+    const message = inviteEmail('Анна', 'student@example.test', 'token')
+    expect(message.text).toContain('1. Задайте пароль')
+    expect(message.text).toContain('доступные вам материалы')
+    expect(message.text).toContain('/forgot-password')
+    expect(message.text).toContain('Не пересылайте это письмо')
+  })
+
+  it('сброс объясняет срок, одноразовость и что делать без запроса', () => {
+    const message = resetPasswordEmail('Анна', 'token')
+    expect(message.text).toContain('1 час')
+    expect(message.text).toContain('один раз')
+    expect(message.text).toContain('пароль останется прежним')
+    expect(message.html).toContain('/forgot-password')
+  })
+
+  it('переходы курса и роадмапа ведут к конкретной сущности, спецсимволы slug кодируются', () => {
+    const course = courseCompletedEmail('Анна', 'Курс', 50, 'react/продвинутый?')
+    const roadmap = roadmapCompletedEmail('Анна', 'Путь', 200, 'frontend')
+    expect(course.html).toContain('/courses/react%2F%D0%BF%D1%80%D0%BE%D0%B4%D0%B2%D0%B8%D0%BD%D1%83%D1%82%D1%8B%D0%B9%3F')
+    expect(roadmap.text).toContain('/roadmaps/frontend')
+    expect(course.text).toContain('/certificates')
+  })
+
+  it.each(ALL_TEMPLATES)('%s — обращение без имени не содержит пустых запятых', (name) => {
+    const message = name === 'приглашение' ? inviteEmail('', 'a@example.test', 't')
+      : name === 'сброс пароля' ? resetPasswordEmail('', 't')
+        : name === 'курс завершён' ? courseCompletedEmail('', 'Курс', 50)
+          : name === 'роадмап завершён' ? roadmapCompletedEmail('', 'Путь', 200)
+            : achievementUnlockedEmail('', 'Награда', 'Описание', 5)
+    expect(message.text).toContain('Здравствуйте!')
+    expect(message.text).not.toMatch(/,\s*,|Поздравляем, !/)
   })
 })
 
