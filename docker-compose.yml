@@ -1,6 +1,6 @@
 x-trainer-image: &trainer-image
-  restart: "no"
-  entrypoint: ["node", "-e", "process.exit(0)"]
+  restart: unless-stopped
+  entrypoint: ["node", "-e", "setInterval(() => {}, 2147483647)"]
   read_only: true
   cap_drop: [ALL]
   security_opt: [no-new-privileges:true]
@@ -131,7 +131,7 @@ services:
         max-size: "50m"
         max-file: "5"
 
-  # Эти контейнеры только гарантируют сборку job images и сразу завершаются.
+  # Держат ссылки на job images: очистка завершённых контейнеров не должна удалять среды задач.
   lms-mentor-trainer-go-image:
     <<: *trainer-image
     image: ${TRAINER_GO_JOB_IMAGE:-lms-trainer-go:local}
@@ -196,13 +196,13 @@ services:
       lms-mentor-trainer-auth:
         condition: service_completed_successfully
       lms-mentor-trainer-go-image:
-        condition: service_completed_successfully
+        condition: service_started
       lms-mentor-trainer-python-image:
-        condition: service_completed_successfully
+        condition: service_started
       lms-mentor-trainer-frontend-image:
-        condition: service_completed_successfully
+        condition: service_started
       lms-mentor-trainer-next-image:
-        condition: service_completed_successfully
+        condition: service_started
     environment:
       - TRAINER_RUNTIME_TOKEN=${TRAINER_RUNTIME_TOKEN:-}
       - TRAINER_RUNTIME_TOKEN_FILE=/trainer-auth/token
