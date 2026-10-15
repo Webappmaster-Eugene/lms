@@ -9,4 +9,6 @@ export default defineConfig({
     plugins: [tailwindcss()],
   },
   site: SITE_URL,
+  // Одна страница: отдельный CSS-файл только задерживает первый экран лишним запросом.
+  build: { inlineStylesheets: 'always' },
 })

@@ -12,6 +12,7 @@ test('инструкция ссылается на платформу и сай�
   await expect(page.locator('footer a[href="https://nadtocheev.ru"]')).toBeVisible()
   const text = await page.locator('body').innerText()
   expect(text).not.toMatch(/Надточеев|оплата после|до оффера|записаться на|лет опыта/i)
+  expect(text).not.toMatch(/Ctrl|⌘|горячие клавиши/i)
   expect(await page.locator('img[src^="/guide/"]').count()).toBeGreaterThanOrEqual(10)
   await expect(page.getByText('Зелёные тесты после «Запустить» ещё не означают зачёт. Всегда завершайте решение успешной отправкой на сервер.')).toBeVisible()
 })
@@ -34,6 +35,28 @@ test('шаги выбираются с экрана, показ можно ос�
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).not.toBeVisible()
   await expect(zoom).toBeFocused()
+})
+
+test('показ шагов сразу приближает первый шаг, сам переходит дальше и в конце возвращает общий вид', async ({ page }) => {
+  await page.clock.install()
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/#trainer')
+  const guide = page.locator('#trainer [data-walkthrough]')
+  const label = guide.locator('[data-tour-label]')
+  const canvas = guide.locator('.screen-canvas')
+  await expect(canvas).toHaveCSS('transform', 'none')
+  await guide.getByRole('button', { name: 'Показать шаги' }).click()
+  await expect(label).toHaveText('Шаг 1 из 3 · Прочитайте условие и тесты')
+  await expect(canvas).not.toHaveCSS('transform', 'none')
+  await page.clock.runFor(9_000)
+  await expect(label).toHaveText('Шаг 2 из 3 · Проверьте код: «Запустить»')
+  await expect(guide.locator('[data-step="1"]')).toHaveAttribute('data-active', 'true')
+  await page.clock.runFor(20_000)
+  await expect(guide.getByRole('button', { name: 'Показать шаги' })).toHaveAttribute('aria-pressed', 'false')
+  await expect(guide.locator('[data-step="2"]')).toHaveAttribute('data-active', 'true')
+  await expect(label).toHaveText('Показываем на экране')
+  await expect(canvas).toHaveCSS('transform', 'none')
 })
 
 test('чек-лист сохраняется после перезагрузки и не отправляет результат в LMS', async ({ page }) => {
@@ -75,7 +98,7 @@ test('оглавление ищет раздел, показывает пуст�
   await search.press('Enter')
   await expect(page).toHaveURL(/#trainer$/)
   await expect(search).toHaveValue('')
-  await expect(nav.locator('a:visible')).toHaveCount(14)
+  await expect(nav.locator('a:visible')).toHaveCount(13)
 })
 
 test('мобильное оглавление доступно из середины инструкции и сворачивается после перехода', async ({ page }) => {

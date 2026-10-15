@@ -11,8 +11,8 @@ JSON-LD, llms.txt и картинки Open Graph.
 
 - `landing/src/data/guide.ts`: десять разделов, инструкции и координаты меток.
 - `landing/src/data/faq.ts`: общий источник видимого FAQ и JSON-LD.
-- `landing/src/components/GuideScreen.astro`: скриншот и доступные кнопки шагов.
-- `landing/src/scripts/guide.ts`: выбор и показ шагов, увеличение скриншотов,
+- `landing/src/components/GuideScreen.astro`: скриншот, заголовки `h3` и кнопки шагов.
+- `landing/src/scripts/guide.ts`: выбор шагов, показ с приближением к метке, увеличение скриншотов,
   оглавление с поиском и закреплённой мобильной навигацией, локальный
   чек-лист. Чек-лист не меняет учебный прогресс LMS.
 - `landing/public/guide/`: 13 WebP-скриншотов настоящего интерфейса.
@@ -31,6 +31,18 @@ JSON-LD, llms.txt и картинки Open Graph.
 screens.json и координаты меток. Инструкция отражает реальные условия:
 аккаунт выдаёт администратор; просмотр видео не завершает урок;
 в тренажёре зачёт даёт успешная отправка на сервер.
+
+## Поиск и превью ссылок
+
+- Title, description, canonical, Open Graph и JSON-LD — `landing/src/layouts/Layout.astro`;
+  sitemap — `landing/src/pages/sitemap.xml.ts`. Стили встроены в HTML (`inlineStylesheets`).
+- Дубли главной (`/index.html`, `//…`) отвечают 301 в `landing/nginx.conf`;
+  `scripts/landing-server.mjs` повторяет это для тестов. Ссылки с `utm_*` Яндекс
+  склеивает по `Clean-param` из `robots.txt`, Google — по canonical.
+- HTML отдаётся с `Cache-Control: no-cache`, чтобы после выката не показывалась старая версия.
+- `og.png` 1200×630 нарисована HTML-шаблоном со шрифтом Golos Text и снимком
+  `guide/dashboard.webp`, без личных упоминаний. Telegram кеширует превью ссылки,
+  обновить его можно через @WebpageBot.
 
 ## Домены
 

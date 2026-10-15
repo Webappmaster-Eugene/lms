@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { LANDING_USE } from '../fixtures/env'
+import { LANDING_URL, LANDING_USE } from '../fixtures/env'
 
 /**
  * Лендинг (landing/, Astro): мета-теги, canonical, Open Graph, JSON-LD,
@@ -26,6 +26,27 @@ test('title, description, canonical, robots и язык страницы', async
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /index, follow/)
   await expect(page.locator('meta[name="viewport"]')).toHaveAttribute('content', /width=device-width/)
   await expect(page.locator('h1')).toHaveCount(1)
+  // Стили встроены в HTML: отдельный файл задерживал первый экран лишним запросом.
+  await expect(page.locator('link[rel="stylesheet"]')).toHaveCount(0)
+})
+
+test('шаги разделов — заголовки h3 под заголовком раздела', async ({ page }) => {
+  await page.goto('/')
+  const trainer = page.locator('#trainer')
+  await expect(trainer.locator('h2')).toHaveText('Напишите код, проверьте и отправьте решение')
+  // Номер шага отделён пробелом: «1Прочитайте» поисковик прочитал бы одним словом.
+  await expect(trainer.getByRole('heading', { level: 3 })).toHaveText(['1 Прочитайте условие и тесты', '2 Проверьте код: «Запустить»', '3 Получите зачёт: «Отправить»'])
+  expect(await page.locator('.chapter h3').count()).toBe(await page.locator('[data-step]').count())
+})
+
+test('дубли главной отвечают 301 на /', async ({ request }) => {
+  // Полный адрес: «//» без него читается как ссылка без протокола.
+  const origin = new URL(LANDING_URL).origin
+  for (const [path, location] of [['/index.html', '/'], ['/index.html?utm_source=tg', '/?utm_source=tg'], ['//', '/']]) {
+    const response = await request.get(`${origin}${path}`, { maxRedirects: 0 })
+    expect(response.status(), path).toBe(301)
+    expect(response.headers()['location'], path).toBe(location)
+  }
 })
 
 test('Open Graph и Twitter Card заполнены и указывают на существующую картинку', async ({ page, request }) => {
@@ -54,7 +75,10 @@ test('JSON-LD описывает инструкцию и FAQ совпадает 
     return data['@graph'] ?? [data]
   })
   const types = graph.map((node) => node['@type'])
-  expect(types).toEqual(expect.arrayContaining(['WebSite', 'WebPage', 'FAQPage']))
+  expect(types).toEqual(expect.arrayContaining(['Organization', 'WebSite', 'WebPage', 'ImageObject', 'FAQPage']))
+  const webPage = graph.find((node) => node['@type'] === 'WebPage') as { dateModified: string; primaryImageOfPage: { '@id': string } }
+  expect(Number.isNaN(Date.parse(webPage.dateModified))).toBe(false)
+  expect(webPage.primaryImageOfPage['@id']).toBe(`${SITE}/#primaryimage`)
   expect(types).not.toContain('Person')
   expect(types).not.toContain('Course')
   for (const node of graph) {
@@ -81,6 +105,8 @@ test('robots.txt разрешает индексацию и указывает s
   expect(text).toMatch(/User-agent: \*/)
   expect(text).not.toMatch(/Disallow: \/\s*$/m)
   expect(text).toContain(`Sitemap: ${SITE}/sitemap.xml`)
+  // Метки рассылок и рекламы не должны плодить дубли в Яндексе.
+  expect(text).toMatch(/^Clean-param: utm_source&[^\n]*utm_campaign[^\n]* \/$/m)
 })
 
 test('sitemap.xml — валидный XML с главной и свежим lastmod', async ({ request, page }) => {

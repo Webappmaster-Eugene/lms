@@ -54,7 +54,19 @@ function resolveFile(pathname) {
   return candidates.find((file) => file.startsWith(DIST) && existsSync(file) && statSync(file).isFile())
 }
 
+// Те же редиректы дублей главной, что в nginx.conf: /index.html и //… → чистый адрес.
+function duplicateRedirect(url) {
+  if (/^\/index\.html(?:\?|$)/.test(url)) return `/${url.slice('/index.html'.length)}`.replace(/^\/\?$/, '/')
+  if (/^\/{2,}/.test(url)) return url.replace(/^\/+/, '/')
+  return null
+}
+
 const server = createServer((req, res) => {
+  const location = duplicateRedirect(req.url ?? '/')
+  if (location !== null) {
+    res.writeHead(301, { Location: location })
+    return res.end()
+  }
   const { pathname } = new URL(req.url ?? '/', 'http://landing')
   const file = resolveFile(pathname)
   const status = file ? 200 : 404
