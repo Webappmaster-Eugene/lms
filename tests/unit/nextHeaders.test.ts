@@ -17,6 +17,22 @@ function headersFor(rules: Header[], pathname: string): Headers {
 }
 
 describe('итоговые HTTP-заголовки Next + Payload', () => {
+  it('HSTS и Permissions-Policy на всех маршрутах, версии стека не раскрываются', async () => {
+    const rules = await config.headers()
+    // false выключает и встроенный заголовок Next, и тот, что withPayload добавляет своим правилом.
+    expect(config.poweredByHeader).toBe(false)
+    for (const path of ['/', '/login', '/trainer/go-programming/go-sum-json', '/api/health', '/api/media/file/avatar.png', '/admin', '/admin/collections/users/3', '/sw.js']) {
+      const headers = headersFor(rules, path)
+      expect(headers.get('X-Powered-By'), path).toBeNull()
+      expect(headers.get('Strict-Transport-Security'), path).toMatch(/^max-age=\d+$/)
+      for (const feature of ['camera', 'microphone', 'geolocation']) {
+        expect(headers.get('Permissions-Policy'), path).toContain(`${feature}=()`)
+      }
+      // Слайды, видео и роадмап разворачиваются на весь экран.
+      expect(headers.get('Permissions-Policy'), path).not.toContain('fullscreen')
+    }
+  })
+
   it('подсказка темы запрашивается только админкой, без потери security/cache и остальных SDK-заголовков', async () => {
     const rules = await config.headers()
     const publicRoutes = [
@@ -32,13 +48,11 @@ describe('итоговые HTTP-заголовки Next + Payload', () => {
       expect(headers.get('Accept-CH'), path).toBeNull()
       expect(headers.get('Critical-CH'), path).toBeNull()
       expect(headers.get('Vary') ?? '', path).not.toContain('Sec-CH-Prefers-Color-Scheme')
-      expect(headers.get('X-Powered-By'), path).toBe('Next.js, Payload')
       expect(headers.get('X-Robots-Tag'), path).toBe('noindex, nofollow')
     }
     for (const path of ['/admin', '/admin/', '/admin/login', '/admin/collections/users/3', '/admin/roadmap-editor/7']) {
       const headers = headersFor(rules, path)
       for (const key of hintKeys) expect(headers.get(key), `${path}: ${key}`).toBe('Sec-CH-Prefers-Color-Scheme')
-      expect(headers.get('X-Powered-By'), path).toBe('Next.js, Payload')
       expect(headers.get('Content-Security-Policy'), path).toBe("frame-ancestors 'none'")
       expect(headers.get('X-Frame-Options'), path).toBe('DENY')
       expect(headers.get('X-Content-Type-Options'), path).toBe('nosniff')

@@ -9,6 +9,9 @@ const skipBuildChecks = process.env.LMS_SKIP_BUILD_CHECKS === '1'
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  // «X-Powered-By: Next.js, Payload» — готовая подсказка сканерам уязвимостей. При false
+  // заголовок не ставит ни Next, ни withPayload.
+  poweredByHeader: false,
   typescript: { ignoreBuildErrors: skipBuildChecks },
   eslint: { ignoreDuringBuilds: skipBuildChecks },
 
@@ -39,7 +42,19 @@ const nextConfig = {
 
   async headers() {
     return [
-      { source: '/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+          // Срок короткий, пока HSTS обкатывается: если HTTPS сломается, браузер не пустит на сайт до его конца.
+          { key: 'Strict-Transport-Security', value: 'max-age=86400' },
+          // Полноэкранный режим (слайды, видео, роадмап) и буфер обмена («Поделиться») нужны — их не ограничиваем.
+          {
+            key: 'Permissions-Policy',
+            value: 'accelerometer=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()',
+          },
+        ],
+      },
       {
         source: '/sw.js',
         headers: [
