@@ -49,6 +49,26 @@ test('дубли главной отвечают 301 на /', async ({ request }
   }
 })
 
+test('CSP из nginx.conf не ломает страницу: показ шагов, увеличение, поиск по оглавлению', async ({ page }) => {
+  const violations: string[] = []
+  page.on('console', (message) => { if (message.type() === 'error') violations.push(message.text()) })
+  await page.addInitScript(() => {
+    document.addEventListener('securitypolicyviolation', (event) => console.error(`CSP: ${event.violatedDirective} ${event.blockedURI}`))
+  })
+  const response = await page.goto('/')
+  // Сервер тестов берёт заголовки из nginx.conf — проверяем, что CSP действительно пришла.
+  expect(response?.headers()['content-security-policy']).toContain("script-src 'self'")
+  await page.waitForLoadState('networkidle')
+  const trainer = page.locator('#trainer')
+  await trainer.locator('[data-play]').click()
+  await expect(trainer.locator('[data-tour-label]')).toContainText('Шаг 1 из 3')
+  await trainer.locator('[data-zoom]').click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.locator('[data-contents-search] input').first().fill('тренажёр')
+  expect(violations).toEqual([])
+})
+
 test('Open Graph и Twitter Card заполнены и указывают на существующую картинку', async ({ page, request }) => {
   await page.goto('/')
   const og = async (property: string) => page.locator(`meta[property="og:${property}"]`).getAttribute('content')

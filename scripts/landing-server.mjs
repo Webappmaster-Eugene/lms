@@ -5,7 +5,7 @@
  * Сборка пересобирается, если её нет, если исходники новее или при E2E_BUILD=1.
  */
 import { spawnSync } from 'node:child_process'
-import { createReadStream, existsSync, readdirSync, statSync } from 'node:fs'
+import { createReadStream, existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -41,6 +41,11 @@ if (process.env.E2E_BUILD === '1' || stale) run('npm', ['run', 'build'])
 // сервер вместо `astro preview`: у Astro 7 он держит lock-файл на весь проект
 // и не стартует рядом с чужим запущенным предпросмотром.
 const DIST = join(LANDING, 'dist')
+// Заголовки читаются из nginx.conf, а не копируются: тесты лендинга идут под той же CSP, что и прод.
+const SECURITY_HEADERS = Object.fromEntries(
+  [...readFileSync(join(LANDING, 'nginx.conf'), 'utf8').matchAll(/^\s*add_header ([\w-]+) "([^"]+)" always;$/gm)].map((m) => [m[1], m[2]]),
+)
+if (!SECURITY_HEADERS['Content-Security-Policy']) throw new Error('В landing/nginx.conf не найден Content-Security-Policy')
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8', '.xml': 'application/xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8',
@@ -64,7 +69,7 @@ function duplicateRedirect(url) {
 const server = createServer((req, res) => {
   const location = duplicateRedirect(req.url ?? '/')
   if (location !== null) {
-    res.writeHead(301, { Location: location })
+    res.writeHead(301, { Location: location, ...SECURITY_HEADERS })
     return res.end()
   }
   const { pathname } = new URL(req.url ?? '/', 'http://landing')
@@ -73,9 +78,7 @@ const server = createServer((req, res) => {
   const body = file ?? join(DIST, '404.html')
   res.writeHead(status, {
     'Content-Type': TYPES[extname(body)] ?? 'application/octet-stream',
-    'X-Frame-Options': 'SAMEORIGIN',
-    'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    ...SECURITY_HEADERS,
   })
   if (req.method === 'HEAD') return res.end()
   createReadStream(body).pipe(res)

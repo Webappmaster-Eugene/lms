@@ -206,9 +206,42 @@ describe('nginx лендинга', () => {
     })
   }
 
+  /** Значение `add_header Имя "значение" always;` уровня server. */
+  function header(name: string): string {
+    const match = NGINX.match(new RegExp(`^ {4}add_header ${name} "([^"]+)" always;$`, 'm'))
+    expect(match, `в nginx.conf нет add_header ${name} на уровне server`).not.toBeNull()
+    return match![1]
+  }
+
   it('заголовки безопасности заданы на уровне server', () => {
-    for (const header of ['X-Frame-Options', 'X-Content-Type-Options', 'Referrer-Policy']) {
-      expect(NGINX, header).toMatch(new RegExp(`^ {4}add_header ${header} .+ always;$`, 'm'))
+    for (const name of ['X-Frame-Options', 'X-Content-Type-Options', 'Referrer-Policy', 'Strict-Transport-Security', 'Content-Security-Policy', 'Permissions-Policy']) {
+      header(name)
+    }
+  })
+
+  it('версия nginx не раскрывается', () => {
+    expect(NGINX).toMatch(/^ {4}server_tokens off;$/m)
+  })
+
+  it('HSTS без preload: из списка браузеров его не отозвать, если HTTPS сломается', () => {
+    expect(Number(header('Strict-Transport-Security').match(/max-age=(\d+)/)?.[1] ?? 0)).toBeGreaterThan(0)
+    expect(header('Strict-Transport-Security')).not.toContain('preload')
+  })
+
+  it('CSP не разрешает чужие и встроенные скрипты', () => {
+    const csp = Object.fromEntries(header('Content-Security-Policy').split(';').map((part) => {
+      const [name, ...sources] = part.trim().split(/\s+/)
+      return [name, sources.join(' ')]
+    }))
+    expect(csp['default-src']).toBe("'self'")
+    expect(csp['script-src']).toBe("'self'")
+    expect(csp['object-src']).toBe("'none'")
+    expect(csp['frame-ancestors']).toBe("'self'")
+  })
+
+  it('Permissions-Policy запрещает камеру, микрофон и геолокацию', () => {
+    for (const feature of ['camera', 'microphone', 'geolocation']) {
+      expect(header('Permissions-Policy')).toContain(`${feature}=()`)
     }
   })
 

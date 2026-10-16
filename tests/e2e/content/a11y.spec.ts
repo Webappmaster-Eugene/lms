@@ -86,6 +86,14 @@ test.describe('лендинг', () => {
     })
   }
 
+  test('подписи aria-label только у элементов с ролью', async ({ page }) => {
+    // На span и div без роли подпись игнорируют VoiceOver и NVDA: вместо «Раздел 1 из 10»
+    // звучало «ноль один». axe считает это «неполной» проверкой и в нарушения не выносит.
+    await page.goto('/')
+    expect(await page.locator('span[aria-label]:not([role]), div[aria-label]:not([role])').count()).toBe(0)
+    await expect(page.locator('#start .chapter-number .sr-only')).toHaveText('Раздел 1 из 10')
+  })
+
   test('страница 404', async ({ page }) => {
     await page.goto('/no-such-page')
     expect(await audit(page, 'landing-404')).toEqual([])
