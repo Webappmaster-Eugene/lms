@@ -42,6 +42,8 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+const IPHONE_SAFARI = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'
+
 async function reveal() { await act(async () => { await vi.advanceTimersByTimeAsync(1500) }) }
 function installEvent(outcome: 'accepted' | 'dismissed' = 'accepted') {
   const event = Object.assign(new Event('beforeinstallprompt'), { prompt: vi.fn(async () => undefined), userChoice: Promise.resolve({ outcome }) }) as InstallPromptEvent
@@ -84,14 +86,37 @@ describe('mobile PWA explanation', () => {
   })
 
   it('gives actionable iPhone instructions without pretending a browser install button exists', async () => {
-    navigatorProperty('userAgent', 'Mozilla/5.0 iPhone Safari')
+    navigatorProperty('userAgent', IPHONE_SAFARI)
     render(<InstallExplanation />)
     await reveal()
-    expect(screen.getByText(/в Safari, нажмите «Поделиться» → «На экран Домой»/)).toBeInTheDocument()
+    expect(screen.getByText(/Нажмите «Поделиться» → «На экран „Домой“», затем «Добавить»/)).toBeInTheDocument()
     expect(screen.getByText(/iOS 16.4/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Установить приложение' })).not.toBeInTheDocument()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('inside Telegram explains that installation needs a real browser and copies the link', async () => {
+    navigatorProperty('userAgent', 'Mozilla/5.0 (Linux; Android 14; Pixel 7 Build/AP2A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0 Mobile Safari/537.36 Telegram-Android/11.2.3')
+    const writeText = vi.fn(async () => undefined)
+    navigatorProperty('clipboard', { writeText })
+    render(<InstallExplanation />)
+    await reveal()
+    expect(screen.getByText(/Сайт открыт внутри другого приложения/)).toBeInTheDocument()
+    expect(screen.queryByText(/Установить приложение» или «Добавить на главный экран/)).not.toBeInTheDocument()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Скопировать ссылку' })) })
+    expect(writeText).toHaveBeenCalledWith(window.location.href)
+    expect(screen.getByText(/Ссылка скопирована/)).toBeInTheDocument()
+  })
+
+  it('shows the link for manual copying when the in-app browser blocks the clipboard', async () => {
+    navigatorProperty('userAgent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 330.0')
+    navigatorProperty('clipboard', { writeText: vi.fn(async () => { throw new Error('denied') }) })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    render(<InstallExplanation />)
+    await reveal()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Скопировать ссылку' })) })
+    expect(screen.getByText(/Скопируйте ссылку вручную/)).toHaveTextContent(window.location.href)
   })
 
   it('does not interrupt an installed application or a desktop session', async () => {

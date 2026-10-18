@@ -79,6 +79,14 @@ test('manifest and public PNG icons are installable resources with real pixel di
     expect(bytes.readUInt32BE(16)).toBe(width)
     expect(bytes.readUInt32BE(20)).toBe(height)
   }
+  // iOS берёт иконку и признак веб-приложения из head, а не из manifest.
+  await expect(page.locator('meta[name="apple-mobile-web-app-capable"]')).toHaveAttribute('content', 'yes')
+  const appleIcon = await page.request.get(new URL(await page.locator('link[rel="apple-touch-icon"]').getAttribute('href') ?? '', APP_URL).href)
+  expect(appleIcon.status()).toBe(200)
+  const appleBytes = await appleIcon.body()
+  expect([appleBytes.readUInt32BE(16), appleBytes.readUInt32BE(20)]).toEqual([180, 180])
+  // Тип цвета 2 — RGB без альфа-канала: прозрачные углы iOS залил бы чёрным.
+  expect(appleBytes[25]).toBe(2)
 })
 
 test('real service worker provides generic offline navigation and never caches private lessons or API/media', async ({ page, context }) => {
@@ -163,7 +171,7 @@ test('phone browser and simulated standalone mode give appropriate installation 
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/settings/app')
   await expect(page.getByText(/Android:/)).toBeVisible()
-  await expect(page.getByText(/iPhone:/)).toBeVisible()
+  await expect(page.getByText(/iPhone и iPad:/)).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.addInitScript(() => { Object.defineProperty(navigator, 'standalone', { configurable: true, value: true }) })
   await page.reload()

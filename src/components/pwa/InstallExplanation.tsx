@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { BellRing, BookOpen, Download, Smartphone } from 'lucide-react'
 import { MobileSheet } from '@/components/layout/MobileSheet'
+import { InstallInstructions, useInstallGuide } from './InstallInstructions'
 import { currentInstallPrompt, installExplanationSeen, isInstalledPwa, isIosDevice, rememberInstallExplanation, rememberInstallPrompt } from '@/lib/pwa-client'
 
 function subscribeToInstallation(callback: () => void) {
@@ -25,6 +26,7 @@ export function InstallExplanation({ paused = false }: { paused?: boolean }) {
   const canInstall = Boolean(environment & 1)
   const installed = Boolean(environment & 2)
   const ios = Boolean(environment & 4)
+  const guide = useInstallGuide()
 
   useEffect(() => {
     const mobile = window.matchMedia('(max-width: 1023px)').matches && (/Android|iPhone|iPad|iPod/.test(navigator.userAgent) || navigator.maxTouchPoints > 1)
@@ -80,7 +82,7 @@ export function InstallExplanation({ paused = false }: { paused?: boolean }) {
           <li className="flex gap-3"><BookOpen className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" /><span>Те же уроки, заметки и прогресс — без панели браузера.</span></li>
           <li className="flex gap-3"><BellRing className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" /><span>Напоминания о занятиях и ответы ментора на телефоне. Уведомления включаются отдельно, когда вы захотите.</span></li>
         </ul>
-        {!canInstall && <div className="rounded-xl bg-muted p-4 text-sm leading-relaxed">{ios ? <p>На iPhone или iPad откройте сайт в Safari, нажмите «Поделиться» → «На экран Домой», затем «Добавить». Откройте MentorCareer с новой иконки.</p> : <p>Откройте меню браузера и выберите «Установить приложение» или «Добавить на главный экран».</p>}</div>}
+        {!canInstall && guide && <div className="space-y-3 rounded-xl bg-muted p-4 text-sm leading-relaxed"><InstallInstructions guide={guide} /></div>}
         <p className="text-xs leading-relaxed text-muted-foreground">Для уроков и синхронизации нужен интернет.{ios && ' Уведомления доступны в установленном приложении на iOS 16.4 и новее.'}</p>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         <div className="space-y-2">

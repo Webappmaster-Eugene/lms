@@ -41,7 +41,11 @@ describe('общие метаданные платформы', () => {
   it('явно перечисляют SVG-иконку: иначе поле icons отключает app/icon.svg', () => {
     const icons = ROOT_METADATA.icons as { icon: { url: string }[]; apple: { url: string }[] }
     expect(icons.icon.map((icon) => icon.url)).toContain('/icon.svg')
-    expect(icons.apple.map((icon) => icon.url)).toContain('/images/pwa/icon-192.png')
+    expect(icons.apple.map((icon) => icon.url)).toContain('/images/pwa/apple-touch-icon.png')
+  })
+
+  it('Safari получает apple-вариант признака веб-приложения: Next 15 сам выводит только mobile-web-app-capable', () => {
+    expect(ROOT_METADATA.other).toMatchObject({ 'apple-mobile-web-app-capable': 'yes' })
   })
 
   it('картинка превью лежит под /images, который middleware отдаёт без входа', () => {

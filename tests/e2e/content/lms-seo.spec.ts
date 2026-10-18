@@ -30,7 +30,7 @@ async function expectIcons(page: Page, request: APIRequestContext) {
   const icons = await page.locator('link[rel="icon"], link[rel="apple-touch-icon"]').evaluateAll((links) =>
     links.map((link) => new URL(link.getAttribute('href') ?? '', location.href).pathname),
   )
-  expect(icons).toEqual(expect.arrayContaining(['/favicon.ico', '/icon.svg', '/images/pwa/icon-192.png']))
+  expect(icons).toEqual(expect.arrayContaining(['/favicon.ico', '/icon.svg', '/images/pwa/apple-touch-icon.png']))
   for (const path of new Set(icons)) {
     const response = await request.get(path, { maxRedirects: 0 })
     expect(response.status(), path).toBe(200)

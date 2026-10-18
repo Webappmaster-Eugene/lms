@@ -29,6 +29,22 @@ export function isIosDevice(): boolean {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 }
 
+export type InstallGuide = 'in-app' | 'ios-safari' | 'ios-browser' | 'android' | 'desktop'
+
+/**
+ * Какую инструкцию по установке показать. Во встроенных браузерах Telegram, VK, Instagram
+ * и Facebook установки нет совсем — ученик ищет пункт меню, которого там не бывает.
+ * WebView на iOS отличается от Safari отсутствием токена Safari/ в user agent.
+ */
+export function installGuide(userAgent: string, ios: boolean): InstallGuide {
+  if (/Telegram|VKAndroidApp|VKClient|com\.vk\.|Instagram|FBAN|FBAV|FB_IAB|; wv\)/i.test(userAgent)) return 'in-app'
+  if (ios) {
+    if (/CriOS|FxiOS|EdgiOS|YaBrowser|OPiOS|OPT\//.test(userAgent)) return 'ios-browser'
+    return /Safari\//.test(userAgent) ? 'ios-safari' : 'in-app'
+  }
+  return /Android/i.test(userAgent) ? 'android' : 'desktop'
+}
+
 export function rememberInstallPrompt(prompt: InstallPromptEvent | null): void {
   installPrompt = prompt
   window.dispatchEvent(new Event('lms:install-ready'))

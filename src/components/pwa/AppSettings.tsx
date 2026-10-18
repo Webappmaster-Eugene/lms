@@ -5,9 +5,11 @@ import Link from 'next/link'
 import { CheckCircle2, Download, Smartphone } from 'lucide-react'
 import { currentInstallPrompt, rememberInstallPrompt } from '@/lib/pwa-client'
 import { usePwaCapabilities } from './use-pwa-capabilities'
+import { InstallInstructions, useInstallGuide } from './InstallInstructions'
 
 export function AppSettings() {
   const { installed, canInstall } = usePwaCapabilities()
+  const guide = useInstallGuide()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -47,7 +49,7 @@ export function AppSettings() {
         ) : canInstall ? (
           <button type="button" disabled={busy} onClick={() => void install()} className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"><Download className="h-4 w-4" aria-hidden="true" />{busy ? 'Устанавливаем…' : 'Установить приложение'}</button>
         ) : (
-          <div className="mt-4 space-y-3 text-sm leading-relaxed"><p><strong>Android:</strong> откройте меню браузера и выберите «Установить приложение» или «Добавить на главный экран».</p><p><strong>iPhone:</strong> нажмите «Поделиться» → «На экран Домой», затем откройте приложение с новой иконки.</p></div>
+          <div className="mt-4 space-y-3 text-sm leading-relaxed">{guide && <InstallInstructions guide={guide} />}</div>
         )}
         <p className="mt-4 text-xs leading-relaxed text-muted-foreground">Для новых уроков и синхронизации нужен интернет. Вход сохраняется на 30 дней, место остановки переносится между устройствами.</p>
       </section>

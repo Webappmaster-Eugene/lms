@@ -67,7 +67,7 @@ test('iPhone получает инструкцию добавления на э�
     await page.goto(test.info().project.use.baseURL ?? 'http://localhost:3100')
     const explanation = page.getByRole('dialog', { name: 'Учиться удобнее с телефона' })
     await expect(explanation).toBeVisible()
-    await expect(explanation.getByText(/На iPhone или iPad/)).toBeVisible()
+    await expect(explanation.getByText(/«Поделиться» → «На экран „Домой“»/)).toBeVisible()
     await expect(explanation.getByText(/iOS 16.4/)).toBeVisible()
     await explanation.getByRole('button', { name: 'Закрыть подсказку об установке' }).click()
     await expect(explanation).toHaveCount(0)
