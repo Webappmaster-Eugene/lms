@@ -63,7 +63,7 @@ export default async function FrontendLayout({ children }: { children: React.Rea
                   </div>
                 </div>
                 <div className="contents print:hidden">
-                  <BottomNav trainerEnabled={trainerEnabled} />
+                  <BottomNav />
                 </div>
               </div>
             </SidebarProvider>

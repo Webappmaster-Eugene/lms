@@ -41,11 +41,11 @@ describe('нижняя навигация', () => {
   it('содержит основные разделы', () => {
     render(<BottomNav />)
 
-    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Главная', 'Роадмапы', 'Курсы', 'Тренажёр', 'История'])
-    for (const label of ['Главная', 'Курсы', 'Тренажёр', 'Роадмапы', 'История']) {
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Главная', 'Роадмапы', 'Курсы', 'История'])
+    for (const label of ['Главная', 'Курсы', 'Роадмапы', 'История']) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }
-    // «Ещё» замыкает панель: остальные разделы открываются из него.
+    // «Ещё» замыкает панель: тренажёр и остальные разделы открываются из него.
     const items = screen.getByRole('navigation', { name: 'Основная навигация' }).querySelectorAll('a, button')
     expect(items[items.length - 1]).toHaveTextContent('Ещё')
   })
@@ -59,35 +59,34 @@ describe('нижняя навигация', () => {
     expect(screen.getByRole('link', { name: /Главная/ })).not.toHaveAttribute('aria-current')
   })
 
-  it('закрытый тренажёр отсутствует в мобильной навигации, остальные разделы доступны', () => {
-    render(<BottomNav trainerEnabled={false} />)
-
-    expect(screen.queryByRole('link', { name: /Тренажёр/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Курсы/ })).toHaveAttribute('href', '/courses')
-    expect(screen.getByRole('button', { name: /Ещё/ })).toBeInTheDocument()
-  })
-
   it('ссылки ведут по своим адресам', () => {
     render(<BottomNav />)
 
+    expect(screen.getByRole('link', { name: /Главная/ })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: /Курсы/ })).toHaveAttribute('href', '/courses')
-    expect(screen.getByRole('link', { name: /Тренажёр/ })).toHaveAttribute('href', '/trainer')
     expect(screen.getByRole('link', { name: /Роадмапы/ })).toHaveAttribute('href', '/roadmaps')
     expect(screen.queryByRole('link', { name: /Рейтинг/ })).not.toBeInTheDocument()
   })
 
   it('текущий раздел подсвечен', () => {
-    pathname.current = '/trainer'
+    pathname.current = '/courses'
     render(<BottomNav />)
 
-    expect(screen.getByRole('link', { name: /Тренажёр/ }).className).toContain('text-primary')
+    expect(screen.getByRole('link', { name: /Курсы/ }).className).toContain('text-primary')
   })
 
   it('вложенная страница раздела тоже считается текущей', () => {
+    pathname.current = '/courses/react-basics'
+    render(<BottomNav />)
+
+    expect(screen.getByRole('link', { name: /Курсы/ }).className).toContain('text-primary')
+  })
+
+  it('в тренажёре ни одна вкладка не подсвечена — он открывается из «Ещё»', () => {
     pathname.current = '/trainer/js-core/create-counter'
     render(<BottomNav />)
 
-    expect(screen.getByRole('link', { name: /Тренажёр/ }).className).toContain('text-primary')
+    expect(screen.getAllByRole('link').filter((link) => link.hasAttribute('aria-current'))).toEqual([])
   })
 
   it('главная подсвечивается только на самой главной', () => {

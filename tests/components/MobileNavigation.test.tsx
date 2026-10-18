@@ -34,7 +34,7 @@ describe('мобильные панели', () => {
   })
 
   it('закрытый тренажёр скрыт и в боковом меню, и в нижних вкладках', async () => {
-    render(<SidebarProvider><Sidebar trainerEnabled={false} /><BottomNav trainerEnabled={false} /></SidebarProvider>)
+    render(<SidebarProvider><Sidebar trainerEnabled={false} /><BottomNav /></SidebarProvider>)
     expect(screen.queryByRole('link', { name: /Тренажёр/ })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Ещё' }))
     expect(within(screen.getByRole('dialog')).queryByRole('link', { name: /Тренажёр/ })).not.toBeInTheDocument()
