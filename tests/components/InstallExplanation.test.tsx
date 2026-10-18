@@ -109,6 +109,20 @@ describe('mobile PWA explanation', () => {
     expect(screen.getByText(/Ссылка скопирована/)).toBeInTheDocument()
   })
 
+  it('in Yandex Browser on Android explains the shortcut limit and sends the student to Chrome', async () => {
+    navigatorProperty('userAgent', 'Mozilla/5.0 (Linux; arm_64; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 YaBrowser/24.4.5.98.00 SA/3 Mobile Safari/537.36')
+    const writeText = vi.fn(async () => undefined)
+    navigatorProperty('clipboard', { writeText })
+    render(<InstallExplanation />)
+    await reveal()
+    expect(screen.getByText(/только ярлыком: меню браузера → «Добавить ярлык»/)).toBeInTheDocument()
+    expect(screen.getByText(/откройте сайт в Chrome и выберите в меню \(⋮\) «Установить приложение»/)).toBeInTheDocument()
+    expect(screen.queryByText(/Установить приложение» или «Добавить на главный экран/)).not.toBeInTheDocument()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Скопировать ссылку' })) })
+    expect(writeText).toHaveBeenCalledWith(window.location.href)
+    expect(screen.getByText(/Ссылка скопирована/)).toBeInTheDocument()
+  })
+
   it('shows the link for manual copying when the in-app browser blocks the clipboard', async () => {
     navigatorProperty('userAgent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 330.0')
     navigatorProperty('clipboard', { writeText: vi.fn(async () => { throw new Error('denied') }) })

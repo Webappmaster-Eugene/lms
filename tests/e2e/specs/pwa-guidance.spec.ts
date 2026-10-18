@@ -74,6 +74,26 @@ test('iPhone получает инструкцию добавления на э�
   } finally { await context.close() }
 })
 
+test('Яндекс Браузер на Android объясняет, что установка — через Chrome', async ({ browser }) => {
+  const context = await browser.newContext({
+    storageState: storageStateOf('student'), viewport: { width: 390, height: 844 },
+    userAgent: 'Mozilla/5.0 (Linux; arm_64; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 YaBrowser/24.4.5.98.00 SA/3 Mobile Safari/537.36',
+    isMobile: true, hasTouch: true,
+  })
+  try {
+    const page = await context.newPage()
+    await page.goto(test.info().project.use.baseURL ?? 'http://localhost:3100')
+    const explanation = page.getByRole('dialog', { name: 'Учиться удобнее с телефона' })
+    await expect(explanation).toBeVisible()
+    await expect(explanation.getByText(/только ярлыком: меню браузера → «Добавить ярлык»/)).toBeVisible()
+    await expect(explanation.getByText(/откройте сайт в Chrome/)).toBeVisible()
+    await expect(explanation.getByRole('button', { name: 'Скопировать ссылку' })).toBeVisible()
+    await explanation.getByRole('button', { name: 'Продолжить в браузере' }).click()
+    await page.goto(new URL('/settings/app', page.url()).href)
+    await expect(page.getByText(/только ярлыком: меню браузера → «Добавить ярлык»/)).toBeVisible()
+  } finally { await context.close() }
+})
+
 test('после восстановления сети плашка исчезает даже при устаревшем navigator.onLine', async ({ page, context }) => {
   await page.addInitScript(() => localStorage.setItem('lms:pwa-install-explained:v1', 'seen'))
   await page.goto(`/lessons/${CONTENT.lessons[0].slug}`)

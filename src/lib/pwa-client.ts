@@ -29,12 +29,14 @@ export function isIosDevice(): boolean {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 }
 
-export type InstallGuide = 'in-app' | 'ios-safari' | 'ios-browser' | 'android' | 'desktop'
+export type InstallGuide = 'in-app' | 'ios-safari' | 'ios-browser' | 'android' | 'android-yandex' | 'desktop'
 
 /**
  * Какую инструкцию по установке показать. Во встроенных браузерах Telegram, VK, Instagram
  * и Facebook установки нет совсем — ученик ищет пункт меню, которого там не бывает.
  * WebView на iOS отличается от Safari отсутствием токена Safari/ в user agent.
+ * Яндекс Браузер на Android приложение не устанавливает: он добавляет только ярлык,
+ * который открывает сайт вкладкой браузера, — полноценная установка есть в Chrome.
  */
 export function installGuide(userAgent: string, ios: boolean): InstallGuide {
   if (/Telegram|VKAndroidApp|VKClient|com\.vk\.|Instagram|FBAN|FBAV|FB_IAB|; wv\)/i.test(userAgent)) return 'in-app'
@@ -42,7 +44,8 @@ export function installGuide(userAgent: string, ios: boolean): InstallGuide {
     if (/CriOS|FxiOS|EdgiOS|YaBrowser|OPiOS|OPT\//.test(userAgent)) return 'ios-browser'
     return /Safari\//.test(userAgent) ? 'ios-safari' : 'in-app'
   }
-  return /Android/i.test(userAgent) ? 'android' : 'desktop'
+  if (!/Android/i.test(userAgent)) return 'desktop'
+  return /YaBrowser\//.test(userAgent) ? 'android-yandex' : 'android'
 }
 
 export function rememberInstallPrompt(prompt: InstallPromptEvent | null): void {
