@@ -7,9 +7,13 @@ vi.mock('next/navigation', async () => (await import('../helpers/url-navigation'
 vi.mock('next/link', async () => (await import('../helpers/component-mocks')).linkMock())
 
 const { CourseCatalog, courseStatus, filterCourses } = await import('@/components/course/CourseCatalog')
-import { navigationRouter, navigationURL, setNavigationURL } from '../helpers/url-navigation'
+import { navigationRouter, navigationURL, routeHistoryThroughNavigation, setNavigationURL } from '../helpers/url-navigation'
 
-beforeEach(() => setNavigationURL('/courses'))
+beforeEach(() => {
+  vi.clearAllMocks()
+  setNavigationURL('/courses')
+  routeHistoryThroughNavigation()
+})
 
 import type { CatalogCourse } from '@/components/course/CourseCatalog'
 
@@ -77,6 +81,30 @@ describe('каталог', () => {
     expect(screen.getByRole('link', { name: /React/ })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /NestJS/ })).not.toBeInTheDocument()
     expect(screen.getByText('1 курс')).toBeInTheDocument()
+  })
+
+  it('фильтр и сортировка применяются без запроса к серверу: адрес меняется через history API', async () => {
+    render(<CourseCatalog courses={courses} />)
+
+    await userEvent.click(screen.getByRole('button', { name: /В процессе/ }))
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Порядок курсов' }), 'title')
+
+    expect(navigationRouter().push).not.toHaveBeenCalled()
+    expect(navigationRouter().replace).not.toHaveBeenCalled()
+    expect(window.history.pushState).toHaveBeenCalledTimes(2)
+    expect(navigationURL()).toBe('/courses?status=active&sort=title')
+    expect(screen.getByRole('button', { name: /В процессе/ })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('поиск фильтрует сразу по введённому тексту, а в адрес попадает после паузы', async () => {
+    render(<CourseCatalog courses={courses} />)
+
+    await userEvent.type(screen.getByRole('searchbox', { name: /Найти курс/ }), 'nest')
+
+    expect(screen.getAllByRole('link')).toHaveLength(1)
+    await waitFor(() => expect(navigationURL()).toBe('/courses?q=nest'))
+    expect(window.history.replaceState).toHaveBeenCalled()
+    expect(navigationRouter().replace).not.toHaveBeenCalled()
   })
 
   it('фильтр по роадмапу', async () => {

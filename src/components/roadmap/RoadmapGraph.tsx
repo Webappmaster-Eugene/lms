@@ -17,6 +17,7 @@ import '@xyflow/react/dist/style.css'
 import './roadmap-graph.css'
 
 import { Crosshair, Search, Scan, Maximize, Minimize } from 'lucide-react'
+import { useUrlSearchText } from '@/hooks/use-url-search-text'
 import type { RoadmapGraphProps, AnyRoadmapNode, GraphNode, NodeStatus } from './types'
 import { RoadmapCategoryNode } from './RoadmapCategoryNode'
 import { RoadmapTopicNode } from './RoadmapTopicNode'
@@ -115,11 +116,7 @@ function RoadmapCanvas({ nodes, edges, nextStepNodeId = null, managementRoadmapI
   const [localSelectedId, setLocalSelectedId] = useState<string | null>(null)
   const selectedId = selectedTopic === undefined ? localSelectedId : selectedTopic
   const setSelectedId = useCallback((id: string | null) => { if (onTopicChange) onTopicChange(id); else setLocalSelectedId(id) }, [onTopicChange])
-  const [localQuery, setLocalQuery] = useState(searchQuery ?? '')
-  const [syncedQuery, setSyncedQuery] = useState(searchQuery)
-  if (searchQuery !== undefined && searchQuery !== syncedQuery) { setSyncedQuery(searchQuery); setLocalQuery(searchQuery) }
-  const query = localQuery
-  const setQuery = (next: string) => { setLocalQuery(next); onSearchQueryChange?.(next) }
+  const [query, setQuery] = useUrlSearchText(searchQuery ?? '', (next) => onSearchQueryChange?.(next))
   const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {

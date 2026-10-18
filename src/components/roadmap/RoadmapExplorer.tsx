@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import dynamic from 'next/dynamic'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { boundedQueryText, queryHref, sharedVideoId } from '@/lib/shared-url'
 import { ShareButton } from '@/components/ui/ShareButton'
 import { List, Network } from 'lucide-react'
@@ -41,7 +41,6 @@ type Props = {
 export function RoadmapExplorer({ nodes, edges, looseCourses, nextStepNodeId, managementRoadmapId }: Props) {
   const hydrated = useHydrated()
   const search = useSearchParams()
-  const router = useRouter()
   const pathname = usePathname()
   const current = search.toString()
   const rawView = search.get('view')
@@ -51,12 +50,14 @@ export function RoadmapExplorer({ nodes, edges, looseCourses, nextStepNodeId, ma
   const hasMap = nodes.some(isTopicNode)
   const topicNodes = nodes.filter(isTopicNode)
 
-  const choose = (next: View) => router.push(queryHref(pathname, current, { view: next }), { scroll: false })
-  const chooseTopic = (topic: string | null) => router.push(queryHref(pathname, current, { topic, view }), { scroll: false })
-  const changeQuery = (next: string) => router.replace(queryHref(pathname, current, { q: next.slice(0, 160), view }), { scroll: false })
+  // Вид, тема и поиск — состояние браузера, сервер их не читает: адрес меняется через history API
+  // без перерисовки тяжёлой страницы роадмапа на сервере.
+  const choose = (next: View) => window.history.pushState(null, '', queryHref(pathname, current, { view: next }))
+  const chooseTopic = (topic: string | null) => window.history.pushState(null, '', queryHref(pathname, current, { topic, view }))
+  const changeQuery = (next: string) => window.history.replaceState(null, '', queryHref(pathname, current, { q: next.slice(0, 160), view }))
   useEffect(() => {
-    if (hydrated && hasMap && rawView !== 'map' && rawView !== 'list') router.replace(queryHref(pathname, current, { view }), { scroll: false })
-  }, [hydrated, hasMap, rawView, router, pathname, current, view])
+    if (hydrated && hasMap && rawView !== 'map' && rawView !== 'list') window.history.replaceState(null, '', queryHref(pathname, current, { view }))
+  }, [hydrated, hasMap, rawView, pathname, current, view])
 
   if (!hasMap) return <RoadmapTopicList nodes={topicNodes} looseCourses={looseCourses} managementRoadmapId={managementRoadmapId} selectedTopic={selectedTopic} onTopicChange={chooseTopic} />
 

@@ -25,6 +25,12 @@ const router = {
   back: vi.fn(() => { if (index > 0) { index -= 1; href = history[index]; for (const listener of listeners) listener() } }),
 }
 
+/** Next связывает window.history.pushState/replaceState с useSearchParams — здесь то же через мок адреса. */
+export function routeHistoryThroughNavigation() {
+  vi.spyOn(window.history, 'pushState').mockImplementation((_data, _unused, url) => { if (url) navigate(String(url)) })
+  vi.spyOn(window.history, 'replaceState').mockImplementation((_data, _unused, url) => { if (url) navigate(String(url), true) })
+}
+
 export function navigationURL() { return href }
 export function navigationRouter() { return router }
 export function urlNavigationMock() {

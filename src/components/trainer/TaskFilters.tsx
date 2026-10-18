@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState, useTransition } from 'react'
+import { useEffect, useOptimistic, useRef, useTransition } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Search, X } from 'lucide-react'
+import { Loader2, Search, X } from 'lucide-react'
 
 import {
   COMPANY_OPTIONS,
@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils'
 import { INTERVIEW_FORMAT_OPTIONS } from '@/lib/trainer/metadata'
 import { ShareButton } from '@/components/ui/ShareButton'
+import { useUrlSearchText } from '@/hooks/use-url-search-text'
 
 /**
  * Панель фильтров каталога задач.
@@ -39,47 +40,44 @@ type TaskFiltersProps = {
   total: number
 }
 
+const NO_FILTERS: Required<TaskFilterValues> = { q: '', language: '', difficulty: '', tag: '', company: '', topic: '', status: '', format: '' }
+
 const STATUS_OPTIONS = [
   { label: 'Все', value: '' },
   { label: 'Не решённые', value: 'todo' },
   { label: 'Решённые', value: 'solved' },
 ] as const
 
-export function TaskFilters({ values, topics, total }: TaskFiltersProps) {
+export function TaskFilters({ values: confirmed, topics, total }: TaskFiltersProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
-  const [query, setQuery] = useState(values.q)
-  const [syncedQuery, setSyncedQuery] = useState(values.q)
+  // Список фильтрует сервер, и ответ на телефоне приходит не сразу. Без оптимистичного
+  // значения селект до ответа возвращался к прежнему выбору — нажатие выглядело пропавшим.
+  const [values, showChoice] = useOptimistic(confirmed, (current, change: Partial<TaskFilterValues>) => ({ ...current, ...change }))
+  // searchParams до ответа сервера ещё старые: второй быстрый выбор стёр бы первый.
+  // Поэтому следующий выбор строится от адреса, который уже запрошен.
+  const requested = useRef<string | null>(null)
+  const confirmedQuery = searchParams.toString()
+  useEffect(() => { requested.current = null }, [confirmedQuery])
 
-  // Поле ввода следует за адресной строкой (кнопка «Сбросить», переход назад).
-  // Подстройка идёт в фазе рендера — эффект здесь дал бы лишний проход и
-  // мигание старого значения.
-  if (syncedQuery !== values.q) {
-    setSyncedQuery(values.q)
-    setQuery(values.q)
-  }
-
-  const apply = useCallback(
-    (key: keyof TaskFilterValues, value: string) => {
-      const next = new URLSearchParams(searchParams.toString())
+  const apply = (changes: Partial<TaskFilterValues>) => {
+    const next = new URLSearchParams(requested.current ?? confirmedQuery)
+    for (const [key, value] of Object.entries(changes)) {
       if (value) next.set(key, value)
       else next.delete(key)
-      startTransition(() => {
-        router.replace(next.size > 0 ? `${pathname}?${next}` : pathname, { scroll: false })
-      })
-    },
-    [pathname, router, searchParams],
-  )
+    }
+    requested.current = next.toString()
+    startTransition(() => {
+      showChoice(changes)
+      router.replace(next.size > 0 ? `${pathname}?${next}` : pathname, { scroll: false })
+    })
+  }
 
   // Поиск применяется с задержкой: иначе каждый символ — это новый рендер
   // серверного списка.
-  useEffect(() => {
-    if (query === values.q) return
-    const timer = setTimeout(() => apply('q', query.trim()), 350)
-    return () => clearTimeout(timer)
-  }, [apply, query, values.q])
+  const [query, setQuery] = useUrlSearchText(confirmed.q, (q) => apply({ q }), 350)
 
   const hasFilters = Object.values(values).some((value) => Boolean(value?.length))
 
@@ -101,25 +99,25 @@ export function TaskFilters({ values, topics, total }: TaskFiltersProps) {
         <Select
           label="Язык"
           value={values.language}
-          onChange={(value) => apply('language', value)}
+          onChange={(value) => apply({ language: value })}
           options={[{ label: 'Любой язык', value: '' }, ...LANGUAGE_OPTIONS]}
         />
         <Select
           label="Формат собеседования"
           value={values.format ?? ''}
-          onChange={(value) => apply('format', value)}
+          onChange={(value) => apply({ format: value })}
           options={[{ label: 'Любой формат', value: '' }, ...INTERVIEW_FORMAT_OPTIONS]}
         />
         <Select
           label="Сложность"
           value={values.difficulty}
-          onChange={(value) => apply('difficulty', value)}
+          onChange={(value) => apply({ difficulty: value })}
           options={[{ label: 'Любая сложность', value: '' }, ...DIFFICULTY_OPTIONS]}
         />
         <Select
           label="Тема"
           value={values.topic}
-          onChange={(value) => apply('topic', value)}
+          onChange={(value) => apply({ topic: value })}
           options={[
             { label: 'Все темы', value: '' },
             ...topics.map((topic) => ({ label: topic.title, value: topic.slug })),
@@ -128,13 +126,13 @@ export function TaskFilters({ values, topics, total }: TaskFiltersProps) {
         <Select
           label="Тег"
           value={values.tag}
-          onChange={(value) => apply('tag', value)}
+          onChange={(value) => apply({ tag: value })}
           options={[{ label: 'Все теги', value: '' }, ...TAG_OPTIONS]}
         />
         <Select
           label="Компания"
           value={values.company}
-          onChange={(value) => apply('company', value)}
+          onChange={(value) => apply({ company: value })}
           options={[{ label: 'Все компании', value: '' }, ...COMPANY_OPTIONS]}
         />
       </div>
@@ -145,7 +143,7 @@ export function TaskFilters({ values, topics, total }: TaskFiltersProps) {
             <button
               key={option.value}
               type="button"
-              onClick={() => apply('status', option.value)}
+              onClick={() => apply({ status: option.value })}
               aria-pressed={values.status === option.value}
               className={cn(
                 'min-h-11 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
@@ -162,11 +160,7 @@ export function TaskFilters({ values, topics, total }: TaskFiltersProps) {
         {hasFilters && (
           <button
             type="button"
-            onClick={() => {
-              const next = new URLSearchParams(searchParams.toString())
-              for (const key of new Set([...Object.keys(values), 'format'])) next.delete(key)
-              startTransition(() => router.replace(next.size ? `${pathname}?${next}` : pathname, { scroll: false }))
-            }}
+            onClick={() => apply(NO_FILTERS)}
             className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
@@ -174,8 +168,13 @@ export function TaskFilters({ values, topics, total }: TaskFiltersProps) {
           </button>
         )}
 
-        <span className={cn('ml-auto text-xs text-muted-foreground', isPending && 'opacity-50')}>
-          Найдено задач: {total}
+        <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
+          {isPending ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+              Обновляем список…
+            </>
+          ) : `Найдено задач: ${total}`}
         </span>
         <ShareButton />
       </div>

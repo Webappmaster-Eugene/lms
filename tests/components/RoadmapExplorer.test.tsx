@@ -13,7 +13,7 @@ const { RoadmapNodePanel } = await import('@/components/roadmap/RoadmapNodePanel
 const { RoadmapTopicList, groupTopicsByStage } = await import('@/components/roadmap/RoadmapTopicList')
 const { RoadmapExplorer } = await import('@/components/roadmap/RoadmapExplorer')
 
-import { navigationRouter, navigationURL, setNavigationURL } from '../helpers/url-navigation'
+import { navigationRouter, navigationURL, routeHistoryThroughNavigation, setNavigationURL } from '../helpers/url-navigation'
 
 import type { GraphNode, NodeCourse, RoadmapNodeData } from '@/components/roadmap/types'
 
@@ -64,6 +64,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   window.localStorage.clear()
   setNavigationURL('/roadmaps/frontend')
+  routeHistoryThroughNavigation()
 })
 
 describe('панель темы', () => {
@@ -252,6 +253,9 @@ describe('переключение вида', () => {
 
     expect(screen.queryByTestId('react-flow')).not.toBeInTheDocument()
     expect(navigationURL()).toContain('view=list')
+    // Вид — состояние браузера: тяжёлая страница роадмапа на сервере не перерисовывается.
+    expect(navigationRouter().push).not.toHaveBeenCalled()
+    expect(navigationRouter().replace).not.toHaveBeenCalled()
   })
 
   it('вид из ссылки важнее прежнего выбора устройства', () => {

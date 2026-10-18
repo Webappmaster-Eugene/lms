@@ -1,13 +1,14 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { Clock, Lock, Search } from 'lucide-react'
 
 import { cn, pluralize } from '@/lib/utils'
 import { boundedQueryText, CATALOG_PAGE_SIZE, positiveQueryInteger, queryHref } from '@/lib/shared-url'
 import { ShareButton } from '@/components/ui/ShareButton'
+import { useUrlSearchText } from '@/hooks/use-url-search-text'
 
 export type CatalogCourse = {
   id: string
@@ -73,23 +74,19 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 export function CourseCatalog({ courses }: { courses: CatalogCourse[] }) {
   const search = useSearchParams()
   const pathname = usePathname()
-  const router = useRouter()
   const queryFromURL = boundedQueryText(search.get('q'))
-  const [query, setQuery] = useState(queryFromURL)
-  const [syncedQuery, setSyncedQuery] = useState(queryFromURL)
-  if (queryFromURL !== syncedQuery) { setSyncedQuery(queryFromURL); setQuery(queryFromURL) }
   const roadmap = boundedQueryText(search.get('roadmap')) || null
   const rawStatus = search.get('status')
   const status: Status = rawStatus === 'active' || rawStatus === 'new' || rawStatus === 'done' ? rawStatus : 'all'
   const assignedOnly = search.get('assigned') === '1'
   const sort = search.get('sort') === 'title' ? 'title' : search.get('sort') === 'progress' ? 'progress' : 'program'
   const currentQuery = search.toString()
-  const apply = (changes: Record<string, string | null>) => router.push(queryHref(pathname, currentQuery, { q: query.trim(), page: null, ...changes }), { scroll: false })
-  useEffect(() => {
-    if (query === queryFromURL) return
-    const timer = setTimeout(() => router.replace(queryHref(pathname, currentQuery, { q: query.trim(), page: null }), { scroll: false }), 250)
-    return () => clearTimeout(timer)
-  }, [query, queryFromURL, currentQuery, pathname, router])
+  // Каталог целиком уже в браузере, а сервер параметры не читает. router.push перерисовывал
+  // всю страницу на сервере ради одного адреса: на телефоне нажатие секунду-две ничего не меняло.
+  // history API Next синхронизирует с useSearchParams без запроса.
+  const apply = (changes: Record<string, string | null>) => window.history.pushState(null, '', queryHref(pathname, currentQuery, { page: null, ...changes }))
+  const [query, setQuery] = useUrlSearchText(queryFromURL, (next) => window.history.replaceState(null, '', queryHref(pathname, currentQuery, { q: next, page: null })), 250)
+  const needle = query.trim()
 
   const roadmaps = useMemo(
     () => [...new Set(courses.flatMap((c) => (c.roadmapTitle ? [c.roadmapTitle] : [])))],
@@ -100,10 +97,11 @@ export function CourseCatalog({ courses }: { courses: CatalogCourse[] }) {
     for (const c of courses) result[courseStatus(c)] += 1
     return result
   }, [courses])
-  const shown = filterCourses(courses, { roadmap, status, query: queryFromURL, assignedOnly })
+  const shown = filterCourses(courses, { roadmap, status, query: needle, assignedOnly })
   const sorted = sort === 'program' ? shown : [...shown].sort((a, b) => sort === 'title' ? a.title.localeCompare(b.title, 'ru') : b.progressPercent - a.progressPercent || a.title.localeCompare(b.title, 'ru'))
   const pageCount = Math.max(1, Math.ceil(sorted.length / CATALOG_PAGE_SIZE))
-  const page = Math.min(pageCount, positiveQueryInteger(search.get('page')))
+  // Новый поисковый запрос начинает с первой страницы ещё до того, как попал в адрес.
+  const page = needle === queryFromURL ? Math.min(pageCount, positiveQueryInteger(search.get('page'))) : 1
   const pageCourses = sorted.slice((page - 1) * CATALOG_PAGE_SIZE, page * CATALOG_PAGE_SIZE)
 
   return (
@@ -154,7 +152,7 @@ export function CourseCatalog({ courses }: { courses: CatalogCourse[] }) {
             <option value="program">По программе</option><option value="title">По названию</option><option value="progress">По прогрессу</option>
           </select>
         </label>
-        <ShareButton getHref={() => queryHref(pathname, currentQuery, { q: query.trim() })} />
+        <ShareButton getHref={() => queryHref(pathname, currentQuery, { q: needle })} />
       </div>
 
       <p className="text-sm text-muted-foreground" aria-live="polite">
