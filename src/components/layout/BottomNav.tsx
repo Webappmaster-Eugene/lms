@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Code2, GraduationCap, LayoutDashboard, Map, Menu } from 'lucide-react'
+import { Code2, GraduationCap, History, LayoutDashboard, Map, Menu } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useHydrated } from '@/hooks/use-hydrated'
 import { useSidebar } from './SidebarContext'
@@ -19,6 +19,7 @@ const TABS: readonly Tab[] = [
   { href: '/roadmaps', label: 'Роадмапы', icon: Map },
   { href: '/courses', label: 'Курсы', icon: GraduationCap },
   { href: '/trainer', label: 'Тренажёр', icon: Code2 },
+  { href: '/learning-history', label: 'История', icon: History },
 ]
 
 export function BottomNav({ trainerEnabled = true }: { trainerEnabled?: boolean } = {}) {
@@ -39,12 +40,12 @@ export function BottomNav({ trainerEnabled = true }: { trainerEnabled?: boolean 
               href={href}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring',
+                'flex min-h-11 min-w-11 flex-auto flex-col items-center justify-center gap-1 px-0.5 text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring',
                 isActive ? 'text-primary' : 'text-muted-foreground',
               )}
             >
-              <span className={cn('flex h-7 w-12 items-center justify-center rounded-full', isActive && 'bg-primary/10')}><Icon aria-hidden="true" className="h-5 w-5" /></span>
-              <span>{label}</span>
+              <span className={cn('flex h-7 w-full max-w-12 items-center justify-center rounded-full', isActive && 'bg-primary/10')}><Icon aria-hidden="true" className="h-5 w-5" /></span>
+              <span className="max-w-full truncate">{label}</span>
             </Link>
           )
         })}
@@ -57,10 +58,10 @@ export function BottomNav({ trainerEnabled = true }: { trainerEnabled?: boolean 
           aria-expanded={mobileOpen}
           aria-haspopup="dialog"
           aria-controls={mobileOpen ? 'platform-mobile-menu' : undefined}
-          className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium text-muted-foreground transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
+          className="flex min-h-11 min-w-11 flex-auto flex-col items-center justify-center gap-1 px-0.5 text-[11px] font-medium text-muted-foreground transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
         >
-          <span className="flex h-7 w-12 items-center justify-center"><Menu aria-hidden="true" className="h-5 w-5" /></span>
-          <span>Ещё</span>
+          <span className="flex h-7 w-full max-w-12 items-center justify-center"><Menu aria-hidden="true" className="h-5 w-5" /></span>
+          <span className="max-w-full truncate">Ещё</span>
         </button>
       </div>
     </nav>

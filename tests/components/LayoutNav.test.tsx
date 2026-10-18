@@ -41,10 +41,22 @@ describe('нижняя навигация', () => {
   it('содержит основные разделы', () => {
     render(<BottomNav />)
 
-    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Главная', 'Роадмапы', 'Курсы', 'Тренажёр'])
-    for (const label of ['Главная', 'Курсы', 'Тренажёр', 'Роадмапы']) {
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Главная', 'Роадмапы', 'Курсы', 'Тренажёр', 'История'])
+    for (const label of ['Главная', 'Курсы', 'Тренажёр', 'Роадмапы', 'История']) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }
+    // «Ещё» замыкает панель: остальные разделы открываются из него.
+    const items = screen.getByRole('navigation', { name: 'Основная навигация' }).querySelectorAll('a, button')
+    expect(items[items.length - 1]).toHaveTextContent('Ещё')
+  })
+
+  it('история обучения ведёт на свой раздел и подсвечивается на нём', () => {
+    pathname.current = '/learning-history'
+    render(<BottomNav />)
+
+    expect(screen.getByRole('link', { name: /История/ })).toHaveAttribute('href', '/learning-history')
+    expect(screen.getByRole('link', { name: /История/ })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: /Главная/ })).not.toHaveAttribute('aria-current')
   })
 
   it('закрытый тренажёр отсутствует в мобильной навигации, остальные разделы доступны', () => {

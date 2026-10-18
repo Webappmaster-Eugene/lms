@@ -36,6 +36,9 @@ for (const width of [320, 390]) {
           expect(box?.width).toBeGreaterThanOrEqual(44)
           expect(box?.height).toBeGreaterThanOrEqual(44)
         }
+        // Шесть вкладок на 320px: подпись «Роадмапы» не должна обрезаться многоточием.
+        const clipped = await bottom.locator('a > span:last-child, button > span:last-child').evaluateAll((labels) => labels.filter((label) => label.scrollWidth > label.clientWidth).map((label) => label.textContent))
+        expect(clipped).toEqual([])
         const more = bottom.getByRole('button', { name: 'Ещё' })
         await more.click()
         const menu = page.getByRole('dialog', { name: 'Меню платформы' })
