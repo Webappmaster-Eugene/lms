@@ -22,7 +22,7 @@
   ".claude/skills/lms-content/references/roadmaps.md": "d2e9e7542ca7ae33e4009d4f699c8ee20bf59389f083cec77aabf868d0fd2576",
   ".claude/skills/lms-content/references/trainer.md": "fb843e9105206f6cb29dde6ea7372c8b2fb6ddc6f8473c4e414be5acb27c4d0e",
   ".claude/skills/lms-content/references/users.md": "32395ec09d371e67835fa21003518eb7ba653ea5dc9ef8471d5a9a1823179772",
-  ".claude/skills/prod-check/SKILL.md": "bb3d16f47a47e44defa0bd7b390bc53a34bd73566b139f137d6799de506e914a",
+  ".claude/skills/prod-check/SKILL.md": "6f57f6ed25e851deff8abd35a90e19aa05e0347d96e51f1cc0a2a4ab7fbb53b7",
   ".claude/skills/self-review/SKILL.md": "ec3937c5665b0a34b236769bfb7b4ad01d4d8299c5fc02854a735f9439ececb6",
   "scripts/codex/app-server.mjs": "e2b7c26660a5b9b32f9177a34e452cb8330f3ef3bf5bd2c4cedd349a786788f1",
   "scripts/codex/config.template.toml": "0dd9395c1054f872f2a003c4a30e23d03d675b98bd1885ff65434fc3536c3a10",

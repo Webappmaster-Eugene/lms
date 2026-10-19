@@ -38,12 +38,15 @@ error: password authentication failed for user "lms"
 падает → Traefik убирает бэкенд из роутера → **все страницы отдают 404**, включая `/login`.
 Со стороны это неотличимо от «сайт исчез».
 
-Диагностика:
+Диагностика. С 19.10.2026 стек LMS работает в домашней VM (Dokploy-сервер `serverlink-vm`), в неё
+заходят через VDS как прыжковый хост; имена контейнеров находятся по `lms-mentor`, хеш в имени
+приложения меняется при пересоздании:
 
 ```bash
-ssh root@217.199.254.38
-docker ps --filter name=lms-mentor-3ghbnk --format '{{.Names}}\t{{.Status}}'   # ищем unhealthy
-docker logs --tail 50 lms-mentor-3ghbnk-lms-mentor-app-1 | grep -i 'authentication\|Failed query'
+ssh -J root@217.199.254.38 eugene@10.77.0.2
+docker ps --filter name=lms-mentor --format '{{.Names}}\t{{.Status}}'   # ищем unhealthy
+app=$(docker ps -q --filter name=lms-mentor-app); db=$(docker ps -q --filter name=lms-mentor-db)
+docker logs --tail 50 "$app" | grep -i 'authentication\|Failed query'
 ```
 
 **Важно про проверку пароля.** В `pg_hba.conf` контейнера для `127.0.0.1` стоит `trust`, а
@@ -52,7 +55,7 @@ docker logs --tail 50 lms-mentor-3ghbnk-lms-mentor-app-1 | grep -i 'authenticati
 приложение — по имени сервиса:
 
 ```bash
-docker exec lms-mentor-3ghbnk-lms-mentor-db-1 sh -c \
+docker exec "$db" sh -c \
   'PGPASSWORD="$POSTGRES_PASSWORD" psql -U lms -d lms_platform -h lms-mentor-db -c "select 1"'
 ```
 
@@ -60,7 +63,7 @@ docker exec lms-mentor-3ghbnk-lms-mentor-db-1 sh -c \
 
 Роль и переменную нужно менять вместе, роль — первой или сразу следом, но не «когда-нибудь».
 
-1. Поменять `DB_PASSWORD` в Dokploy (Environment у compose `mentor`).
+1. Поменять `DB_PASSWORD` в Dokploy (Environment у compose `mentor-home` в проекте `lms`, сервер `serverlink-vm`).
 2. Передеплоить — контейнеры пересоздаются с новым `DATABASE_URL`.
 3. **Сразу привести пароль роли к тому же значению.** Файл с командой (значение подставляет psql
    из окружения контейнера, руками нигде не набирается и в вывод не попадает):
@@ -71,20 +74,22 @@ docker exec lms-mentor-3ghbnk-lms-mentor-db-1 sh -c \
    ```
 
    ```bash
-   scp fix-role-password.sql root@217.199.254.38:/tmp/
-   ssh root@217.199.254.38 '
-     docker cp /tmp/fix-role-password.sql lms-mentor-3ghbnk-lms-mentor-db-1:/tmp/ &&
-     docker exec lms-mentor-3ghbnk-lms-mentor-db-1 sh -c "
+   prod() { ssh -J root@217.199.254.38 eugene@10.77.0.2 "$@"; }
+   scp -J root@217.199.254.38 fix-role-password.sql eugene@10.77.0.2:/tmp/
+   prod '
+     db=$(docker ps -q --filter name=lms-mentor-db) &&
+     docker cp /tmp/fix-role-password.sql "$db":/tmp/ &&
+     docker exec "$db" sh -c "
        psql -U lms -d lms_platform -h 127.0.0.1 -v ON_ERROR_STOP=1 \
             -v pw=\$POSTGRES_PASSWORD -f /tmp/fix-role-password.sql" &&
-     docker exec lms-mentor-3ghbnk-lms-mentor-db-1 rm -f /tmp/fix-role-password.sql &&
+     docker exec "$db" rm -f /tmp/fix-role-password.sql &&
      rm -f /tmp/fix-role-password.sql'
    ```
 
 4. Проверить сетевую аутентификацию (команда выше) и дождаться `healthy`:
 
    ```bash
-   docker inspect --format '{{.State.Health.Status}}' lms-mentor-3ghbnk-lms-mentor-app-1
+   prod 'docker inspect --format "{{.State.Health.Status}}" $(docker ps -q --filter name=lms-mentor-app)'
    curl -s https://learn.mentorcareer.ru/api/health
    ```
 

@@ -23,7 +23,10 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync }
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
-const SSH = process.env.PROD_SSH ?? 'root@217.199.254.38'
+// С 19.10.2026 прод живёт в домашней VM, а снаружи её видно только через VDS.
+const SSH = process.env.PROD_SSH ?? 'eugene@10.77.0.2'
+// Пустая строка отключает прыжок: из домашней сети или с алиасом из ~/.ssh/config.
+const SSH_JUMP = process.env.PROD_SSH_JUMP ?? 'root@217.199.254.38'
 const BASE_URL = process.env.PROD_BASE_URL ?? 'https://learn.mentorcareer.ru'
 const ENV_FILE = process.env.PROD_TEST_ENV ?? join(homedir(), '.config/lms-prod-test/accounts.env')
 const DOMAIN = 'lms-e2e.invalid'
@@ -35,7 +38,7 @@ function sql(query) {
     'test -n "$db" || { echo "контейнер БД lms-mentor-db не найден" >&2; exit 1; }',
     'docker exec -i "$db" sh -c \'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q -At\'',
   ].join('; ')
-  const result = spawnSync('ssh', [SSH, script], { input: query, encoding: 'utf8' })
+  const result = spawnSync('ssh', [...(SSH_JUMP ? ['-J', SSH_JUMP] : []), SSH, script], { input: query, encoding: 'utf8' })
   if (result.status !== 0) throw new Error(`SQL на проде не выполнился: ${result.stderr.trim()}`)
   return result.stdout.trim()
 }
