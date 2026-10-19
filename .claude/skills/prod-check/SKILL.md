@@ -20,8 +20,8 @@ description: Диагностика прода LMS (learn.mentorcareer.ru / info
 VM — это KVM-машина на домашнем сервере Beelink (Wi-Fi, без ИБП). SSH в неё из любой точки — через VDS как прыжковый хост:
 
 ```bash
-PROD='ssh -J root@217.199.254.38 eugene@10.77.0.2'   # docker без sudo
-$PROD 'hostname; uptime'
+prod() { ssh -J root@217.199.254.38 eugene@10.77.0.2 "$@"; }   # функция, а не переменная: так работает и в zsh; docker без sudo
+prod 'hostname; uptime'
 ```
 
 LMS развёрнута как **Dokploy compose**-приложение:
@@ -74,8 +74,8 @@ ssh root@217.199.254.38 'curl -s -o /dev/null -w "%{http_code} %{time_total}s\n"
 ### 3. Стек в VM — статус
 
 ```bash
-$PROD 'docker ps -a --filter name=lms-mentor --format "{{.Names}}\t{{.Status}}\t{{.Image}}"'
-$PROD 'docker volume ls | grep -i lms-mentor'
+prod 'docker ps -a --filter name=lms-mentor --format "{{.Names}}\t{{.Status}}\t{{.Image}}"'
+prod 'docker volume ls | grep -i lms-mentor'
 ```
 
 Если контейнеров нет, а тома есть — приложение снято с выката, данные целы. Статус и история выкатов — в БД Dokploy, она на VDS:
@@ -94,13 +94,13 @@ ssh root@217.199.254.38 'docker exec $(docker ps -q -f name=dokploy-postgres) \
 ### 4. Ресурсы VM и хоста
 
 ```bash
-$PROD 'free -h; df -h /; uptime'
+prod 'free -h; df -h /; uptime'
 ```
 
 ### 5. Логи приложения
 
 ```bash
-$PROD 'docker logs $(docker ps -qf name=lms-mentor-app) --tail 200 2>&1'
+prod 'docker logs $(docker ps -qf name=lms-mentor-app) --tail 200 2>&1'
 ```
 
 **Маркеры «всё ок»:** старт Next на `:3000`; отсутствие ошибок применения миграций; `Admin user already exists` или создание админа при пустой БД.
@@ -110,12 +110,12 @@ $PROD 'docker logs $(docker ps -qf name=lms-mentor-app) --tail 200 2>&1'
 | `ECONNREFUSED ... 5432` | `lms-mentor-db` не поднялся или не прошёл healthcheck |
 | ошибка в `prodMigrations` | Миграция не применилась. **Не перевыкатывай вслепую** — разбери конкретную миграцию, БД могла остаться в промежуточном состоянии |
 | `PAYLOAD_SECRET` пустой/короткий | Переменная не доехала из Dokploy UI в контейнер |
-| таймауты к внешним API, SMTP | Домашний выход в интернет идёт через VPN роутера (Цюрих) — сначала проверь сеть VM: `$PROD 'curl -sI https://api.github.com | head -1'` |
+| таймауты к внешним API, SMTP | Домашний выход в интернет идёт через VPN роутера (Цюрих) — сначала проверь сеть VM: `prod 'curl -sI https://api.github.com | head -1'` |
 
 ### 6. Проверка изнутри контейнера (минует оба Traefik)
 
 ```bash
-$PROD 'docker exec $(docker ps -qf name=lms-mentor-app) curl -sf http://localhost:3000/api/health && echo OK || echo FAIL'
+prod 'docker exec $(docker ps -qf name=lms-mentor-app) curl -sf http://localhost:3000/api/health && echo OK || echo FAIL'
 ```
 
 `OK` внутри при ошибке снаружи — проблема в маршруте (Traefik VM, туннель, Traefik VDS), а не в приложении: смотри метки контейнера, домены в Dokploy UI и шаг 2.
@@ -127,14 +127,14 @@ $PROD 'docker exec $(docker ps -qf name=lms-mentor-app) curl -sf http://localhos
 Перезапуск уже существующего стека:
 
 ```bash
-$PROD 'cd /etc/dokploy/compose/lms-mentor-home-s62veg/code && docker compose -p lms-mentor-home-s62veg -f ./docker-compose.yml up -d'
+prod 'cd /etc/dokploy/compose/lms-mentor-home-s62veg/code && docker compose -p lms-mentor-home-s62veg -f ./docker-compose.yml up -d'
 ```
 
 Полный деплой (пересборка из GitHub) делается **из Dokploy UI** — так обновится и статус приложения, и метки Traefik. Сборка идёт в самой VM; кэш сборки там есть только после первой сборки, а скачивание зависимостей идёт через домашний Wi-Fi — первая сборка после чистки кэша долгая.
 
 ### 8. Данные и копии
 
-Тома переживают пересоздание контейнеров, но проверить содержимое после инцидента стоит явно. Ночные копии БД (00:30 UTC, хранится 14) уходят с VM на VDS — назначение Dokploy `vds-offsite` (S3 на `10.77.0.1:19000`, бакет `home-backups`). Процедура прямого подключения к БД в `docs/seed-production.md` написана для VDS и для домашней VM не годится — подключайся через `$PROD` и `docker exec` в `lms-mentor-db`.
+Тома переживают пересоздание контейнеров, но проверить содержимое после инцидента стоит явно. Ночные копии БД (00:30 UTC, хранится 14) уходят с VM на VDS — назначение Dokploy `vds-offsite` (S3 на `10.77.0.1:19000`, бакет `home-backups`). Процедура прямого подключения к БД в `docs/seed-production.md` написана для VDS и для домашней VM не годится — подключайся через `prod` и `docker exec` в `lms-mentor-db`.
 
 ## Что стоит проверить заодно
 

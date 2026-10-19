@@ -2,17 +2,20 @@
 
 ## Архитектура
 
+С 19.10.2026 база прода живёт в домашней VM (Dokploy-сервер `serverlink-vm`, адрес `10.77.0.2` в
+туннеле AmneziaWG), а VDS `217.199.254.38` служит прыжковым хостом: снаружи VM напрямую не видна.
+
 ```
-┌─ Local dev machine ─┐     SSH tunnel      ┌─ Dokploy server ─────────────┐
-│                      │ ◄─────────────────► │                              │
-│  seed-roadmaps.ts    │   port 15432        │  socat (port 25432)          │
-│  DATABASE_URL=       │                     │     ↓ dokploy-network        │
-│    localhost:15432    │                     │  lms-mentor-db (port 5432)   │
-│                      │                     │  lms-mentor-app              │
-└──────────────────────┘                     └──────────────────────────────┘
+┌─ Local dev machine ─┐   SSH -J через VDS    ┌─ Домашняя VM (serverlink-vm) ─┐
+│                      │ ◄──────────────────► │                                │
+│  seed-roadmaps.ts    │   localhost:15432    │  socat 127.0.0.1:25432         │
+│  DATABASE_URL=       │                      │     ↓ dokploy-network          │
+│    localhost:15432   │                      │  lms-mentor-db (port 5432)     │
+│                      │                      │  lms-mentor-app                │
+└──────────────────────┘                      └────────────────────────────────┘
 ```
 
-**Почему нужен socat**: PostgreSQL находится в Docker overlay-сети `dokploy-network`. Порт 5432 не проброшен на хост. Прямой SSH-туннель к IP контейнера не работает (overlay-сети не маршрутизируются с хоста). Socat-контейнер на той же сети пробрасывает порт на хост.
+**Почему нужен socat**: PostgreSQL находится в Docker overlay-сети `dokploy-network`. Порт 5432 не проброшен на хост. Прямой SSH-туннель к IP контейнера не работает (overlay-сети не маршрутизируются с хоста). Socat-контейнер на той же сети пробрасывает порт на `127.0.0.1` VM — наружу он не открыт.
 
 ## Когда нужен ручной seed
 
@@ -24,33 +27,33 @@
 
 ## Быстрый старт
 
+Вход по SSH-ключу: на VDS — как `root`, в VM — как `eugene` (в группе `docker`). Пароль не нужен.
+
 ```bash
-# 1. SSH доступ (логин из expert_info/ssh_access.txt)
-SSH_PASS="<пароль из ssh_access.txt>"
+prod() { ssh -J root@217.199.254.38 eugene@10.77.0.2 "$@"; }
 
-# 2. Поднять прокси
-sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no root@217.199.254.38 \
-  "docker run -d --rm --name lms-db-proxy \
-   --network dokploy-network -p 25432:5432 \
-   alpine/socat TCP-LISTEN:5432,fork,reuseaddr TCP:lms-mentor-db:5432"
+# 1. Поднять прокси к БД (слушает только 127.0.0.1 внутри VM)
+prod "docker run -d --rm --name lms-db-proxy \
+   --network dokploy-network -p 127.0.0.1:25432:5432 \
+   alpine/socat:1.8.1.1 TCP-LISTEN:5432,fork,reuseaddr TCP:lms-mentor-db:5432"
 
-# 3. SSH-туннель
-sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no -f -N \
-  -L 15432:localhost:25432 root@217.199.254.38
+# 2. SSH-туннель через VDS
+ssh -J root@217.199.254.38 -f -N -L 15432:127.0.0.1:25432 eugene@10.77.0.2
 
-# 4. Seed (из директории lms/)
-cd lms
-DATABASE_URL=postgresql://lms:changeme@localhost:15432/lms_platform \
+# 3. Пароль роли lms — из env стека в VM, в вывод и историю он не попадает
+export PGPASSWORD="$(prod 'grep -m1 "^DB_PASSWORD=" /etc/dokploy/compose/lms-mentor-home-*/code/.env | cut -d= -f2-')"
+
+# 4. Seed (из корня репозитория)
+DATABASE_URL="postgresql://lms:${PGPASSWORD}@localhost:15432/lms_platform" \
   pnpm exec payload run src/seed-roadmaps.ts
 
 # 5. Cleanup
-sshpass -p "$SSH_PASS" ssh root@217.199.254.38 "docker stop lms-db-proxy"
+prod "docker stop lms-db-proxy"
 kill $(lsof -t -i:15432) 2>/dev/null
+unset PGPASSWORD
 ```
 
-## Claude Code
-
-Используйте команду `/seed-production` — она автоматизирует все шаги выше.
+Сид пишет в базу прода — запускать только с согласия владельца прода (см. `CLAUDE.md`, раздел 3).
 
 ## Auto-seed (onInit)
 
@@ -80,6 +83,6 @@ src/
 ## Важные нюансы
 
 - **`.env` указывает на другую БД** — `DATABASE_URL` в `.env` не совпадает с production Docker-базой. Всегда передавайте `DATABASE_URL` явно при seed.
-- **Production DATABASE_URL**: `postgresql://lms:changeme@lms-mentor-db:5432/lms_platform`
+- **Production DATABASE_URL** внутри стека: `postgresql://lms:<DB_PASSWORD>@lms-mentor-db:5432/lms_platform`; пароль — `DB_PASSWORD` в Dokploy UI (compose `mentor-home`), см. `db-password-rotation.md`
 - **Seed идемпотентен** — удаляет старые nodes/edges и пересоздаёт
 - **Stub-курсы** создаются для узлов без реальных курсов (для кликабельности графа)
