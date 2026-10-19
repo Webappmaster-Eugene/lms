@@ -145,14 +145,20 @@ pnpm seed:trainer             # каталог задач тренажёра, и
 
 | Что | Значение |
 |---|---|
-| Сервер | Dokploy на `root@217.199.254.38` |
-| Приложение | compose `lms-mentor-<hash>`, хеш меняется при пересоздании |
+| Панель Dokploy | VDS `root@217.199.254.38`, `deploy.nadtocheev.ru` |
+| Где работает | с 19.10.2026 — домашняя VM, Dokploy-сервер `serverlink-vm` (10.77.0.2 в туннеле AmneziaWG); SSH: `ssh -J root@217.199.254.38 eugene@10.77.0.2` |
+| Приложение | compose `lms-mentor-home-<hash>` (сейчас `lms-mentor-home-s62veg`), хеш меняется при пересоздании |
 | Сервисы | `lms-mentor-app` (3000), `lms-mentor-db` (postgres:16), `lms-mentor-landing` (80) |
-| Домены | `learn.mentorcareer.ru`, `info.mentorcareer.ru` |
-| Тома | `…_lms-pgdata`, `…_lms-media` |
+| Домены | `learn.mentorcareer.ru`, `info.mentorcareer.ru`: TLS на Traefik VDS, оттуда по туннелю в VM (`/etc/dokploy/traefik/dynamic/home-sites.yml`) |
+| Тома (в VM) | `…_lms-pgdata`, `…_lms-media`, `…_lms-geoip`, `…_lms-trainer-auth` |
+| Копии БД | ночью с VM на VDS, назначение Dokploy `vds-offsite` |
 
-Имена контейнеров находить динамически. На сервере живут чужие стеки — фильтровать
-по `lms-mentor`. Новая переменная окружения должна попасть в три места сразу:
+Имена контейнеров находить динамически. Старый стек `lms-mentor-3ghbnk` на VDS
+остановлен намеренно — не запускать и не деплоить: две живые копии LMS разошлют
+ученикам дубли уведомлений. В VM рядом живут другие сайты — фильтровать по
+`lms-mentor`. Push в main собирает образ в самой VM (8 vCPU), а не на Raspberry Pi.
+
+Новая переменная окружения должна попасть в три места сразу:
 `.env.example`, `docker-compose.yml` и Dokploy UI; `NEXT_PUBLIC_*` — ещё и как `ARG`
 в `Dockerfile`, иначе в браузере будет `undefined`.
 
