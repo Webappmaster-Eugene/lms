@@ -24,7 +24,8 @@ seed(".codex/memory/MEMORY.md", `# Память проекта LMS
   .codex/context/lms/agents.
 - Пакетный менеджер pnpm 10 (packageManager в package.json), обычно через corepack.
   Лендинг landing/ — отдельный npm-пакет на Astro со своим package-lock.json.
-- Прод: Dokploy на 217.199.254.38, compose-приложение lms-mentor-<hash>;
+- Прод: панель Dokploy на 217.199.254.38, стек lms-mentor-home-<hash> — в домашней VM
+  (Dokploy-сервер serverlink-vm, ssh -J root@217.199.254.38 eugene@10.77.0.2);
   learn.mentorcareer.ru — Next+Payload, info.mentorcareer.ru — инструкция (лендинг).
   Push в main = деплой. Хеш в имени приложения меняется, имена находить динамически.
 - Миграции Payload применяются на старте контейнера (prodMigrations), поэтому
