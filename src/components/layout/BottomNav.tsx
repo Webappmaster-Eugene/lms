@@ -40,12 +40,14 @@ export function BottomNav() {
               href={href}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-1 px-0.5 text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring',
+                'flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring',
                 isActive ? 'text-primary' : 'text-muted-foreground',
               )}
             >
               <span className={cn('flex h-7 w-full max-w-12 items-center justify-center rounded-full', isActive && 'bg-primary/10')}><Icon aria-hidden="true" className="h-5 w-5" /></span>
-              <span className="max-w-full truncate">{label}</span>
+              {/* На 320px вкладка шириной 64px, а «Роадмапы» в Inter 11px — 61px: без боковых отступов
+                  и с плотным трекингом на узких экранах подпись влезает с запасом, без многоточия. */}
+              <span className="max-w-full truncate max-[359px]:tracking-tight">{label}</span>
             </Link>
           )
         })}
@@ -58,10 +60,10 @@ export function BottomNav() {
           aria-expanded={mobileOpen}
           aria-haspopup="dialog"
           aria-controls={mobileOpen ? 'platform-mobile-menu' : undefined}
-          className="flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-1 px-0.5 text-[11px] font-medium text-muted-foreground transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
+          className="flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
         >
           <span className="flex h-7 w-full max-w-12 items-center justify-center"><Menu aria-hidden="true" className="h-5 w-5" /></span>
-          <span className="max-w-full truncate">Ещё</span>
+          <span className="max-w-full truncate max-[359px]:tracking-tight">Ещё</span>
         </button>
       </div>
     </nav>
