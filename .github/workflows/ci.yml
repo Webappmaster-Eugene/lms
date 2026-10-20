@@ -15,6 +15,13 @@ concurrency:
 permissions:
   contents: read
 
+# Раннеры свои: ci-lms-1/2 в изолированной VM ci на домашнем сервере serverlink (с 20.10.2026).
+# PR из форков чужой код на них не исполняют: такие PR идут на ubuntu-latest (для публичного
+# репозитория бесплатно), а запуск для внешних участников требует одобрения в настройках репозитория.
+# Два прогона могут идти на одной VM одновременно, поэтому джобы не занимают порты хоста:
+# БД и браузеры живут в контейнерах со своей сетью, а trainer-runtime с общими тегами образов
+# и lms-test-pg:55433 выстроен в одну очередь.
+
 env:
   NEXT_TELEMETRY_DISABLED: '1'
   ASTRO_TELEMETRY_DISABLED: '1'
@@ -25,7 +32,7 @@ env:
 jobs:
   quality:
     name: lint · typecheck · unit
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJson((github.event.pull_request.head.repo.fork && '"ubuntu-latest"') || '["self-hosted","linux","x64","serverlink-ci"]') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +48,10 @@ jobs:
 
   trainer-runtime:
     name: Go · HTML/CSS · React · Next.js (Docker)
-    runs-on: ubuntu-latest
+    concurrency:
+      group: lms-trainer-runtime-docker
+      cancel-in-progress: false
+    runs-on: ${{ fromJson((github.event.pull_request.head.repo.fork && '"ubuntu-latest"') || '["self-hosted","linux","x64","serverlink-ci"]') }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -56,8 +66,10 @@ jobs:
 
   integration:
     name: integration (Payload + PostgreSQL)
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJson((github.event.pull_request.head.repo.fork && '"ubuntu-latest"') || '["self-hosted","linux","x64","serverlink-ci"]') }}
     timeout-minutes: 30
+    container:
+      image: node:22-bookworm
     services:
       postgres:
         image: postgres:16-alpine
@@ -65,12 +77,12 @@ jobs:
           POSTGRES_USER: lms
           POSTGRES_PASSWORD: lms
           POSTGRES_DB: postgres
-        ports: ['5432:5432']
         options: >-
           --health-cmd "pg_isready -U lms" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
-      # scripts/test-db.mjs не поднимает свой контейнер, если адрес задан явно.
-      TEST_PG_URL: postgresql://lms:lms@localhost:5432
+      # scripts/test-db.mjs не поднимает свой контейнер, если адрес задан явно. Порт хоста не нужен:
+      # джоба в контейнере и видит сервис по имени.
+      TEST_PG_URL: postgresql://lms:lms@postgres:5432
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -83,7 +95,7 @@ jobs:
 
   e2e:
     name: e2e · api · content/a11y
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJson((github.event.pull_request.head.repo.fork && '"ubuntu-latest"') || '["self-hosted","linux","x64","serverlink-ci"]') }}
     timeout-minutes: 45
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
@@ -125,7 +137,7 @@ jobs:
 
   visual:
     name: visual regression
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJson((github.event.pull_request.head.repo.fork && '"ubuntu-latest"') || '["self-hosted","linux","x64","serverlink-ci"]') }}
     timeout-minutes: 45
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
