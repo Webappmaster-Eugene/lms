@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { BellRing } from 'lucide-react'
+import { BellRing, Mail } from 'lucide-react'
 import { vapidBytes } from '@/lib/pwa-client'
 import { usePwaCapabilities } from './use-pwa-capabilities'
 
 interface Preferences {
   remindersEnabled: boolean
+  emailBroadcastsEnabled: boolean
   timezone: string
   reminderHour: number
   pushEnabled: boolean
@@ -60,7 +61,7 @@ function settingsDto(value: unknown): PushSettings {
   if (!value || typeof value !== 'object' || !('preferences' in value) || !value.preferences || typeof value.preferences !== 'object') throw new Error('Не удалось загрузить настройки')
   const prefs = value.preferences as Record<string, unknown>
   const data = value as Record<string, unknown>
-  if (typeof prefs.remindersEnabled !== 'boolean' || typeof prefs.pushEnabled !== 'boolean' || typeof prefs.timezone !== 'string' || typeof prefs.reminderHour !== 'number' || typeof data.pushConfigured !== 'boolean' || typeof data.devicesCount !== 'number' || !(data.vapidPublicKey === null || typeof data.vapidPublicKey === 'string')) throw new Error('Не удалось загрузить настройки')
+  if (typeof prefs.remindersEnabled !== 'boolean' || typeof prefs.emailBroadcastsEnabled !== 'boolean' || typeof prefs.pushEnabled !== 'boolean' || typeof prefs.timezone !== 'string' || typeof prefs.reminderHour !== 'number' || typeof data.pushConfigured !== 'boolean' || typeof data.devicesCount !== 'number' || !(data.vapidPublicKey === null || typeof data.vapidPublicKey === 'string')) throw new Error('Не удалось загрузить настройки')
   return value as PushSettings
 }
 
@@ -157,6 +158,8 @@ export function NotificationSettings() {
           <label className="space-y-2 text-sm"><span className="block font-medium">Время напоминания</span><select className="min-h-11 w-full rounded-xl border border-border bg-background px-3" value={preferences.reminderHour} onChange={(event) => setPreferences({ ...preferences, reminderHour: Number(event.target.value) })}>{Array.from({ length: 14 }, (_, i) => i + 8).map((hour) => <option value={hour} key={hour}>{String(hour).padStart(2, '0')}:00</option>)}</select></label>
           <label className="space-y-2 text-sm"><span className="block font-medium">Часовой пояс</span><select className="min-h-11 w-full rounded-xl border border-border bg-background px-3" value={preferences.timezone} onChange={(event) => setPreferences({ ...preferences, timezone: event.target.value })}>{[...new Set([preferences.timezone, Intl.DateTimeFormat().resolvedOptions().timeZone, 'Europe/Moscow', 'Asia/Yekaterinburg', 'Asia/Novosibirsk', 'Asia/Almaty', 'Europe/Berlin', 'Europe/London', 'America/New_York', 'America/Los_Angeles'])].map((zone) => <option value={zone} key={zone}>{timezoneLabel(zone)}</option>)}</select></label>
         </div>
+        <h2 className="mt-6 flex items-center gap-3 border-t border-border pt-5 text-lg font-semibold"><Mail className="h-5 w-5 shrink-0" aria-hidden="true" />Почта</h2>
+        <label className="mt-4 flex min-h-11 items-start gap-3 text-sm"><input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-primary" checked={preferences.emailBroadcastsEnabled} onChange={(event) => setPreferences({ ...preferences, emailBroadcastsEnabled: event.target.checked })} /><span><strong className="block">Письма-рассылки</strong><span className="mt-1 block leading-relaxed text-muted-foreground">Новости платформы, объявления и подборки материалов. Письма об аккаунте — приглашение и восстановление пароля — приходят всегда.</span></span></label>
         <button className={buttonClass + ' mt-5'} disabled={busy} type="submit">{busy ? 'Сохраняем…' : 'Сохранить настройки'}</button>
       </form>}
     </div>

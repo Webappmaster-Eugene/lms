@@ -9,7 +9,7 @@ export default async function ContentManagementPage({ searchParams }: { searchPa
   const [roadmaps, courses, query] = await Promise.all([managedList('roadmaps'), managedList('courses'), searchParams])
   return (
     <>
-      <ManagementHeading title="Учебный контент" description="Создавайте курсы, собирайте программу и готовьте уроки. Черновики остаются здесь до публикации." actions={<Link href="/manage/courses/new" className={managementPrimary}>Добавить курс</Link>} />
+      <ManagementHeading title="Учебный контент" description="Создавайте курсы, собирайте программу и готовьте уроки. Черновики остаются здесь до публикации." actions={<><Link href="/manage/broadcasts" className={managementLink}>Email-рассылки</Link><Link href="/manage/courses/new" className={managementPrimary}>Добавить курс</Link></>} />
       <nav aria-label="Контент по роадмапам" className="flex flex-wrap gap-2">
         {roadmaps.map((roadmap) => <Link key={roadmap.id} href={`/manage/roadmaps/${roadmap.id}`} className={managementLink}>{roadmap.title}</Link>)}
       </nav>

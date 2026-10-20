@@ -59,6 +59,9 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   'push-subscriptions': (ctx) => ({ user: ctx.studentId, endpointHash: createHash('sha256').update(uid('push')).digest('hex'), endpoint: 'https://fcm.googleapis.com/fcm/send/fixture', p256dh: 'fixture-public-key', auth: 'fixture-auth-key', sessionHash: createHash('sha256').update(uid('sid')).digest('hex') }),
   'notification-deliveries': (ctx) => ({ user: ctx.studentId, notification: 0, subscription: 0, status: 'pending', attempts: 0, nextAttemptAt: new Date().toISOString() }),
   'notification-job-state': () => ({ key: uid('job'), leaseUntil: new Date().toISOString(), claimToken: uid('claim') }),
+  'email-broadcasts': (ctx) => ({ subject: `Рассылка ${uid()}`, body: 'Текст фикстуры', audience: 'all', status: 'draft', createdBy: ctx.userId }),
+  // Отменённая доставка: фоновая задача рассылок в других тестах её не возьмёт.
+  'email-broadcast-deliveries': (ctx) => ({ broadcast: 0, user: ctx.studentId, status: 'cancelled', attempts: 0, nextAttemptAt: new Date().toISOString() }),
   certificates: (ctx) => ({
     user: ctx.studentId, type: 'course', title: 'Курс', relatedEntity: String(ctx.courseId),
     issuedAt: new Date().toISOString(), certificateNumber: uid('MC'),
@@ -128,6 +131,9 @@ export async function makeValid(payload: Payload, slug: string, ctx: FixtureCont
     data.achievement = (await payload.create({ collection: 'achievements', data: { title: uid('achievement'), description: 'Тестовое достижение', criteriaType: 'lesson_count', criteriaValue: 1000000, isActive: false } })).id
   }
   if (slug === 'certificates') data.relatedEntity = uid('certificate-entity')
+  if (slug === 'email-broadcast-deliveries') {
+    data.broadcast = (await payload.create({ collection: 'email-broadcasts', data: VALID['email-broadcasts'](ctx) as never })).id
+  }
   if (slug === 'notification-deliveries') {
     data.notification = (await payload.create({ collection: 'notifications', data: { user: Number(data.user), title: 'Фикстура', message: 'Не отправлять', type: 'info' }, context: { skipHooks: true } })).id
     const subscription = VALID['push-subscriptions'](ctx)

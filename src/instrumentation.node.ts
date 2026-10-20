@@ -23,6 +23,7 @@ import {
   ATTR_SERVICE_VERSION,
   SEMRESATTRS_DEPLOYMENT_ENVIRONMENT,
 } from '@opentelemetry/semantic-conventions'
+import { initServerSentry } from '@/lib/error-reporting/server-sentry'
 
 const OTEL_ENDPOINT = process.env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim().replace(/\/+$/, '')
 
@@ -181,3 +182,7 @@ if (OTEL_ENDPOINT) {
   process.on('SIGTERM', () => void shutdown())
   process.on('SIGINT', () => void shutdown())
 }
+
+// Sentry поднимается после OTel: иначе он не найдёт активный спан, к которому
+// привязывает ошибку, а свой провайдер трасс ему регистрировать нельзя.
+initServerSentry()

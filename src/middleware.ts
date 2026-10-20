@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { PUBLIC_FONT_PATHS } from '@/lib/public-fonts'
 
-const PUBLIC_PATHS = ['/login', '/forgot-password', '/reset-password', '/admin', '/api']
+const PUBLIC_PATHS = ['/login', '/forgot-password', '/reset-password', '/unsubscribe', '/admin', '/api']
 
 const STATIC_PREFIXES = ['/_next', '/images', '/monaco']
 

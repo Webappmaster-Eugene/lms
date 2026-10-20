@@ -1,6 +1,7 @@
 import 'server-only'
 import { InterviewAnalysisClientError } from '@/server/interviews/analysis-client'
 import { logger } from '@/lib/telemetry'
+import { stackOnly } from '@/lib/error-reporting/capture'
 import { createLocalReq } from 'payload'
 import { getPayload } from '@/lib/payload'
 import { readBoundedJson, RequestBodyError } from '@/server/read-json-body'
@@ -70,7 +71,7 @@ export async function interviewRoute(request: Request, action: Action, id?: numb
     if (error instanceof RequestBodyError) return response({ error: error.message }, error.status)
     if (error instanceof InterviewStorageError) return response({ error: error.message }, error.statusCode)
     // Provider errors can contain signed URLs or private transcripts; log no raw error.
-    logger.error('Interview library request failed', { action, recordingId: id ?? null, errorClass: error instanceof Error ? error.name.slice(0, 64) : 'Unknown' })
+    logger.error('Interview library request failed', stackOnly(error), { action, recordingId: id ?? '', errorClass: error instanceof Error ? error.name.slice(0, 64) : 'Unknown' })
     return response({ error: 'Сервис собеседований временно недоступен. Попробуйте ещё раз' }, 503)
   }
 }

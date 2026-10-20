@@ -7,7 +7,7 @@ import { PwaProvider } from '@/components/pwa/PwaProvider'
 import { currentInstallPrompt, rememberInstallPrompt, type InstallPromptEvent } from '@/lib/pwa-client'
 
 const settings = {
-  preferences: { remindersEnabled: true, timezone: 'Europe/Moscow', reminderHour: 18, pushEnabled: true },
+  preferences: { remindersEnabled: true, emailBroadcastsEnabled: true, timezone: 'Europe/Moscow', reminderHour: 18, pushEnabled: true },
   vapidPublicKey: 'AQID', pushConfigured: true, devicesCount: 0,
 }
 
@@ -174,12 +174,13 @@ describe('notification settings: consent and device subscriptions', () => {
     await screen.findByRole('button', { name: 'Сохранить настройки' })
     await user.click(screen.getByRole('checkbox', { name: /Напоминать, если я давно не учился/ }))
     await user.click(screen.getByRole('checkbox', { name: /Разрешить push на подключённых устройствах/ }))
+    await user.click(screen.getByRole('checkbox', { name: /Письма-рассылки/ }))
     await user.selectOptions(screen.getByRole('combobox', { name: 'Время напоминания' }), '10')
     await user.selectOptions(screen.getByRole('combobox', { name: 'Часовой пояс' }), 'Asia/Novosibirsk')
     await user.click(screen.getByRole('button', { name: 'Сохранить настройки' }))
     expect(await screen.findByText('Настройки сохранены.')).toBeInTheDocument()
     const request = api.mock.calls.find(([path, init]) => path === '/api/push/settings' && init?.method === 'PATCH')
-    expect(JSON.parse(String(request?.[1]?.body))).toEqual({ remindersEnabled: false, pushEnabled: false, reminderHour: 10, timezone: 'Asia/Novosibirsk' })
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({ remindersEnabled: false, emailBroadcastsEnabled: false, pushEnabled: false, reminderHour: 10, timezone: 'Asia/Novosibirsk' })
   })
 
   it('an iPhone browser guides installation before offering a push permission prompt', async () => {

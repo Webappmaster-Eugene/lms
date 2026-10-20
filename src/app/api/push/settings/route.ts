@@ -12,8 +12,8 @@ export async function PATCH(request: Request) {
   try {
     const { payload, user } = await notificationAuth(request, true)
     const body = await notificationBody(request)
-    const changes: { pushEnabled?: boolean; remindersEnabled?: boolean; timezone?: string; reminderHour?: number } = {}
-    for (const field of ['pushEnabled', 'remindersEnabled'] as const) {
+    const changes: { pushEnabled?: boolean; remindersEnabled?: boolean; emailBroadcastsEnabled?: boolean; timezone?: string; reminderHour?: number } = {}
+    for (const field of ['pushEnabled', 'remindersEnabled', 'emailBroadcastsEnabled'] as const) {
       if (body[field] === undefined) continue
       if (typeof body[field] !== 'boolean') throw new NotificationError('Некорректные настройки')
       changes[field] = body[field]

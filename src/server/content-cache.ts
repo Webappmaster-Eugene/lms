@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { createClient } from 'redis'
+import { captureThrottled } from '@/lib/error-reporting/capture'
 
 const TTL_SECONDS = 300
 const MAX_VALUE_BYTES = 4 * 1024 * 1024
@@ -17,12 +18,22 @@ let connecting: Promise<void> | undefined
 let retryAt = 0
 let warningAt = 0
 
-function unavailable() {
+// Учебные страницы при этом работают (локальный кеш и Payload), поэтому в Sentry
+// это предупреждение и не чаще раза в 10 минут — но без него Redis лежал бы незаметно.
+const REPORT_INTERVAL_MS = 10 * 60_000
+
+function unavailable(error?: unknown) {
   retryAt = Date.now() + RETRY_AFTER_MS
   if (Date.now() >= warningAt) {
     warningAt = retryAt
     console.warn('[content-cache] Redis недоступен; используется локальный кеш и Payload')
   }
+  captureThrottled('redis-unavailable', REPORT_INTERVAL_MS, error ?? 'Redis недоступен', {
+    level: 'warning',
+    message: 'Redis недоступен: кеш каталога работает локально',
+    tags: { component: 'redis' },
+    fingerprint: ['redis-unavailable'],
+  })
 }
 
 async function bounded<T>(operation: Promise<T>): Promise<T> {
@@ -54,10 +65,10 @@ async function redisClient() {
       await bounded(connecting)
     }
     return client
-  } catch {
+  } catch (error) {
     if (client?.isOpen) client.destroy()
     client = undefined
-    unavailable()
+    unavailable(error)
     return undefined
   }
 }
@@ -65,10 +76,10 @@ async function redisClient() {
 async function readRedis(key: string): Promise<string | null> {
   const redis = await redisClient()
   if (!redis) return null
-  try { return await bounded(redis.get(key)) } catch {
+  try { return await bounded(redis.get(key)) } catch (error) {
     if (redis.isOpen) redis.destroy()
     if (client === redis) client = undefined
-    unavailable()
+    unavailable(error)
     return null
   }
 }
@@ -76,10 +87,10 @@ async function readRedis(key: string): Promise<string | null> {
 async function writeRedis(key: string, json: string): Promise<void> {
   const redis = await redisClient()
   if (!redis) return
-  try { await bounded(redis.set(key, json, { EX: TTL_SECONDS })) } catch {
+  try { await bounded(redis.set(key, json, { EX: TTL_SECONDS })) } catch (error) {
     if (redis.isOpen) redis.destroy()
     if (client === redis) client = undefined
-    unavailable()
+    unavailable(error)
   }
 }
 

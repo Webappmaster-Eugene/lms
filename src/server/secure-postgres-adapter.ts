@@ -1,10 +1,29 @@
 import { postgresAdapter, sql } from '@payloadcms/db-postgres'
 import { APIError } from 'payload'
+import { captureThrottled } from '@/lib/error-reporting/capture'
+import { logger } from '@/lib/telemetry'
 
 type StoredSession = { id: string; expiresAt: string | Date; [key: string]: unknown }
 function activeSessions(value: unknown): StoredSession[] {
   if (!Array.isArray(value)) return []
   return value.filter((session): session is StoredSession => session !== null && typeof session === 'object' && typeof session.id === 'string' && Date.parse(String(session.expiresAt)) > Date.now())
+}
+
+type ErrorEmitter = { on(event: 'error', listener: (error: Error) => void): unknown; listenerCount(event: 'error'): number }
+
+/**
+ * Пул pg шлёт 'error', когда рвётся простаивающее соединение (перезапуск или
+ * failover Postgres). Адаптер Payload слушателя не ставит, а событие без
+ * слушателя — необработанное исключение, и перезапуск базы ронял бы процесс
+ * приложения. Пул сам выбросит сломанное соединение и откроет новое.
+ */
+export function watchPoolErrors(pool: ErrorEmitter | undefined): void {
+  if (!pool || pool.listenerCount('error') > 0) return
+  pool.on('error', (error) => {
+    const code = (error as { code?: unknown }).code
+    logger.warn('Postgres: оборвалось простаивающее соединение пула', { 'error.type': error.name, 'db.error_code': typeof code === 'string' ? code : '' })
+    captureThrottled('postgres-pool-error', 60_000, error, { level: 'warning', message: 'Postgres: обрыв соединения пула', tags: { component: 'postgres' } })
+  })
 }
 
 /** Keep the upstream adapter, with a narrow projection for the SDK's whole-user session writes. */
@@ -14,6 +33,13 @@ export function securePostgresAdapter(args: Parameters<typeof postgresAdapter>[0
     ...base,
     init: (context) => {
       const adapter = base.init(context)
+      const connect = adapter.connect?.bind(adapter)
+      if (connect) {
+        adapter.connect = async (options) => {
+          await connect(options)
+          watchPoolErrors(adapter.pool)
+        }
+      }
       const updateOne = adapter.updateOne.bind(adapter)
       adapter.updateOne = async (options) => {
         const data = options.data

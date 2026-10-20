@@ -9,6 +9,8 @@ export const NotificationPreferences: CollectionConfig = {
     { name: 'user', type: 'relationship', relationTo: 'users', required: true, unique: true },
     { name: 'pushEnabled', type: 'checkbox', defaultValue: false },
     { name: 'remindersEnabled', type: 'checkbox', defaultValue: true },
+    // Нет строки настроек — рассылки разрешены: отписка создаёт её с false.
+    { name: 'emailBroadcastsEnabled', type: 'checkbox', defaultValue: true },
     { name: 'timezone', type: 'text', required: true, defaultValue: 'Europe/Moscow', maxLength: 80 },
     { name: 'reminderHour', type: 'number', required: true, defaultValue: 18, min: 8, max: 21 },
     { name: 'lastLearningAt', type: 'date', index: true },

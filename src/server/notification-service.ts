@@ -64,7 +64,7 @@ export async function recordLearningActivity(req: PayloadRequest, userId: number
   // Pending reminders become stale as soon as studying resumes; dispatch checks this again.
 }
 
-export async function changeNotificationPreferences(payload: Payload, user: User, data: Partial<Pick<NotificationPreference, 'pushEnabled' | 'remindersEnabled' | 'timezone' | 'reminderHour'>>) {
+export async function changeNotificationPreferences(payload: Payload, user: Pick<User, 'id'>, data: Partial<Pick<NotificationPreference, 'pushEnabled' | 'remindersEnabled' | 'emailBroadcastsEnabled' | 'timezone' | 'reminderHour'>>) {
   return transact(payload, async (req) => {
     await lock(req, user.id)
     const prefs = await getNotificationPreferences(req, user.id)
@@ -78,7 +78,7 @@ export async function notificationSettings(payload: Payload, user: User) {
     const prefs = await getNotificationPreferences(req, user.id)
     const devices = await payload.count({ collection: 'push-subscriptions', where: { and: [{ user: { equals: user.id } }, { enabled: { equals: true } }] }, req, overrideAccess: true })
     const config = vapidConfiguration()
-    return { preferences: { pushEnabled: prefs.pushEnabled ?? false, remindersEnabled: prefs.remindersEnabled ?? true, timezone: prefs.timezone, reminderHour: prefs.reminderHour }, vapidPublicKey: config?.publicKey ?? null, pushConfigured: config !== null, devicesCount: devices.totalDocs }
+    return { preferences: { pushEnabled: prefs.pushEnabled ?? false, remindersEnabled: prefs.remindersEnabled ?? true, emailBroadcastsEnabled: prefs.emailBroadcastsEnabled ?? true, timezone: prefs.timezone, reminderHour: prefs.reminderHour }, vapidPublicKey: config?.publicKey ?? null, pushConfigured: config !== null, devicesCount: devices.totalDocs }
   })
 }
 

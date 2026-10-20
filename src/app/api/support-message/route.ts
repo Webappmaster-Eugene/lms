@@ -102,7 +102,7 @@ export async function POST(request: Request) {
         context: { skipHooks: true },
       })
     } catch (err) {
-      logger.error(`Failed to create support notification for admin ${admin.id}: ${err}`)
+      logger.error('Не удалось создать уведомление администратору об обращении', err, { adminId: admin.id })
     }
   }
 

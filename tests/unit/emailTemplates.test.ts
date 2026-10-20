@@ -101,6 +101,21 @@ describe('приглашение', () => {
     const occurrences = html.split('/reset-password?token=tok-1').length - 1
     expect(occurrences).toBeGreaterThanOrEqual(2)
   })
+
+  it('зовёт в чат учеников, если ссылка на него задана в настройках', () => {
+    const { html, text } = inviteEmail('Алексей', 'student@mail.ru', 'tok-1', 'https://t.me/+h3m2mocKtJI0Yzcy')
+
+    expect(html).toContain('href="https://t.me/+h3m2mocKtJI0Yzcy"')
+    expect(html).toContain('Вступить в чат учеников в Telegram')
+    expect(text).toContain('https://t.me/+h3m2mocKtJI0Yzcy')
+  })
+
+  it.each([undefined, '', 'javascript:alert(1)', 'http://t.me/x', 'https://user:pass@t.me/x'])('без безопасной https-ссылки блока про чат нет (%j)', (url) => {
+    const { html, text } = inviteEmail('Алексей', 'student@mail.ru', 'tok-1', url)
+
+    expect(html).not.toContain('чат учеников')
+    expect(text).not.toContain('Чат учеников')
+  })
 })
 
 describe('обращение по имени', () => {

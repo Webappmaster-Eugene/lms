@@ -1,3 +1,5 @@
+import { absoluteBroadcastUrl, broadcastPlainText, parseBroadcastBody, type BroadcastInline } from '@/lib/broadcast-markup'
+
 const BASE_URL = (process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000').replace(/\/+$/, '')
 const BRAND_NAME = 'MentorCareer LMS'
 
@@ -68,7 +70,12 @@ function resultCard(title: string, description: string, points: number): string 
   </table>`
 }
 
-function layout(preview: string, title: string, content: string): string {
+type EmailFooter = { html: string; text: string }
+
+const DEFAULT_FOOTER_HTML = `<p style="margin:0 0 8px;">Это автоматическое письмо, связанное с вашим аккаунтом или обучением в MentorCareer. Ответы на этот адрес не обрабатываются.</p>
+          <p style="margin:0;">${link('Открыть платформу', BASE_URL)} &nbsp; / &nbsp; ${link('Контакты', `${BASE_URL}/contacts`)}</p>`
+
+function layout(preview: string, title: string, content: string, footer = DEFAULT_FOOTER_HTML): string {
   return `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -105,8 +112,7 @@ function layout(preview: string, title: string, content: string): string {
           <p style="margin:30px 0 0;padding-top:22px;border-top:1px solid #e4e4e7;font-size:14px;line-height:1.6;color:#52525b;">До встречи на платформе,<br><strong style="color:#27272a;">Команда MentorCareer</strong></p>
         </td></tr>
         <tr><td class="email-content" bgcolor="#fafafa" style="padding:22px 36px;border-top:1px solid #e4e4e7;border-radius:0 0 11px 11px;font-size:12px;line-height:1.7;color:#52525b;">
-          <p style="margin:0 0 8px;">Это автоматическое письмо, связанное с вашим аккаунтом или обучением в MentorCareer. Ответы на этот адрес не обрабатываются.</p>
-          <p style="margin:0;">${link('Открыть платформу', BASE_URL)} &nbsp; / &nbsp; ${link('Контакты', `${BASE_URL}/contacts`)}</p>
+          ${footer}
         </td></tr>
       </table>
       <!--[if mso]></td></tr></table><![endif]-->
@@ -116,11 +122,13 @@ function layout(preview: string, title: string, content: string): string {
 </html>`
 }
 
-function email(subject: string, preview: string, title: string, html: string, text: string): EmailContent {
+const DEFAULT_FOOTER_TEXT = `Это автоматическое письмо. Ответы на этот адрес не обрабатываются.\nКонтакты: ${BASE_URL}/contacts`
+
+function email(subject: string, preview: string, title: string, html: string, text: string, footer?: EmailFooter): EmailContent {
   return {
     subject,
-    html: layout(preview, title, html),
-    text: `${BRAND_NAME}\n\n${title}\n\n${text.trim()}\n\nДо встречи на платформе,\nКоманда MentorCareer\n${BASE_URL}\n\nЭто автоматическое письмо. Ответы на этот адрес не обрабатываются.\nКонтакты: ${BASE_URL}/contacts\n`,
+    html: layout(preview, title, html, footer?.html),
+    text: `${BRAND_NAME}\n\n${title}\n\n${text.trim()}\n\nДо встречи на платформе,\nКоманда MentorCareer\n${BASE_URL}\n\n${footer?.text ?? DEFAULT_FOOTER_TEXT}\n`,
   }
 }
 
@@ -128,8 +136,20 @@ export function passwordSetupUrl(token: string): string {
   return `${BASE_URL}/reset-password?token=${encodeURIComponent(token)}`
 }
 
-export function inviteEmail(firstName: string, address: string, token: string): EmailContent {
+/** В письмо попадает только https-ссылка: значение приходит из настроек CMS. */
+function safeCommunityUrl(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'https:' && !parsed.username && !parsed.password ? parsed.toString() : undefined
+  } catch {
+    return undefined
+  }
+}
+
+export function inviteEmail(firstName: string, address: string, token: string, communityUrl?: string): EmailContent {
   const url = passwordSetupUrl(token)
+  const community = safeCommunityUrl(communityUrl)
   const steps = ['Задайте пароль по ссылке из этого письма.', 'Войдите на платформу с вашим email и новым паролем.', 'Откройте доступные вам материалы и выберите первый урок.']
   return email(
     `Доступ к ${BRAND_NAME}`,
@@ -143,8 +163,9 @@ export function inviteEmail(firstName: string, address: string, token: string): 
     ${paragraph('<strong>Ссылка действует 7 дней и используется один раз.</strong> Выберите пароль, который не используете в других сервисах.')}
     ${fallbackLink(url)}
     ${paragraph(`Ссылка устарела? ${link('Запросите новую', `${BASE_URL}/forgot-password`)}. Уже задали пароль? ${link('Войдите в аккаунт', `${BASE_URL}/login`)}.`)}
+    ${community ? paragraph(`Вопросы по задачам, разборы и общение с другими учениками — в нашем чате. ${link('Вступить в чат учеников в Telegram', community)}.`) : ''}
     ${notice('Если вы не ожидали приглашения, уточните его у администратора, который выдал доступ. Не пересылайте это письмо: ссылка позволяет задать пароль к вашему аккаунту.')}`,
-    `${greeting(firstName)}\n\nАдминистратор создал для вас аккаунт MentorCareer.\nВаш логин: ${address}\n\n${steps.map((step, index) => `${index + 1}. ${step}`).join('\n')}\n\nЗадать пароль по ссылке:\n${url}\n\nСсылка действует 7 дней и используется один раз. Выберите пароль, который не используете в других сервисах.\n\nСсылка устарела? Запросите новую: ${BASE_URL}/forgot-password\nУже задали пароль? Войти: ${BASE_URL}/login\n\nЕсли вы не ожидали приглашения, уточните его у администратора, который выдал доступ. Не пересылайте это письмо: ссылка позволяет задать пароль к вашему аккаунту.`,
+    `${greeting(firstName)}\n\nАдминистратор создал для вас аккаунт MentorCareer.\nВаш логин: ${address}\n\n${steps.map((step, index) => `${index + 1}. ${step}`).join('\n')}\n\nЗадать пароль по ссылке:\n${url}\n\nСсылка действует 7 дней и используется один раз. Выберите пароль, который не используете в других сервисах.\n\nСсылка устарела? Запросите новую: ${BASE_URL}/forgot-password\nУже задали пароль? Войти: ${BASE_URL}/login\n\n${community ? `Чат учеников в Telegram — вопросы по задачам, разборы и общение:\n${community}\n\n` : ''}Если вы не ожидали приглашения, уточните его у администратора, который выдал доступ. Не пересылайте это письмо: ссылка позволяет задать пароль к вашему аккаунту.`,
   )
 }
 
@@ -214,4 +235,51 @@ export function roadmapCompletedEmail(firstName: string, roadmapTitle: string, b
     ${paragraph(`Посмотрите свои результаты в разделе ${link('«Сертификаты»', `${BASE_URL}/certificates`)}. Для следующего шага ${link('откройте другие роадмапы', `${BASE_URL}/roadmaps`)}.`)}`,
     `${greeting(firstName)}\n\nПоздравляем! Вы завершили роадмап «${roadmapTitle}» и прошли все его курсы.\n${bonus ? `\nНаграда за завершение роадмапа: ${bonus}. Она учтена в ваших баллах на платформе.\n` : ''}\nЗакрепите знания в практике или используйте их как основу для следующего направления.\n\nОткрыть роадмап: ${url}\nВаши сертификаты: ${BASE_URL}/certificates\nДругие роадмапы: ${BASE_URL}/roadmaps`,
   )
+}
+
+function broadcastInlineHtml(nodes: BroadcastInline[]): string {
+  return nodes.map((node) => {
+    if (node.type === 'text') return escapeHtml(node.value)
+    if (node.type === 'break') return '<br>'
+    if (node.type === 'bold') return `<strong style="color:#27272a;">${broadcastInlineHtml(node.children)}</strong>`
+    return link(node.label, node.url)
+  }).join('')
+}
+
+export type BroadcastEmailInput = {
+  firstName: string
+  subject: string
+  body: string
+  ctaLabel?: string | null
+  ctaUrl?: string | null
+  unsubscribeUrl: string
+  /** Есть ли адрес для ответа: иначе подвал честно говорит, что ответы не читаются. */
+  replyable: boolean
+}
+
+export function broadcastEmail({ firstName, subject, body, ctaLabel, ctaUrl, unsubscribeUrl, replyable }: BroadcastEmailInput): EmailContent {
+  const paragraphs = parseBroadcastBody(body)
+  const cta = ctaLabel?.trim() && ctaUrl?.trim() ? { label: ctaLabel.trim(), url: absoluteBroadcastUrl(ctaUrl.trim(), BASE_URL) } : null
+  const plain = paragraphs.map(broadcastPlainText).join('\n\n')
+  const preview = plain.replace(/\s+/g, ' ').slice(0, 140)
+  const reason = 'Вы получили это письмо, потому что учитесь на платформе MentorCareer.'
+  const reply = replyable ? 'Чтобы задать вопрос, просто ответьте на это письмо.' : 'Ответы на этот адрес не обрабатываются.'
+  return email(
+    subject,
+    preview,
+    subject,
+    `${paragraph(escapeHtml(greeting(firstName)))}
+    ${paragraphs.map((nodes) => paragraph(broadcastInlineHtml(nodes))).join('\n    ')}
+    ${cta ? `${button(cta.label, cta.url)}\n    ${fallbackLink(cta.url)}` : ''}`,
+    `${greeting(firstName)}\n\n${plain}${cta ? `\n\n${cta.label}: ${cta.url}` : ''}`,
+    {
+      html: `<p style="margin:0 0 8px;">${escapeHtml(`${reason} ${reply}`)}</p>
+          <p style="margin:0;">${link('Открыть платформу', BASE_URL)} &nbsp; / &nbsp; ${link('Контакты', `${BASE_URL}/contacts`)} &nbsp; / &nbsp; ${link('Отписаться от рассылок', unsubscribeUrl)}</p>`,
+      text: `${reason} ${reply}\nКонтакты: ${BASE_URL}/contacts\nОтписаться от рассылок: ${unsubscribeUrl}`,
+    },
+  )
+}
+
+export function emailBaseUrl(): string {
+  return BASE_URL
 }

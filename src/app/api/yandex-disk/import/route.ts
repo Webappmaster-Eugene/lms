@@ -190,7 +190,7 @@ export async function POST(request: Request) {
         err instanceof YandexDiskError || err instanceof Error ? err.message : 'Неизвестная ошибка'
 
       await updateImportStatus(payload, importRecord.id, 'failed', message)
-      logger.error(`YD Import упал: ${message}`)
+      logger.error('Импорт курса с Яндекс Диска не удался', err, { importId: importRecord.id })
 
       return NextResponse.json({ error: message }, { status: 500 })
     }

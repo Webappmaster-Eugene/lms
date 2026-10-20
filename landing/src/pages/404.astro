@@ -4,9 +4,16 @@ import { LMS_URL } from '../config'
 ---
 <Layout title="Страница не найдена | MentorCareer" description="Такой страницы в инструкции MentorCareer нет." noindex>
   <main id="main" class="not-found">
-    <p>Ошибка 404</p>
-    <h1>Страница не найдена</h1>
-    <p>Возможно, ссылка устарела. Откройте инструкцию и найдите нужный раздел в оглавлении.</p>
+    <p class="not-found-eyebrow"><span aria-hidden="true"></span>Ошибка 404</p>
+    <h1>Такой страницы в инструкции нет</h1>
+    <p>Возможно, ссылка устарела или раздел переименовали. Откройте инструкцию и найдите нужное в оглавлении — или сразу перейдите в платформу.</p>
+    <figure class="not-found-terminal" aria-hidden="true">
+      <div class="not-found-terminal-bar"><span></span><span></span><span></span><b>mentorcareer — zsh</b></div>
+      <pre><span class="prompt">$</span> open info.mentorcareer.ru/…
+<span class="error">✗ 404: раздел не найден</span>
+<span class="comment"># оглавление инструкции — на главной</span>
+<span class="prompt">$</span> <span class="hint">cd ~/guide</span></pre>
+    </figure>
     <div class="actions"><a href="/" class="button">Открыть инструкцию</a><a href={LMS_URL} class="text-link">Перейти в платформу</a></div>
   </main>
 </Layout>

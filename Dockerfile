@@ -84,7 +84,21 @@ ENV NODE_OPTIONS=--max-old-space-size=2048
 # на нём, и выкат упал. Причина и условие — в next.config.mjs.
 ENV LMS_SKIP_BUILD_CHECKS=1
 
-RUN npx next build
+# Sentry: имя релиза и загрузка source maps браузерного кода. Токен приходит
+# BuildKit-секретом (compose: build.secrets) и не остаётся ни в слоях, ни в истории
+# образа. Без токена сборка та же, а стек браузерных ошибок в Sentry будет сжатым.
+ARG SENTRY_RELEASE=
+ARG SENTRY_ORG=
+ARG SENTRY_PROJECT=
+ENV SENTRY_RELEASE=${SENTRY_RELEASE} \
+    SENTRY_ORG=${SENTRY_ORG} \
+    SENTRY_PROJECT=${SENTRY_PROJECT}
+
+# Source maps удаляет и плагин Sentry, но публичными они стали бы при его сбое:
+# .next/static раздаётся без входа, поэтому удаляем их здесь ещё раз.
+RUN --mount=type=secret,id=sentry_auth_token,required=false \
+    SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" npx next build \
+    && find .next/static -name '*.map' -delete
 
 # ──────────────────────────────────────────────
 # Stage 4: runner — minimal production image

@@ -54,6 +54,8 @@ const MATRIX: Record<string, Matrix> = {
   'push-subscriptions': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
   'notification-deliveries': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
   'notification-job-state': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
+  'email-broadcasts': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
+  'email-broadcast-deliveries': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
   certificates: { create: 'admin', read: 'own', update: 'admin', delete: 'admin' },
   streaks: { create: 'admin', read: 'own', update: 'admin', delete: 'admin' },
   // Пишет только сервер после проверки в песочнице (/api/trainer/submit)
@@ -97,6 +99,8 @@ const PATCH: Record<string, Record<string, unknown>> = {
   'push-subscriptions': { enabled: false },
   'notification-deliveries': { status: 'cancelled' },
   'notification-job-state': { userCursor: 0 },
+  'email-broadcasts': { subject: 'обновлено' },
+  'email-broadcast-deliveries': { status: 'skipped' },
   certificates: { title: 'обновлено' },
   streaks: { totalActiveDays: 7 },
   'user-trainer-progress': { userCode: '// обновлено' },

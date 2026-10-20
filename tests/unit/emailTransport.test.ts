@@ -6,11 +6,14 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
  * не анонсирует STARTTLS.
  */
 
-const createTransport = vi.fn((config: unknown) => ({ __transport: config, use: vi.fn() }))
+const verify = vi.fn(() => Promise.resolve(true))
+const createTransport = vi.fn((config: unknown) => ({ __transport: config, use: vi.fn(), verify }))
 const nodemailerAdapter = vi.fn((config: unknown) => ({ __adapter: config }))
+const logError = vi.fn()
 
 vi.mock('nodemailer', () => ({ default: { createTransport } }))
 vi.mock('@payloadcms/email-nodemailer', () => ({ nodemailerAdapter }))
+vi.mock('@/lib/telemetry', () => ({ logger: { error: logError, warn: vi.fn(), info: vi.fn() } }))
 
 const { buildEmailAdapter } = await import('@/payload/email/transport')
 
@@ -241,6 +244,26 @@ describe('сборка SMTP-транспорта', () => {
 
       expect(warn).not.toHaveBeenCalled()
       warn.mockRestore()
+    })
+  })
+
+  describe('проверка SMTP на старте', () => {
+    it('отказ почтового сервера уходит в логгер, а с ним в Sentry, а не только в console.error адаптера', async () => {
+      const refused = Object.assign(new Error('Invalid login: 535 5.7.0 NEOBHODIM parol prilozheniya'), { code: 'EAUTH', responseCode: 535 })
+      verify.mockRejectedValueOnce(refused)
+      configureSmtp()
+      const build = await freshBuildEmailAdapter()
+      build()
+      await vi.waitFor(() => expect(logError).toHaveBeenCalledWith('Error verifying Nodemailer transport.', refused))
+      expect(adapterConfig()).toMatchObject({ skipVerify: true })
+    })
+
+    it('сервер проверяется один раз за процесс, а не на каждую сборку конфига', async () => {
+      configureSmtp()
+      const build = await freshBuildEmailAdapter()
+      build()
+      build()
+      expect(verify).toHaveBeenCalledTimes(1)
     })
   })
 

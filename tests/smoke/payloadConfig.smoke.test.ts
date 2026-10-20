@@ -80,7 +80,8 @@ describe('миграции', () => {
   })
 
   it('конфиг действительно применяет миграции на проде', () => {
-    expect(CONFIG).toMatch(/prodMigrations:\s*migrations/)
+    // Обёртка только отправляет ошибку миграции в Sentry перед выходом процесса.
+    expect(CONFIG).toMatch(/prodMigrations:\s*(?:reportMigrationFailures\()?migrations\)?,/)
   })
 })
 

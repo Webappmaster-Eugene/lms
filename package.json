@@ -68,6 +68,7 @@
     "@payloadcms/next": "3.89.0",
     "@payloadcms/richtext-lexical": "3.89.0",
     "@payloadcms/ui": "3.89.0",
+    "@sentry/nextjs": "11.4.0",
     "@xyflow/react": "^12.11.6",
     "clsx": "2.1.1",
     "cross-env": "7.0.3",

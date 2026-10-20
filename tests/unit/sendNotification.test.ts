@@ -51,8 +51,9 @@ function makePayload() {
     }) => 'invite-token-1',
   )
   const sendEmail = vi.fn(async (_message: { to: string; subject: string; html: string; text: string }) => undefined)
+  const findGlobal = vi.fn(async (_args: { slug: string }): Promise<{ contacts?: { telegramGroup?: string | null } }> => ({ contacts: { telegramGroup: 'https://t.me/+h3m2mocKtJI0Yzcy' } }))
 
-  return { findByID, forgotPassword, sendEmail, entities }
+  return { findByID, forgotPassword, sendEmail, findGlobal, entities }
 }
 
 function makeReq(payload: ReturnType<typeof makePayload>): PayloadRequest {
@@ -87,6 +88,26 @@ describe('приглашение в платформу', () => {
     expect(args.to).toBe(user.email)
     expect(String(args.html)).toContain('invite-token-1')
     expect(String(args.text)).toContain('invite-token-1')
+  })
+
+  it('зовёт в чат учеников по ссылке из настроек сайта', async () => {
+    await run()
+
+    expect(payload.findGlobal).toHaveBeenCalledWith(expect.objectContaining({ slug: 'site-settings' }))
+    // Вне транзакции создания: сбой чтения не должен откатывать нового ученика.
+    expect(payload.findGlobal.mock.calls[0]?.[0]).not.toHaveProperty('req')
+    const [args] = payload.sendEmail.mock.calls[0]
+    expect(String(args.html)).toContain('https://t.me/+h3m2mocKtJI0Yzcy')
+  })
+
+  it('уходит и без ссылки на чат, если настройки не прочитались', async () => {
+    payload.findGlobal.mockRejectedValueOnce(new Error('connection terminated'))
+    await run()
+
+    expect(payload.sendEmail).toHaveBeenCalledTimes(1)
+    expect(String(payload.sendEmail.mock.calls[0]?.[0].html)).not.toContain('t.me')
+    expect(logger.warn).toHaveBeenCalled()
+    expect(logger.error).not.toHaveBeenCalled()
   })
 
   it('не уходит при правке профиля', async () => {

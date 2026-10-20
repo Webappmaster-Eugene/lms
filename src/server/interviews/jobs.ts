@@ -4,6 +4,7 @@ import type { InterviewRecording } from '@/payload-types'
 import type { Payload, Where } from 'payload'
 import { relationId } from '@/lib/relation-id'
 import { logger } from '@/lib/telemetry'
+import { stackOnly } from '@/lib/error-reporting/capture'
 import { interviewTransaction, storedAnalysisContext } from '@/server/interviews/service'
 import { createInterviewAnalysis, getInterviewAnalysis, isInterviewAnalysisConfigured, InterviewAnalysisClientError } from '@/server/interviews/analysis-client'
 import { createInterviewSource } from '@/server/interviews/capability'
@@ -56,7 +57,7 @@ export async function runInterviewAnalysisJobs(payload: Payload) {
       await update({ analysisProgress: 'Ожидаем ответа сервиса оценки', analysisClaim: null, analysisLeaseUntil: new Date(Date.now() + 60000).toISOString() })
       return { skipped: false, pending: 1 }
     }
-    logger.error('Interview evaluation integration failed', { recordingId: doc.id, errorClass: error instanceof Error ? error.name : 'Unknown' })
+    logger.error('Interview evaluation integration failed', stackOnly(error), { recordingId: doc.id, errorClass: error instanceof Error ? error.name : 'Unknown' })
     await update({ analysisStatus: 'failed', analysisError: error instanceof InterviewAnalysisClientError ? error.message : 'Не удалось оценить собеседование. Попробуйте ещё раз', analysisClaim: null, analysisLeaseUntil: null })
     return { skipped: false, failed: 1 }
   }

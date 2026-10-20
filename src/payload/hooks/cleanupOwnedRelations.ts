@@ -49,6 +49,7 @@ export const cleanupUserRelations = cleanupDependents('пользователь'
   { collection: 'points-transactions', field: 'user' },
   { collection: 'user-achievements', field: 'user' },
   { collection: 'certificates', field: 'user' },
+  { collection: 'email-broadcast-deliveries', field: 'user' },
   { collection: 'notification-deliveries', field: 'user' },
   { collection: 'push-subscriptions', field: 'user' },
   { collection: 'notification-preferences', field: 'user' },
@@ -58,6 +59,11 @@ export const cleanupUserRelations = cleanupDependents('пользователь'
   { collection: 'bookmarks', field: 'user' },
   { collection: 'comments', field: 'user' },
   { collection: 'interview-rooms', field: 'owner' },
+])
+
+/** Журнал доставки рассылки: без него удаление рассылки упиралось бы в NOT NULL */
+export const cleanupBroadcastRelations = cleanupDependents('рассылка', [
+  { collection: 'email-broadcast-deliveries', field: 'broadcast' },
 ])
 
 /** Выданные экземпляры достижения; начисленные за него баллы остаются в истории */

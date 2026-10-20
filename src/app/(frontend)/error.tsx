@@ -1,37 +1,40 @@
 'use client'
 
-import { useEffect } from 'react'
-import { AlertCircle, RefreshCw } from 'lucide-react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { LifeBuoy } from 'lucide-react'
+import { ErrorScreen, errorSecondaryAction } from '@/components/errors/ErrorScreen'
+import { RetryButton } from '@/components/errors/RetryButton'
+import { supportHref, useErrorReport } from '@/components/errors/use-error-report'
 
-export default function FrontendError({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string }
-  reset: () => void
-}) {
-  useEffect(() => {
-    console.error('[frontend] render error', { digest: error.digest, message: error.message })
-  }, [error])
+export default function FrontendError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  const reference = useErrorReport(error)
+  const pathname = usePathname()
 
   return (
-    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-6 px-4">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10">
-        <AlertCircle className="h-8 w-8 text-destructive" />
-      </div>
-      <div className="text-center">
-        <h2 className="text-xl font-bold text-foreground">Что-то пошло не так</h2>
-        <p className="mt-2 text-sm text-muted-foreground max-w-md">
-          Произошла ошибка при загрузке страницы. Попробуйте обновить.
-        </p>
-      </div>
-      <button
-        onClick={reset}
-        className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-      >
-        <RefreshCw className="h-4 w-4" />
-        Попробовать снова
-      </button>
-    </div>
+    <ErrorScreen
+      status="500"
+      tone="danger"
+      eyebrow="Сбой на нашей стороне"
+      title="Страница не загрузилась"
+      description="Отчёт об ошибке уже у разработчиков. Попробуйте открыть страницу ещё раз — чаще всего это помогает. Ваш прогресс сохранён."
+      terminal={[
+        { kind: 'command', text: `open ${pathname ?? '/'}` },
+        { kind: 'error', text: 'Error: страница упала при загрузке' },
+        { kind: 'comment', text: 'отчёт отправлен, уже разбираемся' },
+        { kind: 'hint', text: 'retry' },
+      ]}
+      reference={reference}
+      actions={
+        <>
+          <RetryButton reset={reset} />
+          <Link href="/" className={errorSecondaryAction}>На дашборд</Link>
+          <Link href={supportHref(reference, pathname)} className={errorSecondaryAction}>
+            <LifeBuoy className="h-4 w-4" aria-hidden="true" />
+            Написать в поддержку
+          </Link>
+        </>
+      }
+    />
   )
 }

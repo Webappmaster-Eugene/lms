@@ -21,4 +21,16 @@ describe('контакты автора из CMS', () => {
     expect(channel).toHaveAttribute('rel', 'noopener noreferrer')
     expect(screen.getByRole('link', { name: 'Открыть в Telegram: Написать Евгению' })).toHaveAttribute('href', 'https://t.me/eugene_nadtocheev')
   })
+
+  it('ведёт в чат учеников и открывает почту поддержки на месте', async () => {
+    const settings = await import('@/lib/site-settings')
+    vi.spyOn(settings, 'readSiteContacts').mockResolvedValueOnce({ telegramGroup: 'https://t.me/+h3m2mocKtJI0Yzcy', email: 'support@mentorcareer.ru' })
+    render(await ContactsPage())
+    const group = screen.getByRole('link', { name: 'Вступить в группу: Чат учеников в Telegram' })
+    expect(group).toHaveAttribute('href', 'https://t.me/+h3m2mocKtJI0Yzcy')
+    expect(group).toHaveAttribute('target', '_blank')
+    const mail = screen.getByRole('link', { name: 'support@mentorcareer.ru: Почта поддержки' })
+    expect(mail).toHaveAttribute('href', 'mailto:support@mentorcareer.ru')
+    expect(mail).not.toHaveAttribute('target')
+  })
 })

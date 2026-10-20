@@ -63,6 +63,7 @@ export const ADMIN_NAV_GROUPS = [
     items: [
       { href: '/admin/collections/comments', label: 'Комментарии к урокам' },
       { href: '/admin/collections/notifications', label: 'Уведомления' },
+      { href: '/manage/broadcasts', label: 'Email-рассылки' },
       { href: '/admin/collections/faq-items', label: 'Вопросы и ответы' },
       { href: '/admin/globals/site-settings', label: 'Настройки платформы' },
     ],

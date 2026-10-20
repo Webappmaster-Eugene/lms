@@ -9,6 +9,7 @@ import { getProfileDTO } from '@/server/profile/read'
 import { authorizeProfileCredentialChange } from '@/payload/hooks/protectProfileCredentials'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
 import { logger } from '@/lib/telemetry'
+import { stackOnly } from '@/lib/error-reporting/capture'
 
 const limiter = createRateLimiter('profile-write', 20, 60000)
 const PROFILE_FIELDS = ['firstName', 'lastName', 'email', 'telegram', 'bio', 'avatar', 'currentPassword']
@@ -70,7 +71,7 @@ function routeError(error: unknown): Response {
     return json({ error: error.message }, error.status)
   }
   // Never log SDK validation data: it may contain the raw submitted password.
-  logger.error('Не удалось сохранить профиль', undefined, { 'error.type': error instanceof Error ? error.name : 'UnknownError' })
+  logger.error('Не удалось сохранить профиль', stackOnly(error), { 'error.type': error instanceof Error ? error.name : 'UnknownError' })
   return json({ error: 'Не удалось сохранить изменения. Попробуйте ещё раз.' }, 500)
 }
 

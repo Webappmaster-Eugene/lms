@@ -92,6 +92,8 @@ export interface Config {
     'push-subscriptions': PushSubscription;
     'notification-deliveries': NotificationDelivery;
     'notification-job-state': NotificationJobState;
+    'email-broadcasts': EmailBroadcast;
+    'email-broadcast-deliveries': EmailBroadcastDelivery;
     'student-session-telemetry': StudentSessionTelemetry;
     'student-learning-events': StudentLearningEvent;
     'web-vitals-reports': WebVitalsReport;
@@ -138,6 +140,8 @@ export interface Config {
     'push-subscriptions': PushSubscriptionsSelect<false> | PushSubscriptionsSelect<true>;
     'notification-deliveries': NotificationDeliveriesSelect<false> | NotificationDeliveriesSelect<true>;
     'notification-job-state': NotificationJobStateSelect<false> | NotificationJobStateSelect<true>;
+    'email-broadcasts': EmailBroadcastsSelect<false> | EmailBroadcastsSelect<true>;
+    'email-broadcast-deliveries': EmailBroadcastDeliveriesSelect<false> | EmailBroadcastDeliveriesSelect<true>;
     'student-session-telemetry': StudentSessionTelemetrySelect<false> | StudentSessionTelemetrySelect<true>;
     'student-learning-events': StudentLearningEventsSelect<false> | StudentLearningEventsSelect<true>;
     'web-vitals-reports': WebVitalsReportsSelect<false> | WebVitalsReportsSelect<true>;
@@ -1179,6 +1183,7 @@ export interface NotificationPreference {
   user: number | User;
   pushEnabled?: boolean | null;
   remindersEnabled?: boolean | null;
+  emailBroadcastsEnabled?: boolean | null;
   timezone: string;
   reminderHour: number;
   lastLearningAt?: string | null;
@@ -1230,6 +1235,44 @@ export interface NotificationJobState {
   leaseUntil: string;
   claimToken: string;
   userCursor?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "email-broadcasts".
+ */
+export interface EmailBroadcast {
+  id: number;
+  subject: string;
+  body: string;
+  ctaLabel?: string | null;
+  ctaUrl?: string | null;
+  audience: 'all' | 'selected';
+  recipients?: (number | User)[] | null;
+  status: 'draft' | 'sending' | 'sent' | 'cancelled' | 'failed';
+  createdBy?: (number | null) | User;
+  queuedAt?: string | null;
+  completedAt?: string | null;
+  recipientsTotal?: number | null;
+  excludedCount?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "email-broadcast-deliveries".
+ */
+export interface EmailBroadcastDelivery {
+  id: number;
+  broadcast: number | EmailBroadcast;
+  user: number | User;
+  status: 'pending' | 'processing' | 'sent' | 'failed' | 'cancelled' | 'skipped';
+  attempts: number;
+  nextAttemptAt: string;
+  claimToken?: string | null;
+  lastError?: string | null;
+  sentAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -2187,6 +2230,7 @@ export interface NotificationPreferencesSelect<T extends boolean = true> {
   user?: T;
   pushEnabled?: T;
   remindersEnabled?: T;
+  emailBroadcastsEnabled?: T;
   timezone?: T;
   reminderHour?: T;
   lastLearningAt?: T;
@@ -2235,6 +2279,42 @@ export interface NotificationJobStateSelect<T extends boolean = true> {
   leaseUntil?: T;
   claimToken?: T;
   userCursor?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "email-broadcasts_select".
+ */
+export interface EmailBroadcastsSelect<T extends boolean = true> {
+  subject?: T;
+  body?: T;
+  ctaLabel?: T;
+  ctaUrl?: T;
+  audience?: T;
+  recipients?: T;
+  status?: T;
+  createdBy?: T;
+  queuedAt?: T;
+  completedAt?: T;
+  recipientsTotal?: T;
+  excludedCount?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "email-broadcast-deliveries_select".
+ */
+export interface EmailBroadcastDeliveriesSelect<T extends boolean = true> {
+  broadcast?: T;
+  user?: T;
+  status?: T;
+  attempts?: T;
+  nextAttemptAt?: T;
+  claimToken?: T;
+  lastError?: T;
+  sentAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

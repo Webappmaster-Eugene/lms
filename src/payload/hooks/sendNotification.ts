@@ -1,4 +1,4 @@
-import type { CollectionAfterChangeHook } from 'payload'
+import type { CollectionAfterChangeHook, PayloadRequest } from 'payload'
 import {
   inviteEmail,
   courseCompletedEmail,
@@ -18,6 +18,21 @@ const INVITE_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000
  * Аккаунты заводит администратор, поэтому студент не знает пароля.
  * В письме его не передаём — выпускаем одноразовый токен на `/reset-password`.
  */
+/**
+ * Ссылка на чат учеников из настроек сайта. Без неё приглашение всё равно уходит.
+ * Читается без req, вне транзакции создания пользователя: при сбое запроса Payload
+ * откатил бы транзакцию, и администратор получил бы «успех» без созданного ученика.
+ */
+async function communityUrl(req: PayloadRequest): Promise<string | undefined> {
+  try {
+    const settings = await req.payload.findGlobal({ slug: 'site-settings', depth: 0, overrideAccess: true })
+    return settings.contacts?.telegramGroup ?? undefined
+  } catch (error) {
+    logger.warn('Приглашение уйдёт без ссылки на чат: настройки сайта не прочитались', { 'error.type': error instanceof Error ? error.name : 'unknown' })
+    return undefined
+  }
+}
+
 export const sendInviteEmail: CollectionAfterChangeHook = async ({ doc, operation, req }) => {
   if (operation !== 'create') return doc
   if (req.context?.skipHooks) return doc
@@ -38,7 +53,7 @@ export const sendInviteEmail: CollectionAfterChangeHook = async ({ doc, operatio
         throw new Error('forgotPassword returned an empty token')
       }
 
-      const { subject, html, text } = inviteEmail(doc.firstName ?? '', doc.email, token)
+      const { subject, html, text } = inviteEmail(doc.firstName ?? '', doc.email, token, await communityUrl(req))
       await req.payload.sendEmail({ to: doc.email, subject, html, text })
     } catch (err) {
       logger.error('Failed to send invite email', err, { 'user.email': doc.email })

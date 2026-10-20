@@ -18,6 +18,7 @@ import { PwaProvider } from '@/components/pwa/PwaProvider'
 import { StudentActivityBridge } from '@/components/analytics/StudentActivityBridge'
 import { VideoViewportRecovery } from '@/components/layout/VideoViewportRecovery'
 import { getTrainerAccess } from '@/server/trainer-access'
+import { ErrorReportingUser } from '@/components/errors/ErrorReportingUser'
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -43,6 +44,7 @@ export default async function FrontendLayout({ children }: { children: React.Rea
           <ToastProvider>
             <PwaProvider />
             <VideoViewportRecovery />
+            <ErrorReportingUser userId={user.id} />
             <Suspense fallback={null}><StudentActivityBridge userId={user.id} /></Suspense>
             <Suspense fallback={null}>
               <NavigationProgress />

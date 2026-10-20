@@ -273,7 +273,7 @@ describe('режим сборки Next', () => {
     // Сборщик на Raspberry Pi не выдерживает этот шаг по памяти. Пропуск допустим, пока
     // те же проверки стоят в smoke и CI: если их оттуда убрать, ошибка типов уедет в прод.
     expect(DOCKERFILE).toMatch(/^ENV LMS_SKIP_BUILD_CHECKS=1$/m)
-    expect(DOCKERFILE.indexOf('ENV LMS_SKIP_BUILD_CHECKS=1')).toBeLessThan(DOCKERFILE.indexOf('RUN npx next build'))
+    expect(DOCKERFILE.indexOf('ENV LMS_SKIP_BUILD_CHECKS=1')).toBeLessThan(DOCKERFILE.search(/npx next build(?: \\)?$/m))
     expect(NEXT_CONFIG).toMatch(/const skipBuildChecks = process\.env\.LMS_SKIP_BUILD_CHECKS === '1'/)
     expect(NEXT_CONFIG).toMatch(/typescript:\s*\{\s*ignoreBuildErrors:\s*skipBuildChecks\s*\}/)
     expect(NEXT_CONFIG).toMatch(/eslint:\s*\{\s*ignoreDuringBuilds:\s*skipBuildChecks\s*\}/)
@@ -317,6 +317,40 @@ describe('инструментирование', () => {
     const missing = otel.filter((name) => !external.includes(name))
 
     expect(missing, `не объявлены внешними: ${missing.join(', ')}`).toEqual([])
+  })
+})
+
+describe('Sentry', () => {
+  const INSTRUMENTATION = read('../../src/instrumentation.ts')
+  const CLIENT = read('../../src/instrumentation-client.ts')
+  const ENV_EXAMPLE = read('../../.env.example')
+
+  it('необработанные ошибки запросов Next уходят в Sentry', () => {
+    expect(INSTRUMENTATION).toMatch(/export const onRequestError = captureRequestError/)
+  })
+
+  it('браузер не знает настоящего DSN: он идёт через туннель и меняется без пересборки', () => {
+    expect(CLIENT).toMatch(/tunnel: SENTRY_TUNNEL_PATH/)
+    expect(CLIENT).not.toMatch(/SENTRY_DSN/)
+    expect(DOCKERFILE).not.toMatch(/SENTRY_DSN/)
+  })
+
+  it('DSN приходит в рантайме через compose и описан в .env.example', () => {
+    expect(COMPOSE).toMatch(/- SENTRY_DSN=\$\{SENTRY_DSN:-\}/)
+    expect(COMPOSE).toMatch(/- SENTRY_BROWSER_DSN=\$\{SENTRY_BROWSER_DSN:-\}/)
+    expect(ENV_EXAMPLE).toMatch(/SENTRY_DSN=/)
+  })
+
+  it('токен загрузки source maps — секрет сборки, а не ARG, который останется в истории образа', () => {
+    expect(DOCKERFILE).not.toMatch(/ARG SENTRY_AUTH_TOKEN/)
+    expect(DOCKERFILE).toMatch(/--mount=type=secret,id=sentry_auth_token,required=false/)
+    expect(COMPOSE).toMatch(/secrets: \[sentry_auth_token\]/)
+    expect(COMPOSE).toMatch(/sentry_auth_token:\s*\n\s*environment: SENTRY_AUTH_TOKEN/)
+  })
+
+  it('source maps удаляются из образа после загрузки, и ещё раз — на случай сбоя плагина', () => {
+    expect(NEXT_CONFIG).toMatch(/deleteSourcemapsAfterUpload: true/)
+    expect(DOCKERFILE).toMatch(/npx next build \\\n\s*&& find \.next\/static -name '\*\.map' -delete/)
   })
 })
 

@@ -1,5 +1,6 @@
 import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
-import nodemailer from 'nodemailer'
+import nodemailer, { type Transporter } from 'nodemailer'
+import { logger } from '@/lib/telemetry'
 import { registerTextAlternative } from '@/payload/email/textAlternative'
 
 const IMPLICIT_TLS_PORT = 465
@@ -48,6 +49,21 @@ function reportFailureOnce(message: string): void {
 
 function reportWarningOnce(message: string): void {
   if (registerProblem(message)) console.warn(message)
+}
+
+let verificationStarted = false
+
+/**
+ * Своя проверка SMTP вместо встроенной в адаптер: та пишет отказ через
+ * console.error мимо логгера, и неверный пароль ящика не доходит до Sentry —
+ * письма молча перестают уходить. Текст сообщения прежний: по нему отказ ищут в логах.
+ */
+function verifyOnce(transport: Transporter): void {
+  if (verificationStarted) return
+  verificationStarted = true
+  transport.verify().catch((error: unknown) => {
+    logger.error('Error verifying Nodemailer transport.', error)
+  })
 }
 
 function requireEnv(name: string): string {
@@ -148,10 +164,12 @@ export function buildEmailAdapter(): ReturnType<typeof nodemailerAdapter> | unde
     socketTimeout: SOCKET_TIMEOUT_MS,
   })
   registerTextAlternative(transport)
+  verifyOnce(transport)
 
   return nodemailerAdapter({
     defaultFromAddress: settings.fromAddress,
     defaultFromName: settings.fromName,
     transport,
+    skipVerify: true,
   })
 }

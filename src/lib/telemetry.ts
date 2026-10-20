@@ -1,5 +1,6 @@
 import { isSpanContextValid, trace, SpanStatusCode, type Span, type Tracer, type Attributes } from '@opentelemetry/api'
 import { logs, SeverityNumber } from '@opentelemetry/api-logs'
+import { addLogBreadcrumb, captureServerError } from '@/lib/error-reporting/capture'
 
 const TRACER_NAME = 'lms'
 const LOGGER_NAME = 'lms'
@@ -99,13 +100,20 @@ function emit(severity: SeverityNumber, severityText: string, message: string, a
   }
 }
 
+/**
+ * info и warn попадают в Sentry хлебными крошками запроса, error — событием
+ * с настоящим стеком: в OTel-логи стек и текст ошибки не пишутся (там нет
+ * очистки по содержимому), а события Sentry чистит beforeSend.
+ */
 export const logger = {
   info(message: string, attrs?: Attributes): void {
     emit(SeverityNumber.INFO, 'INFO', message, attrs)
+    addLogBreadcrumb('info', safeLogText(message), safeLogAttributes(attrs))
   },
 
   warn(message: string, attrs?: Attributes): void {
     emit(SeverityNumber.WARN, 'WARN', message, attrs)
+    addLogBreadcrumb('warning', safeLogText(message), safeLogAttributes(attrs))
   },
 
   error(message: string, error?: unknown, attrs?: Attributes): void {
@@ -118,5 +126,6 @@ export const logger = {
       errorAttrs['error.message'] = String(error)
     }
     emit(SeverityNumber.ERROR, 'ERROR', message, errorAttrs)
+    captureServerError(error, { message: safeLogText(message), attributes: safeLogAttributes(attrs) })
   },
 }

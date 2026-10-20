@@ -38,4 +38,4 @@ export const CONTENT = {
 export const SUM_SOLUTION = 'function sum(a, b) {\n  return a + b\n}\n'
 
 /** Заголовок собственной страницы 404 платформы (src/app/(frontend)/not-found.tsx). */
-export const NOT_FOUND_HEADING = 'Такой страницы нет'
+export const NOT_FOUND_HEADING = 'Такой страницы нет в программе'

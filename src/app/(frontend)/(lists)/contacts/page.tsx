@@ -11,18 +11,18 @@ export default async function ContactsPage() {
 
   const cards = [
     {
+      icon: Users,
+      title: 'Чат учеников в Telegram',
+      description: 'Вопросы по задачам, разборы и общение с другими учениками и ментором',
+      link: contacts.telegramGroup,
+      linkText: 'Вступить в группу',
+    },
+    {
       icon: MessageCircle,
       title: 'Telegram-канал',
       description: 'Новости, обновления и полезные материалы',
       link: contacts.telegramChannel,
       linkText: 'Подписаться',
-    },
-    {
-      icon: Users,
-      title: 'Telegram-группа',
-      description: 'Общение с другими учениками и наставниками',
-      link: contacts.telegramGroup,
-      linkText: 'Присоединиться',
     },
     {
       icon: Globe,
@@ -33,8 +33,8 @@ export default async function ContactsPage() {
     },
     {
       icon: Mail,
-      title: 'Email',
-      description: 'Для официальных обращений и предложений',
+      title: 'Почта поддержки',
+      description: 'Для официальных обращений и вопросов, на которые нужен письменный ответ',
       link: contacts.email ? `mailto:${contacts.email}` : undefined,
       linkText: contacts.email ?? 'Не указан',
     },
@@ -64,19 +64,20 @@ export default async function ContactsPage() {
               <Icon className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h3 className="font-semibold text-foreground">{title}</h3>
+              <h2 className="font-semibold text-foreground">{title}</h2>
               <p className="mt-1 text-sm text-muted-foreground">{description}</p>
             </div>
             {link ? (
+              // Почтовый клиент открывается на месте: новая вкладка осталась бы пустой.
               <a
                 href={link}
                 aria-label={`${linkText}: ${title}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-auto inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                target={link.startsWith('mailto:') ? undefined : '_blank'}
+                rel={link.startsWith('mailto:') ? undefined : 'noopener noreferrer'}
+                className="mt-auto inline-flex min-h-11 items-center gap-1.5 break-all text-sm font-medium text-primary hover:text-primary/80 transition-colors"
               >
                 {linkText}
-                <ExternalLink className="h-3.5 w-3.5" />
+                {link.startsWith('mailto:') ? null : <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
               </a>
             ) : (
               <span className="mt-auto text-sm text-muted-foreground">Не настроено</span>

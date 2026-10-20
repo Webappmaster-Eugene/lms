@@ -1,11 +1,34 @@
 'use client'
 
-export default function ContentError({ reset }: { reset: () => void }) {
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { ErrorScreen, errorSecondaryAction } from '@/components/errors/ErrorScreen'
+import { RetryButton } from '@/components/errors/RetryButton'
+import { useErrorReport } from '@/components/errors/use-error-report'
+
+export default function ContentError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  const reference = useErrorReport(error)
+  const pathname = usePathname()
+
   return (
-    <div role="alert" className="space-y-3 rounded-xl border border-border p-6">
-      <h2 className="font-semibold">Не удалось загрузить учебный контент</h2>
-      <p className="text-sm text-muted-foreground">Проверьте соединение и попробуйте ещё раз.</p>
-      <button type="button" onClick={reset} className="min-h-[44px] rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Попробовать ещё раз</button>
-    </div>
+    <ErrorScreen
+      status="500"
+      tone="danger"
+      eyebrow="Управление платформой"
+      title="Раздел управления не загрузился"
+      description="Несохранённые изменения формы могли потеряться, сохранённые — на месте. Ошибка уже отправлена в Sentry."
+      terminal={[
+        { kind: 'command', text: `open ${pathname ?? '/manage'}` },
+        { kind: 'error', text: 'Error: раздел не загрузился' },
+        { kind: 'comment', text: 'подробности — в Sentry по коду ниже' },
+      ]}
+      reference={reference}
+      actions={
+        <>
+          <RetryButton reset={reset} />
+          <Link href="/manage" className={errorSecondaryAction}>К разделу управления</Link>
+        </>
+      }
+    />
   )
 }

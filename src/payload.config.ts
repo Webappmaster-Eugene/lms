@@ -8,6 +8,7 @@ import sharp from 'sharp'
 
 import { migrations } from './migrations'
 import { buildEmailAdapter } from '@/payload/email/transport'
+import { payloadLogger, reportMigrationFailures, reportPayloadError } from '@/payload/hooks/reportPayloadError'
 import { Users } from '@/payload/collections/Users'
 import { Roadmaps } from '@/payload/collections/Roadmaps'
 import { RoadmapNodes } from '@/payload/collections/RoadmapNodes'
@@ -30,6 +31,7 @@ import { Notes } from '@/payload/collections/Notes'
 import { Comments } from '@/payload/collections/Comments'
 import { Notifications } from '@/payload/collections/Notifications'
 import { NotificationPreferences, PushSubscriptions, NotificationDeliveries, NotificationJobState } from '@/payload/collections/NotificationInfrastructure'
+import { EmailBroadcasts, EmailBroadcastDeliveries } from '@/payload/collections/EmailBroadcasts'
 import { bootstrapInterviewDirections } from '@/server/interviews/bootstrap'
 import { bootstrapDefaultAchievements } from '@/lib/default-achievements'
 import { StudentSessionTelemetry, StudentLearningEvents } from '@/payload/collections/StudentAnalytics'
@@ -109,6 +111,8 @@ export default buildConfig({
     PushSubscriptions,
     NotificationDeliveries,
     NotificationJobState,
+    EmailBroadcasts,
+    EmailBroadcastDeliveries,
     StudentSessionTelemetry,
     StudentLearningEvents,
     WebVitalsReports,
@@ -133,12 +137,18 @@ export default buildConfig({
     pool: {
       connectionString: process.env.DATABASE_URL,
     },
-    prodMigrations: migrations,
+    prodMigrations: reportMigrationFailures(migrations),
   }),
 
   sharp,
 
   email: buildEmailAdapter(),
+
+  logger: payloadLogger,
+
+  hooks: {
+    afterError: [reportPayloadError],
+  },
 
   secret: process.env.PAYLOAD_SECRET ?? 'CHANGE_ME_IN_PRODUCTION',
 

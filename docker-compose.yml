@@ -70,6 +70,11 @@ services:
       context: .
       args:
         - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-https://learn.mentorcareer.ru}
+        - SENTRY_RELEASE=${SENTRY_RELEASE:-}
+        - SENTRY_ORG=${SENTRY_ORG:-}
+        - SENTRY_PROJECT=${SENTRY_PROJECT:-}
+      # Токен загрузки source maps — секретом сборки, а не аргументом: аргументы видны в истории образа.
+      secrets: [sentry_auth_token]
     restart: unless-stopped
     depends_on:
       lms-mentor-db:
@@ -99,6 +104,11 @@ services:
       - SMTP_PASS=${SMTP_PASS:-}
       - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS:-noreply@mentorcareer.ru}
       - EMAIL_FROM_NAME=${EMAIL_FROM_NAME:-MentorCareer}
+      # Sentry: без SENTRY_DSN отчёты об ошибках выключены (и сервер, и туннель браузера)
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_BROWSER_DSN=${SENTRY_BROWSER_DSN:-}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
+      - SENTRY_RELEASE=${SENTRY_RELEASE:-}
       # OpenTelemetry
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT-http://lms-mentor-otel:4318}
       - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-lms-platform}
@@ -400,6 +410,10 @@ volumes:
   lms-media:
   lms-geoip:
   lms-trainer-auth:
+
+secrets:
+  sentry_auth_token:
+    environment: SENTRY_AUTH_TOKEN
 
 networks:
   lms-cache:

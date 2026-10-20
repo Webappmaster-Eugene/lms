@@ -1,4 +1,5 @@
 import { withPayload } from '@payloadcms/next/withPayload'
+import { withSentryConfig } from '@sentry/nextjs/config'
 
 // Образ собирается на Raspberry Pi под эмуляцией amd64: линтер и проверка типов внутри
 // `next build` идут там около сорока минут и упираются в память сборщика — он зависает,
@@ -132,7 +133,7 @@ const configWithPayload = withPayload(nextConfig)
 const headersWithPayload = configWithPayload.headers
 const themeHintKeys = new Set(['Accept-CH', 'Vary', 'Critical-CH'])
 
-export default {
+const configWithHeaders = {
   ...configWithPayload,
   async headers() {
     const rules = await headersWithPayload()
@@ -151,3 +152,34 @@ export default {
     })
   },
 }
+
+// Source maps уходят в Sentry только при заданном SENTRY_AUTH_TOKEN (сборка в
+// Dokploy) и удаляются из образа после загрузки: исходники платформы не
+// раздаются браузерам. Без токена сборка та же, отчёты просто со сжатым стеком.
+const uploadSourceMaps = Boolean(process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT)
+
+export default withSentryConfig(configWithHeaders, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !uploadSourceMaps,
+  telemetry: false,
+  sourcemaps: { disable: !uploadSourceMaps, deleteSourcemapsAfterUpload: true },
+  // В образе нет .git: версию передаёт сборка (SENTRY_RELEASE), коммиты не связываем.
+  release: { name: process.env.SENTRY_RELEASE || undefined, create: uploadSourceMaps, finalize: uploadSourceMaps, setCommits: false },
+  widenClientFileUpload: true,
+  // Ошибки сервера ловит onRequestError в instrumentation.ts, трассы — наш OTel.
+  // Обёртки Sentry вокруг каждого серверного компонента дали бы только лишние спаны.
+  webpack: {
+    autoInstrumentServerFunctions: false,
+    autoInstrumentMiddleware: false,
+    autoInstrumentAppDirectory: false,
+  },
+  bundleSizeOptimizations: {
+    excludeDebugStatements: true,
+    excludeTracing: true,
+    excludeReplayIframe: true,
+    excludeReplayShadowDom: true,
+    excludeReplayWorker: true,
+  },
+})
