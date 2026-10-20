@@ -21,6 +21,8 @@ permissions:
 # Два прогона могут идти на одной VM одновременно, поэтому джобы не занимают порты хоста:
 # БД и браузеры живут в контейнерах со своей сетью, а trainer-runtime с общими тегами образов
 # и lms-test-pg:55433 выстроен в одну очередь.
+# Установка зависимостей — через scripts/ci-install.mjs: таймаут и повтор, если загрузка из
+# реестра npm замирает (бывает на канале МТС).
 
 env:
   NEXT_TELEMETRY_DISABLED: '1'
@@ -41,7 +43,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: node scripts/ci-install.mjs pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
@@ -60,7 +62,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: node scripts/ci-install.mjs pnpm install --frozen-lockfile
       - run: node --test trainer-runtime/tests/*.test.mjs
       - run: pnpm test:integration:runtime --build
 
@@ -90,7 +92,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: node scripts/ci-install.mjs pnpm install --frozen-lockfile
       - run: pnpm test:integration
 
   e2e:
@@ -123,8 +125,8 @@ jobs:
         with:
           path: ~/.npm
           key: npm-landing-${{ hashFiles('landing/package-lock.json') }}
-      - run: pnpm install --frozen-lockfile
-      - run: npm ci --prefix landing
+      - run: node scripts/ci-install.mjs pnpm install --frozen-lockfile
+      - run: node scripts/ci-install.mjs npm ci --prefix landing
       - run: pnpm test:e2e:all
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -165,10 +167,13 @@ jobs:
         with:
           path: ~/.npm
           key: npm-landing-${{ hashFiles('landing/package-lock.json') }}
-      - run: pnpm install --frozen-lockfile
-      - run: npm ci --prefix landing
+      - run: node scripts/ci-install.mjs pnpm install --frozen-lockfile
+      - run: node scripts/ci-install.mjs npm ci --prefix landing
       # Уже внутри контейнера Playwright: браузер и шрифты те же, что при съёмке эталонов.
-      - run: pnpm exec playwright test --project=visual
+      # --max-failures: каждое расхождение со скриншотом ждёт стабильный кадр до 10 с и идёт на повтор,
+      # поэтому массовое расхождение (устаревшие эталоны) не укладывалось в 45 минут и джоба
+      # снималась без отчёта. Теперь она падает быстро и выкладывает отчёт с отличиями.
+      - run: pnpm exec playwright test --project=visual --max-failures=10
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
