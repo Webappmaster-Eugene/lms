@@ -348,6 +348,12 @@ describe('Sentry', () => {
     expect(COMPOSE).toMatch(/sentry_auth_token:\s*\n\s*environment: SENTRY_AUTH_TOKEN/)
   })
 
+  it('source maps грузятся в свой GlitchTip: адрес приходит аргументом сборки', () => {
+    expect(NEXT_CONFIG).toMatch(/sentryUrl: process\.env\.SENTRY_URL/)
+    expect(DOCKERFILE).toMatch(/ARG SENTRY_URL=/)
+    expect(COMPOSE).toMatch(/- SENTRY_URL=\$\{SENTRY_URL:-\}/)
+  })
+
   it('source maps удаляются из образа после загрузки, и ещё раз — на случай сбоя плагина', () => {
     expect(NEXT_CONFIG).toMatch(/deleteSourcemapsAfterUpload: true/)
     expect(DOCKERFILE).toMatch(/npx next build \\\n\s*&& find \.next\/static -name '\*\.map' -delete/)

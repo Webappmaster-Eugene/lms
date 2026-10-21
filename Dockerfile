@@ -88,9 +88,11 @@ ENV LMS_SKIP_BUILD_CHECKS=1
 # BuildKit-секретом (compose: build.secrets) и не остаётся ни в слоях, ни в истории
 # образа. Без токена сборка та же, а стек браузерных ошибок в Sentry будет сжатым.
 ARG SENTRY_RELEASE=
+ARG SENTRY_URL=
 ARG SENTRY_ORG=
 ARG SENTRY_PROJECT=
 ENV SENTRY_RELEASE=${SENTRY_RELEASE} \
+    SENTRY_URL=${SENTRY_URL} \
     SENTRY_ORG=${SENTRY_ORG} \
     SENTRY_PROJECT=${SENTRY_PROJECT}
 

@@ -159,6 +159,8 @@ const configWithHeaders = {
 const uploadSourceMaps = Boolean(process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT)
 
 export default withSentryConfig(configWithHeaders, {
+  // Свой GlitchTip (errors.nadtocheev.ru); без SENTRY_URL плагин грузил бы в sentry.io.
+  sentryUrl: process.env.SENTRY_URL || undefined,
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   authToken: process.env.SENTRY_AUTH_TOKEN,

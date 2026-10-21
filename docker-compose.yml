@@ -71,6 +71,7 @@ services:
       args:
         - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-https://learn.mentorcareer.ru}
         - SENTRY_RELEASE=${SENTRY_RELEASE:-}
+        - SENTRY_URL=${SENTRY_URL:-}
         - SENTRY_ORG=${SENTRY_ORG:-}
         - SENTRY_PROJECT=${SENTRY_PROJECT:-}
       # Токен загрузки source maps — секретом сборки, а не аргументом: аргументы видны в истории образа.

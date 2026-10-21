@@ -1,10 +1,15 @@
-# Ошибки и Sentry
+# Ошибки и трекер ошибок
 
-Ошибки платформы собираются в Sentry (sentry.io). Трассы, метрики и логи
-по-прежнему идут через OpenTelemetry в Tempo, Prometheus и Loki
-([learning-observability.md](learning-observability.md)). Sentry спанов не
+Ошибки платформы собираются в свой GlitchTip — `https://errors.nadtocheev.ru`
+(организация `mentorcareer`, проект `lms`). GlitchTip принимает протокол Sentry,
+поэтому в коде работает обычный SDK `@sentry/nextjs`, и переезд на sentry.io —
+это только другой `SENTRY_DSN`. Трассы, метрики и логи по-прежнему идут через
+OpenTelemetry в Tempo, Prometheus и Loki
+([learning-observability.md](learning-observability.md)). SDK спанов не
 шлёт и своего провайдера трасс не регистрирует. Каждое событие несёт
 `trace_id` активного спана OTel: по нему в Grafana находится трасса запроса.
+
+Ниже «Sentry» — это SDK и протокол, а принимает события GlitchTip.
 
 Без `SENTRY_DSN` отправка выключена целиком. Приложение работает как раньше,
 браузер продолжает слать отчёты в туннель, а туннель отвечает 204 и их
@@ -98,31 +103,53 @@ Sentry. Вырезается:
 `router.refresh()` и `reset()`: одного `reset()` мало, упавший серверный
 компонент без нового запроса так и останется упавшим.
 
-## Настройка в Dokploy
+## GlitchTip
 
-1. Создать в Sentry проект с платформой Next.js. DSN взять в
-   Settings → Client Keys.
+| Что | Где |
+|---|---|
+| Интерфейс | `https://errors.nadtocheev.ru` (TLS на Traefik VDS, маршрут в `home-sites.yml`, как у остальных домашних сайтов) |
+| Где работает | Dokploy, проект «GlitchTip — трекер ошибок», compose `glitchtip-…` на сервере `serverlink-vm`; compose-файл и секреты — в самом Dokploy |
+| Состав | `glitchtip-web` (GlitchTip 6, веб и воркер в одном процессе), `glitchtip-postgres`, `glitchtip-valkey` |
+| Сеть | в `dokploy-network` только `glitchtip-web`; база и Valkey — во внутренней сети compose |
+| Хранение | события 90 дней (`GLITCHTIP_RETENTION_DAYS`) |
+| Регистрация | закрыта: новых людей добавляет владелец в настройках организации |
+| Почта алертов | тот же SMTP, что у LMS (`EMAIL_URL` в Environment compose GlitchTip) |
+
+LMS отправляет события внутри VM на `http://glitchtip-web:8000`, без выхода в
+интернет: сервер сам, браузер — через туннель `/api/monitoring`. Если
+GlitchTip лежит, SDK теряет события, но на работу LMS это не влияет.
+
+Обновление GlitchTip: поменять тег образа в compose в Dokploy и нажать Deploy,
+миграции он применяет сам. Мажорные версии — сначала прочитать
+`https://glitchtip.com/blog/`.
+
+## Настройка LMS в Dokploy
+
+1. В GlitchTip: проект → Settings → Client Keys (DSN). Для LMS хост в DSN
+   меняется на внутренний: `http://<public-key>@glitchtip-web:8000/<id>`.
 2. В Environment приложения LMS в Dokploy:
-   - `SENTRY_DSN` — DSN проекта (рантайм; меняется без пересборки);
-   - `SENTRY_BROWSER_DSN` — по желанию, второй Client Key того же проекта для
-     отчётов браузера. Туннель открыт без входа, поэтому на этом ключе стоит
-     поставить лимит (Client Keys → Rate Limiting, например 500 событий в
-     час): мусор через туннель не выест квоту серверных ошибок;
+   - `SENTRY_DSN` — DSN проекта (рантайм; меняется без пересборки, но нужен Deploy);
+   - `SENTRY_BROWSER_DSN` — по желанию, второй ключ того же проекта для
+     отчётов браузера с ограничением частоты: туннель открыт без входа;
    - `SENTRY_ENVIRONMENT` — `production` (по умолчанию так и есть).
 3. Для читаемых стеков браузера (source maps), только на этапе сборки:
-   - `SENTRY_AUTH_TOKEN` — Organization Auth Token (Settings → Auth Tokens).
+   - `SENTRY_URL` — `https://errors.nadtocheev.ru`: сборка идёт в Docker и
+     внутреннего имени `glitchtip-web` не видит;
+   - `SENTRY_AUTH_TOKEN` — API-токен GlitchTip (профиль → Auth Tokens, права
+     `project:read`, `project:write`, `project:releases`, `org:read`).
      Передаётся BuildKit-секретом (`build.secrets` в compose) и не остаётся
      ни в слоях, ни в истории образа;
-   - `SENTRY_ORG`, `SENTRY_PROJECT` — slug организации и проекта;
+   - `SENTRY_ORG`, `SENTRY_PROJECT` — `mentorcareer` и `lms`;
    - `SENTRY_RELEASE` — по желанию, например короткий SHA коммита.
      Без него source maps всё равно сопоставляются по debug id.
 
    После загрузки source maps удаляются из образа (плагином Sentry и ещё раз
-   `find … -delete` в Dockerfile): исходники браузерам не раздаются. Без токена сборка та же, но стек браузерных ошибок в Sentry
-   будет сжатым.
-4. Алерты настроить в самом Sentry (Alerts → Create Alert). Минимум —
-   «новая проблема» и «проблема повторилась после resolve», с уведомлением на
-   почту или в Telegram.
+   `find … -delete` в Dockerfile): исходники браузерам не раздаются. Если
+   GlitchTip недоступен во время сборки, плагин пишет ошибку и сборка идёт
+   дальше — стек браузерных ошибок будет сжатым до следующего выката.
+4. Алерты — в GlitchTip: проект → Settings → Alerts. Сейчас одно правило:
+   письмо участникам проекта, как только у проблемы появляется событие
+   (порог 1 событие за 1 минуту), и при сбоях uptime-мониторов.
 
 ## Проверка
 
