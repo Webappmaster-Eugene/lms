@@ -1,6 +1,6 @@
 # Ошибки и трекер ошибок
 
-Ошибки платформы собираются в свой GlitchTip — `https://errors.nadtocheev.ru`
+Ошибки платформы собираются в свой GlitchTip — `https://sentry.mentorcareer.ru`
 (организация `mentorcareer`, проект `lms`). GlitchTip принимает протокол Sentry,
 поэтому в коде работает обычный SDK `@sentry/nextjs`, и переезд на sentry.io —
 это только другой `SENTRY_DSN`. Трассы, метрики и логи по-прежнему идут через
@@ -107,13 +107,14 @@ Sentry. Вырезается:
 
 | Что | Где |
 |---|---|
-| Интерфейс | `https://errors.nadtocheev.ru` (TLS на Traefik VDS, маршрут в `home-sites.yml`, как у остальных домашних сайтов) |
+| Интерфейс | `https://sentry.mentorcareer.ru` (TLS на Traefik VDS, маршрут в `home-sites.yml`, как у остальных домашних сайтов) |
 | Где работает | Dokploy, проект «GlitchTip — трекер ошибок», compose `glitchtip-…` на сервере `serverlink-vm`; compose-файл и секреты — в самом Dokploy |
 | Состав | `glitchtip-web` (GlitchTip 6, веб и воркер в одном процессе), `glitchtip-postgres`, `glitchtip-valkey` |
 | Сеть | в `dokploy-network` только `glitchtip-web`; база и Valkey — во внутренней сети compose |
 | Хранение | события 90 дней (`GLITCHTIP_RETENTION_DAYS`) |
 | Регистрация | закрыта: новых людей добавляет владелец в настройках организации |
 | Почта алертов | тот же SMTP, что у LMS (`EMAIL_URL` в Environment compose GlitchTip) |
+| Бэкап | дамп базы Dokploy каждую ночь в 01:05 UTC в `vds-offsite` (каталог `glitchtip`, хранить 14); Pi и хост serverlink забирают его в restic, Pi 1-го числа восстанавливает в `postgres:18-alpine`. Том с source maps не бэкапится: их заново грузит следующий выкат |
 
 LMS отправляет события внутри VM на `http://glitchtip-web:8000`, без выхода в
 интернет: сервер сам, браузер — через туннель `/api/monitoring`. Если
@@ -133,7 +134,7 @@ GlitchTip лежит, SDK теряет события, но на работу LM
      отчётов браузера с ограничением частоты: туннель открыт без входа;
    - `SENTRY_ENVIRONMENT` — `production` (по умолчанию так и есть).
 3. Для читаемых стеков браузера (source maps), только на этапе сборки:
-   - `SENTRY_URL` — `https://errors.nadtocheev.ru`: сборка идёт в Docker и
+   - `SENTRY_URL` — `https://sentry.mentorcareer.ru`: сборка идёт в Docker и
      внутреннего имени `glitchtip-web` не видит;
    - `SENTRY_AUTH_TOKEN` — API-токен GlitchTip (профиль → Auth Tokens, права
      `project:read`, `project:write`, `project:releases`, `org:read`).
