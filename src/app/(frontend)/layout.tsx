@@ -18,6 +18,7 @@ import { PwaProvider } from '@/components/pwa/PwaProvider'
 import { StudentActivityBridge } from '@/components/analytics/StudentActivityBridge'
 import { VideoViewportRecovery } from '@/components/layout/VideoViewportRecovery'
 import { getTrainerAccess } from '@/server/trainer-access'
+import { getGuideAccess } from '@/server/guide-access'
 import { ErrorReportingUser } from '@/components/errors/ErrorReportingUser'
 
 export const viewport: Viewport = {
@@ -34,7 +35,10 @@ export default async function FrontendLayout({ children }: { children: React.Rea
   const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login')
   const isAdmin = user.role === 'admin'
-  const trainerEnabled = (await getTrainerAccess(payload, user, req)).hasAccess
+  const [trainerEnabled, guidesEnabled] = await Promise.all([
+    getTrainerAccess(payload, user, req).then((access) => access.hasAccess),
+    getGuideAccess(payload, user, req).then((access) => access.hasAccess),
+  ])
 
   return (
     <html lang="ru" suppressHydrationWarning>
@@ -53,7 +57,7 @@ export default async function FrontendLayout({ children }: { children: React.Rea
             <SidebarProvider>
               <div className="flex min-h-dvh overflow-x-hidden">
                 <div className="contents print:hidden">
-                  <Sidebar isAdmin={isAdmin} trainerEnabled={trainerEnabled} />
+                  <Sidebar isAdmin={isAdmin} trainerEnabled={trainerEnabled} guidesEnabled={guidesEnabled} />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col lg:ml-64 print:ml-0">
                   <div className="contents print:hidden">

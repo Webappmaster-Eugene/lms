@@ -20,15 +20,15 @@ export function consumeLearningAccessAuditActor(req: PayloadRequest, userId: num
   return actor
 }
 
-export async function persistLearningAccessPolicy(req: PayloadRequest, userId: number, next: Pick<AuthoritativeLearningPolicy, 'mode' | 'role'> & Partial<Pick<AuthoritativeLearningPolicy, 'catalogVisibility' | 'trainerMode'>>): Promise<void> {
+export async function persistLearningAccessPolicy(req: PayloadRequest, userId: number, next: Pick<AuthoritativeLearningPolicy, 'mode' | 'role'> & Partial<Pick<AuthoritativeLearningPolicy, 'catalogVisibility' | 'trainerMode' | 'guidesMode'>>): Promise<void> {
   const existing = await req.payload.find({ collection: 'learning-access-policies', where: { user: { equals: userId } }, limit: 1, depth: 0, overrideAccess: true, req })
   const previousCapability = req.context.syncLearningAccessPolicy
   req.context.syncLearningAccessPolicy = true
   try {
     const policy = existing.docs[0]
-    next = { ...next, catalogVisibility: next.catalogVisibility ?? policy?.catalogVisibility ?? 'catalog', trainerMode: next.trainerMode ?? policy?.trainerMode ?? 'all' }
+    next = { ...next, catalogVisibility: next.catalogVisibility ?? policy?.catalogVisibility ?? 'catalog', trainerMode: next.trainerMode ?? policy?.trainerMode ?? 'all', guidesMode: next.guidesMode ?? (policy?.guidesMode === 'all' ? 'all' : 'assigned') }
     if (policy) {
-      if (policy.mode !== next.mode || policy.role !== next.role || policy.catalogVisibility !== next.catalogVisibility || policy.trainerMode !== next.trainerMode) await req.payload.update({ collection: 'learning-access-policies', id: policy.id, data: next, overrideAccess: true, req })
+      if (policy.mode !== next.mode || policy.role !== next.role || policy.catalogVisibility !== next.catalogVisibility || policy.trainerMode !== next.trainerMode || policy.guidesMode !== next.guidesMode) await req.payload.update({ collection: 'learning-access-policies', id: policy.id, data: next, overrideAccess: true, req })
     } else await req.payload.create({ collection: 'learning-access-policies', data: { user: userId, ...next }, overrideAccess: true, req })
   } finally {
     if (previousCapability === undefined) delete req.context.syncLearningAccessPolicy
@@ -40,18 +40,19 @@ export async function persistLearningAccessPolicy(req: PayloadRequest, userId: n
 
 /** Runs even for seeds/skipHooks: notification preferences must never skip policy creation. */
 export const createLearningAccessPolicy: CollectionAfterChangeHook = async ({ doc, operation, req }) => {
-  if (operation === 'create') await persistLearningAccessPolicy(req, doc.id, { mode: doc.learningAccessMode === 'all' ? 'all' : 'assigned', role: doc.role === 'admin' ? 'admin' : 'student', catalogVisibility: doc.learningCatalogVisibility === 'catalog' ? 'catalog' : 'assigned', trainerMode: doc.trainerAccessMode === 'all' || doc.trainerAccessMode === 'disabled' ? doc.trainerAccessMode : 'assigned' })
+  if (operation === 'create') await persistLearningAccessPolicy(req, doc.id, { mode: doc.learningAccessMode === 'all' ? 'all' : 'assigned', role: doc.role === 'admin' ? 'admin' : 'student', catalogVisibility: doc.learningCatalogVisibility === 'catalog' ? 'catalog' : 'assigned', trainerMode: doc.trainerAccessMode === 'all' || doc.trainerAccessMode === 'disabled' ? doc.trainerAccessMode : 'assigned', guidesMode: doc.guidesAccessMode === 'all' ? 'all' : 'assigned' })
   return doc
 }
 
 export const reflectLearningAccessPolicy: CollectionAfterReadHook = async ({ doc, req }) => {
   const id = learningRelationId(doc)
-  if (id !== null && (Object.hasOwn(doc, 'learningAccessMode') || Object.hasOwn(doc, 'role') || Object.hasOwn(doc, 'learningCatalogVisibility') || Object.hasOwn(doc, 'trainerAccessMode'))) {
+  if (id !== null && (Object.hasOwn(doc, 'learningAccessMode') || Object.hasOwn(doc, 'role') || Object.hasOwn(doc, 'learningCatalogVisibility') || Object.hasOwn(doc, 'trainerAccessMode') || Object.hasOwn(doc, 'guidesAccessMode'))) {
     const actual = await getAuthoritativeLearningPolicy(req.payload, id, req)
     if (Object.hasOwn(doc, 'learningAccessMode')) doc.learningAccessMode = actual.mode
     if (Object.hasOwn(doc, 'role')) doc.role = actual.role
     if (Object.hasOwn(doc, 'learningCatalogVisibility')) doc.learningCatalogVisibility = actual.catalogVisibility
     if (Object.hasOwn(doc, 'trainerAccessMode')) doc.trainerAccessMode = actual.trainerMode
+    if (Object.hasOwn(doc, 'guidesAccessMode')) doc.guidesAccessMode = actual.guidesMode
   }
   return doc
 }
@@ -61,5 +62,5 @@ export const normalizeLearningLoginIdentity: CollectionBeforeLoginHook = async (
   if (!current || ('isActive' in current && current.isActive === false) || !('hash' in current) || !('salt' in current) || current.hash !== user.hash || current.salt !== user.salt || !('email' in current) || current.email !== user.email) throw new AuthenticationError(req.t)
   clearAuthoritativeLearningMode(req)
   const actual = await getAuthoritativeLearningPolicy(req.payload, user.id, req)
-  return { ...user, role: actual.role, learningAccessMode: actual.mode, learningCatalogVisibility: actual.catalogVisibility, trainerAccessMode: actual.trainerMode }
+  return { ...user, role: actual.role, learningAccessMode: actual.mode, learningCatalogVisibility: actual.catalogVisibility, trainerAccessMode: actual.trainerMode, guidesAccessMode: actual.guidesMode }
 }

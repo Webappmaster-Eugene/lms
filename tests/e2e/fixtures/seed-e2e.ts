@@ -12,7 +12,7 @@ import { interviewResult, interviewContext } from '../../fixtures/interview-anal
  * `roadmap-nodes` два больших роадмапа с заглушками, и содержимое страниц
  * перестало бы быть фиксированным. Автосид отдельно проверяют интеграционные тесты.
  */
-import { getPayload } from 'payload'
+import { createLocalReq, getPayload } from 'payload'
 import config from '@payload-config'
 import { bootstrapInterviewDirections } from '@/server/interviews/bootstrap'
 
@@ -58,7 +58,7 @@ const created: Record<keyof typeof USERS, number> = { admin: 0, student: 0, lead
 for (const [key, u] of Object.entries(USERS) as [keyof typeof USERS, (typeof USERS)[keyof typeof USERS]][]) {
   const doc = await payload.create({
     collection: 'users',
-    data: { ...u, role: key === 'admin' ? 'admin' : 'student', learningCatalogVisibility: 'catalog', trainerAccessMode: 'all', learningAccessMode: 'all', isActive: true },
+    data: { ...u, role: key === 'admin' ? 'admin' : 'student', learningCatalogVisibility: 'catalog', trainerAccessMode: 'all', learningAccessMode: 'all', guidesAccessMode: key === 'doer' ? 'all' : 'assigned', isActive: true },
     context: { skipHooks: true },
   })
   created[key] = doc.id
@@ -204,9 +204,15 @@ await payload.create({
   },
 })
 
-await payload.create({
+const e2eGuide = await payload.create({
   collection: 'guides',
   data: { title: CONTENT.guide.title, slug: CONTENT.guide.slug, summary: CONTENT.guide.summary, content: guideContent(CONTENT.guide.sections), order: 1, isPublished: true },
+})
+// Гайды выдаются отдельно от курсов: студенту — назначением, doer — режимом «все», у leader доступа нет.
+await payload.create({
+  collection: 'learning-access-grants',
+  req: await createLocalReq({ user: await payload.findByID({ collection: 'users', id: created.admin }) }, payload),
+  data: { user: created.student, target: { relationTo: 'guides', value: e2eGuide.id }, effect: 'allow', ruleKey: `${created.student}:guides:${e2eGuide.id}` },
 })
 await payload.create({
   collection: 'guides',

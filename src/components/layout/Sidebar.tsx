@@ -55,7 +55,7 @@ const NAV_ICONS: Record<PlatformSectionHref, typeof LayoutDashboard> = {
 }
 const NAV_ITEMS = PLATFORM_SECTIONS.map((section) => ({ ...section, icon: NAV_ICONS[section.href] }))
 
-export function Sidebar({ isAdmin = false, trainerEnabled = true }: { isAdmin?: boolean; trainerEnabled?: boolean }) {
+export function Sidebar({ isAdmin = false, trainerEnabled = true, guidesEnabled = false }: { isAdmin?: boolean; trainerEnabled?: boolean; guidesEnabled?: boolean }) {
   const pathname = usePathname()
   const { mobileOpen, setMobileOpen } = useSidebar()
 
@@ -82,7 +82,7 @@ export function Sidebar({ isAdmin = false, trainerEnabled = true }: { isAdmin?: 
 
       {/* Navigation */}
       <nav aria-label="Меню платформы" className={cn('flex-1 overflow-y-auto px-3 py-4', mobile ? 'grid grid-cols-1 gap-2 min-[360px]:grid-cols-2' : 'space-y-1')}>
-        {NAV_ITEMS.filter((item) => trainerEnabled || item.href !== '/trainer').map(({ href, label, hint, icon: Icon }) => {
+        {NAV_ITEMS.filter((item) => (trainerEnabled || item.href !== '/trainer') && (guidesEnabled || item.href !== '/guides')).map(({ href, label, hint, icon: Icon }) => {
           const isActive = href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)
           return (
             <Link

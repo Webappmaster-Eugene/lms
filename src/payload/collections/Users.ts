@@ -104,6 +104,12 @@ export const Users: CollectionConfig = {
       admin: { position: 'sidebar', description: 'Точечные назначения задаются в разделе «Доступ к обучению».' },
     },
     {
+      name: 'guidesAccessMode', type: 'select', defaultValue: () => 'assigned', label: 'Доступ к гайдам',
+      options: [{ label: 'Только назначенные гайды', value: 'assigned' }, { label: 'Все опубликованные гайды', value: 'all' }],
+      access: { create: canAdministerUsers, update: canAdministerUsers },
+      admin: { position: 'sidebar', description: 'Доступ к обучению гайды не открывает. Отдельные гайды назначаются в разделе «Доступ к обучению».' },
+    },
+    {
       name: 'firstName',
       type: 'text',
       required: true,

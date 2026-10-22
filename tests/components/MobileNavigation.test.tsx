@@ -104,7 +104,7 @@ describe('мобильные панели', () => {
   })
 
   it('«Ещё» открывает отдельное модальное меню и закрывает его при переходе', async () => {
-    render(<SidebarProvider><Sidebar /><BottomNav /></SidebarProvider>)
+    render(<SidebarProvider><Sidebar guidesEnabled /><BottomNav /></SidebarProvider>)
     const more = screen.getByRole('button', { name: 'Ещё' })
     expect(more).toHaveAttribute('aria-expanded', 'false')
     await userEvent.click(more)

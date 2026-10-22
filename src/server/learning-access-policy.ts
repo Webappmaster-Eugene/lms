@@ -1,8 +1,10 @@
 import type { Payload, PayloadRequest } from 'payload'
 
+import type { GuidesAccessMode } from '@/lib/guide-access'
+
 export type LearningAccessMode = 'all' | 'assigned'
 export type LearningAccessRole = 'admin' | 'student'
-export type AuthoritativeLearningPolicy = { mode: LearningAccessMode; role: LearningAccessRole; catalogVisibility: 'catalog' | 'assigned'; trainerMode: 'all' | 'assigned' | 'disabled' }
+export type AuthoritativeLearningPolicy = { mode: LearningAccessMode; role: LearningAccessRole; catalogVisibility: 'catalog' | 'assigned'; trainerMode: 'all' | 'assigned' | 'disabled'; guidesMode: GuidesAccessMode }
 const modes = new WeakMap<PayloadRequest, Map<number, Promise<AuthoritativeLearningPolicy>>>()
 
 export function clearAuthoritativeLearningMode(req: PayloadRequest): void {
@@ -12,12 +14,12 @@ export function clearAuthoritativeLearningMode(req: PayloadRequest): void {
 /** Auth SDK rewrites whole users rows; this separate policy row is the authority. */
 export async function getAuthoritativeLearningPolicy(payload: Payload, userId: number, req?: Partial<PayloadRequest>): Promise<AuthoritativeLearningPolicy> {
   const load = async (): Promise<AuthoritativeLearningPolicy> => {
-    const policies = await payload.find({ collection: 'learning-access-policies', where: { user: { equals: userId } }, select: { mode: true, role: true, catalogVisibility: true, trainerMode: true }, depth: 0, limit: 1, overrideAccess: true, req })
+    const policies = await payload.find({ collection: 'learning-access-policies', where: { user: { equals: userId } }, select: { mode: true, role: true, catalogVisibility: true, trainerMode: true, guidesMode: true }, depth: 0, limit: 1, overrideAccess: true, req })
     const policy = policies.docs[0]
-    if (policy) return { mode: policy.mode === 'all' ? 'all' : 'assigned', role: policy.role === 'admin' ? 'admin' : 'student', catalogVisibility: policy.catalogVisibility === 'assigned' ? 'assigned' : 'catalog', trainerMode: policy.trainerMode === 'assigned' || policy.trainerMode === 'disabled' ? policy.trainerMode : 'all' }
+    if (policy) return { mode: policy.mode === 'all' ? 'all' : 'assigned', role: policy.role === 'admin' ? 'admin' : 'student', catalogVisibility: policy.catalogVisibility === 'assigned' ? 'assigned' : 'catalog', trainerMode: policy.trainerMode === 'assigned' || policy.trainerMode === 'disabled' ? policy.trainerMode : 'all', guidesMode: policy.guidesMode === 'all' ? 'all' : 'assigned' }
     // Compatibility only for pre-migration users without a policy; no Users.afterRead recursion.
     const current = await payload.db.findOne({ collection: 'users', where: { id: { equals: userId } }, req })
-    return { mode: current && 'learningAccessMode' in current && current.learningAccessMode === 'all' ? 'all' : 'assigned', role: current && 'role' in current && current.role === 'admin' ? 'admin' : 'student', catalogVisibility: current && 'learningCatalogVisibility' in current && current.learningCatalogVisibility === 'assigned' ? 'assigned' : 'catalog', trainerMode: current && 'trainerAccessMode' in current && (current.trainerAccessMode === 'assigned' || current.trainerAccessMode === 'disabled') ? current.trainerAccessMode : 'all' }
+    return { mode: current && 'learningAccessMode' in current && current.learningAccessMode === 'all' ? 'all' : 'assigned', role: current && 'role' in current && current.role === 'admin' ? 'admin' : 'student', catalogVisibility: current && 'learningCatalogVisibility' in current && current.learningCatalogVisibility === 'assigned' ? 'assigned' : 'catalog', trainerMode: current && 'trainerAccessMode' in current && (current.trainerAccessMode === 'assigned' || current.trainerAccessMode === 'disabled') ? current.trainerAccessMode : 'all', guidesMode: current && 'guidesAccessMode' in current && current.guidesAccessMode === 'all' ? 'all' : 'assigned' }
   }
   if (!req) return load()
   const request = req as PayloadRequest

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { LearningAccessManager } from '@/components/learning-access/LearningAccessManager'
 import type { AssignmentSnapshot } from '@/components/learning-access/contracts'
 
-const original: AssignmentSnapshot = { userId: 34, student: { id: 34, title: 'Александр Студент' }, mode: 'all', catalogVisibility: 'catalog', trainerMode: 'all', revision: 'a'.repeat(64), rules: [] }
+const original: AssignmentSnapshot = { userId: 34, student: { id: 34, title: 'Александр Студент' }, mode: 'all', catalogVisibility: 'catalog', trainerMode: 'all', guidesMode: 'assigned', revision: 'a'.repeat(64), rules: [] }
 let saved: Record<string, unknown> | null
 let saveError: string | null
 let saveStatus = 409
@@ -16,9 +16,10 @@ const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) 
     if (saveError) return Response.json({ error: saveError }, { status: saveStatus })
     return Response.json({ ...original, ...saved, revision: 'b'.repeat(64) })
   }
-  if (init?.method === 'POST') return Response.json({ courses: [{ id: 1, title: 'Node.js', access: 'full', visible: true }, { id: 2, title: 'React', access: 'closed', visible: false }], hiddenCount: 1, availableCount: 1, totalCount: 2, page: Number(address.searchParams.get('page') ?? 1), hasNextPage: false, trainer: { tasks: [{ id: 90, title: 'Тестовая задача', access: 'open', visible: true }], availableCount: 1, totalCount: 30, page: Number(address.searchParams.get('trainerPage') ?? 1), hasNextPage: Number(address.searchParams.get('trainerPage') ?? 1) === 1 } })
+  if (init?.method === 'POST') return Response.json({ courses: [{ id: 1, title: 'Node.js', access: 'full', visible: true }, { id: 2, title: 'React', access: 'closed', visible: false }], hiddenCount: 1, availableCount: 1, totalCount: 2, page: Number(address.searchParams.get('page') ?? 1), hasNextPage: false, trainer: { tasks: [{ id: 90, title: 'Тестовая задача', access: 'open', visible: true }], availableCount: 1, totalCount: 30, page: Number(address.searchParams.get('trainerPage') ?? 1), hasNextPage: Number(address.searchParams.get('trainerPage') ?? 1) === 1 }, guides: { items: [{ id: 7, title: 'Регистрация и работа в LinkedIn', access: 'closed' }], availableCount: 0, totalCount: 1 } })
   if (address.searchParams.get('kind') === 'students') return Response.json({ docs: [{ id: 34, title: 'Александр (alexander@example.test)' }, { id: 35, title: 'Другой ученик' }], page: 1, hasNextPage: false })
   if (address.searchParams.get('kind') === 'targets' && address.searchParams.get('type') === 'trainer-tasks') return Response.json({ docs: [{ id: 80, title: 'Замыкания: счётчик' }], page: 1, hasNextPage: false })
+  if (address.searchParams.get('kind') === 'targets' && address.searchParams.get('type') === 'guides') return Response.json({ docs: [{ id: 7, title: 'Регистрация и работа в LinkedIn', published: true }], page: 1, hasNextPage: false })
   if (address.searchParams.get('kind') === 'targets' && address.searchParams.get('type') === 'trainer-topics') return Response.json({ docs: [{ id: 81, title: 'Замыкания' }], page: 1, hasNextPage: false })
   if (address.searchParams.get('kind') === 'targets') return Response.json({ docs: [{ id: address.searchParams.get('type') === 'roadmaps' ? 1 : 20, title: address.searchParams.get('type') === 'roadmaps' ? 'Backend Node.js' : 'Курс по Express' }], page: 1, hasNextPage: false })
   return snapshotError ? Response.json(snapshotError, { status: 409 }) : Response.json(original)
@@ -137,8 +138,37 @@ describe('админ назначает обучение', () => {
     await screen.findByRole('alert')
     expect(screen.getByRole('radio', { name: /Только назначенные материалы/ })).toBeChecked()
     await user.click(screen.getByRole('button', { name: 'Отменить изменения' }))
-    expect(screen.getByRole('radio', { name: /Все опубликованные/ })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /Все опубликованные материалы/ })).toBeChecked()
     expect(screen.getByRole('button', { name: 'Сохранить назначения' })).toBeDisabled()
+  })
+
+  it('гайды по умолчанию закрыты: выдаёт отдельный гайд назначением, режим гайдов не меняет', async () => {
+    const user = userEvent.setup()
+    render(<LearningAccessManager initialUserId={34} />)
+    await screen.findByRole('heading', { name: 'Александр Студент' })
+    expect(screen.getByRole('radio', { name: /Только назначенные гайды/ })).toBeChecked()
+    await user.click(screen.getByRole('button', { name: 'Посмотреть доступ по курсам' }))
+    const guides = await screen.findByText('Доступны 0 из 1 опубликованных гайдов.')
+    expect(within(guides.parentElement as HTMLElement).getByText('Закрыт')).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Материал'), 'guides')
+    expect(screen.queryByText(/Ограничить поиск/)).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Открыть' }))
+    await user.click(screen.getByRole('button', { name: 'Сохранить назначения' }))
+    await screen.findByText(/Назначения сохранены/)
+    expect(saved).toMatchObject({ guidesMode: 'assigned', rules: [{ target: { relationTo: 'guides', value: 7 }, effect: 'allow' }] })
+  })
+
+  it('открывает все гайды режимом и возвращает режим отменой', async () => {
+    const user = userEvent.setup()
+    render(<LearningAccessManager initialUserId={34} />)
+    await screen.findByRole('heading', { name: 'Александр Студент' })
+    await user.click(screen.getByRole('radio', { name: /Все опубликованные гайды/ }))
+    await user.click(screen.getByRole('button', { name: 'Отменить изменения' }))
+    expect(screen.getByRole('radio', { name: /Только назначенные гайды/ })).toBeChecked()
+    await user.click(screen.getByRole('radio', { name: /Все опубликованные гайды/ }))
+    await user.click(screen.getByRole('button', { name: 'Сохранить назначения' }))
+    await screen.findByText(/Назначения сохранены/)
+    expect(saved).toMatchObject({ guidesMode: 'all', trainerMode: 'all', rules: [] })
   })
 
   it('после смены типа не позволяет добавить старую цель под новым типом', async () => {

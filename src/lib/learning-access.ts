@@ -1,6 +1,6 @@
 import type { Where } from 'payload'
 
-export const learningTargetCollections = ['roadmaps', 'roadmap-nodes', 'courses', 'sections', 'lessons', 'trainer-topics', 'trainer-tasks'] as const
+export const learningTargetCollections = ['roadmaps', 'roadmap-nodes', 'courses', 'sections', 'lessons', 'trainer-topics', 'trainer-tasks', 'guides'] as const
 export type LearningTargetCollection = (typeof learningTargetCollections)[number]
 export type LearningEffect = 'allow' | 'deny'
 export type LearningAccessUser = { id: number; role?: string | null; learningAccessMode?: 'all' | 'assigned' | null; learningCatalogVisibility?: 'catalog' | 'assigned' | null }

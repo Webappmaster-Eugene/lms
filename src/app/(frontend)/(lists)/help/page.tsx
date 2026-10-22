@@ -7,6 +7,7 @@ import { collectAllPages } from '@/lib/paginate'
 import { PLATFORM_SECTIONS } from '@/lib/platform-sections'
 import { getLearningRequest } from '@/server/learning-request'
 import { getTrainerAccess } from '@/server/trainer-access'
+import { getGuideAccess } from '@/server/guide-access'
 import { readSiteContacts } from '@/lib/site-settings'
 
 export const metadata: Metadata = {
@@ -39,9 +40,10 @@ export default async function HelpPage({ searchParams }: { searchParams: HelpSea
   const draft = errorReportDraft(await searchParams)
   const contacts = await readSiteContacts()
   const { payload, user, req } = await getLearningRequest()
-  // Справка перечисляет те же разделы, что и меню: тренажёр скрыт у тех, кому он не назначен.
+  // Справка перечисляет те же разделы, что и меню: тренажёр и гайды скрыты у тех, кому они не назначены.
   const trainerEnabled = user ? (await getTrainerAccess(payload, user, req)).hasAccess : false
-  const sections = PLATFORM_SECTIONS.filter((section) => trainerEnabled || section.href !== '/trainer')
+  const guidesEnabled = user ? (await getGuideAccess(payload, user, req)).hasAccess : false
+  const sections = PLATFORM_SECTIONS.filter((section) => (trainerEnabled || section.href !== '/trainer') && (guidesEnabled || section.href !== '/guides'))
 
   // Почта открывается на месте: в новой вкладке почтовый клиент оставил бы пустую страницу.
   const channels = [

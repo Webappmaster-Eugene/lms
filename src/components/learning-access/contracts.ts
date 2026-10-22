@@ -12,11 +12,12 @@ export type AssignmentRule = {
 }
 export type CatalogVisibility = 'catalog' | 'assigned'
 export type TrainerMode = 'all' | 'assigned' | 'disabled'
-export type AssignmentInput = { userId: number; mode: 'all' | 'assigned'; catalogVisibility?: CatalogVisibility; trainerMode?: TrainerMode; revision: string; rules: AssignmentRule[] }
-export type AssignmentSnapshot = AssignmentInput & { catalogVisibility: CatalogVisibility; trainerMode: TrainerMode; student: { id: number; title: string } }
+export type GuidesMode = 'all' | 'assigned'
+export type AssignmentInput = { userId: number; mode: 'all' | 'assigned'; catalogVisibility?: CatalogVisibility; trainerMode?: TrainerMode; guidesMode?: GuidesMode; revision: string; rules: AssignmentRule[] }
+export type AssignmentSnapshot = AssignmentInput & { catalogVisibility: CatalogVisibility; trainerMode: TrainerMode; guidesMode: GuidesMode; student: { id: number; title: string } }
 export type AssignmentOption = { id: number; title: string; published?: boolean; parentId?: number | null }
 export type AssignmentOptions = { docs: AssignmentOption[]; page: number; hasNextPage: boolean }
-export type AssignmentPreview = { courses: { id: number; title: string; access: 'full' | 'partial' | 'closed'; visible: boolean }[]; page: number; hasNextPage: boolean; availableCount: number; totalCount: number; hiddenCount: number; trainer: { tasks: { id: number; title: string; access: 'open' | 'closed'; visible: boolean }[]; page: number; hasNextPage: boolean; availableCount: number; totalCount: number } }
+export type AssignmentPreview = { courses: { id: number; title: string; access: 'full' | 'partial' | 'closed'; visible: boolean }[]; page: number; hasNextPage: boolean; availableCount: number; totalCount: number; hiddenCount: number; trainer: { tasks: { id: number; title: string; access: 'open' | 'closed'; visible: boolean }[]; page: number; hasNextPage: boolean; availableCount: number; totalCount: number }; guides: { items: { id: number; title: string; access: 'open' | 'closed' }[]; availableCount: number; totalCount: number } }
 
 export class AssignmentInputError extends Error {
   constructor(message: string, readonly status = 400, readonly code?: 'orphaned-assignment') { super(message) }
@@ -54,6 +55,7 @@ export function validateAssignmentInput(value: unknown): AssignmentInput {
   if (input.mode !== 'all' && input.mode !== 'assigned') throw new AssignmentInputError('Выберите режим доступа')
   if (input.catalogVisibility !== undefined && input.catalogVisibility !== 'catalog' && input.catalogVisibility !== 'assigned') throw new AssignmentInputError('Выберите видимость каталога')
   if (input.trainerMode !== undefined && input.trainerMode !== 'all' && input.trainerMode !== 'assigned' && input.trainerMode !== 'disabled') throw new AssignmentInputError('Выберите доступ к тренажёру')
+  if (input.guidesMode !== undefined && input.guidesMode !== 'all' && input.guidesMode !== 'assigned') throw new AssignmentInputError('Выберите доступ к гайдам')
   if (typeof input.revision !== 'string' || !/^[a-f0-9]{64}$/.test(input.revision)) throw new AssignmentInputError('Обновите назначения перед сохранением')
   if (!Array.isArray(input.rules) || input.rules.length > maximumLearningRules) throw new AssignmentInputError(`У одного ученика может быть не более ${maximumLearningRules} назначений`)
   const targets = new Set<string>()
@@ -61,7 +63,7 @@ export function validateAssignmentInput(value: unknown): AssignmentInput {
   const rules = input.rules.map((raw): AssignmentRule => {
     const rule = object(raw)
     const target = object(rule.target)
-    if (typeof target.relationTo !== 'string' || !learningTargetCollections.includes(target.relationTo as LearningTargetCollection)) throw new AssignmentInputError('Выберите учебный материал или задачу тренажёра')
+    if (typeof target.relationTo !== 'string' || !learningTargetCollections.includes(target.relationTo as LearningTargetCollection)) throw new AssignmentInputError('Выберите учебный материал, задачу тренажёра или гайд')
     const value = assignmentId(target.value)
     const key = `${target.relationTo}:${value}`
     if (targets.has(key)) throw new AssignmentInputError('Для материала уже есть назначение. Измените существующее правило')
@@ -76,5 +78,5 @@ export function validateAssignmentInput(value: unknown): AssignmentInput {
     if (id !== undefined) ids.add(id)
     return { id, target: { relationTo: target.relationTo as LearningTargetCollection, value }, effect: rule.effect, startsAt, expiresAt, note: typeof rule.note === 'string' ? rule.note.trim() : '' }
   })
-  return { userId, mode: input.mode, revision: input.revision, rules, ...(input.catalogVisibility === undefined ? {} : { catalogVisibility: input.catalogVisibility }), ...(input.trainerMode === undefined ? {} : { trainerMode: input.trainerMode }) }
+  return { userId, mode: input.mode, revision: input.revision, rules, ...(input.catalogVisibility === undefined ? {} : { catalogVisibility: input.catalogVisibility }), ...(input.trainerMode === undefined ? {} : { trainerMode: input.trainerMode }), ...(input.guidesMode === undefined ? {} : { guidesMode: input.guidesMode }) }
 }

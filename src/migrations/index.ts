@@ -27,6 +27,7 @@ import * as migration_20261011_074547_checkfrod_interview_integration from './20
 import * as migration_20261012_170329_slides_block from './20261012_170329_slides_block';
 import * as migration_20261020_195554_email_broadcasts from './20261020_195554_email_broadcasts';
 import * as migration_20261022_093223_guides from './20261022_093223_guides';
+import * as migration_20261022_131120_guides_access from './20261022_131120_guides_access';
 
 export const migrations = [
   {
@@ -172,6 +173,11 @@ export const migrations = [
   {
     up: migration_20261022_093223_guides.up,
     down: migration_20261022_093223_guides.down,
-    name: '20261022_093223_guides'
+    name: '20261022_093223_guides',
+  },
+  {
+    up: migration_20261022_131120_guides_access.up,
+    down: migration_20261022_131120_guides_access.down,
+    name: '20261022_131120_guides_access'
   },
 ];

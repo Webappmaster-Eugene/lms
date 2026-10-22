@@ -21,6 +21,8 @@ export const LearningAccessPolicies: CollectionConfig = {
     { name: 'mode', type: 'select', required: true, options: ['all', 'assigned'], label: 'Режим доступа' },
     { name: 'catalogVisibility', type: 'select', options: ['catalog', 'assigned'], label: 'Видимость каталога' },
     { name: 'trainerMode', type: 'select', options: ['all', 'assigned', 'disabled'], label: 'Доступ к тренажёру' },
+    // Пустое значение у политик до появления гайдов читается как 'assigned': без назначения гайды закрыты.
+    { name: 'guidesMode', type: 'select', options: ['all', 'assigned'], label: 'Доступ к гайдам' },
     { name: 'role', type: 'select', required: true, options: ['admin', 'student'], label: 'Роль аккаунта' },
   ],
 }

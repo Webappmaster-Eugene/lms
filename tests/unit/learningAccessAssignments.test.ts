@@ -8,6 +8,7 @@ describe('проверка назначения обучения', () => {
   it('оставляет опущенные настройки неопределёнными для совместимого сохранения', () => {
     expect(validateAssignmentInput(input)).not.toHaveProperty('catalogVisibility')
     expect(validateAssignmentInput(input)).not.toHaveProperty('trainerMode')
+    expect(validateAssignmentInput(input)).not.toHaveProperty('guidesMode')
   })
   it.each(['catalog', 'assigned'])('принимает видимость %s', (catalogVisibility) => {
     expect(validateAssignmentInput({ ...input, catalogVisibility })).toMatchObject({ catalogVisibility })
@@ -15,11 +16,15 @@ describe('проверка назначения обучения', () => {
   it.each(['all', 'assigned', 'disabled'])('принимает режим тренажёра %s', (trainerMode) => {
     expect(validateAssignmentInput({ ...input, trainerMode })).toMatchObject({ trainerMode })
   })
+  it.each(['all', 'assigned'])('принимает режим гайдов %s', (guidesMode) => {
+    expect(validateAssignmentInput({ ...input, guidesMode })).toMatchObject({ guidesMode })
+  })
   it.each([null, '', 'hidden', true, {}, ['assigned']])('отвергает невалидные настройки %s', (value) => {
     expect(() => validateAssignmentInput({ ...input, catalogVisibility: value })).toThrow('видимость')
     expect(() => validateAssignmentInput({ ...input, trainerMode: value })).toThrow('тренажёру')
+    expect(() => validateAssignmentInput({ ...input, guidesMode: value })).toThrow('гайдам')
   })
-  it.each(['trainer-topics', 'trainer-tasks'])('принимает назначение %s', (relationTo) => {
+  it.each(['trainer-topics', 'trainer-tasks', 'guides'])('принимает назначение %s', (relationTo) => {
     expect(validateAssignmentInput({ ...input, rules: [{ ...rule, target: { relationTo, value: 9 } }] }).rules[0].target).toEqual({ relationTo, value: 9 })
   })
 

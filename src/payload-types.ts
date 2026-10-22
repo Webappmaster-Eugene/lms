@@ -219,6 +219,10 @@ export interface User {
    * Точечные назначения задаются в разделе «Доступ к обучению».
    */
   trainerAccessMode?: ('assigned' | 'all' | 'disabled') | null;
+  /**
+   * Доступ к обучению гайды не открывает. Отдельные гайды назначаются в разделе «Доступ к обучению».
+   */
+  guidesAccessMode?: ('assigned' | 'all') | null;
   firstName: string;
   lastName: string;
   role: 'admin' | 'student';
@@ -703,6 +707,10 @@ export interface LearningAccessGrant {
     | {
         relationTo: 'trainer-tasks';
         value: number | TrainerTask;
+      }
+    | {
+        relationTo: 'guides';
+        value: number | Guide;
       };
   effect: 'allow' | 'deny';
   startsAt?: string | null;
@@ -1065,6 +1073,7 @@ export interface LearningAccessPolicy {
   mode: 'all' | 'assigned';
   catalogVisibility?: ('catalog' | 'assigned') | null;
   trainerMode?: ('all' | 'assigned' | 'disabled') | null;
+  guidesMode?: ('all' | 'assigned') | null;
   role: 'admin' | 'student';
   updatedAt: string;
   createdAt: string;
@@ -1823,6 +1832,7 @@ export interface UsersSelect<T extends boolean = true> {
   learningAccessMode?: T;
   learningCatalogVisibility?: T;
   trainerAccessMode?: T;
+  guidesAccessMode?: T;
   firstName?: T;
   lastName?: T;
   role?: T;
@@ -2174,6 +2184,7 @@ export interface LearningAccessPoliciesSelect<T extends boolean = true> {
   mode?: T;
   catalogVisibility?: T;
   trainerMode?: T;
+  guidesMode?: T;
   role?: T;
   updatedAt?: T;
   createdAt?: T;

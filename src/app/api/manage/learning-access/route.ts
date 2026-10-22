@@ -6,6 +6,7 @@ import config from '@payload-config'
 import { AssignmentInputError, assignmentId, storedAssignmentTarget, validateAssignmentInput, type AssignmentInput, type AssignmentRule, type AssignmentSnapshot } from '@/components/learning-access/contracts'
 import { buildLearningAccess, learningGrantIsActive, learningRelationId, learningTargetCollections, type LearningTargetCollection } from '@/lib/learning-access'
 import { buildTrainerAccess } from '@/lib/trainer-access'
+import { buildGuideAccess, type GuidesAccessMode } from '@/lib/guide-access'
 import { collectAllPages } from '@/lib/paginate'
 import { lockLearningAccess } from '@/payload/hooks/learningAccessLock'
 
@@ -50,20 +51,21 @@ function queryPage(raw: string | null): number {
   return page
 }
 
-function revision(userId: number, mode: 'all' | 'assigned', catalogVisibility: 'catalog' | 'assigned', trainerMode: 'all' | 'assigned' | 'disabled', updatedAt: string, rules: AssignmentRule[]) {
+function revision(userId: number, mode: 'all' | 'assigned', catalogVisibility: 'catalog' | 'assigned', trainerMode: 'all' | 'assigned' | 'disabled', guidesMode: GuidesAccessMode, updatedAt: string, rules: AssignmentRule[]) {
   const stable = rules.map(({ id, target, effect, startsAt, expiresAt, note }) => ({ id, target, effect, startsAt, expiresAt, note })).sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
-  return createHash('sha256').update(JSON.stringify({ userId, mode, catalogVisibility, trainerMode, updatedAt, rules: stable })).digest('hex')
+  return createHash('sha256').update(JSON.stringify({ userId, mode, catalogVisibility, trainerMode, guidesMode, updatedAt, rules: stable })).digest('hex')
 }
 
 async function snapshot(payload: Payload, userId: number, req: PayloadRequest): Promise<AssignmentSnapshot> {
-  const student = await payload.findByID({ collection: 'users', id: userId, depth: 0, select: { firstName: true, lastName: true, role: true, learningAccessMode: true, learningCatalogVisibility: true, trainerAccessMode: true, updatedAt: true }, overrideAccess: false, req })
+  const student = await payload.findByID({ collection: 'users', id: userId, depth: 0, select: { firstName: true, lastName: true, role: true, learningAccessMode: true, learningCatalogVisibility: true, trainerAccessMode: true, guidesAccessMode: true, updatedAt: true }, overrideAccess: false, req })
   if (student.role !== 'student') throw new AssignmentInputError('Назначения доступны для аккаунтов учеников', 400)
   const grants = await collectAllPages(({ page, limit }) => payload.find({ collection: 'learning-access-grants', where: { user: { equals: userId } }, page, limit, sort: 'id', depth: 0, overrideAccess: false, req }), { label: 'Назначения ученика' })
   const rules: AssignmentRule[] = grants.map((grant) => ({ id: grant.id, target: storedAssignmentTarget(grant.target, grant.id), effect: grant.effect, startsAt: grant.startsAt ?? null, expiresAt: grant.expiresAt ?? null, note: grant.note ?? '' }))
   const mode = student.learningAccessMode === 'all' ? 'all' : 'assigned'
   const catalogVisibility = student.learningCatalogVisibility === 'assigned' ? 'assigned' : 'catalog'
   const trainerMode = student.trainerAccessMode === 'assigned' || student.trainerAccessMode === 'disabled' ? student.trainerAccessMode : 'all'
-  return { userId, mode, catalogVisibility, trainerMode, revision: revision(userId, mode, catalogVisibility, trainerMode, student.updatedAt, rules), rules, student: { id: student.id, title: `${student.firstName} ${student.lastName}` } }
+  const guidesMode = student.guidesAccessMode === 'all' ? 'all' : 'assigned'
+  return { userId, mode, catalogVisibility, trainerMode, guidesMode, revision: revision(userId, mode, catalogVisibility, trainerMode, guidesMode, student.updatedAt, rules), rules, student: { id: student.id, title: `${student.firstName} ${student.lastName}` } }
 }
 
 async function ruleTitles(payload: Payload, rules: AssignmentRule[], req: PayloadRequest) {
@@ -111,17 +113,18 @@ async function readInput(request: Request) {
 }
 
 async function preview(payload: Payload, input: AssignmentInput, req: PayloadRequest, page: number, trainerPage: number) {
-  const [courses, sections, roadmaps, nodes, trainerTopics, trainerTasks] = await Promise.all([
+  const [courses, sections, roadmaps, nodes, trainerTopics, trainerTasks, guides] = await Promise.all([
     collectAllPages(({ page, limit }) => payload.find({ collection: 'courses', page, limit, sort: 'id', depth: 0, select: { title: true, roadmap: true, roadmapNode: true, isPublished: true }, overrideAccess: false, req })),
     collectAllPages(({ page, limit }) => payload.find({ collection: 'sections', page, limit, sort: 'id', depth: 0, select: { course: true, isPublished: true }, overrideAccess: false, req })),
     collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmaps', page, limit, sort: 'id', depth: 0, select: { isPublished: true }, overrideAccess: false, req })),
     collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmap-nodes', page, limit, sort: 'id', depth: 0, select: { roadmap: true, course: true }, overrideAccess: false, req })),
     collectAllPages(({ page, limit }) => payload.find({ collection: 'trainer-topics', page, limit, sort: 'id', depth: 0, select: { title: true, isPublished: true }, overrideAccess: false, req })),
     collectAllPages(({ page, limit }) => payload.find({ collection: 'trainer-tasks', page, limit, sort: 'id', depth: 0, select: { title: true, topic: true, isPublished: true }, overrideAccess: false, req })),
+    collectAllPages(({ page, limit }) => payload.find({ collection: 'guides', page, limit, sort: ['order', 'id'], depth: 0, select: { title: true, isPublished: true }, overrideAccess: false, req })),
   ])
   const lessonIds = input.rules.filter((rule) => rule.target.relationTo === 'lessons').map((rule) => rule.target.value)
   const lessons = lessonIds.length ? await collectAllPages(({ page, limit }) => payload.find({ collection: 'lessons', where: { id: { in: lessonIds } }, page, limit, sort: 'id', depth: 0, select: { course: true, section: true, isPublished: true }, overrideAccess: false, req })) : []
-  const user = { id: input.userId, role: 'student', learningAccessMode: input.mode, learningCatalogVisibility: input.catalogVisibility, trainerAccessMode: input.trainerMode }
+  const user = { id: input.userId, role: 'student', learningAccessMode: input.mode, learningCatalogVisibility: input.catalogVisibility, trainerAccessMode: input.trainerMode, guidesAccessMode: input.guidesMode }
   const metadata = { courses, sections, roadmaps, nodes, lessons }
   const now = Date.now()
   const policy = buildLearningAccess(user, input.rules, metadata, now)
@@ -140,10 +143,12 @@ async function preview(payload: Payload, input: AssignmentInput, req: PayloadReq
   const trainerPolicy = buildTrainerAccess(user, input.rules, { topics: trainerTopics, tasks: trainerTasks }, now)
   const liveTopics = new Set(trainerTopics.filter((topic) => topic.isPublished).map((topic) => topic.id))
   const publishedTasks = trainerTasks.filter((task) => task.isPublished && liveTopics.has(learningRelationId(task.topic) ?? -1))
+  const guidePolicy = buildGuideAccess(user, input.rules, guides, now)
+  const publishedGuides = guides.filter((guide) => guide.isPublished)
   const docs = visible.slice((page - 1) * pageSize, page * pageSize).map((course) => {
     return { id: course.id, title: course.title, visible: policy.canBrowseCourse(course.id), access: !policy.canAccessCourse(course.id) ? 'closed' : base.canAccessCourse(course.id) && !deniedDescendants.has(course.id) ? 'full' : 'partial' }
   })
-  return { courses: docs, page, hasNextPage: page * pageSize < visible.length, availableCount: visible.filter((course) => policy.canAccessCourse(course.id)).length, totalCount: visible.length, hiddenCount: visible.filter((course) => !policy.canBrowseCourse(course.id)).length, trainer: { tasks: publishedTasks.slice((trainerPage - 1) * pageSize, trainerPage * pageSize).map((task) => ({ id: task.id, title: task.title, visible: trainerPolicy.canBrowseTask(task.id), access: trainerPolicy.canAccessTask(task.id) ? 'open' : 'closed' })), page: trainerPage, hasNextPage: trainerPage * pageSize < publishedTasks.length, availableCount: trainerPolicy.accessibleTaskIds.length, totalCount: publishedTasks.length } }
+  return { courses: docs, page, hasNextPage: page * pageSize < visible.length, availableCount: visible.filter((course) => policy.canAccessCourse(course.id)).length, totalCount: visible.length, hiddenCount: visible.filter((course) => !policy.canBrowseCourse(course.id)).length, trainer: { tasks: publishedTasks.slice((trainerPage - 1) * pageSize, trainerPage * pageSize).map((task) => ({ id: task.id, title: task.title, visible: trainerPolicy.canBrowseTask(task.id), access: trainerPolicy.canAccessTask(task.id) ? 'open' : 'closed' })), page: trainerPage, hasNextPage: trainerPage * pageSize < publishedTasks.length, availableCount: trainerPolicy.accessibleTaskIds.length, totalCount: publishedTasks.length }, guides: { items: publishedGuides.map((guide) => ({ id: guide.id, title: guide.title, access: guidePolicy.canAccessGuide(guide.id) ? 'open' : 'closed' })), availableCount: guidePolicy.accessibleGuideIds.length, totalCount: publishedGuides.length } }
 }
 
 function failure(error: unknown) {
@@ -210,6 +215,7 @@ async function mutate(request: Request, save: boolean) {
     if (current.revision !== input.revision) throw new AssignmentInputError('Другой администратор уже изменил назначения. Обновите данные перед сохранением', 409)
     input.catalogVisibility ??= current.catalogVisibility
     input.trainerMode ??= current.trainerMode
+    input.guidesMode ??= current.guidesMode
     const currentById = new Map(current.rules.map((rule) => [rule.id, rule]))
     for (const rule of input.rules) {
       if (rule.id !== undefined && !currentById.has(rule.id)) throw new AssignmentInputError('Назначение не принадлежит выбранному ученику', 403)
@@ -230,7 +236,7 @@ async function mutate(request: Request, save: boolean) {
         if (original.effect !== rule.effect || original.startsAt !== rule.startsAt || original.expiresAt !== rule.expiresAt || original.note !== rule.note) await payload.update({ collection: 'learning-access-grants', id: rule.id, data, overrideAccess: false, req })
       } else await payload.create({ collection: 'learning-access-grants', data: { ...data, ruleKey: `${input.userId}:${rule.target.relationTo}:${rule.target.value}` }, overrideAccess: false, req })
     }
-    if (current.mode !== input.mode || current.catalogVisibility !== input.catalogVisibility || current.trainerMode !== input.trainerMode) await payload.update({ collection: 'users', id: input.userId, data: { learningAccessMode: input.mode, learningCatalogVisibility: input.catalogVisibility, trainerAccessMode: input.trainerMode }, overrideAccess: false, req })
+    if (current.mode !== input.mode || current.catalogVisibility !== input.catalogVisibility || current.trainerMode !== input.trainerMode || current.guidesMode !== input.guidesMode) await payload.update({ collection: 'users', id: input.userId, data: { learningAccessMode: input.mode, learningCatalogVisibility: input.catalogVisibility, trainerAccessMode: input.trainerMode, guidesAccessMode: input.guidesMode }, overrideAccess: false, req })
     const next = await snapshot(payload, input.userId, req)
     const rules = await ruleTitles(payload, next.rules, req)
     await commitTransaction(req)

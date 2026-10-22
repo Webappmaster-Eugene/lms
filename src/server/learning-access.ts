@@ -2,6 +2,7 @@ import { APIError, type Access, type Payload, type PayloadRequest } from 'payloa
 
 import { getLearningCatalog } from '@/server/learning-catalog'
 import { invalidateTrainerAccess } from '@/server/trainer-access'
+import { invalidateGuideAccess } from '@/server/guide-access'
 import { collectAllPages } from '@/lib/paginate'
 import { recordLearningAccess, withLearningSpan } from '@/lib/learning-observability'
 import { clearAuthoritativeLearningMode, getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
@@ -26,6 +27,7 @@ export function invalidateLearningAccess(req: PayloadRequest) {
   requestUsers.delete(req)
   clearAuthoritativeLearningMode(req)
   invalidateTrainerAccess(req)
+  invalidateGuideAccess(req)
 }
 
 /** A partial producer DTO must not turn a missing mode into unrestricted access. */

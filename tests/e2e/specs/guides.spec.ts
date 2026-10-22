@@ -4,7 +4,8 @@ import { CONTENT, NOT_FOUND_HEADING } from '../fixtures/data'
 import { storageStateOf } from '../fixtures/env'
 
 /**
- * Раздел «Гайды»: список, оглавление гайда и видимость черновиков.
+ * Раздел «Гайды»: список, оглавление, черновики и выборочный доступ. По сиду гайд студенту
+ * назначен отдельно, а у leader доступа к гайдам нет при открытых курсах.
  */
 test.describe('ученик', () => {
   test.use({ storageState: storageStateOf('student') })
@@ -35,6 +36,23 @@ test.describe('ученик', () => {
     const response = await page.goto(`/guides/${CONTENT.draftGuide.slug}`)
     expect(response?.status()).toBe(404)
     await expect(page.getByRole('heading', { name: NOT_FOUND_HEADING })).toBeVisible()
+  })
+})
+
+test.describe('ученик без назначенных гайдов', () => {
+  test.use({ storageState: storageStateOf('leader') })
+
+  test('не видит раздела в меню, список объясняет, где взять доступ, прямая ссылка — 404', async ({ page }) => {
+    await page.goto('/courses')
+    await expect(page.locator('aside').last().getByRole('link', { name: 'Курсы', exact: true })).toBeVisible()
+    await expect(page.locator('aside').last().getByRole('link', { name: 'Гайды', exact: true })).toHaveCount(0)
+
+    await page.goto('/guides')
+    await expect(page.getByText('Вам пока не открыт ни один гайд')).toBeVisible()
+    await expect(page.getByRole('link', { name: new RegExp(CONTENT.guide.title) })).toHaveCount(0)
+
+    const response = await page.goto(`/guides/${CONTENT.guide.slug}`)
+    expect(response?.status()).toBe(404)
   })
 })
 

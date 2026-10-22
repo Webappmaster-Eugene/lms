@@ -15,7 +15,7 @@ export default async function GuidesPage() {
   const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login?redirect=%2Fguides')
 
-  // Отбор публикации делает access: ученик получает опубликованное, админ — ещё и черновики для проверки.
+  // Отбор делает access: ученик получает назначенные ему опубликованные гайды, админ — все, включая черновики.
   const guides = await collectAllPages(
     ({ page, limit }) =>
       payload.find({
@@ -42,7 +42,13 @@ export default async function GuidesPage() {
       </div>
 
       {guides.length === 0 ? (
-        <p className="rounded-xl border border-border bg-card px-5 py-12 text-center text-muted-foreground">Гайдов пока нет — скоро появятся первые</p>
+        <div className="rounded-xl border border-border bg-card px-5 py-12 text-center text-muted-foreground">
+          {user.role === 'admin' ? (
+            <p>Гайдов пока нет. Создайте первый в CMS — раздел «Гайды»</p>
+          ) : (
+            <p>Вам пока не открыт ни один гайд. Гайды выдаёт ментор — если нужен конкретный, напишите в разделе <Link href="/help#support" className="font-medium text-primary underline-offset-2 hover:underline">«Помощь»</Link></p>
+          )}
+        </div>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2">
           {guides.map((guide) => (

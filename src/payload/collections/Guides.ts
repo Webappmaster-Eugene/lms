@@ -1,12 +1,13 @@
 import type { CollectionConfig } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
-import { isPublishedOrAdmin } from '@/payload/access/isPublishedOrAdmin'
 import { generateSlug } from '@/payload/hooks/generateSlug'
+import { cleanupLearningTargetGrants } from '@/payload/hooks/learningAccessCleanup'
+import { guideReadAccess } from '@/server/guide-access'
 
 /**
- * Самостоятельные инструкции вне программы курсов: открыты каждому вошедшему ученику,
- * не требуют назначения обучения и не дают баллов.
+ * Самостоятельные инструкции вне программы курсов, баллов не дают. Доступ к обучению их
+ * не открывает: ученик видит гайд только по отдельному назначению или режиму «все гайды».
  */
 export const Guides: CollectionConfig = {
   slug: 'guides',
@@ -21,12 +22,13 @@ export const Guides: CollectionConfig = {
   },
   access: {
     create: isAdmin,
-    read: isPublishedOrAdmin,
+    read: guideReadAccess,
     update: isAdmin,
     delete: isAdmin,
   },
   hooks: {
     beforeValidate: [generateSlug],
+    beforeDelete: [cleanupLearningTargetGrants('guides')],
   },
   fields: [
     {

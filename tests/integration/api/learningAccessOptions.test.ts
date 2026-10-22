@@ -11,6 +11,7 @@ let adminToken: string
 let studentToken: string
 let topicId: number
 let taskId: number
+let guideId: number
 
 function request(method: 'GET' | 'POST' | 'PUT', data?: unknown, token = adminToken, query = `user=${student.id}`) {
   return new Request(`http://lms.test/api/manage/learning-access?${query}`, { method, headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) })
@@ -26,6 +27,8 @@ beforeAll(async () => {
   topicId = topic.id
   const task = await payload.create({ collection: 'trainer-tasks', data: { title: 'Закрытый стартовый код', slug: `assignment-task-${Date.now()}`, topic: topicId, starterCode: 'PRIVATE_STARTER', difficulty: 'easy', languages: ['js'], checkMode: 'stdout', expectedOutput: 'PRIVATE_OUTPUT', isPublished: true } })
   taskId = task.id
+  const guide = await payload.create({ collection: 'guides', data: { title: 'Гайд для назначения', slug: `assignment-guide-${Date.now()}`, summary: 'Кратко', content: { root: { type: 'root', direction: 'ltr', format: '', indent: 0, version: 1, children: [{ type: 'paragraph', version: 1, children: [{ type: 'text', version: 1, text: 'Текст' }] }] } }, isPublished: true } })
+  guideId = guide.id
 })
 beforeEach(async () => {
   student = await createStudent(payload)
@@ -84,6 +87,26 @@ describe('персональная видимость и тренажёр: ад�
     const denied = await POST(request('POST', { ...original, trainerMode: 'assigned', rules: [...rules, { ...rules[0], target: { relationTo: 'trainer-tasks', value: taskId }, effect: 'deny' }] }))
     expect((await denied.json() as AssignmentPreview).trainer.availableCount).toBe(preview.trainer.availableCount - 1)
     expect((await current()).revision).toBe(original.revision)
+  })
+
+  it('гайды: по умолчанию закрыты, назначение и режим сохраняются, старая ревизия отклоняется', async () => {
+    const original = await current()
+    expect(original.guidesMode).toBe('assigned')
+    const rules = [{ target: { relationTo: 'guides', value: guideId }, effect: 'allow', startsAt: null, expiresAt: null, note: '' }]
+    const closed = await (await POST(request('POST', original))).json() as AssignmentPreview
+    expect(closed.guides.items.find((item) => item.id === guideId)?.access).toBe('closed')
+    const opened = await (await POST(request('POST', { ...original, rules }))).json() as AssignmentPreview
+    expect(opened.guides.items.find((item) => item.id === guideId)?.access).toBe('open')
+    const saved = await PUT(request('PUT', { ...original, rules }))
+    expect(saved.status).toBe(200)
+    const assigned = await saved.json() as AssignmentSnapshot
+    expect(assigned).toMatchObject({ guidesMode: 'assigned', rules: [{ target: { relationTo: 'guides', value: guideId }, effect: 'allow', title: 'Гайд для назначения' }] })
+    expect((await rest('GET', `/guides/${guideId}`, { token: studentToken })).status).toBe(200)
+    expect((await PUT(request('PUT', { ...original, guidesMode: 'all' }))).status).toBe(409)
+    const all = await PUT(request('PUT', { ...assigned, guidesMode: 'all', rules: [] }))
+    expect(await all.json()).toMatchObject({ guidesMode: 'all', rules: [] })
+    expect((await rest('GET', `/guides/${guideId}`, { token: studentToken })).status).toBe(200)
+    expect((await PUT(request('PUT', { ...(await current()), guidesMode: 'assigned' }, studentToken))).status).toBe(403)
   })
 
   it('ошибка сохранения пользователя откатывает назначения и обе настройки', async () => {
