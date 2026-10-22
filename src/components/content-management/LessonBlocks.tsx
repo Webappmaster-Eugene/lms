@@ -12,11 +12,14 @@ import { freshSlides, SlidesEditor } from '@/components/content-management/Slide
 
 type Blocks = NonNullable<Lesson['content']>
 type Block = Blocks[number]
-const names: Record<Block['blockType'], string> = { text: 'Текст', video: 'Видео', image: 'Изображение', link: 'Ссылка', miro: 'Miro-доска', file: 'Файл', slides: 'Презентация' }
+type AddableType = Exclude<Block['blockType'], 'markdown'>
+const addable: Record<AddableType, string> = { text: 'Текст', video: 'Видео', image: 'Изображение', link: 'Ссылка', miro: 'Miro-доска', file: 'Файл', slides: 'Презентация' }
+// Текст из репозитория приходит только импортом: добавить его здесь нельзя.
+const names: Record<Block['blockType'], string> = { ...addable, markdown: 'Текст из репозитория' }
 const fieldClass = 'mt-1 min-h-[44px] w-full rounded border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50'
 const buttonClass = 'inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded border px-3 py-2 text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50'
 
-function freshBlock(type: Block['blockType']): Block {
+function freshBlock(type: AddableType): Block {
   const id = contentKey()
   switch (type) {
     case 'text': return { id, blockType: type, content: emptyRichText() }
@@ -106,8 +109,9 @@ export function LessonBlocks({ value, onChange, disabled = false }: { value: Blo
           <Description value={block.description} disabled={disabled} onChange={(description) => update(index, { description })} />
         </>}
         {block.blockType === 'slides' && <SlidesEditor id={id} block={block} disabled={disabled} onChange={(patch) => update(index, patch)} />}
+        {block.blockType === 'markdown' && <p className="text-sm text-muted-foreground">Текст правится в Git-репозитории и приходит импортом{block.source ? ` (${block.source})` : ''}. Здесь его можно переставить или удалить, но не изменить.</p>}
       </article>
     })}
-    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Добавить материал"><p className="mr-1 text-sm font-medium">Добавить материал:</p>{(Object.keys(names) as Block['blockType'][]).map((type) => <button key={type} type="button" className={buttonClass} disabled={disabled} onClick={() => onChange([...value, freshBlock(type)])}>{names[type]}</button>)}</div>
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Добавить материал"><p className="mr-1 text-sm font-medium">Добавить материал:</p>{(Object.keys(addable) as AddableType[]).map((type) => <button key={type} type="button" className={buttonClass} disabled={disabled} onClick={() => onChange([...value, freshBlock(type)])}>{addable[type]}</button>)}</div>
   </section>
 }

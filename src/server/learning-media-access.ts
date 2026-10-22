@@ -91,7 +91,7 @@ async function readableMediaWhere(payload: Payload, req: PayloadRequest, filenam
       join lessons l on l.id = b._parent_id and coalesce(l.media_references_resolved, false) = false
       union
       select a.media_id, null::integer, true
-      from aliases a join courses c on c.cover_image_id = a.media_id and c.is_published = true
+      from aliases a join courses c on c.cover_image_id = a.media_id and c.is_published = true and coalesce(c.assigned_only, false) = false
       join roadmaps r on r.id = c.roadmap_id and r.is_published = true
       left join roadmap_nodes n on n.id = c.roadmap_node_id
       where a.raster and (c.roadmap_node_id is null or n.roadmap_id = c.roadmap_id)

@@ -406,6 +406,10 @@ export interface Course {
   roadmapNode?: (number | null) | RoadmapNode;
   order?: number | null;
   isPublished?: boolean | null;
+  /**
+   * Открывается только назначением на курс, его тему, раздел или урок. Режим «все опубликованные курсы» и доступ ко всей карте его не открывают, каталог не показывает.
+   */
+  assignedOnly?: boolean | null;
   estimatedHours?: number | null;
   /**
    * Курсы, которые нужно завершить перед началом этого курса
@@ -475,7 +479,9 @@ export interface Lesson {
   order?: number | null;
   isPublished?: boolean | null;
   estimatedMinutes?: number | null;
-  content?: (TextBlock | VideoBlock | ImageBlock | LinkBlock | MiroBlock | FileBlock | SlidesBlock)[] | null;
+  content?:
+    | (TextBlock | VideoBlock | ImageBlock | LinkBlock | MiroBlock | FileBlock | SlidesBlock | MarkdownBlock)[]
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -597,6 +603,23 @@ export interface SlidesBlock {
   id?: string | null;
   blockName?: string | null;
   blockType: 'slides';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "MarkdownBlock".
+ */
+export interface MarkdownBlock {
+  /**
+   * Правится в Git-репозитории и приходит импортом. Правка здесь пропадёт при следующем импорте.
+   */
+  markdown: string;
+  /**
+   * Методичка, часть и версия, из которых импортирован текст.
+   */
+  source?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'markdown';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1931,6 +1954,7 @@ export interface CoursesSelect<T extends boolean = true> {
   roadmapNode?: T;
   order?: T;
   isPublished?: T;
+  assignedOnly?: T;
   estimatedHours?: T;
   prerequisites?: T;
   updatedAt?: T;
@@ -1975,6 +1999,7 @@ export interface LessonsSelect<T extends boolean = true> {
         miro?: T | MiroBlockSelect<T>;
         file?: T | FileBlockSelect<T>;
         slides?: T | SlidesBlockSelect<T>;
+        markdown?: T | MarkdownBlockSelect<T>;
       };
   updatedAt?: T;
   createdAt?: T;
@@ -2062,6 +2087,16 @@ export interface SlidesBlockSelect<T extends boolean = true> {
         caption?: T;
         id?: T;
       };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "MarkdownBlock_select".
+ */
+export interface MarkdownBlockSelect<T extends boolean = true> {
+  markdown?: T;
+  source?: T;
   id?: T;
   blockName?: T;
 }

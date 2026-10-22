@@ -139,6 +139,7 @@ const BLOCK_FIELDS: Record<string, readonly string[]> = {
   image: ['image', 'caption', 'altText'], link: ['title', 'url', 'platform', 'description'],
   miro: ['title', 'embedUrl', 'height'], file: ['title', 'file', 'description'],
   slides: ['title', 'description', 'folderUrl', 'items'],
+  markdown: ['markdown', 'source'],
 }
 
 function validateSlides(block: Record<string, unknown>): void {
@@ -211,6 +212,15 @@ function validateBlocks(value: unknown, existing: unknown): void {
     }
     if (block.blockType === 'image') contentId(block.image, 'Изображение')
     if (block.blockType === 'file') contentId(block.file, 'Файл')
+    if (block.blockType === 'markdown') {
+      // Текст из репозитория меняет только импорт: правка здесь пропала бы при следующем.
+      const prior: unknown = typeof block.id === 'string'
+        ? previous.find((item: unknown) => item && typeof item === 'object' && 'id' in item && item.id === block.id && 'blockType' in item && item.blockType === 'markdown')
+        : undefined
+      const kept = prior && typeof prior === 'object' && 'markdown' in prior && prior.markdown === block.markdown
+        && (('source' in prior ? prior.source : null) ?? null) === (block.source ?? null)
+      if (!kept) throw new ContentError('Текст из репозитория меняется только импортом из Git')
+    }
   }
 }
 

@@ -116,6 +116,16 @@ describe('Media references, entitlement, aliases and orphan rejection', () => {
     expect((await rest('GET', `/media/${sharedImage.id}`, { token: otherToken })).status).toBe(404)
     expect((await get(sharedImage, otherToken)).status).toBe(404)
   })
+  it('обложка курса «только по назначению» не публична', async () => {
+    await payload.update({ collection: 'courses', id: tree.course.id, data: { assignedOnly: true } })
+    try {
+      expect((await rest('GET', `/media/${cover.id}`)).status).toBe(404)
+      expect((await get(cover)).status).toBe(401)
+    } finally {
+      await payload.update({ collection: 'courses', id: tree.course.id, data: { assignedOnly: false } })
+    }
+    expect((await rest('GET', `/media/${cover.id}`)).status).toBe(200)
+  })
   it('a public cover cannot publish an image or thumbnail referenced by a private lesson', async () => {
     await payload.update({ collection: 'courses', id: tree.course.id, data: { coverImage: sharedImage.id } })
     expect((await get(sharedImage)).status).toBe(401)

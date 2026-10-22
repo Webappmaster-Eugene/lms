@@ -58,7 +58,7 @@ async function loadLessonPolicy(payload: Payload, user: LearningAccessUser | nul
   if (!user || user.role === 'admin') return buildLearningAccess(user, [], empty)
   const courseId = learningRelationId(lesson.course)
   if (courseId === null) return buildLearningAccess(user, [], empty)
-  const courseResult = await payload.find({ collection: 'courses', where: { id: { equals: courseId } }, select: { roadmap: true, roadmapNode: true, isPublished: true }, depth: 0, limit: 1, overrideAccess: true, req })
+  const courseResult = await payload.find({ collection: 'courses', where: { id: { equals: courseId } }, select: { roadmap: true, roadmapNode: true, isPublished: true, assignedOnly: true }, depth: 0, limit: 1, overrideAccess: true, req })
   const course = courseResult.docs[0]
   if (!course) return buildLearningAccess(user, [], empty)
   const roadmapId = learningRelationId(course.roadmap)

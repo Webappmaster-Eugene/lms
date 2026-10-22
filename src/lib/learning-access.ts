@@ -10,7 +10,7 @@ export type LearningGrant = {
   startsAt?: string | null
   expiresAt?: string | null
 }
-export type LearningCourseMetadata = { id: number; roadmap: unknown; roadmapNode?: unknown; isPublished?: boolean | null }
+export type LearningCourseMetadata = { id: number; roadmap: unknown; roadmapNode?: unknown; isPublished?: boolean | null; assignedOnly?: boolean | null }
 export type LearningSectionMetadata = { id: number; course: unknown; isPublished?: boolean | null }
 export type LearningLessonMetadata = { id: number; course: unknown; section?: unknown; isPublished?: boolean | null }
 export type LearningNodeMetadata = { id: number; roadmap: unknown; course?: unknown }
@@ -117,8 +117,10 @@ export function buildLearningAccess(
       if (nodeEffect) topicEffects.push(nodeEffect)
       decision = topicEffects.includes('deny') ? 'deny' : topicEffects.includes('allow') ? 'allow' : undefined
     }
-    decision ??= effect('roadmaps', learningRelationId(course.roadmap) ?? -1)
-    courseEffects.set(course.id, Boolean(user) && (decision ? decision === 'allow' : mode === 'all'))
+    // Курс «только по назначению» (платный поток) открывает лишь назначение на него
+    // самого или его тему: доступ ко всей карте и режим «все курсы» его не касаются.
+    if (!course.assignedOnly) decision ??= effect('roadmaps', learningRelationId(course.roadmap) ?? -1)
+    courseEffects.set(course.id, Boolean(user) && (decision ? decision === 'allow' : mode === 'all' && !course.assignedOnly))
   }
   const sectionAllowed = (section: LearningSectionMetadata) => {
     const decision = effect('sections', section.id)
@@ -179,10 +181,17 @@ export function buildLearningAccess(
       ...(deniedLessons.size ? [{ id: { not_in: [...deniedLessons] } }] : []),
     ],
   }
-  const browseCourses = new Set(user ? catalogVisibility === 'catalog' ? courses.keys() : accessible : [])
+  // Закрытый курс без назначения каталог не показывает: ни карточки, ни программы.
+  const hidden = new Set(admin ? [] : [...courses.values()].filter((course) => course.assignedOnly && !accessible.has(course.id)).map((course) => course.id))
+  const inCatalog = (courseId: number | null) => catalogVisibility === 'catalog' && (courseId === null || !hidden.has(courseId))
+  // Тема без своего курса, к которой привязаны через roadmapNode только закрытые курсы, тоже скрыта.
+  const topicOf = (course: LearningCourseMetadata) => learningRelationId(course.roadmapNode)
+  const openTopics = new Set([...courses.values()].filter((course) => !hidden.has(course.id)).map(topicOf))
+  const hiddenTopics = new Set([...courses.values()].filter((course) => hidden.has(course.id)).map(topicOf).filter((id) => id !== null && !openTopics.has(id)))
+  const browseCourses = new Set(user ? catalogVisibility === 'catalog' ? [...courses.keys()].filter((id) => !hidden.has(id)) : accessible : [])
   const browseSections = new Set<number>()
   for (const section of sections.values()) {
-    if (user && (catalogVisibility === 'catalog' || sectionAllowed(section))) browseSections.add(section.id)
+    if (user && (inCatalog(learningRelationId(section.course)) || sectionAllowed(section))) browseSections.add(section.id)
   }
   for (const lesson of metadata.lessons) {
     if (canAccessLessonMetadata(lesson)) {
@@ -204,13 +213,13 @@ export function buildLearningAccess(
     const roadmapId = learningRelationId(node.roadmap)
     if (!user || roadmapId === null || !roadmaps.has(roadmapId)) continue
     const courseId = learningRelationId(node.course)
-    if (catalogVisibility === 'catalog' || (courseId !== null && browseCourses.has(courseId)) || effect('roadmap-nodes', node.id) === 'allow' || (courseId === null && effect('roadmaps', roadmapId) === 'allow' && effect('roadmap-nodes', node.id) !== 'deny')) {
+    if ((inCatalog(courseId) && !(courseId === null && hiddenTopics.has(node.id))) || (courseId !== null && browseCourses.has(courseId)) || effect('roadmap-nodes', node.id) === 'allow' || (courseId === null && effect('roadmaps', roadmapId) === 'allow' && effect('roadmap-nodes', node.id) !== 'deny')) {
       browseNodes.add(node.id)
       browseRoadmaps.add(roadmapId)
     }
   }
   const publishedWhere: Where = { and: [
-    { isPublished: { equals: true } }, { course: { in: [...courses.keys()] } },
+    { isPublished: { equals: true } }, { course: { in: [...courses.keys()].filter((id) => !hidden.has(id)) } },
     { or: [{ section: { exists: false } }, { section: { in: [...sections.keys()] } }] },
     ...(invalidLessonIds.size ? [{ id: { not_in: [...invalidLessonIds] } }] : []),
   ] }
@@ -222,7 +231,7 @@ export function buildLearningAccess(
     canBrowseSection: id => admin || browseSections.has(id),
     canBrowseRoadmap: id => admin || browseRoadmaps.has(id),
     canBrowseNode: id => admin || browseNodes.has(id),
-    canBrowseLessonMetadata: lesson => isPublishedLesson(lesson) && (catalogVisibility === 'catalog' || canAccessLessonMetadata(lesson)),
+    canBrowseLessonMetadata: lesson => isPublishedLesson(lesson) && (inCatalog(learningRelationId(lesson.course)) || canAccessLessonMetadata(lesson)),
     canAccessCourse: id => admin || accessible.has(id), canAccessLessonMetadata }
 
 }

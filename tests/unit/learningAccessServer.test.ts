@@ -45,7 +45,7 @@ describe('точечная проверка допуска для видео Ran
     await canAccessLesson(payload, student, metadata.lessons[0])
     expect(find).toHaveBeenCalledTimes(6)
     expect(find).toHaveBeenCalledWith(expect.objectContaining({ collection: 'learning-access-policies', where: { user: { equals: student.id } } }))
-    expect(find).toHaveBeenCalledWith(expect.objectContaining({ collection: 'courses', where: { id: { equals: 10 } }, select: { roadmap: true, roadmapNode: true, isPublished: true } }))
+    expect(find).toHaveBeenCalledWith(expect.objectContaining({ collection: 'courses', where: { id: { equals: 10 } }, select: { roadmap: true, roadmapNode: true, isPublished: true, assignedOnly: true } }))
     expect(find).toHaveBeenCalledWith(expect.objectContaining({ collection: 'roadmaps', where: { id: { equals: 1 } } }))
     expect(find).toHaveBeenCalledWith(expect.objectContaining({ collection: 'sections', where: { id: { equals: 30 } } }))
     expect(find).toHaveBeenCalledWith(expect.objectContaining({ collection: 'roadmap-nodes', where: { or: [{ course: { equals: 10 } }, { id: { equals: 100 } }] } }))

@@ -88,6 +88,24 @@ describe('Валидация управления учебным контент�
     expect(() => validateContentInput('lessons', { title: 'Урок', course: 1, content: [{ blockType: 'slides', title: 'Гайд', ...block }] })).toThrow(message)
   })
 
+  it('текст из репозитория меняет только импорт: в редакторе его можно переставить или удалить', () => {
+    const markdown = { id: 'md-1', blockType: 'markdown', markdown: '## Теория\n\nТекст', source: 'nodejs-bootcamp 08-outbox theory v0.1.1' }
+    const text = { id: 'text-1', blockType: 'text', content: richText }
+    const existing = { content: [markdown, text] }
+    const update = (content: unknown[]) => validateContentInput('lessons', { content, expectedUpdatedAt: timestamp }, true, { existing })
+    expect(update([text, markdown]).data.content).toEqual([text, markdown])
+    expect(update([{ ...markdown, blockName: 'Методичка' }, text]).data.content).toHaveLength(2)
+    expect(update([text]).data.content).toEqual([text])
+    const withoutSource = { id: 'md-3', blockType: 'markdown', markdown: '## Практикум' }
+    const stored = { content: [{ ...withoutSource, source: null }, text] }
+    expect(validateContentInput('lessons', { content: [text, withoutSource], expectedUpdatedAt: timestamp }, true, { existing: stored }).data.content).toHaveLength(2)
+    expect(() => update([{ ...markdown, markdown: '## Теория\n\nПравка' }])).toThrow('только импортом')
+    expect(() => update([{ ...markdown, source: 'другой источник' }])).toThrow('только импортом')
+    expect(() => update([{ ...markdown, id: 'md-2' }])).toThrow('только импортом')
+    expect(() => validateContentInput('lessons', { title: 'Урок', course: 1, content: [{ blockType: 'markdown', markdown: '# Новый' }] })).toThrow('только импортом')
+    expect(() => update([{ ...markdown, extra: true }])).toThrow()
+  })
+
   it('презентация без названия не сохраняется', () => {
     expect(() => validateContentInput('lessons', { title: 'Урок', course: 1, content: [{ blockType: 'slides', title: ' ', items: [{ url: '/api/media/file/a.png' }] }] })).toThrow('Название блока')
   })

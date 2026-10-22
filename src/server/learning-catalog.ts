@@ -58,9 +58,10 @@ const number = (value: unknown) => value == null || typeof value === 'number' &&
 const text = (value: unknown) => value == null || typeof value === 'string'
 const keys = (value: Record<string, unknown>, allowed: string[]) => Object.keys(value).every((key) => allowed.includes(key))
 const rows = (value: unknown, check: (row: Record<string, unknown>) => boolean) => Array.isArray(value) && value.every((row) => object(row) && id(row.id) && check(row))
-function validCatalog(value: unknown): value is LearningCatalog {
+export function validCatalog(value: unknown): value is LearningCatalog {
   return object(value) && keys(value, ['courses', 'sections', 'roadmaps', 'nodes', 'invalidLessonIds']) &&
-    rows(value.courses, (row) => keys(row, ['id', 'roadmap', 'roadmapNode', 'isPublished']) && relation(row.roadmap) && relation(row.roadmapNode) && boolean(row.isPublished)) &&
+    // assignedOnly обязателен: запись прежнего кода без него открыла бы закрытый курс всем.
+    rows(value.courses, (row) => keys(row, ['id', 'roadmap', 'roadmapNode', 'isPublished', 'assignedOnly']) && relation(row.roadmap) && relation(row.roadmapNode) && boolean(row.isPublished) && typeof row.assignedOnly === 'boolean') &&
     rows(value.sections, (row) => keys(row, ['id', 'course', 'isPublished']) && relation(row.course) && boolean(row.isPublished)) &&
     rows(value.roadmaps, (row) => keys(row, ['id', 'isPublished']) && boolean(row.isPublished)) &&
     rows(value.nodes, (row) => keys(row, ['id', 'roadmap', 'course']) && relation(row.roadmap) && relation(row.course)) &&
@@ -96,14 +97,14 @@ async function revisionCached<T>(payload: Payload, scope: string, req: Partial<P
 export async function getLearningCatalog(payload: Payload, req?: Partial<PayloadRequest>): Promise<LearningCatalog> {
   return revisionCached(payload, 'access-catalog', req, async (internalReq) => {
     const [courses, sections, roadmaps, nodes, invalidLessonIds] = await Promise.all([
-      collectAllPages(({ page, limit }) => payload.find({ collection: 'courses', select: { roadmap: true, roadmapNode: true, isPublished: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req: internalReq }), { label: 'метаданные доступа курсов' }),
+      collectAllPages(({ page, limit }) => payload.find({ collection: 'courses', select: { roadmap: true, roadmapNode: true, isPublished: true, assignedOnly: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req: internalReq }), { label: 'метаданные доступа курсов' }),
       collectAllPages(({ page, limit }) => payload.find({ collection: 'sections', select: { course: true, isPublished: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req: internalReq }), { label: 'метаданные доступа секций' }),
       collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmaps', select: { isPublished: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req: internalReq }), { label: 'публикация роадмапов' }),
       collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmap-nodes', select: { roadmap: true, course: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req: internalReq }), { label: 'метаданные доступа тем' }),
       inconsistentLessonIds(payload, internalReq),
     ])
     return {
-      courses: courses.map(({ id, roadmap, roadmapNode, isPublished }) => ({ id, roadmap, roadmapNode, isPublished })),
+      courses: courses.map(({ id, roadmap, roadmapNode, isPublished, assignedOnly }) => ({ id, roadmap, roadmapNode, isPublished, assignedOnly: assignedOnly === true })),
       sections: sections.map(({ id, course, isPublished }) => ({ id, course, isPublished })),
       roadmaps: roadmaps.map(({ id, isPublished }) => ({ id, isPublished })),
       nodes: nodes.map(({ id, roadmap, course }) => ({ id, roadmap, course })),

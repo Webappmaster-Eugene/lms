@@ -91,6 +91,16 @@ export const Courses: CollectionConfig = {
       },
     },
     {
+      name: 'assignedOnly',
+      type: 'checkbox',
+      defaultValue: false,
+      label: 'Только по назначению',
+      admin: {
+        position: 'sidebar',
+        description: 'Открывается только назначением на курс, его тему, раздел или урок. Режим «все опубликованные курсы» и доступ ко всей карте его не открывают, каталог не показывает.',
+      },
+    },
+    {
       name: 'estimatedHours',
       type: 'number',
       label: 'Ожидаемое время (часов)',

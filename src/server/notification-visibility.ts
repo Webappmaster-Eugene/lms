@@ -30,7 +30,7 @@ export async function notificationLinkIsVisible(payload: Payload, userId: number
     const result = await payload.find({ collection: 'trainer-tasks', where: { slug: { equals: parts[2] } }, select: { topic: true }, limit: 1, depth: 0, overrideAccess: true, req })
     return Boolean(result.docs[0] && scope.canBrowseTask(result.docs[0].id))
   }
-  if (policy.catalogVisibility !== 'assigned') return true
+  // Открытый каталог тоже проверяется: курс «только по назначению» в нём скрыт.
   const scope = await getLearningAccess(payload, user, req)
   const slug = parts[1]
   if (!slug) return true

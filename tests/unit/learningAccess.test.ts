@@ -158,3 +158,82 @@ describe('скрытый каталог', () => {
     expect(policy.browseCourseIds).toHaveLength(3)
   })
 })
+
+describe('курс только по назначению', () => {
+  const closed: LearningPolicyMetadata = {
+    ...metadata,
+    courses: [...metadata.courses, { id: 50, roadmap: 1, roadmapNode: 102, isPublished: true, assignedOnly: true }],
+    nodes: [...metadata.nodes, { id: 102, roadmap: 1, course: 50 }],
+    sections: [...metadata.sections, { id: 60, course: 50, isPublished: true }],
+    lessons: [...metadata.lessons, { id: 70, course: 50, section: 60, isPublished: true }, { id: 71, course: 50, section: null, isPublished: true }],
+  }
+  const [inSection, withoutSection] = closed.lessons.slice(-2)
+  const everyone = { id: 7, role: 'student', learningAccessMode: 'all' as const, learningCatalogVisibility: 'catalog' as const }
+  const courseIdsOf = (where: unknown): unknown => JSON.stringify(where).match(/"course":\{"in":(\[[^\]]*\])/)?.[1]
+
+  it('режим «все курсы» и каталог его не открывают и не показывают, остальные курсы — как раньше', () => {
+    const policy = buildLearningAccess(everyone, [], closed)
+    expect(policy.canAccessCourse(50)).toBe(false)
+    expect(policy.canAccessLessonMetadata(inSection)).toBe(false)
+    expect(policy.canBrowseCourse(50)).toBe(false)
+    expect(policy.canBrowseSection(60)).toBe(false)
+    expect(policy.canBrowseNode(102)).toBe(false)
+    expect(policy.canBrowseLessonMetadata(inSection)).toBe(false)
+    expect(policy.browseCourseIds).not.toContain(50)
+    expect(courseIdsOf(policy.browseLessonWhere)).toBe('[10,11,20]')
+    expect(courseIdsOf(policy.lessonWhere)).not.toContain('50')
+    expect(policy.canAccessCourse(10)).toBe(true)
+    expect(policy.canBrowseNode(101)).toBe(true)
+  })
+
+  it('доступ ко всей карте его не открывает', () => {
+    const policy = buildLearningAccess(everyone, [grant('roadmaps', 1)], closed)
+    expect(policy.canAccessCourse(10)).toBe(true)
+    expect(policy.canAccessCourse(50)).toBe(false)
+    expect(resolve([grant('roadmaps', 1)], closed).canBrowseCourse(50)).toBe(false)
+  })
+
+  it('назначение курса или его темы открывает весь курс и показывает его в каталоге', () => {
+    for (const grants of [[grant('courses', 50)], [grant('roadmap-nodes', 102)]]) {
+      for (const user of [student, everyone]) {
+        const policy = buildLearningAccess(user, grants, closed)
+        expect(policy.canAccessCourse(50)).toBe(true)
+        expect(policy.canAccessLessonMetadata(inSection)).toBe(true)
+        expect(policy.canAccessLessonMetadata(withoutSection)).toBe(true)
+        expect(policy.canBrowseCourse(50)).toBe(true)
+        expect(policy.canBrowseLessonMetadata(withoutSection)).toBe(true)
+      }
+    }
+  })
+
+  it('назначение раздела или урока открывает только его', () => {
+    const section = buildLearningAccess(everyone, [grant('sections', 60)], closed)
+    expect(section.canAccessLessonMetadata(inSection)).toBe(true)
+    expect(section.canAccessLessonMetadata(withoutSection)).toBe(false)
+    expect(section.canBrowseCourse(50)).toBe(true)
+    const lesson = buildLearningAccess(everyone, [grant('lessons', 71)], closed)
+    expect(lesson.canAccessLessonMetadata(withoutSection)).toBe(true)
+    expect(lesson.canAccessLessonMetadata(inSection)).toBe(false)
+  })
+
+  it('тема без своего курса скрыта, если к ней привязаны только закрытые курсы', () => {
+    const topics: LearningPolicyMetadata = {
+      ...closed,
+      courses: [...closed.courses, { id: 51, roadmap: 1, roadmapNode: 103, isPublished: true, assignedOnly: true }, { id: 52, roadmap: 1, roadmapNode: 104, isPublished: true, assignedOnly: true }, { id: 53, roadmap: 1, roadmapNode: 104, isPublished: true }],
+      nodes: [...closed.nodes, { id: 103, roadmap: 1, course: null }, { id: 104, roadmap: 1, course: null }],
+    }
+    const policy = buildLearningAccess(everyone, [], topics)
+    expect(policy.canBrowseNode(103)).toBe(false)
+    expect(policy.canBrowseNode(104)).toBe(true)
+    expect(buildLearningAccess(everyone, [grant('courses', 51)], topics).canBrowseNode(103)).toBe(true)
+  })
+
+  it('запрет сильнее назначения, срок назначения соблюдается, администратор видит всё', () => {
+    expect(buildLearningAccess(everyone, [grant('courses', 50), grant('courses', 50, 'deny')], closed).canAccessCourse(50)).toBe(false)
+    const expired = { ...grant('courses', 50), expiresAt: new Date(500).toISOString() }
+    expect(buildLearningAccess(everyone, [expired], closed, 1000).canAccessCourse(50)).toBe(false)
+    const admin = buildLearningAccess({ id: 1, role: 'admin' }, [], closed)
+    expect(admin.canAccessCourse(50)).toBe(true)
+    expect(admin.canBrowseLessonMetadata(inSection)).toBe(true)
+  })
+})

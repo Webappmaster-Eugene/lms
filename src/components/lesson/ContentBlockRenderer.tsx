@@ -4,6 +4,7 @@ import { VideoPlayer } from './VideoPlayer'
 import { MiroEmbed } from './MiroEmbed'
 import { ExternalLinkBlock } from './ExternalLink'
 import { MarkdownRenderer } from './MarkdownRenderer'
+import { LessonMarkdown } from './LessonMarkdown'
 import { SlidesBlock } from './SlidesBlock'
 import { FileDown } from 'lucide-react'
 import type { LearningVideo } from '@/lib/learning-state'
@@ -60,6 +61,8 @@ function renderBlock(block: ContentBlock, memoryId?: string) {
       return renderMiroBlock(block)
     case 'file':
       return renderFileBlock(block)
+    case 'markdown':
+      return typeof block.markdown === 'string' ? <LessonMarkdown markdown={block.markdown} /> : null
     case 'slides':
       return (
         <SlidesBlock

@@ -267,6 +267,9 @@ export default async function LessonPage({ params }: Props) {
         user: { equals: user.id },
         lesson: { equals: lesson.id },
       },
+      // Нужен только id: глубина по умолчанию тянула бы урок целиком, с текстом методички.
+      depth: 0,
+      select: {},
       limit: 1,
     })
 

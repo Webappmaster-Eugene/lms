@@ -114,7 +114,7 @@ async function readInput(request: Request) {
 
 async function preview(payload: Payload, input: AssignmentInput, req: PayloadRequest, page: number, trainerPage: number) {
   const [courses, sections, roadmaps, nodes, trainerTopics, trainerTasks, guides] = await Promise.all([
-    collectAllPages(({ page, limit }) => payload.find({ collection: 'courses', page, limit, sort: 'id', depth: 0, select: { title: true, roadmap: true, roadmapNode: true, isPublished: true }, overrideAccess: false, req })),
+    collectAllPages(({ page, limit }) => payload.find({ collection: 'courses', page, limit, sort: 'id', depth: 0, select: { title: true, roadmap: true, roadmapNode: true, isPublished: true, assignedOnly: true }, overrideAccess: false, req })),
     collectAllPages(({ page, limit }) => payload.find({ collection: 'sections', page, limit, sort: 'id', depth: 0, select: { course: true, isPublished: true }, overrideAccess: false, req })),
     collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmaps', page, limit, sort: 'id', depth: 0, select: { isPublished: true }, overrideAccess: false, req })),
     collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmap-nodes', page, limit, sort: 'id', depth: 0, select: { roadmap: true, course: true }, overrideAccess: false, req })),

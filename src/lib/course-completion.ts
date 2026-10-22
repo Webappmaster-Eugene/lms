@@ -35,10 +35,12 @@ export async function isCourseCompleted(req: PayloadRequest, userId: number, cou
   return lessons.length > 0 && lessons.every(lesson => completed.has(String(lesson.id)))
 }
 
+/** Курс «только по назначению» в общую программу роадмапа не входит: без него её не закончить. */
 export async function isRoadmapCompleted(req: PayloadRequest, userId: number, roadmapId: string): Promise<boolean> {
   const courses = await collectAllPages(({ page, limit }) => req.payload.find({
     req, overrideAccess: true, collection: 'courses', depth: 0, select: {}, sort: 'id', page, limit,
-    where: { roadmap: { equals: roadmapId }, isPublished: { equals: true } },
+    // not_equals: true в SQL отбросил бы и курсы с пустым флажком: условие пишется явно.
+    where: { roadmap: { equals: roadmapId }, isPublished: { equals: true }, or: [{ assignedOnly: { equals: false } }, { assignedOnly: { exists: false } }] },
   }), { label: `полная программа роадмапа ${roadmapId}` })
   if (courses.length === 0) return false
   const courseIds = courses.map(course => course.id)
