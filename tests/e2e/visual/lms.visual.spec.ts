@@ -33,6 +33,8 @@ const INNER: [string, string][] = [
   ['notes', '/notes'],
   ['questions', '/questions'],
   ['saved', '/saved'],
+  ['guides', '/guides'],
+  ['guide', `/guides/${CONTENT.guide.slug}`],
 ]
 
 for (const theme of ['light', 'dark'] as Theme[]) {

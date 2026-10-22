@@ -44,6 +44,7 @@ import { UserTrainerProgress } from '@/payload/collections/UserTrainerProgress'
 import { InterviewDirections, InterviewRecordings, InterviewAnalysisUsage } from '@/payload/collections/InterviewLibrary'
 import { InterviewRooms } from '@/payload/collections/InterviewRooms'
 import { FaqItems } from '@/payload/collections/FaqItems'
+import { Guides } from '@/payload/collections/Guides'
 import { YandexDiskImports } from '@/payload/collections/YandexDiskImports'
 import { withLessonSourceGuard } from '@/payload/hooks/denyLessonSourceQueries'
 import { SiteSettings } from '@/payload/globals/SiteSettings'
@@ -93,6 +94,7 @@ export default buildConfig({
     Courses,
     Sections,
     Lessons,
+    Guides,
     Media,
     UserProgress,
     LessonLearningStates,

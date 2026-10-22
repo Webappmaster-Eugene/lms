@@ -17,6 +17,7 @@ const NAV: [string, RegExp, string][] = [
   ['Заметки', /\/notes$/, 'Мои заметки'],
   ['Вопросы', /\/questions$/, 'Мои вопросы'],
   ['Сохранённое', /\/saved$/, 'Сохранённое'],
+  ['Гайды', /\/guides$/, 'Гайды'],
   ['Профиль', /\/profile$/, `${USERS.doer.firstName} ${USERS.doer.lastName}`],
   ['Контакты', /\/contacts$/, 'Контакты'],
   ['Помощь', /\/help$/, 'Помощь'],

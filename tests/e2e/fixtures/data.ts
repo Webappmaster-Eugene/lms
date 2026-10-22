@@ -29,6 +29,13 @@ export const CONTENT = {
   draftLesson: { title: 'Черновик урока', slug: 'e2e-draft' },
   topic: { title: 'E2E: функции', slug: 'e2e-functions' },
   task: { title: 'Сумма двух чисел', slug: 'e2e-sum' },
+  guide: {
+    title: 'Регистрация и работа в LinkedIn',
+    slug: 'e2e-linkedin',
+    summary: 'Как завести аккаунт и пережить первые недели без блокировки',
+    sections: ['Что подготовить', 'Шаг 1. Установите антидетект-браузер', 'Правила на каждый день'],
+  },
+  draftGuide: { title: 'Черновик гайда', slug: 'e2e-draft-guide' },
   faq: [
     { question: 'Как начать обучение?', answer: 'Откройте курс и пройдите первый урок.' },
     { question: 'Как связаться с поддержкой?', answer: 'Напишите через форму на странице «Помощь».' },

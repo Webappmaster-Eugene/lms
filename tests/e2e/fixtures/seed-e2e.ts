@@ -38,6 +38,13 @@ function richText(...paragraphs: string[]) {
   }
 }
 
+/** Разделы гайда — заголовки второго уровня с абзацем: из заголовков строится оглавление. */
+function guideContent(sections: readonly string[]) {
+  const doc = richText(...sections.map((title) => `Текст раздела «${title}».`))
+  const heading = (title: string) => ({ ...richText(title).root.children[0], type: 'heading', tag: 'h2' })
+  return { root: { ...doc.root, children: sections.flatMap((title, index) => [heading(title), doc.root.children[index]]) } }
+}
+
 // onInit выключен: иначе на пустой roadmap-nodes он засидит свои роадмапы раньше наших узлов.
 const payload = await getPayload({ config, disableOnInit: true })
 
@@ -195,6 +202,15 @@ await payload.create({
     pointsReward: 10,
     isPublished: true,
   },
+})
+
+await payload.create({
+  collection: 'guides',
+  data: { title: CONTENT.guide.title, slug: CONTENT.guide.slug, summary: CONTENT.guide.summary, content: guideContent(CONTENT.guide.sections), order: 1, isPublished: true },
+})
+await payload.create({
+  collection: 'guides',
+  data: { title: CONTENT.draftGuide.title, slug: CONTENT.draftGuide.slug, summary: 'Ученики его не видят', content: richText('Черновик.'), order: 2, isPublished: false },
 })
 
 for (const [index, item] of CONTENT.faq.entries()) {

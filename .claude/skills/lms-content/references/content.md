@@ -1,6 +1,6 @@
 # Учебный контент и настройки
 
-Источники: `Courses.ts`, `Sections.ts`, `Lessons.ts`, `FaqItems.ts`, `Media.ts`
+Источники: `Courses.ts`, `Sections.ts`, `Lessons.ts`, `Guides.ts`, `FaqItems.ts`, `Media.ts`
 в `src/payload/collections/`, блоки `src/payload/blocks/`, global
 `src/payload/globals/SiteSettings.ts`.
 
@@ -43,13 +43,22 @@
   опубликован — для черновика явно задавай false. `/help` фильтрует публикацию,
   но REST-access коллекции разрешает публичное чтение даже черновиков;
   этот флаг не обеспечивает конфиденциальность ответа.
+- Гайд (`guides`) — самостоятельная инструкция вне курсов: `title`, `summary` (до 300
+  символов, видна в карточке и описании страницы), Lexical `content`, `order`,
+  `isPublished` (по умолчанию false). Назначения обучения на гайды не действуют:
+  опубликованный гайд видит любой вошедший ученик, черновик — только администратор,
+  в том числе на `/guides/<slug>`. Заголовки `h2` в корне `content` становятся
+  оглавлением, поэтому разделы гайда оформляй ими. Lexical из Markdown получай
+  штатным `convertMarkdownToLexical` (`@payloadcms/richtext-lexical`) с
+  `editorConfigFactory.default({ config })` через `pnpm payload run`; вложенные
+  списки он разбивает на отдельные — избегай их.
 - Настройки — global `site-settings`: изменение REST через POST
   `/api/globals/site-settings`, Local API через `updateGlobal`. При правке
   одного контакта сохрани остальные поля `contacts` и не затронь `points`.
 - Удаление урока очищает связанные данные. Если нужна временная недоступность,
   снятие с публикации обычно сохраняет историю лучше удаления.
 
-Просмотр: `/courses/<slug>`, `/lessons/<slug>`, `/help`, `/contacts`.
+Просмотр: `/courses/<slug>`, `/lessons/<slug>`, `/guides`, `/guides/<slug>`, `/help`, `/contacts`.
 Обычное управление учебной программой выполняется в самой LMS:
 «Управление → Учебный контент → роадмап → курс → программа». Со страницы
 карты — «Курсы и уроки» / «Добавить курс»; из темы — «Добавить курс в тему».

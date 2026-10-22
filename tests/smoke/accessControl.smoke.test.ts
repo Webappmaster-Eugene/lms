@@ -34,6 +34,7 @@ const ADMIN_MANAGED = [
   'Achievements',
   'Courses',
   'FaqItems',
+  'Guides',
   'Lessons',
   'RoadmapEdges',
   'RoadmapNodes',

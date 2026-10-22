@@ -152,6 +152,7 @@ pnpm seed:trainer             # каталог задач тренажёра, и
 | Домены | `learn.mentorcareer.ru`, `info.mentorcareer.ru`: TLS на Traefik VDS, оттуда по туннелю в VM (`/etc/dokploy/traefik/dynamic/home-sites.yml`) |
 | Тома (в VM) | `…_lms-pgdata`, `…_lms-media`, `…_lms-geoip`, `…_lms-trainer-auth` |
 | Копии БД | ночью с VM на VDS, назначение Dokploy `vds-offsite` |
+| Схема всей инфраструктуры, сети и восстановления | `infra/RUNBOOK.md` (прочитать до любых действий с сетью, сервером, VDS, Pi, JetKVM); осмотр — `bash infra/healthcheck.sh`, вход на машины — `ssh -F infra/ssh.cfg <vds\|sl\|vm\|ci\|pi\|jetkvm>` |
 
 Имена контейнеров находить динамически. Старый стек `lms-mentor-3ghbnk` на VDS
 остановлен намеренно — не запускать и не деплоить: две живые копии LMS разошлют

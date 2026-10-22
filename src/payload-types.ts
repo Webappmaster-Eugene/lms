@@ -74,6 +74,7 @@ export interface Config {
     courses: Course;
     sections: Section;
     lessons: Lesson;
+    guides: Guide;
     media: Media;
     'user-progress': UserProgress;
     'lesson-learning-states': LessonLearningState;
@@ -122,6 +123,7 @@ export interface Config {
     courses: CoursesSelect<false> | CoursesSelect<true>;
     sections: SectionsSelect<false> | SectionsSelect<true>;
     lessons: LessonsSelect<false> | LessonsSelect<true>;
+    guides: GuidesSelect<false> | GuidesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     'user-progress': UserProgressSelect<false> | UserProgressSelect<true>;
     'lesson-learning-states': LessonLearningStatesSelect<false> | LessonLearningStatesSelect<true>;
@@ -591,6 +593,44 @@ export interface SlidesBlock {
   id?: string | null;
   blockName?: string | null;
   blockType: 'slides';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "guides".
+ */
+export interface Guide {
+  id: number;
+  title: string;
+  /**
+   * Генерируется автоматически из названия
+   */
+  slug: string;
+  /**
+   * Одна-две фразы о том, чему научит гайд. Видны в списке гайдов и в описании страницы
+   */
+  summary: string;
+  /**
+   * Заголовки второго уровня попадают в оглавление гайда
+   */
+  content: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  };
+  order?: number | null;
+  isPublished?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1658,6 +1698,10 @@ export interface PayloadLockedDocument {
         value: number | Lesson;
       } | null)
     | ({
+        relationTo: 'guides';
+        value: number | Guide;
+      } | null)
+    | ({
         relationTo: 'media';
         value: number | Media;
       } | null)
@@ -2005,6 +2049,20 @@ export interface SlidesBlockSelect<T extends boolean = true> {
       };
   id?: T;
   blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "guides_select".
+ */
+export interface GuidesSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  summary?: T;
+  content?: T;
+  order?: T;
+  isPublished?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

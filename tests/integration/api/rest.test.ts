@@ -79,7 +79,7 @@ describe('аутентификация', () => {
 
 describe('коллекции через REST', () => {
   it('аноним не читает закрытые коллекции, но читает FAQ и медиа', async () => {
-    for (const path of ['/courses', '/lessons', '/users', '/trainer-tasks', '/points-transactions', '/globals/site-settings']) {
+    for (const path of ['/courses', '/lessons', '/guides', '/users', '/trainer-tasks', '/points-transactions', '/globals/site-settings']) {
       expect((await rest('GET', path)).status, path).toBe(403)
     }
     expect((await rest('GET', '/faq-items')).status).toBe(200)

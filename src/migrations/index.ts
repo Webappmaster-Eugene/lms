@@ -26,6 +26,7 @@ import * as migration_20261010_212032_interview_analysis_usage from './20261010_
 import * as migration_20261011_074547_checkfrod_interview_integration from './20261011_074547_checkfrod_interview_integration';
 import * as migration_20261012_170329_slides_block from './20261012_170329_slides_block';
 import * as migration_20261020_195554_email_broadcasts from './20261020_195554_email_broadcasts';
+import * as migration_20261022_093223_guides from './20261022_093223_guides';
 
 export const migrations = [
   {
@@ -166,6 +167,11 @@ export const migrations = [
   {
     up: migration_20261020_195554_email_broadcasts.up,
     down: migration_20261020_195554_email_broadcasts.down,
-    name: '20261020_195554_email_broadcasts'
+    name: '20261020_195554_email_broadcasts',
+  },
+  {
+    up: migration_20261022_093223_guides.up,
+    down: migration_20261022_093223_guides.down,
+    name: '20261022_093223_guides'
   },
 ];

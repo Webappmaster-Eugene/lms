@@ -26,6 +26,7 @@ export const ADMIN_NAV_GROUPS = [
       { href: '/admin/collections/courses', label: 'Курсы' },
       { href: '/admin/collections/sections', label: 'Разделы курсов' },
       { href: '/admin/collections/lessons', label: 'Уроки' },
+      { href: '/admin/collections/guides', label: 'Гайды' },
       { href: '/admin/collections/media', label: 'Медиафайлы' },
       { href: '/admin/collections/interview-directions', label: 'Направления собеседований' },
       { href: '/admin/collections/interview-recordings', label: 'Общие записи собеседований' },
