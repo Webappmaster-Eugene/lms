@@ -42,6 +42,10 @@ function richText(...paragraphs: string[]) {
 function guideContent(sections: readonly string[]) {
   const doc = richText(...sections.map((title) => `Текст раздела «${title}».`))
   const heading = (title: string) => ({ ...richText(title).root.children[0], type: 'heading', tag: 'h2' })
+  // Код в строке: скриншоты гайда стерегут его оформление (prose дорисовывает обратные кавычки).
+  const [intro] = doc.root.children
+  const [text] = intro?.children ?? []
+  if (intro && text) intro.children.push({ ...text, text: ' Запуск — ' }, { ...text, text: 'pnpm dev', format: 16 }, { ...text, text: '.' })
   return { root: { ...doc.root, children: sections.flatMap((title, index) => [heading(title), doc.root.children[index]]) } }
 }
 

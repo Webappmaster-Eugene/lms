@@ -82,7 +82,7 @@ export default async function GuidePage({ params }: Props) {
         </nav>
       )}
 
-      <div className="prose prose-sm dark:prose-invert max-w-none break-words sm:prose-base prose-headings:text-foreground prose-a:text-primary prose-strong:text-foreground">
+      <div className="prose prose-sm dark:prose-invert max-w-none break-words sm:prose-base prose-headings:text-foreground prose-a:text-primary prose-strong:text-foreground prose-code:rounded prose-code:bg-secondary prose-code:px-1.5 prose-code:py-0.5 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none">
         <RichText data={guide.content} converters={converters} disableContainer />
       </div>
 
