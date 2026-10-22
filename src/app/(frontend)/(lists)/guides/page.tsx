@@ -21,7 +21,7 @@ export default async function GuidesPage() {
       payload.find({
         collection: 'guides',
         sort: ['order', 'id'],
-        select: { title: true, slug: true, summary: true, content: true, isPublished: true, updatedAt: true },
+        select: { title: true, slug: true, summary: true, markdown: true, content: true, isPublished: true, updatedAt: true },
         depth: 0,
         overrideAccess: false,
         req,
@@ -61,7 +61,7 @@ export default async function GuidesPage() {
                 <h2 className="font-semibold text-foreground transition-colors group-hover:text-primary">{guide.title}</h2>
                 <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{guide.summary}</p>
                 <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" aria-hidden="true" />{guideReadingMinutes(guide.content)} мин чтения</span>
+                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" aria-hidden="true" />{guideReadingMinutes(guide)} мин чтения</span>
                   <span>Обновлён <time dateTime={guide.updatedAt}>{formatDate(guide.updatedAt)}</time></span>
                 </p>
               </Link>

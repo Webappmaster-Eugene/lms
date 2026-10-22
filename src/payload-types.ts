@@ -614,9 +614,13 @@ export interface Guide {
    */
   summary: string;
   /**
-   * Заголовки второго уровня попадают в оглавление гайда
+   * Разделы — заголовки «## …», из них строится оглавление. Таблицы, код и цитаты — обычный Markdown
    */
-  content: {
+  markdown?: string | null;
+  /**
+   * Используется, пока поле Markdown пустое. Загрузите .md, чтобы перевести гайд в Markdown
+   */
+  content?: {
     root: {
       type: string;
       children: {
@@ -630,7 +634,7 @@ export interface Guide {
       version: number;
     };
     [k: string]: unknown;
-  };
+  } | null;
   order?: number | null;
   isPublished?: boolean | null;
   updatedAt: string;
@@ -1179,6 +1183,7 @@ export interface Bookmark {
   user: number | User;
   lesson?: (number | null) | Lesson;
   task?: (number | null) | TrainerTask;
+  guide?: (number | null) | Guide;
   updatedAt: string;
   createdAt: string;
 }
@@ -2068,6 +2073,7 @@ export interface GuidesSelect<T extends boolean = true> {
   title?: T;
   slug?: T;
   summary?: T;
+  markdown?: T;
   content?: T;
   order?: T;
   isPublished?: T;
@@ -2260,6 +2266,7 @@ export interface BookmarksSelect<T extends boolean = true> {
   user?: T;
   lesson?: T;
   task?: T;
+  guide?: T;
   updatedAt?: T;
   createdAt?: T;
 }

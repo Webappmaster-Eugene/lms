@@ -5,43 +5,45 @@ import { isAdminOrSelf } from '@/payload/access/isAdminOrSelf'
 import { assignOwner } from '@/payload/hooks/assignOwner'
 import { guardLearningLessonWrite } from '@/payload/hooks/learningLessonWrite'
 import { guardTrainerTaskBookmark } from '@/payload/hooks/trainerTaskBookmark'
+import { guardGuideBookmark } from '@/payload/hooks/guideBookmark'
 import { learningStateRead } from '@/payload/access/learningStateRead'
 
-/** Закладка ведёт ровно на одно: урок или задачу тренажёра. */
+/** Закладка ведёт ровно на одно: урок, задачу тренажёра или гайд. */
 const oneTarget: CollectionBeforeValidateHook = ({ data, originalDoc }) => {
   const merged = { ...originalDoc, ...data }
-  const targets = [merged.lesson, merged.task].filter((v) => v !== null && v !== undefined && v !== '')
+  const targets = [merged.lesson, merged.task, merged.guide].filter((v) => v !== null && v !== undefined && v !== '')
   if (targets.length !== 1) {
     throw new ValidationError({
       collection: 'bookmarks',
-      errors: [{ path: 'lesson', message: 'Закладка должна вести либо на урок, либо на задачу тренажёра' }],
+      errors: [{ path: 'lesson', message: 'Закладка должна вести на что-то одно: урок, задачу тренажёра или гайд' }],
     })
   }
   return data
 }
 
-/** «Сохранённое»: уроки и задачи, к которым ученик хочет вернуться. */
+/** «Сохранённое»: уроки, задачи и гайды, к которым ученик хочет вернуться. */
 export const Bookmarks: CollectionConfig = {
   slug: 'bookmarks',
   admin: {
-    defaultColumns: ['user', 'lesson', 'task', 'createdAt'],
+    defaultColumns: ['user', 'lesson', 'task', 'guide', 'createdAt'],
     group: 'Прогресс',
   },
   access: {
     create: isAuthenticated,
-    read: learningStateRead({ allowTask: true }),
+    read: learningStateRead({ allowTask: true, allowGuide: true }),
     update: isAdminOrSelf,
     delete: isAdminOrSelf,
   },
   hooks: {
     beforeValidate: [oneTarget],
-    beforeChange: [assignOwner, guardLearningLessonWrite, guardTrainerTaskBookmark],
+    beforeChange: [assignOwner, guardLearningLessonWrite, guardTrainerTaskBookmark, guardGuideBookmark],
   },
   // Повторное «сохранить» не плодит дубли. NULL в Postgres уникальности не мешает,
-  // поэтому закладки на урок и на задачу живут в одной таблице.
+  // поэтому закладки на урок, задачу и гайд живут в одной таблице.
   indexes: [
     { fields: ['user', 'lesson'], unique: true },
     { fields: ['user', 'task'], unique: true },
+    { fields: ['user', 'guide'], unique: true },
   ],
   fields: [
     {
@@ -62,6 +64,12 @@ export const Bookmarks: CollectionConfig = {
       type: 'relationship',
       relationTo: 'trainer-tasks',
       label: 'Задача тренажёра',
+    },
+    {
+      name: 'guide',
+      type: 'relationship',
+      relationTo: 'guides',
+      label: 'Гайд',
     },
   ],
 }

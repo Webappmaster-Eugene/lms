@@ -2,14 +2,19 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Bookmark, BookOpen, Code2, Loader2, X } from 'lucide-react'
+import { Bookmark, BookOpen, Code2, Compass, Loader2, X } from 'lucide-react'
 
 import { useToast } from '@/components/ui/Toast'
 import type { SavedItem } from '@/lib/bookmarks'
 import { cn, formatDate, pluralize } from '@/lib/utils'
 
 type Filter = 'all' | SavedItem['kind']
-const FILTER_LABELS: Record<Filter, string> = { all: 'Всё', lesson: 'Уроки', task: 'Задачи' }
+const FILTER_LABELS: Record<Filter, string> = { all: 'Всё', lesson: 'Уроки', task: 'Задачи', guide: 'Гайды' }
+const KIND: Record<SavedItem['kind'], { label: string; icon: typeof BookOpen }> = {
+  lesson: { label: 'Урок', icon: BookOpen },
+  task: { label: 'Задача', icon: Code2 },
+  guide: { label: 'Гайд', icon: Compass },
+}
 
 export function SavedList({ items: initial }: { items: SavedItem[] }) {
   const [items, setItems] = useState(initial)
@@ -39,7 +44,7 @@ export function SavedList({ items: initial }: { items: SavedItem[] }) {
           <Bookmark className="h-8 w-8 text-muted-foreground" />
         </div>
         <p className="max-w-sm text-muted-foreground">
-          Здесь пока пусто. Нажмите «В сохранённое» на уроке или задаче тренажёра, чтобы вернуться к ним позже
+          Здесь пока пусто. Нажмите «В сохранённое» на уроке, задаче тренажёра или в гайде, чтобы вернуться к ним позже
         </p>
         <Link href="/courses" className="text-sm font-medium text-primary underline-offset-2 hover:underline">
           К курсам
@@ -52,6 +57,7 @@ export function SavedList({ items: initial }: { items: SavedItem[] }) {
     all: items.length,
     lesson: items.filter((i) => i.kind === 'lesson').length,
     task: items.filter((i) => i.kind === 'task').length,
+    guide: items.filter((i) => i.kind === 'guide').length,
   }
   const shown = items.filter((i) => filter === 'all' || i.kind === filter)
 
@@ -82,7 +88,7 @@ export function SavedList({ items: initial }: { items: SavedItem[] }) {
 
       <ul className="space-y-2">
         {shown.map((item) => {
-          const Icon = item.kind === 'lesson' ? BookOpen : Code2
+          const Icon = KIND[item.kind].icon
           return (
             <li key={item.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 sm:p-4">
               <Icon className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -91,7 +97,7 @@ export function SavedList({ items: initial }: { items: SavedItem[] }) {
                   {item.title}
                 </Link>
                 <p className="truncate text-xs text-muted-foreground">
-                  {item.kind === 'lesson' ? 'Урок' : 'Задача'}
+                  {KIND[item.kind].label}
                   {item.context && ` · ${item.context}`} · сохранено {formatDate(item.savedAt)}
                 </p>
               </div>

@@ -8,13 +8,13 @@ import { cn } from '@/lib/utils'
 
 type Props = {
   /** Числовой id: Payload отвергает строковые id в relationship-полях. */
-  target: { lesson: number } | { task: number }
-  /** id закладки, если урок или задача уже сохранены. */
+  target: { lesson: number } | { task: number } | { guide: number }
+  /** id закладки, если урок, задача или гайд уже сохранены. */
   initialId: number | string | null
   className?: string
 }
 
-/** «Сохранить на потом» — урок или задача попадают в «Сохранённое». */
+/** «Сохранить на потом» — урок, задача или гайд попадают в «Сохранённое». */
 export function BookmarkButton({ target, initialId, className }: Props) {
   const [id, setId] = useState(initialId)
   const [busy, setBusy] = useState(false)

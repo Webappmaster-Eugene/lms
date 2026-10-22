@@ -11,8 +11,9 @@ import { APP_URL, LANDING_URL, LANDING_USE, storageStateOf } from '../fixtures/e
 const SKIP = [/^\/admin/, /^\/api\//, /^\/_next\//]
 const MAX_PAGES = 60
 
-async function linksOn(page: Page): Promise<string[]> {
-  return page.locator('a[href]').evaluateAll((anchors) => anchors.map((a) => (a as HTMLAnchorElement).href))
+/** Ссылка с download — файл: переход на неё начинает скачивание, а не открывает страницу. */
+async function linksOn(page: Page): Promise<{ href: string; file: boolean }[]> {
+  return page.locator('a[href]').evaluateAll((anchors) => anchors.map((a) => ({ href: (a as HTMLAnchorElement).href, file: a.hasAttribute('download') })))
 }
 
 test.describe('платформа (как студент)', () => {
@@ -39,7 +40,7 @@ test.describe('платформа (как студент)', () => {
       )
       brokenImages.push(...images.map((src) => `${path}: ${src}`))
 
-      for (const href of await linksOn(page)) {
+      for (const { href, file } of await linksOn(page)) {
         const url = new URL(href)
         if (url.origin !== origin) {
           if (url.protocol === 'http:' || url.protocol === 'https:') external.add(href)
@@ -48,7 +49,12 @@ test.describe('платформа (как студент)', () => {
         const target = url.pathname
         if (SKIP.some((re) => re.test(target)) || seen.has(target)) continue
         seen.add(target)
-        queue.push(target)
+        if (!file) {
+          queue.push(target)
+          continue
+        }
+        const download = await page.request.get(target)
+        if (download.status() >= 400) broken.push(`${target} → ${download.status()} (файл)`)
       }
     }
 

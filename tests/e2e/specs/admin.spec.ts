@@ -137,6 +137,24 @@ test('урок без ручного slug сохраняется, slug гене�
   await request.delete(`/api/lessons/${page.url().match(/lessons\/(\d+)/)![1]}`)
 })
 
+test('гайд из .md-файла: шапка заполняет поля, текст уходит в Markdown, страница его верстает', async ({ page, request }) => {
+  const stamp = Date.now()
+  const slug = `admin-md-${stamp}`
+  const file = `---\ntitle: Гайд из файла ${stamp}\nsummary: "Описание: из шапки"\nslug: ${slug}\n---\n\n## Раздел\n\n| Шаг | Итог |\n| --- | --- |\n| Загрузить | Готово |\n`
+  await page.goto('/admin/collections/guides/create')
+  await page.locator('input[type="file"][accept*=".md"]').setInputFiles({ name: 'guide.md', mimeType: 'text/markdown', buffer: Buffer.from(file) })
+  await expect(page.getByText('«guide.md»: заполнены текст, название, описание, slug')).toBeVisible()
+  await expect(page.locator('#field-title')).toHaveValue(`Гайд из файла ${stamp}`)
+  await expect(page.locator('#field-summary')).toHaveValue('Описание: из шапки')
+  await expect(page.locator('#field-markdown')).toHaveValue(/^## Раздел/)
+  await save(page)
+  await expect(page).toHaveURL(/\/admin\/collections\/guides\/\d+/)
+  const id = page.url().match(/guides\/(\d+)/)![1]
+  await page.goto(`/guides/${slug}`)
+  await expect(page.getByRole('table')).toContainText('Готово')
+  await request.delete(`/api/guides/${id}`)
+})
+
 test('контакты из «Настроек сайта» появляются на странице контактов', async ({ page, browser, request }) => {
   const channel = `https://t.me/e2e_changed_${Date.now()}`
   await page.goto('/admin/globals/site-settings')

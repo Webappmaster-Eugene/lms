@@ -76,3 +76,8 @@ export const cleanupTaskRelations = cleanupDependents('задача тренаж
   { collection: 'user-trainer-progress', field: 'task' },
   { collection: 'bookmarks', field: 'task' },
 ])
+
+/** Закладки на гайд: без них «Сохранённое» держало бы запись без цели */
+export const cleanupGuideRelations = cleanupDependents('гайд', [
+  { collection: 'bookmarks', field: 'guide' },
+])

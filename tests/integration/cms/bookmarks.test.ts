@@ -7,11 +7,12 @@ import {
   createStudent,
   createSumTask,
   getTestPayload,
+  uid,
   type CourseTree,
   type TestUser,
 } from '../helpers/payload'
 
-/** «Сохранённое»: закладки на уроки и задачи тренажёра на настоящей базе. */
+/** «Сохранённое»: закладки на уроки, задачи тренажёра и гайды на настоящей базе. */
 let payload: Payload
 let tree: CourseTree
 let student: TestUser
@@ -57,6 +58,20 @@ describe('закладки', () => {
     expect(items.map((i) => i.kind)).toEqual(['task', 'lesson'])
     expect(items[1]).toMatchObject({ title: tree.lessons[0].title, href: `/lessons/${tree.lessons[0].slug}`, context: tree.course.title })
     expect(items[0].href).toMatch(new RegExp(`/trainer/.+/${task.slug}$`))
+  })
+
+  it('«Сохранённое» показывает гайды без контекста; снятый с публикации гайд пропадает', async () => {
+    const user = await createStudent(payload, { guidesAccessMode: 'all' })
+    const guide = () => payload.create({ collection: 'guides', data: { title: uid('Гайд'), slug: uid('saved-guide'), summary: 'Кратко', markdown: 'Текст', isPublished: true } })
+    const [shown, hidden] = [await guide(), await guide()]
+    await save(user, { guide: shown.id })
+    await save(user, { guide: hidden.id })
+    await payload.update({ collection: 'guides', id: hidden.id, data: { isPublished: false } })
+
+    const items = await loadSaved(payload, user.id, user)
+
+    expect(items).toEqual([expect.objectContaining({ kind: 'guide', title: shown.title, href: `/guides/${shown.slug}`, context: null })])
+    expect(await findBookmarkId(payload, user.id, { guide: shown.id })).not.toBeNull()
   })
 
   it('удаление урока убирает закладки на него', async () => {

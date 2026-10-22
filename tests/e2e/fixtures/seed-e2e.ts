@@ -38,15 +38,20 @@ function richText(...paragraphs: string[]) {
   }
 }
 
-/** Разделы гайда — заголовки второго уровня с абзацем: из заголовков строится оглавление. */
-function guideContent(sections: readonly string[]) {
-  const doc = richText(...sections.map((title) => `Текст раздела «${title}».`))
-  const heading = (title: string) => ({ ...richText(title).root.children[0], type: 'heading', tag: 'h2' })
-  // Код в строке: скриншоты гайда стерегут его оформление (prose дорисовывает обратные кавычки).
-  const [intro] = doc.root.children
-  const [text] = intro?.children ?? []
-  if (intro && text) intro.children.push({ ...text, text: ' Запуск — ' }, { ...text, text: 'pnpm dev', format: 16 }, { ...text, text: '.' })
-  return { root: { ...doc.root, children: sections.flatMap((title, index) => [heading(title), doc.root.children[index]]) } }
+/**
+ * Гайд в Markdown: разделы «##» строят оглавление. Таблица, цитата, код в строке и блок кода
+ * с языком стерегут вёрстку на скриншотах (prose дорисовывает обратные кавычки и курсив цитат).
+ */
+function guideMarkdown(sections: readonly string[]) {
+  const [first, ...rest] = sections
+  return [
+    `## ${first}`,
+    `Текст раздела «${first}». Запуск — \`pnpm dev\`.`,
+    '| Что | Зачем |\n| --- | --- |\n| Браузер | Отдельный профиль |\n| Прокси | Постоянный адрес |',
+    '> Совет: первую неделю не меняйте устройство.',
+    ...rest.flatMap((title) => [`## ${title}`, `Текст раздела «${title}».`]),
+    '```bash\npnpm install\n```',
+  ].join('\n\n')
 }
 
 // onInit выключен: иначе на пустой roadmap-nodes он засидит свои роадмапы раньше наших узлов.
@@ -210,7 +215,7 @@ await payload.create({
 
 const e2eGuide = await payload.create({
   collection: 'guides',
-  data: { title: CONTENT.guide.title, slug: CONTENT.guide.slug, summary: CONTENT.guide.summary, content: guideContent(CONTENT.guide.sections), order: 1, isPublished: true },
+  data: { title: CONTENT.guide.title, slug: CONTENT.guide.slug, summary: CONTENT.guide.summary, markdown: guideMarkdown(CONTENT.guide.sections), order: 1, isPublished: true },
 })
 // Гайды выдаются отдельно от курсов: студенту — назначением, doer — режимом «все», у leader доступа нет.
 await payload.create({
@@ -218,6 +223,7 @@ await payload.create({
   req: await createLocalReq({ user: await payload.findByID({ collection: 'users', id: created.admin }) }, payload),
   data: { user: created.student, target: { relationTo: 'guides', value: e2eGuide.id }, effect: 'allow', ruleKey: `${created.student}:guides:${e2eGuide.id}` },
 })
+// Черновик — в старом формате Lexical: страница по-прежнему рендерит такие гайды.
 await payload.create({
   collection: 'guides',
   data: { title: CONTENT.draftGuide.title, slug: CONTENT.draftGuide.slug, summary: 'Ученики его не видят', content: richText('Черновик.'), order: 2, isPublished: false },

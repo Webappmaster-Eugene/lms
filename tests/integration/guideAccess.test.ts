@@ -86,3 +86,93 @@ describe('выборочный доступ к гайдам', () => {
     expect(await visibleIds(token, [published.id, draft.id])).toEqual([published.id, draft.id].sort((a, b) => a - b))
   })
 })
+
+describe('гайд в Markdown', () => {
+  it('файл целиком: шапка раскладывается по полям, в тексте остаётся Markdown', async () => {
+    const slug = uid('md-guide')
+    const markdown = `---\ntitle: Гайд из файла\nsummary: Описание из шапки\nslug: ${slug}\norder: 4\npublished: true\n---\n\nВступление.\n\n## Раздел\n`
+    const created = await payload.create({ collection: 'guides', data: { markdown } as never, req: await createLocalReq({ user: admin }, payload) })
+    expect(created).toMatchObject({ title: 'Гайд из файла', summary: 'Описание из шапки', slug, order: 4, isPublished: true, markdown: 'Вступление.\n\n## Раздел' })
+    expect(created.content ?? null).toBeNull()
+  })
+
+  it('повторная загрузка файла без slug меняет текст, но не адрес гайда', async () => {
+    const existing = await payload.create({ collection: 'guides', data: { title: 'Старое название', slug: uid('keep'), summary: 'Кратко', markdown: 'Старый текст' } })
+    const updated = await payload.update({ collection: 'guides', id: existing.id, data: { markdown: '---\ntitle: Новое название\n---\nНовый текст' }, req: await createLocalReq({ user: admin }, payload) })
+    expect(updated).toMatchObject({ title: 'Новое название', slug: existing.slug, markdown: 'Новый текст' })
+  })
+
+  it('без Markdown и без старого текста гайд не сохраняется; старый Lexical-гайд по-прежнему валиден', async () => {
+    const error = await payload.create({ collection: 'guides', data: { title: uid('Пустой'), slug: uid('empty'), summary: 'Кратко' } }).catch((reason: unknown) => reason)
+    expect(error).toMatchObject({ data: { errors: [expect.objectContaining({ path: 'markdown', message: 'Добавьте текст гайда в Markdown' })] } })
+    const legacy = await guide()
+    const renamed = await payload.update({ collection: 'guides', id: legacy.id, data: { title: 'Переименован' } })
+    expect(renamed.title).toBe('Переименован')
+  })
+})
+
+describe('закладки на гайды', () => {
+  async function bookmark(token: string, guideId: number) {
+    return rest('POST', '/bookmarks', { token, body: { guide: guideId } })
+  }
+  async function savedGuideIds(token: string) {
+    const response = await rest('GET', '/bookmarks?depth=0&limit=100', { token })
+    expect(response.status).toBe(200)
+    return (response.json.docs as { guide?: number | null }[]).flatMap((doc) => (doc.guide ? [doc.guide] : []))
+  }
+
+  it('ученик сохраняет выданный гайд, а закрытый — нет', async () => {
+    const student = await createStudent(payload)
+    const token = await login(payload, student)
+    const [open, closed] = [await guide(), await guide()]
+    await grant(student.id, open.id)
+    expect((await bookmark(token, open.id)).status).toBe(201)
+    expect((await bookmark(token, closed.id)).status).toBe(403)
+    expect(await savedGuideIds(token)).toEqual([open.id])
+  })
+
+  it('повторное сохранение того же гайда не создаёт дубль', async () => {
+    const student = await createStudent(payload)
+    const token = await login(payload, student)
+    const open = await guide()
+    await grant(student.id, open.id)
+    expect((await bookmark(token, open.id)).status).toBe(201)
+    expect((await bookmark(token, open.id)).status).toBe(400)
+    expect(await savedGuideIds(token)).toEqual([open.id])
+  })
+
+  it('закрытый доступ прячет закладку, снова выданный — возвращает', async () => {
+    const student = await createStudent(payload)
+    const token = await login(payload, student)
+    const open = await guide()
+    const allow = await grant(student.id, open.id)
+    expect((await bookmark(token, open.id)).status).toBe(201)
+    await payload.delete({ collection: 'learning-access-grants', id: allow.id, req: await createLocalReq({ user: admin }, payload) })
+    expect(await savedGuideIds(token)).toEqual([])
+    await grant(student.id, open.id)
+    expect(await savedGuideIds(token)).toEqual([open.id])
+  })
+
+  it('закладка не переносится на другой гайд и не ведёт сразу на урок и гайд', async () => {
+    const student = await createStudent(payload)
+    const token = await login(payload, student)
+    const [first, second] = [await guide(), await guide()]
+    await grant(student.id, first.id)
+    await grant(student.id, second.id)
+    const created = await bookmark(token, first.id)
+    const id = (created.json.doc as { id: number }).id
+    expect((await rest('PATCH', `/bookmarks/${id}`, { token, body: { guide: second.id } })).status).toBe(400)
+    expect((await rest('POST', '/bookmarks', { token, body: { guide: first.id, task: 1 } })).status).toBe(400)
+  })
+
+  it('удаление гайда удаляет закладки на него', async () => {
+    const student = await createStudent(payload)
+    const token = await login(payload, student)
+    const removed = await guide()
+    await grant(student.id, removed.id)
+    expect((await bookmark(token, removed.id)).status).toBe(201)
+    await payload.delete({ collection: 'guides', id: removed.id, req: await createLocalReq({ user: admin }, payload) })
+    const left = await payload.find({ collection: 'bookmarks', where: { user: { equals: student.id } }, depth: 0 })
+    expect(left.totalDocs).toBe(0)
+  })
+})

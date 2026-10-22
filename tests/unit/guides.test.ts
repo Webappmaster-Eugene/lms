@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { guideHeadings, guideReadingMinutes } from '@/lib/guides'
+import { guideContents, guideHeadings, guideReadingMinutes } from '@/lib/guides'
 
 const text = (value: string) => ({ type: 'text', text: value, version: 1 })
 const heading = (tag: string, value: string) => ({ type: 'heading', tag, version: 1, children: [text(value)] })
@@ -33,13 +33,28 @@ describe('оглавление гайда', () => {
 })
 
 describe('время чтения гайда', () => {
+  const words = Array.from({ length: 480 }, (_, i) => `слово${i}`).join(' ')
+
   it('считает слова всего документа и округляет до минут', () => {
-    const words = Array.from({ length: 480 }, (_, i) => `слово${i}`).join(' ')
-    expect(guideReadingMinutes(doc(heading('h2', 'Раздел'), paragraph(words)))).toBe(3)
+    expect(guideReadingMinutes({ content: doc(heading('h2', 'Раздел'), paragraph(words)) })).toBe(3)
+  })
+
+  it('у гайда в Markdown считает текст, а не разметку и адреса ссылок', () => {
+    const links = Array.from({ length: 200 }, (_, i) => `[ссылка](https://example.com/${'очень/длинный/адрес/'.repeat(5)}${i})`).join(' ')
+    expect(guideReadingMinutes({ markdown: `## Раздел\n\n${words}\n\n${links}`, content: doc(paragraph('Старый текст')) })).toBe(4)
   })
 
   it('короткий или пустой гайд — не меньше минуты', () => {
-    expect(guideReadingMinutes(doc(paragraph('Коротко')))).toBe(1)
-    expect(guideReadingMinutes(null)).toBe(1)
+    expect(guideReadingMinutes({ content: doc(paragraph('Коротко')) })).toBe(1)
+    expect(guideReadingMinutes({ content: null })).toBe(1)
+    expect(guideReadingMinutes({ markdown: '   ', content: null })).toBe(1)
+  })
+})
+
+describe('оглавление гайда в любом формате', () => {
+  it('Markdown важнее старого Lexical, пустой Markdown — нет', () => {
+    const legacy = doc(heading('h2', 'Старый раздел'))
+    expect(guideContents({ markdown: '## Новый раздел\n\nТекст', content: legacy }).map((h) => h.title)).toEqual(['Новый раздел'])
+    expect(guideContents({ markdown: ' \n', content: legacy }).map((h) => h.title)).toEqual(['Старый раздел'])
   })
 })

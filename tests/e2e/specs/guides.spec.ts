@@ -1,11 +1,14 @@
+import { readFile } from 'node:fs/promises'
+
 import { expect, test } from '@playwright/test'
 
 import { CONTENT, NOT_FOUND_HEADING } from '../fixtures/data'
 import { storageStateOf } from '../fixtures/env'
 
 /**
- * Раздел «Гайды»: список, оглавление, черновики и выборочный доступ. По сиду гайд студенту
- * назначен отдельно, а у leader доступа к гайдам нет при открытых курсах.
+ * Раздел «Гайды»: список, оглавление, Markdown-вёрстка, скачивание .md, «Сохранённое», черновики
+ * и выборочный доступ. По сиду гайд студенту назначен отдельно, а у leader доступа к гайдам нет
+ * при открытых курсах. Черновик хранится в старом формате Lexical.
  */
 test.describe('ученик', () => {
   test.use({ storageState: storageStateOf('student') })
@@ -32,6 +35,36 @@ test.describe('ученик', () => {
     await expect(page).toHaveURL(/\/guides$/)
   })
 
+  test('Markdown свёрстан: таблица, врезка, код в строке и подсвеченный блок кода', async ({ page }) => {
+    await page.goto(`/guides/${CONTENT.guide.slug}`)
+    await expect(page.getByRole('table')).toContainText('Отдельный профиль')
+    await expect(page.locator('blockquote')).toContainText('первую неделю не меняйте устройство')
+    await expect(page.locator('p code', { hasText: 'pnpm dev' })).toBeVisible()
+    await expect(page.locator('pre.shiki')).toContainText('pnpm install')
+  })
+
+  test('скачивает гайд файлом .md с названием, текстом и ссылкой на источник', async ({ page }) => {
+    await page.goto(`/guides/${CONTENT.guide.slug}`)
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name: 'Скачать .md' }).click()])
+    expect(download.suggestedFilename()).toBe(`${CONTENT.guide.slug}.md`)
+    const file = await readFile(await download.path(), 'utf8')
+    expect(file.startsWith(`# ${CONTENT.guide.title}\n\n> ${CONTENT.guide.summary}`)).toBe(true)
+    expect(file).toContain(`## ${CONTENT.guide.sections[0]}`)
+    expect(file).toMatch(new RegExp(`Источник: http\\S+/guides/${CONTENT.guide.slug}`))
+  })
+
+  test('сохраняет гайд и находит его в «Сохранённом»', async ({ page }) => {
+    await page.goto(`/guides/${CONTENT.guide.slug}`)
+    await page.getByRole('button', { name: 'В сохранённое' }).click()
+    await expect(page.getByRole('button', { name: 'В сохранённом' })).toHaveAttribute('aria-pressed', 'true')
+
+    await page.goto('/saved')
+    await page.getByRole('button', { name: /Гайды/ }).click()
+    await expect(page.getByRole('link', { name: CONTENT.guide.title })).toHaveAttribute('href', `/guides/${CONTENT.guide.slug}`)
+    await page.getByRole('button', { name: `Убрать «${CONTENT.guide.title}» из сохранённого` }).click()
+    await expect(page.getByRole('link', { name: CONTENT.guide.title })).toHaveCount(0)
+  })
+
   test('черновик гайда по прямой ссылке отвечает 404', async ({ page }) => {
     const response = await page.goto(`/guides/${CONTENT.draftGuide.slug}`)
     expect(response?.status()).toBe(404)
@@ -53,6 +86,7 @@ test.describe('ученик без назначенных гайдов', () => {
 
     const response = await page.goto(`/guides/${CONTENT.guide.slug}`)
     expect(response?.status()).toBe(404)
+    expect((await page.request.get(`/guides/${CONTENT.guide.slug}/download`)).status()).toBe(404)
   })
 })
 
@@ -66,5 +100,9 @@ test.describe('администратор', () => {
     await draft.click()
     await expect(page.getByRole('heading', { name: CONTENT.draftGuide.title, level: 1 })).toBeVisible()
     await expect(page.getByText('Черновик — ученики его пока не видят')).toBeVisible()
+    // Старый Lexical-гайд читается, но файлом не скачивается; черновик в «Сохранённое» не кладут.
+    await expect(page.getByText('Черновик.')).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Скачать .md' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'В сохранённое' })).toHaveCount(0)
   })
 })

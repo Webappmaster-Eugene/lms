@@ -35,13 +35,13 @@ describe('кнопка «В сохранённое»', () => {
     expect(JSON.parse(String(calls[0].init?.body))).toEqual({ lesson: 5 })
   })
 
-  it('задача сохраняется так же', async () => {
-    render(<BookmarkButton target={{ task: 9 }} initialId={null} />)
+  it.each([{ task: 9 }, { guide: 4 }])('задача и гайд сохраняются так же: %j', async (target) => {
+    render(<BookmarkButton target={target} initialId={null} />)
 
     await userEvent.click(screen.getByRole('button', { name: 'В сохранённое' }))
 
     await waitFor(() => expect(calls).toHaveLength(1))
-    expect(JSON.parse(String(calls[0].init?.body))).toEqual({ task: 9 })
+    expect(JSON.parse(String(calls[0].init?.body))).toEqual(target)
   })
 
   it('повторное нажатие убирает закладку по её id', async () => {
@@ -69,6 +69,7 @@ describe('«Сохранённое»', () => {
   const items: SavedItem[] = [
     { id: '1', kind: 'lesson', title: 'Хуки', href: '/lessons/hooks', context: 'React', savedAt: '2026-09-20T10:00:00Z' },
     { id: '2', kind: 'task', title: 'Сумма', href: '/trainer/functions/sum', context: 'Функции', savedAt: '2026-09-19T10:00:00Z' },
+    { id: '3', kind: 'guide', title: 'LinkedIn', href: '/guides/linkedin', context: null, savedAt: '2026-09-18T10:00:00Z' },
   ]
 
   it('ссылки ведут на урок и задачу, видно курс и тему', () => {
@@ -88,6 +89,16 @@ describe('«Сохранённое»', () => {
     expect(screen.getByText('1 запись')).toBeInTheDocument()
   })
 
+  it('гайд подписан «Гайд» без контекста и отбирается фильтром «Гайды»', async () => {
+    render(<SavedList items={items} />)
+
+    await userEvent.click(screen.getByRole('button', { name: /Гайды/ }))
+
+    expect(screen.getByRole('link', { name: 'LinkedIn' })).toHaveAttribute('href', '/guides/linkedin')
+    expect(screen.getByText(/^Гайд · сохранено/)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Сумма' })).not.toBeInTheDocument()
+  })
+
   it('убрать из сохранённого — запись пропадает из списка', async () => {
     render(<SavedList items={items} />)
 
@@ -100,6 +111,6 @@ describe('«Сохранённое»', () => {
   it('пустой список объясняет, как сохранять', () => {
     render(<SavedList items={[]} />)
 
-    expect(screen.getByText(/Нажмите «В сохранённое» на уроке или задаче/)).toBeInTheDocument()
+    expect(screen.getByText(/Нажмите «В сохранённое» на уроке, задаче тренажёра или в гайде/)).toBeInTheDocument()
   })
 })

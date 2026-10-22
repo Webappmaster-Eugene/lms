@@ -28,6 +28,7 @@ import * as migration_20261012_170329_slides_block from './20261012_170329_slide
 import * as migration_20261020_195554_email_broadcasts from './20261020_195554_email_broadcasts';
 import * as migration_20261022_093223_guides from './20261022_093223_guides';
 import * as migration_20261022_131120_guides_access from './20261022_131120_guides_access';
+import * as migration_20261022_191842_guides_markdown from './20261022_191842_guides_markdown';
 
 export const migrations = [
   {
@@ -178,6 +179,11 @@ export const migrations = [
   {
     up: migration_20261022_131120_guides_access.up,
     down: migration_20261022_131120_guides_access.down,
-    name: '20261022_131120_guides_access'
+    name: '20261022_131120_guides_access',
+  },
+  {
+    up: migration_20261022_191842_guides_markdown.up,
+    down: migration_20261022_191842_guides_markdown.down,
+    name: '20261022_191842_guides_markdown'
   },
 ];
