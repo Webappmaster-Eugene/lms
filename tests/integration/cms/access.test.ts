@@ -29,6 +29,8 @@ const MATRIX: Record<string, Matrix> = {
   lessons: PUBLISHABLE,
   // Гайды не входят в доступ к обучению: ученику без отдельного назначения не виден ни один.
   guides: { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
+  // Справочник категорий: названия видят все вошедшие, меняет только админ.
+  'guide-categories': CONTENT,
   'learning-access-grants': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
   'learning-access-audit': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'learning-access-policies': { create: 'nobody', read: 'own', update: 'nobody', delete: 'nobody' },
@@ -77,6 +79,7 @@ const PATCH: Record<string, Record<string, unknown>> = {
   sections: { order: 7 },
   lessons: { order: 7 },
   guides: { order: 7 },
+  'guide-categories': { order: 7 },
   'learning-access-grants': { note: 'Обновлено' },
   'learning-access-audit': { effect: 'deny' },
   'learning-access-policies': { mode: 'all' },

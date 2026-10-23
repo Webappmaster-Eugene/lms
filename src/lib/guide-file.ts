@@ -1,4 +1,3 @@
-import { GUIDE_CATEGORIES, guideCategoryFromText, type GuideCategory } from '@/lib/guides'
 import { formatDate } from '@/lib/utils'
 
 /** Поля гайда, которые можно задать шапкой `---` в начале `.md`-файла. */
@@ -8,7 +7,8 @@ export type GuideFileFields = {
   slug?: string
   order?: number
   published?: boolean
-  category?: GuideCategory
+  /** Название или slug категории как написано в шапке; в id его переводит серверный хук, у которого есть база. */
+  category?: string
   /** Даты — ISO-строки. */
   reviewedAt?: string
   reviewBy?: string
@@ -48,11 +48,8 @@ function readFrontmatter(block: string): { fields: GuideFileFields; problems: st
     if (key === 'title' || key === 'summary' || key === 'slug') fields[key] = value
     else if (key === 'order' && /^-?\d+$/.test(value)) fields.order = Number(value)
     else if (key === 'published' && /^(true|false)$/i.test(value)) fields.published = value.toLowerCase() === 'true'
-    else if (key === 'category') {
-      const category = guideCategoryFromText(value)
-      if (category) fields.category = category
-      else problems.push(`category: «${value}» — такой категории нет, есть ${GUIDE_CATEGORIES.map((item) => item.value).join(', ')}`)
-    } else if (key === 'reviewed' || key === 'reviewby') {
+    else if (key === 'category') fields.category = value
+    else if (key === 'reviewed' || key === 'reviewby') {
       const date = headerDate(value)
       if (!date) problems.push(`${pair[1]}: «${value}» — нужна дата вида 2026-10-22`)
       else if (key === 'reviewed') fields.reviewedAt = date

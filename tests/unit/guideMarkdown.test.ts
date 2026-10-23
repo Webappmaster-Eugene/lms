@@ -41,18 +41,17 @@ describe('файл гайда .md', () => {
     })
   })
 
-  it('категория и даты проверки: код или подпись категории, review_by и reviewBy — одно поле', () => {
+  it('категория остаётся как в шапке (в id её переведёт сервер), review_by и reviewBy — одно поле', () => {
     const parsed = parseGuideFile('---\ncategory: ИИ в работе\nreviewed: 2026-10-22\nreview_by: 2027-01-15\n---\nТекст')
-    expect(parsed.fields).toEqual({ category: 'ai', reviewedAt: '2026-10-22T12:00:00.000Z', reviewBy: '2027-01-15T12:00:00.000Z' })
+    expect(parsed.fields).toEqual({ category: 'ИИ в работе', reviewedAt: '2026-10-22T12:00:00.000Z', reviewBy: '2027-01-15T12:00:00.000Z' })
     expect(parseGuideFile('---\nreviewBy: 2027-01-15\n---\nТекст').fields).toEqual({ reviewBy: '2027-01-15T12:00:00.000Z' })
     expect(parsed.problems).toEqual([])
   })
 
-  it('непонятная категория и дата не теряются молча, а попадают в problems', () => {
+  it('непонятная дата не теряется молча, а попадает в problems (категорию проверяет сервер по справочнику)', () => {
     const parsed = parseGuideFile('---\ncategory: финансы\nreviewed: 22.10.2026\nreview_by: 2026-02-30\n---\nТекст')
-    expect(parsed.fields).toEqual({})
+    expect(parsed.fields).toEqual({ category: 'финансы' })
     expect(parsed.problems).toEqual([
-      'category: «финансы» — такой категории нет, есть career, ai, business, other',
       'reviewed: «22.10.2026» — нужна дата вида 2026-10-22',
       'review_by: «2026-02-30» — нужна дата вида 2026-10-22',
     ])

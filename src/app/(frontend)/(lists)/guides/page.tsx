@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { CheckCircle2, Clock, Compass } from 'lucide-react'
 import { collectAllPages } from '@/lib/paginate'
-import { GUIDE_CATEGORIES, guideCategoryLabel, guideIsNew, isGuideCategory } from '@/lib/guides'
+import { guideIsNew } from '@/lib/guides'
 import { learningRelationId } from '@/lib/learning-access'
 import { cn, formatDate } from '@/lib/utils'
 import { getLearningRequest } from '@/server/learning-request'
@@ -19,11 +19,11 @@ type Props = {
 export default async function GuidesPage({ searchParams }: Props) {
   const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login?redirect=%2Fguides')
-  const requested = (await searchParams).category
-  const category = isGuideCategory(requested) ? requested : null
+  const requestedParam = (await searchParams).category
+  const requestedSlug = Array.isArray(requestedParam) ? requestedParam[0] : requestedParam
 
   // Отбор делает access: ученик получает назначенные ему опубликованные гайды, админ — все, включая черновики.
-  const [guides, reads] = await Promise.all([
+  const [guides, reads, categories] = await Promise.all([
     collectAllPages(
       ({ page, limit }) =>
         payload.find({
@@ -42,10 +42,18 @@ export default async function GuidesPage({ searchParams }: Props) {
       ({ page, limit }) => payload.find({ collection: 'guide-reads', where: { user: { equals: user.id } }, select: { guide: true }, depth: 0, sort: 'id', overrideAccess: false, req, page, limit }),
       { label: 'прочитанные гайды' },
     ),
+    collectAllPages(
+      ({ page, limit }) => payload.find({ collection: 'guide-categories', sort: ['order', 'title'], select: { title: true, slug: true }, depth: 0, overrideAccess: true, req, page, limit }),
+      { label: 'категории гайдов' },
+    ),
   ])
   const read = new Set(reads.map((item) => learningRelationId(item.guide)))
-  const present = GUIDE_CATEGORIES.filter((item) => guides.some((guide) => guide.category === item.value))
-  const shown = category ? guides.filter((guide) => guide.category === category) : guides
+  const categoryById = new Map(categories.map((item) => [item.id, item]))
+  const guideCategoryId = (guide: (typeof guides)[number]) => learningRelationId(guide.category)
+  const activeCategory = requestedSlug ? categories.find((item) => item.slug === requestedSlug) ?? null : null
+  // Фильтр показываем только для категорий, в которых у ученика есть хотя бы один гайд.
+  const present = categories.filter((item) => guides.some((guide) => guideCategoryId(guide) === item.id))
+  const shown = activeCategory ? guides.filter((guide) => guideCategoryId(guide) === activeCategory.id) : guides
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -60,12 +68,12 @@ export default async function GuidesPage({ searchParams }: Props) {
       {/* Фильтр нужен, когда гайды есть хотя бы в двух категориях. */}
       {present.length > 1 && (
         <nav aria-label="Категории гайдов" className="flex flex-wrap gap-2">
-          {[{ value: null, label: 'Все' }, ...present].map((item) => {
-            const current = item.value === category
+          {[{ slug: null, label: 'Все' }, ...present.map((item) => ({ slug: item.slug, label: item.title }))].map((item) => {
+            const current = item.slug === (activeCategory?.slug ?? null)
             return (
               <Link
-                key={item.value ?? 'all'}
-                href={item.value ? `/guides?category=${item.value}` : '/guides'}
+                key={item.slug ?? 'all'}
+                href={item.slug ? `/guides?category=${item.slug}` : '/guides'}
                 aria-current={current ? 'page' : undefined}
                 className={cn(
                   'inline-flex min-h-[36px] items-center rounded-full border px-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-ring',
@@ -81,7 +89,7 @@ export default async function GuidesPage({ searchParams }: Props) {
 
       {shown.length === 0 ? (
         <div className="rounded-xl border border-border bg-card px-5 py-12 text-center text-muted-foreground">
-          {category ? (
+          {activeCategory ? (
             <p>В этой категории гайдов пока нет. <Link href="/guides" className="font-medium text-primary underline-offset-2 hover:underline">Показать все</Link></p>
           ) : user.role === 'admin' ? (
             <p>Гайдов пока нет. Создайте первый в CMS — раздел «Гайды»</p>
@@ -94,7 +102,8 @@ export default async function GuidesPage({ searchParams }: Props) {
           {shown.map((guide) => {
             const isRead = read.has(guide.id)
             const isNew = user.role !== 'admin' && guideIsNew(guide.announcedAt, isRead)
-            const label = guideCategoryLabel(guide.category)
+            const categoryId = guideCategoryId(guide)
+            const label = categoryId != null ? categoryById.get(categoryId)?.title ?? null : null
             return (
               <li key={guide.id}>
                 <Link

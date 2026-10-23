@@ -10,29 +10,6 @@ export const GUIDE_NEW_DAYS = 30
 /** За столько дней до срока гайд попадает в список «пора пересмотреть» в CMS. */
 export const GUIDE_REVIEW_SOON_DAYS = 14
 
-export const GUIDE_CATEGORIES = [
-  { value: 'career', label: 'Карьера' },
-  { value: 'ai', label: 'ИИ в работе' },
-  { value: 'business', label: 'Свой бизнес' },
-  { value: 'other', label: 'Другое' },
-] as const
-
-export type GuideCategory = (typeof GUIDE_CATEGORIES)[number]['value']
-
-export function isGuideCategory(value: unknown): value is GuideCategory {
-  return GUIDE_CATEGORIES.some((category) => category.value === value)
-}
-
-/** Категория из шапки файла: код (`ai`) или подпись (`ИИ в работе`) без учёта регистра. */
-export function guideCategoryFromText(value: string): GuideCategory | null {
-  const text = value.trim().toLowerCase()
-  return GUIDE_CATEGORIES.find((category) => category.value === text || category.label.toLowerCase() === text)?.value ?? null
-}
-
-export function guideCategoryLabel(value: string | null | undefined): string | null {
-  return GUIDE_CATEGORIES.find((category) => category.value === value)?.label ?? null
-}
-
 export function guideReadingMinutes(markdown: string | null | undefined): number {
   const words = markdown?.trim() ? markdownPlainText(markdown).split(/\s+/).filter(Boolean).length : 0
   return Math.max(1, Math.round(words / WORDS_PER_MINUTE))

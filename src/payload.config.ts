@@ -45,6 +45,7 @@ import { InterviewDirections, InterviewRecordings, InterviewAnalysisUsage } from
 import { InterviewRooms } from '@/payload/collections/InterviewRooms'
 import { FaqItems } from '@/payload/collections/FaqItems'
 import { Guides } from '@/payload/collections/Guides'
+import { GuideCategories } from '@/payload/collections/GuideCategories'
 import { GuideReads } from '@/payload/collections/GuideReads'
 import { YandexDiskImports } from '@/payload/collections/YandexDiskImports'
 import { withLessonSourceGuard } from '@/payload/hooks/denyLessonSourceQueries'
@@ -96,6 +97,7 @@ export default buildConfig({
     Sections,
     Lessons,
     Guides,
+    GuideCategories,
     Media,
     UserProgress,
     LessonLearningStates,

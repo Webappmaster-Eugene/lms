@@ -3,8 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   GUIDE_NEW_DAYS,
   defaultGuideReviewBy,
-  guideCategoryFromText,
-  guideCategoryLabel,
   guideIsNew,
   guideReadingMinutes,
   guideReviewHorizon,
@@ -25,21 +23,6 @@ describe('время чтения гайда', () => {
     expect(guideReadingMinutes('Коротко')).toBe(1)
     expect(guideReadingMinutes('   ')).toBe(1)
     expect(guideReadingMinutes(null)).toBe(1)
-  })
-})
-
-describe('категории гайдов', () => {
-  it('из шапки принимается код и подпись без учёта регистра', () => {
-    expect(guideCategoryFromText('ai')).toBe('ai')
-    expect(guideCategoryFromText(' Свой бизнес ')).toBe('business')
-    expect(guideCategoryFromText('КАРЬЕРА')).toBe('career')
-    expect(guideCategoryFromText('финансы')).toBeNull()
-  })
-
-  it('подпись категории; неизвестная или пустая — без подписи', () => {
-    expect(guideCategoryLabel('ai')).toBe('ИИ в работе')
-    expect(guideCategoryLabel('nope')).toBeNull()
-    expect(guideCategoryLabel(null)).toBeNull()
   })
 })
 

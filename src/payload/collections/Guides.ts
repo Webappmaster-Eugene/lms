@@ -1,6 +1,5 @@
 import type { CollectionConfig } from 'payload'
 
-import { GUIDE_CATEGORIES } from '@/lib/guides'
 import { isAdmin } from '@/payload/access/isAdmin'
 import { cleanupGuideRelations } from '@/payload/hooks/cleanupOwnedRelations'
 import { generateSlug } from '@/payload/hooks/generateSlug'
@@ -61,7 +60,8 @@ export const Guides: CollectionConfig = {
       label: 'Slug',
       admin: {
         position: 'sidebar',
-        description: 'Генерируется автоматически из названия',
+        description: 'Подставляется из названия транслитом. Менять уже опубликованный адрес не стоит',
+        components: { Field: '/components/admin/AutoSlugField#AutoSlugField' },
       },
     },
     {
@@ -93,12 +93,12 @@ export const Guides: CollectionConfig = {
     },
     {
       name: 'category',
-      type: 'select',
+      type: 'relationship',
+      relationTo: 'guide-categories',
       label: 'Категория',
-      options: GUIDE_CATEGORIES.map((category) => ({ ...category })),
       admin: {
         position: 'sidebar',
-        description: 'По ней ученик фильтрует список гайдов',
+        description: 'По ней ученик фильтрует список гайдов. Нет нужной — создайте кнопкой рядом',
       },
     },
     {

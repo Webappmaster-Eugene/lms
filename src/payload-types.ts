@@ -75,6 +75,7 @@ export interface Config {
     sections: Section;
     lessons: Lesson;
     guides: Guide;
+    'guide-categories': GuideCategory;
     media: Media;
     'user-progress': UserProgress;
     'lesson-learning-states': LessonLearningState;
@@ -125,6 +126,7 @@ export interface Config {
     sections: SectionsSelect<false> | SectionsSelect<true>;
     lessons: LessonsSelect<false> | LessonsSelect<true>;
     guides: GuidesSelect<false> | GuidesSelect<true>;
+    'guide-categories': GuideCategoriesSelect<false> | GuideCategoriesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     'user-progress': UserProgressSelect<false> | UserProgressSelect<true>;
     'lesson-learning-states': LessonLearningStatesSelect<false> | LessonLearningStatesSelect<true>;
@@ -631,7 +633,7 @@ export interface Guide {
   id: number;
   title: string;
   /**
-   * Генерируется автоматически из названия
+   * Подставляется из названия транслитом. Менять уже опубликованный адрес не стоит
    */
   slug: string;
   /**
@@ -640,9 +642,9 @@ export interface Guide {
   summary: string;
   markdown?: string | null;
   /**
-   * По ней ученик фильтрует список гайдов
+   * По ней ученик фильтрует список гайдов. Нет нужной — создайте кнопкой рядом
    */
-  category?: ('career' | 'ai' | 'business' | 'other') | null;
+  category?: (number | null) | GuideCategory;
   /**
    * Когда цифры и ссылки в гайде сверены с источниками. Видно ученику
    */
@@ -658,6 +660,24 @@ export interface Guide {
   announcedAt?: string | null;
   order?: number | null;
   isPublished?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "guide-categories".
+ */
+export interface GuideCategory {
+  id: number;
+  title: string;
+  /**
+   * Адрес фильтра: /guides?category=<slug>. Подставляется из названия
+   */
+  slug: string;
+  /**
+   * Чем меньше, тем левее в фильтре списка гайдов
+   */
+  order?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1753,6 +1773,10 @@ export interface PayloadLockedDocument {
         value: number | Guide;
       } | null)
     | ({
+        relationTo: 'guide-categories';
+        value: number | GuideCategory;
+      } | null)
+    | ({
         relationTo: 'media';
         value: number | Media;
       } | null)
@@ -2134,6 +2158,17 @@ export interface GuidesSelect<T extends boolean = true> {
   announcedAt?: T;
   order?: T;
   isPublished?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "guide-categories_select".
+ */
+export interface GuideCategoriesSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  order?: T;
   updatedAt?: T;
   createdAt?: T;
 }

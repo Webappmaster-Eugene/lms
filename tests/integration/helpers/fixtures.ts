@@ -40,6 +40,7 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   sections: (ctx) => ({ title: `Секция ${uid()}`, course: ctx.courseId }),
   lessons: (ctx) => ({ title: `Урок ${uid()}`, course: ctx.courseId }),
   guides: () => ({ title: `Гайд ${uid()}`, summary: 'Кратко о гайде', markdown: 'Текст гайда' }),
+  'guide-categories': () => ({ title: `Категория ${uid()}` }),
   'learning-access-grants': (ctx) => ({ user: ctx.studentId, target: { relationTo: 'lessons', value: ctx.lessonId }, effect: 'allow', ruleKey: 'server-generated' }),
   'learning-access-audit': (ctx) => ({ actorId: ctx.userId, userId: ctx.studentId, targetType: 'lessons', targetId: ctx.lessonId, effect: 'allow', operation: 'create' }),
   'learning-access-policies': (ctx) => ({ user: ctx.studentId, mode: 'assigned', role: 'student' }),

@@ -9,7 +9,8 @@ import { GuideMarkdown } from '@/components/guides/GuideMarkdown'
 import { GuideSideToc } from '@/components/guides/GuideSideToc'
 import { findBookmarkId } from '@/lib/bookmarks'
 import { guideMarkdownHeadings } from '@/lib/guide-markdown'
-import { guideCategoryLabel, guideReadingMinutes } from '@/lib/guides'
+import { guideReadingMinutes } from '@/lib/guides'
+import { learningRelationId } from '@/lib/learning-access'
 import { routeSlug } from '@/lib/route-slug'
 import { metaDescription } from '@/lib/site-metadata'
 import { formatDate } from '@/lib/utils'
@@ -81,7 +82,10 @@ export default async function GuidePage({ params }: Props) {
     ])
     : [null, null]
   const readState: GuideReadState | null = read ? { id: read.id, helpful: read.helpful ?? null, comment: read.comment ?? null } : null
-  const category = guideCategoryLabel(guide.category)
+  const categoryId = learningRelationId(guide.category)
+  const category = categoryId != null
+    ? (await payload.findByID({ collection: 'guide-categories', id: categoryId, depth: 0, overrideAccess: true, req }).catch(() => null))?.title ?? null
+    : null
 
   return (
     <div className="mx-auto max-w-3xl min-[1400px]:grid min-[1400px]:max-w-[calc(48rem+15rem+2.5rem)] min-[1400px]:grid-cols-[minmax(0,48rem)_15rem] min-[1400px]:gap-10">

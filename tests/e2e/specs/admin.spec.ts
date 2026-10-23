@@ -189,6 +189,16 @@ test('гайд пишется в редакторе CMS: шаблон, пане�
   await request.delete(`/api/guides/${id}`)
 })
 
+test('гайд: slug подставляется из названия транслитом, ручная правка не затирается', async ({ page }) => {
+  await page.goto('/admin/collections/guides/create')
+  await page.locator('#field-title').fill('Как настроить Git')
+  await expect(page.locator('#field-slug')).toHaveValue('kak-nastroit-git')
+  // Своя правка slug остаётся: дальнейший ввод названия её не перезаписывает.
+  await page.locator('#field-slug').fill('moy-slug')
+  await page.locator('#field-title').fill('Как настроить Git и GitHub')
+  await expect(page.locator('#field-slug')).toHaveValue('moy-slug')
+})
+
 test('контакты из «Настроек сайта» появляются на странице контактов', async ({ page, browser, request }) => {
   const channel = `https://t.me/e2e_changed_${Date.now()}`
   await page.goto('/admin/globals/site-settings')

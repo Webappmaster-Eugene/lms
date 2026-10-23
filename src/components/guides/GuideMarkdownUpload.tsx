@@ -16,7 +16,7 @@ export function GuideMarkdownUpload() {
   const slug = useField<string>({ path: 'slug' })
   const order = useField<number>({ path: 'order' })
   const published = useField<boolean>({ path: 'isPublished' })
-  const category = useField<string>({ path: 'category' })
+  const category = useField<number | null>({ path: 'category' })
   const reviewedAt = useField<string | null>({ path: 'reviewedAt' })
   const reviewBy = useField<string | null>({ path: 'reviewBy' })
   const input = useRef<HTMLInputElement>(null)
@@ -39,7 +39,17 @@ export function GuideMarkdownUpload() {
       if (fields.slug) { slug.setValue(fields.slug); filled.push('slug') }
       if (fields.order !== undefined) { order.setValue(fields.order); filled.push('порядок') }
       if (fields.published !== undefined) { published.setValue(fields.published); filled.push('публикация') }
-      if (fields.category) { category.setValue(fields.category); filled.push('категория') }
+      if (fields.category) {
+        // Категория — связь: имя из шапки переводим в id по справочнику, как это делает сервер.
+        const response = await fetch('/api/guide-categories?limit=1000&depth=0', { credentials: 'same-origin' })
+        if (!response.ok) throw new Error('не удалось загрузить список категорий')
+        const all = ((await response.json())?.docs ?? []) as { id: number; slug: string; title: string }[]
+        const text = fields.category.trim().toLowerCase()
+        const match = all.find((item) => item.slug.toLowerCase() === text || (item.title ?? '').trim().toLowerCase() === text)
+        if (!match) throw new Error(`категории «${fields.category.trim()}» нет — создайте её и выберите вручную`)
+        category.setValue(match.id)
+        filled.push('категория')
+      }
       if (fields.reviewedAt) {
         reviewedAt.setValue(fields.reviewedAt)
         // Срок прошлой проверки к новой не относится; пустой пересчитает сервер.

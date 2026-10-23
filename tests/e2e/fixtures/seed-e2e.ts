@@ -216,19 +216,26 @@ await payload.create({
 
 // Уведомления о гайдах сид не рассылает: счётчик колокольчика на скриншотах не должен от них зависеть.
 const quiet = { skipHooks: true }
+// Категории гайдов — отдельный справочник; миграция их уже засеяла, берём по slug или заводим.
+const categoryId = async (title: string, slug: string): Promise<number> => {
+  const found = await payload.find({ collection: 'guide-categories', where: { slug: { equals: slug } }, limit: 1, depth: 0 })
+  return found.docs[0]?.id ?? (await payload.create({ collection: 'guide-categories', data: { title, slug } })).id
+}
+const careerCategory = await categoryId('Карьера', 'career')
+const aiCategory = await categoryId('ИИ в работе', 'ai')
 const e2eGuide = await payload.create({
   collection: 'guides',
   context: quiet,
   data: {
     title: CONTENT.guide.title, slug: CONTENT.guide.slug, summary: CONTENT.guide.summary, markdown: guideMarkdown(CONTENT.guide.sections),
-    category: 'career', reviewedAt: '2026-10-22T12:00:00.000Z', announcedAt: '2026-09-01T12:00:00.000Z', order: 1, isPublished: true,
+    category: careerCategory, reviewedAt: '2026-10-22T12:00:00.000Z', announcedAt: '2026-09-01T12:00:00.000Z', order: 1, isPublished: true,
   },
 })
 // Опубликован только что — у студента он «Новое», пока не открыт.
 const aiGuide = await payload.create({
   collection: 'guides',
   context: quiet,
-  data: { title: CONTENT.aiGuide.title, slug: CONTENT.aiGuide.slug, summary: CONTENT.aiGuide.summary, markdown: '## Что выгрузить\n\nПереписки и память.\n\n## Где хранить\n\nВ git и в зашифрованном архиве.', category: 'ai', order: 3, isPublished: true },
+  data: { title: CONTENT.aiGuide.title, slug: CONTENT.aiGuide.slug, summary: CONTENT.aiGuide.summary, markdown: '## Что выгрузить\n\nПереписки и память.\n\n## Где хранить\n\nВ git и в зашифрованном архиве.', category: aiCategory, order: 3, isPublished: true },
 })
 // Гайды выдаются отдельно от курсов: студенту — назначением, doer — режимом «все», у leader доступа нет.
 const adminReq = await createLocalReq({ user: await payload.findByID({ collection: 'users', id: created.admin }) }, payload)

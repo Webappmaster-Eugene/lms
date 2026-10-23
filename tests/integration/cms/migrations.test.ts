@@ -46,7 +46,14 @@ async function raw(sql: string) {
  * одновременных отправок, а в конфиге коллекции он не объявлен. Drizzle
  * поэтому предлагает его удалить. См. отчёт: лучше объявить его в `indexes`.
  */
-const KNOWN_MIGRATION_ONLY = ['DROP INDEX "user_trainer_progress_user_task_unique_idx";']
+const KNOWN_MIGRATION_ONLY = [
+  'DROP INDEX "user_trainer_progress_user_task_unique_idx";',
+  // Фаза expand: прежнее значение-перечисление категории гайда живёт в БД до contract-выката.
+  'ALTER TABLE "guides" DROP COLUMN "category";',
+  'ALTER TABLE "_guides_v" DROP COLUMN "version_category";',
+  'DROP TYPE "public"."enum__guides_v_version_category";',
+  'DROP TYPE "public"."enum_guides_category";',
+]
 
 const SET_DEFAULT = /^ALTER TABLE "(\w+)" ALTER COLUMN "(\w+)" SET DEFAULT (.+);$/
 
@@ -218,9 +225,27 @@ describe('миграции на чистой базе', () => {
       { version_slug: 'v2-published', has_text: true, version_is_published: true },
       { version_slug: 'v2-draft', has_text: true, version_is_published: false },
     ])
-    expect(await drift()).toEqual([])
+    // Схему проверяет отдельный тест парности: здесь v2.up накатан в одиночку, без более поздних
+    // миграций (они добавляют _guides_v.version_category_id), поэтому drift тут неизбежен.
     await raw(`delete from _guides_v where parent_id in (${ids})`)
     await raw(`delete from guides where id in (${ids})`)
+  })
+
+  it('миграция категорий на живых данных: прежнее значение-перечисление переносится в связь', async () => {
+    const cats = migrations.find((migration) => migration.name.endsWith('_guides_categories'))
+    if (!cats) throw new Error('Миграция guides_categories не зарегистрирована')
+    const req = await createLocalReq({}, payload)
+    await cats.down({ db: db().drizzle, payload, req } as never)
+    // До миграции категория хранится перечислением в колонке category.
+    const inserted = await raw(`insert into guides (title, slug, summary, markdown, category, "order", is_published, updated_at, created_at) values
+      ('С категорией', 'cat-backfill', 'Кратко', 'Текст', 'career', 1, true, '2026-10-20T10:00:00Z', '2026-10-19T10:00:00Z')
+      returning id`)
+    const id = Number(inserted[0].id)
+    await cats.up({ db: db().drizzle, payload, req } as never)
+    // После миграции значение разложилось в связь с одноимённой по slug категорией.
+    expect(await raw(`select c.slug from guides g join guide_categories c on c.id = g.category_id where g.id = ${id}`)).toEqual([{ slug: 'career' }])
+    expect(await drift()).toEqual([])
+    await raw(`delete from guides where id = ${id}`)
   })
 
   it('индекс сортировки истории откатывается и возвращается без потери мест остановки', async () => {

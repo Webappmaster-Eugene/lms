@@ -95,9 +95,13 @@ describe('гайд в Markdown', () => {
     const markdown = `---\ntitle: Гайд из файла\nsummary: Описание из шапки\nslug: ${slug}\norder: 4\npublished: false\ncategory: ai\nreviewed: 2026-10-22\n---\n\nВступление.\n\n## Раздел\n\n${words}\n`
     const created = await payload.create({ collection: 'guides', data: { markdown } as never, req: await createLocalReq({ user: admin }, payload) })
     expect(created).toMatchObject({
-      title: 'Гайд из файла', summary: 'Описание из шапки', slug, order: 4, isPublished: false, category: 'ai',
+      title: 'Гайд из файла', summary: 'Описание из шапки', slug, order: 4, isPublished: false,
       reviewedAt: '2026-10-22T12:00:00.000Z', reviewBy: '2027-01-20T12:00:00.000Z', readingMinutes: 3,
     })
+    // category из шапки («ai») разложился в связь: сервер нашёл категорию по slug.
+    const aiCategory = (await payload.find({ collection: 'guide-categories', where: { slug: { equals: 'ai' } }, limit: 1, depth: 0 })).docs[0]
+    expect(aiCategory).toBeTruthy()
+    expect(typeof created.category === 'object' && created.category ? created.category.id : created.category).toBe(aiCategory.id)
     expect(created.markdown?.startsWith('Вступление.\n\n## Раздел')).toBe(true)
     expect(created.announcedAt ?? null).toBeNull()
   })

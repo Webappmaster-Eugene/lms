@@ -2,17 +2,32 @@ import { ValidationError, type CollectionBeforeChangeHook, type CollectionBefore
 
 import { hasFrontmatter, parseGuideFile } from '@/lib/guide-file'
 import { defaultGuideReviewBy, guideReadingMinutes } from '@/lib/guides'
+import { collectAllPages } from '@/lib/paginate'
 
 /**
  * Гайд можно прислать файлом целиком (REST, `pnpm guide:publish`): шапка `---` раскладывается
  * по полям, первая строка `# …` у нового гайда без названия становится названием.
  * Файл — источник истины, поэтому значения шапки заменяют текущие.
  */
-export const applyGuideFile: CollectionBeforeValidateHook = ({ data, originalDoc }) => {
+export const applyGuideFile: CollectionBeforeValidateHook = async ({ data, originalDoc, req }) => {
   if (!data || typeof data.markdown !== 'string') return data
   const untitled = !data.title && !originalDoc?.title
   if (!hasFrontmatter(data.markdown) && !untitled) return data
   const { fields, markdown, problems } = parseGuideFile(data.markdown)
+
+  // Категорию из шапки (название или slug) сопоставляем со справочником: id знает только база.
+  let categoryId: number | undefined
+  if (fields.category !== undefined) {
+    const text = fields.category.trim().toLowerCase()
+    const all = await collectAllPages(
+      ({ page, limit }) => req.payload.find({ collection: 'guide-categories', depth: 0, overrideAccess: true, req, page, limit }),
+      { label: 'категории гайдов' },
+    )
+    const match = all.find((item) => item.slug.toLowerCase() === text || (item.title ?? '').trim().toLowerCase() === text)
+    if (match) categoryId = match.id
+    else problems.push(`category: «${fields.category.trim()}» — такой категории нет, есть ${all.map((item) => item.slug).join(', ') || '— сначала создайте категорию'}`)
+  }
+
   if (problems.length) {
     throw new ValidationError({ collection: 'guides', errors: problems.map((message) => ({ path: 'markdown', message: `Шапка файла: ${message}` })) })
   }
@@ -25,7 +40,7 @@ export const applyGuideFile: CollectionBeforeValidateHook = ({ data, originalDoc
     ...(fields.slug !== undefined ? { slug: fields.slug } : !data.slug && originalDoc?.slug ? { slug: originalDoc.slug } : {}),
     ...(fields.order !== undefined && { order: fields.order }),
     ...(fields.published !== undefined && { isPublished: fields.published }),
-    ...(fields.category !== undefined && { category: fields.category }),
+    ...(categoryId !== undefined && { category: categoryId }),
     ...(fields.reviewedAt !== undefined && { reviewedAt: fields.reviewedAt }),
     // Новая дата проверки без своего срока сбрасывает старый срок: он относился к прошлой проверке.
     ...(fields.reviewBy !== undefined ? { reviewBy: fields.reviewBy } : fields.reviewedAt !== undefined ? { reviewBy: null } : {}),
