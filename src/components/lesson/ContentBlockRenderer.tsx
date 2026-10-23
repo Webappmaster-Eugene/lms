@@ -33,13 +33,19 @@ export function ContentBlockRenderer({ blocks, learningVideos = [] }: Props) {
     )
   }
 
+  // Якоря второго и следующих блоков Markdown со своим префиксом: id на странице не повторяются.
+  const markdownIndexes = blocks.flatMap((block, index) => (block.blockType === 'markdown' ? [index] : []))
+  const anchorPrefix = (index: number) => {
+    const ordinal = markdownIndexes.indexOf(index)
+    return ordinal <= 0 ? 'section' : `part${ordinal + 1}-section`
+  }
   return (
     <div className="min-w-0 space-y-6 [overflow-wrap:anywhere]">
       {blocks.map((block, index) => {
         const memoryId = learningVideos.find((video) => video.index === index)?.id
         return (
           <div key={block.id ?? index} id={memoryId ? `video-${memoryId}` : undefined}>
-            {renderBlock({ ...block }, memoryId)}
+            {renderBlock({ ...block }, memoryId, anchorPrefix(index))}
           </div>
         )
       })}
@@ -47,7 +53,7 @@ export function ContentBlockRenderer({ blocks, learningVideos = [] }: Props) {
   )
 }
 
-function renderBlock(block: ContentBlock, memoryId?: string) {
+function renderBlock(block: ContentBlock, memoryId?: string, anchorPrefix?: string) {
   switch (block.blockType) {
     case 'text':
       return renderTextBlock(block)
@@ -62,7 +68,7 @@ function renderBlock(block: ContentBlock, memoryId?: string) {
     case 'file':
       return renderFileBlock(block)
     case 'markdown':
-      return typeof block.markdown === 'string' ? <LessonMarkdown markdown={block.markdown} /> : null
+      return typeof block.markdown === 'string' ? <LessonMarkdown markdown={block.markdown} anchorPrefix={anchorPrefix} /> : null
     case 'slides':
       return (
         <SlidesBlock

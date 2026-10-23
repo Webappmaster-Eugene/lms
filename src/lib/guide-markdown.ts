@@ -33,16 +33,23 @@ function plainText(node: MarkdownNode): string {
   return (node.children ?? []).map(plainText).join(PHRASING.has(node.type) ? '' : '\n')
 }
 
-/** Разделы гайда — заголовки `##` в корне документа; в цитатах, списках и коде не считаются. */
-export function guideMarkdownHeadings(markdown: string): GuideMarkdownHeading[] {
-  const headings: GuideMarkdownHeading[] = []
+export type MarkdownHeading = { offset: number; depth: number; title: string }
+
+/** Заголовки нужных уровней в корне документа; в цитатах, списках и коде не считаются. */
+export function markdownRootHeadings(markdown: string, depths: readonly number[]): MarkdownHeading[] {
+  const headings: MarkdownHeading[] = []
   for (const node of parse(markdown).children ?? []) {
     const offset = node.position?.start.offset
-    if (node.type !== 'heading' || node.depth !== 2 || offset === undefined) continue
+    if (node.type !== 'heading' || node.depth === undefined || !depths.includes(node.depth) || offset === undefined) continue
     const title = plainText(node).replace(/\s+/g, ' ').trim()
-    if (title) headings.push({ offset, id: `section-${headings.length + 1}`, title })
+    if (title) headings.push({ offset, depth: node.depth, title })
   }
   return headings
+}
+
+/** Разделы гайда — заголовки `##` в корне документа. */
+export function guideMarkdownHeadings(markdown: string): GuideMarkdownHeading[] {
+  return markdownRootHeadings(markdown, [2]).map(({ offset, title }, index) => ({ offset, id: `section-${index + 1}`, title }))
 }
 
 /** Текст без разметки и адресов ссылок — для оценки времени чтения. */

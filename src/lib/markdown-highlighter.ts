@@ -14,8 +14,10 @@ const languages: Record<string, () => Promise<LanguageInput>> = {
   markdown: () => import('shiki/langs/markdown.mjs').then((module) => module.default),
   python: () => import('shiki/langs/python.mjs').then((module) => module.default),
   go: () => import('shiki/langs/go.mjs').then((module) => module.default),
+  // Грамматика называется docker и регистрирует dockerfile как псевдоним.
+  dockerfile: () => import('shiki/langs/dockerfile.mjs').then((module) => module.default),
 }
-const aliases: Record<string, string> = { js: 'javascript', ts: 'typescript', sh: 'bash', yml: 'yaml', md: 'markdown', golang: 'go', py: 'python' }
+const aliases: Record<string, string> = { js: 'javascript', ts: 'typescript', sh: 'bash', yml: 'yaml', md: 'markdown', golang: 'go', py: 'python', docker: 'dockerfile' }
 let shared: Promise<HighlighterCore> | undefined
 const loading = new Map<string, Promise<void>>()
 

@@ -69,7 +69,8 @@ export default async function CourseDetailPage({ params }: Props) {
             isPublished: { equals: true },
           },
           sort: ['order', 'id'],
-          select: { title: true, order: true },
+          // Описание раздела при скрытом каталоге обнуляет хук protectSectionMetadata: читаем без overrideAccess.
+          select: { title: true, order: true, description: true },
           depth: 0,
           overrideAccess: false,
           req,
@@ -292,6 +293,10 @@ export default async function CourseDetailPage({ params }: Props) {
                   {sectionCompleted}/{sectionLessons.length}
                 </span>
               </summary>
+
+              {section.description && (
+                <p className="-mt-2 whitespace-pre-line px-4 pb-3 pl-12 text-sm text-muted-foreground">{section.description}</p>
+              )}
 
               <div className="border-t border-border px-2 pb-2">
                 {sectionLessons.map((lesson) => (

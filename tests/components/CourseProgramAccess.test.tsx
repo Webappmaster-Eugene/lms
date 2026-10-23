@@ -75,6 +75,22 @@ describe('серверная программа курса', () => {
     expect(screen.getByText('0/1 (0%)')).toBeInTheDocument()
   })
 
+  it('показывает описание раздела под названием, читая его с проверкой доступа', async () => {
+    mocks.policy.mockResolvedValue({ canBrowseCourse: () => true, canBrowseSection: () => true, canBrowseLessonMetadata: () => true, canAccessCourse: () => true, canAccessLessonMetadata: () => true })
+    mocks.find.mockImplementation(async ({ collection }: { collection: string }) => {
+      if (collection === 'courses') return page([{ id: 10, title: 'Node.js', slug: 'node', roadmap: null }])
+      if (collection === 'sections') return page([{ id: 5, title: 'Неделя 1', order: 0, description: 'Рантайм Node.js и событийный цикл' }, { id: 6, title: 'Неделя 2', order: 1, description: null }])
+      if (collection === 'lessons') return page([{ ...lessons[0], section: 5 }, { ...lessons[1], section: 6 }])
+      return page([])
+    })
+    render(await CourseDetailPage({ params: Promise.resolve({ slug: 'node' }) }))
+    expect(screen.getByText('Рантайм Node.js и событийный цикл')).toBeInTheDocument()
+    expect(screen.getByText('Неделя 2').closest('details')?.querySelectorAll('p.whitespace-pre-line')).toHaveLength(0)
+    const query = mocks.find.mock.calls.find(([args]) => args.collection === 'sections')?.[0]
+    // При скрытом каталоге описание обнуляет хук коллекции — он работает только без overrideAccess.
+    expect(query).toMatchObject({ overrideAccess: false, select: { title: true, order: true, description: true } })
+  })
+
   it('старый полный прогресс не объявляет закрытый курс пройденным', async () => {
     mocks.policy.mockResolvedValue({ canBrowseCourse: () => true, canBrowseLessonMetadata: () => true, canAccessCourse: () => false, canAccessLessonMetadata: () => false })
     mocks.find.mockImplementation(async ({ collection }: { collection: string }) => {
