@@ -46,7 +46,11 @@ async function raw(sql: string) {
  * одновременных отправок, а в конфиге коллекции он не объявлен. Drizzle
  * поэтому предлагает его удалить. См. отчёт: лучше объявить его в `indexes`.
  */
-const KNOWN_MIGRATION_ONLY = ['DROP INDEX "user_trainer_progress_user_task_unique_idx";']
+const KNOWN_MIGRATION_ONLY = [
+  'DROP INDEX "user_trainer_progress_user_task_unique_idx";',
+  // Фаза contract: старый Lexical-текст гайдов удаляется следующим выкатом, пока колонка есть только в БД.
+  'ALTER TABLE "guides" DROP COLUMN "content";',
+]
 
 const SET_DEFAULT = /^ALTER TABLE "(\w+)" ALTER COLUMN "(\w+)" SET DEFAULT (.+);$/
 
@@ -194,6 +198,33 @@ describe('миграции на чистой базе', () => {
     expect(await publicTables()).toContain('lesson_learning_states')
     expect(await drift()).toEqual([])
     await payload.delete({ collection: 'users', id: user.id })
+  })
+
+  it('миграция гайдов v2 на живых данных: дата публикации, минуты чтения и первая версия', async () => {
+    const v2 = migrations.find((migration) => migration.name.endsWith('_guides_v2'))
+    if (!v2) throw new Error('Миграция guides_v2 не зарегистрирована')
+    const req = await createLocalReq({}, payload)
+    await v2.down({ db: db().drizzle, payload, req } as never)
+    const words = Array.from({ length: 480 }, (_, i) => `слово${i}`).join(' ')
+    // До миграции гайды пишет старый код: колонок v2 ещё нет. Ссылки и разметка в минуты не считаются.
+    const markdown = `## Раздел\n\n**${words}** [ссылка](https://example.com/${'очень/длинный/путь/'.repeat(20)})`
+    const rows = await raw(`insert into guides (title, slug, summary, markdown, "order", is_published, updated_at, created_at) values
+      ('Опубликован', 'v2-published', 'Кратко', '${markdown}', 1, true, '2026-10-20T10:00:00Z', '2026-10-19T10:00:00Z'),
+      ('Черновик', 'v2-draft', 'Кратко', 'Коротко', 2, false, '2026-10-21T10:00:00Z', '2026-10-21T10:00:00Z')
+      returning id`)
+    await v2.up({ db: db().drizzle, payload, req } as never)
+    const ids = rows.map((row) => Number(row.id)).join(',')
+    expect(await raw(`select slug, announced_at = updated_at as announced_on_update, announced_at is null as not_announced, reading_minutes from guides where id in (${ids}) order by id`)).toEqual([
+      { slug: 'v2-published', announced_on_update: true, not_announced: false, reading_minutes: '3' },
+      { slug: 'v2-draft', announced_on_update: null, not_announced: true, reading_minutes: '1' },
+    ])
+    expect(await raw(`select version_slug, version_markdown is not null as has_text, version_is_published from _guides_v where parent_id in (${ids}) order by parent_id`)).toEqual([
+      { version_slug: 'v2-published', has_text: true, version_is_published: true },
+      { version_slug: 'v2-draft', has_text: true, version_is_published: false },
+    ])
+    expect(await drift()).toEqual([])
+    await raw(`delete from _guides_v where parent_id in (${ids})`)
+    await raw(`delete from guides where id in (${ids})`)
   })
 
   it('индекс сортировки истории откатывается и возвращается без потери мест остановки', async () => {

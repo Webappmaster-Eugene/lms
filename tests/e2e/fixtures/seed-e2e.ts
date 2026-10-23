@@ -39,7 +39,7 @@ function richText(...paragraphs: string[]) {
 }
 
 /**
- * Гайд в Markdown: разделы «##» строят оглавление. Таблица, цитата, код в строке и блок кода
+ * Гайд в Markdown: разделы «##» строят оглавление. Таблица, цитата, врезка, код в строке и блок кода
  * с языком стерегут вёрстку на скриншотах (prose дорисовывает обратные кавычки и курсив цитат).
  */
 function guideMarkdown(sections: readonly string[]) {
@@ -49,6 +49,7 @@ function guideMarkdown(sections: readonly string[]) {
     `Текст раздела «${first}». Запуск — \`pnpm dev\`.`,
     '| Что | Зачем |\n| --- | --- |\n| Браузер | Отдельный профиль |\n| Прокси | Постоянный адрес |',
     '> Совет: первую неделю не меняйте устройство.',
+    '> [!WARNING]\n> Не входите в аккаунт с телефона.',
     ...rest.flatMap((title) => [`## ${title}`, `Текст раздела «${title}».`]),
     '```bash\npnpm install\n```',
   ].join('\n\n')
@@ -213,20 +214,38 @@ await payload.create({
   },
 })
 
+// Уведомления о гайдах сид не рассылает: счётчик колокольчика на скриншотах не должен от них зависеть.
+const quiet = { skipHooks: true }
 const e2eGuide = await payload.create({
   collection: 'guides',
-  data: { title: CONTENT.guide.title, slug: CONTENT.guide.slug, summary: CONTENT.guide.summary, markdown: guideMarkdown(CONTENT.guide.sections), order: 1, isPublished: true },
+  context: quiet,
+  data: {
+    title: CONTENT.guide.title, slug: CONTENT.guide.slug, summary: CONTENT.guide.summary, markdown: guideMarkdown(CONTENT.guide.sections),
+    category: 'career', reviewedAt: '2026-10-22T12:00:00.000Z', announcedAt: '2026-09-01T12:00:00.000Z', order: 1, isPublished: true,
+  },
+})
+// Опубликован только что — у студента он «Новое», пока не открыт.
+const aiGuide = await payload.create({
+  collection: 'guides',
+  context: quiet,
+  data: { title: CONTENT.aiGuide.title, slug: CONTENT.aiGuide.slug, summary: CONTENT.aiGuide.summary, markdown: '## Что выгрузить\n\nПереписки и память.\n\n## Где хранить\n\nВ git и в зашифрованном архиве.', category: 'ai', order: 3, isPublished: true },
 })
 // Гайды выдаются отдельно от курсов: студенту — назначением, doer — режимом «все», у leader доступа нет.
-await payload.create({
-  collection: 'learning-access-grants',
-  req: await createLocalReq({ user: await payload.findByID({ collection: 'users', id: created.admin }) }, payload),
-  data: { user: created.student, target: { relationTo: 'guides', value: e2eGuide.id }, effect: 'allow', ruleKey: `${created.student}:guides:${e2eGuide.id}` },
-})
-// Черновик — в старом формате Lexical: страница по-прежнему рендерит такие гайды.
+const adminReq = await createLocalReq({ user: await payload.findByID({ collection: 'users', id: created.admin }) }, payload)
+for (const guide of [e2eGuide, aiGuide]) {
+  await payload.create({
+    collection: 'learning-access-grants',
+    req: adminReq,
+    context: quiet,
+    data: { user: created.student, target: { relationTo: 'guides', value: guide.id }, effect: 'allow', ruleKey: `${created.student}:guides:${guide.id}` },
+  })
+}
+// Первый гайд студент уже открывал: «Прочитан» в списке не зависит от порядка тестов.
+await payload.create({ collection: 'guide-reads', data: { user: created.student, guide: e2eGuide.id } })
 await payload.create({
   collection: 'guides',
-  data: { title: CONTENT.draftGuide.title, slug: CONTENT.draftGuide.slug, summary: 'Ученики его не видят', content: richText('Черновик.'), order: 2, isPublished: false },
+  context: quiet,
+  data: { title: CONTENT.draftGuide.title, slug: CONTENT.draftGuide.slug, summary: 'Ученики его не видят', markdown: 'Черновик.', order: 2, isPublished: false },
 })
 
 for (const [index, item] of CONTENT.faq.entries()) {

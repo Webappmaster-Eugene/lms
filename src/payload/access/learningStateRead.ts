@@ -4,7 +4,8 @@ import { getGuideAccess } from '@/server/guide-access'
 import { getTrainerAccess } from '@/server/trainer-access'
 import { getLearningAccess } from '@/server/learning-access'
 
-function relationWhere(where: Where, relation = 'lesson'): Where {
+/** Условие доступа к материалу, перенесённое на связь: `isPublished` → `guide.isPublished`. */
+export function relationWhere(where: Where, relation = 'lesson'): Where {
   const result: Where = {}
   for (const [key, value] of Object.entries(where)) {
     if ((key === 'and' || key === 'or') && Array.isArray(value)) result[key] = value.map((item) => relationWhere(item as Where, relation))
@@ -31,4 +32,15 @@ export function learningStateRead({ comments = false, allowTask = false, allowGu
     }
     return { and: [owner, targets.length > 1 ? { or: targets } : targets[0]] }
   }
+}
+
+/**
+ * Записи ученика о гайде (прочтения, отзывы): свои и только по гайдам, открытым сейчас.
+ * Иначе фильтр `where[guide.markdown][contains]` по своей записи посимвольно читал бы закрытый гайд.
+ */
+export const ownGuideStateAccess: Access = async ({ req }) => {
+  if (!req.user) return false
+  const scope = await getGuideAccess(req.payload, req.user, req)
+  if (scope.admin) return true
+  return { and: [{ user: { equals: req.user.id } }, relationWhere(scope.guideWhere, 'guide')] }
 }

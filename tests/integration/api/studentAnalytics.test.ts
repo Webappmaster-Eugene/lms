@@ -79,6 +79,28 @@ describe('protected admin analytics with real Payload sessions and PostgreSQL', 
       expect((await payload.count({ collection: 'user-progress', where: { user: { equals: visitor.id } } })).totalDocs).toBe(0)
     } finally { await payload.delete({ collection: 'users', id: visitor.id }) }
   })
+  it('records the guides list and an open guide; a closed guide is not recorded', async () => {
+    const visitor = await createStudent(payload)
+    const [open, closed] = await Promise.all([
+      payload.create({ collection: 'guides', context: { skipHooks: true }, data: { title: uid('Гайд'), slug: uid('guide'), summary: 'Кратко', markdown: 'Текст', isPublished: true } }),
+      payload.create({ collection: 'guides', context: { skipHooks: true }, data: { title: uid('Гайд'), slug: uid('guide'), summary: 'Кратко', markdown: 'Текст', isPublished: true } }),
+    ])
+    try {
+      await payload.create({ collection: 'learning-access-grants', req: await createLocalReq({ user: admin }, payload), context: { skipHooks: true }, data: { user: visitor.id, target: { relationTo: 'guides', value: open.id }, effect: 'allow', ruleKey: 'server-generated' } })
+      // Журнал пишет не чаще раза в минуту на сессию — каждый заход со своей сессии.
+      for (const path of ['/guides', `/guides/${open.slug}`]) {
+        const response = await activityPOST(apiRequest('activity', await login(payload, visitor), { path, expectedUserId: visitor.id }))
+        expect(response.status).toBe(200)
+      }
+      expect((await activityPOST(apiRequest('activity', await login(payload, visitor), { path: `/guides/${closed.slug}`, expectedUserId: visitor.id }))).status).toBe(404)
+      const events = await payload.find({ collection: 'student-learning-events', where: { user: { equals: visitor.id }, type: { equals: 'page_view' } }, sort: 'id', depth: 0 })
+      expect(events.docs.map((event) => event.path)).toEqual(['/guides', `/guides/${open.slug}`])
+    } finally {
+      await payload.delete({ collection: 'users', id: visitor.id })
+      for (const guide of [open, closed]) await payload.delete({ collection: 'guides', id: guide.id })
+    }
+  })
+
   it('still rejects an unknown page on a fresh session without recording a page view', async () => {
     const visitor = await createStudent(payload)
     try {

@@ -1,60 +1,84 @@
 import { describe, expect, it } from 'vitest'
 
-import { guideContents, guideHeadings, guideReadingMinutes } from '@/lib/guides'
+import {
+  GUIDE_NEW_DAYS,
+  defaultGuideReviewBy,
+  guideCategoryFromText,
+  guideCategoryLabel,
+  guideIsNew,
+  guideReadingMinutes,
+  guideReviewHorizon,
+  guideReviewState,
+} from '@/lib/guides'
 
-const text = (value: string) => ({ type: 'text', text: value, version: 1 })
-const heading = (tag: string, value: string) => ({ type: 'heading', tag, version: 1, children: [text(value)] })
-const paragraph = (value: string) => ({ type: 'paragraph', version: 1, children: [text(value)] })
-const doc = (...children: unknown[]) => ({ root: { type: 'root', version: 1, children } })
-
-describe('оглавление гайда', () => {
-  it('берёт только заголовки второго уровня из корня и помнит их позицию среди узлов', () => {
-    const content = doc(
-      heading('h2', 'Что подготовить'),
-      paragraph('Почта и компьютер'),
-      heading('h3', 'Подраздел не попадает в оглавление'),
-      heading('h2', 'Шаг 1. Браузер'),
-      { type: 'quote', version: 1, children: [heading('h2', 'Вложенный заголовок')] },
-    )
-    expect(guideHeadings(content)).toEqual([
-      { index: 0, id: 'section-1', title: 'Что подготовить' },
-      { index: 3, id: 'section-2', title: 'Шаг 1. Браузер' },
-    ])
-  })
-
-  it('пустой заголовок пропускается и не сбивает нумерацию якорей', () => {
-    const content = doc(heading('h2', '  '), heading('h2', 'Первый настоящий'))
-    expect(guideHeadings(content)).toEqual([{ index: 1, id: 'section-1', title: 'Первый настоящий' }])
-  })
-
-  it.each([null, undefined, 'строка', {}, { root: { children: 'нет' } }])('не падает на значении без документа: %j', (value) => {
-    expect(guideHeadings(value)).toEqual([])
-  })
-})
+const DAY = 24 * 60 * 60 * 1000
 
 describe('время чтения гайда', () => {
   const words = Array.from({ length: 480 }, (_, i) => `слово${i}`).join(' ')
 
-  it('считает слова всего документа и округляет до минут', () => {
-    expect(guideReadingMinutes({ content: doc(heading('h2', 'Раздел'), paragraph(words)) })).toBe(3)
-  })
-
-  it('у гайда в Markdown считает текст, а не разметку и адреса ссылок', () => {
+  it('считает текст, а не разметку и адреса ссылок', () => {
     const links = Array.from({ length: 200 }, (_, i) => `[ссылка](https://example.com/${'очень/длинный/адрес/'.repeat(5)}${i})`).join(' ')
-    expect(guideReadingMinutes({ markdown: `## Раздел\n\n${words}\n\n${links}`, content: doc(paragraph('Старый текст')) })).toBe(4)
+    expect(guideReadingMinutes(`## Раздел\n\n${words}\n\n${links}`)).toBe(4)
   })
 
   it('короткий или пустой гайд — не меньше минуты', () => {
-    expect(guideReadingMinutes({ content: doc(paragraph('Коротко')) })).toBe(1)
-    expect(guideReadingMinutes({ content: null })).toBe(1)
-    expect(guideReadingMinutes({ markdown: '   ', content: null })).toBe(1)
+    expect(guideReadingMinutes('Коротко')).toBe(1)
+    expect(guideReadingMinutes('   ')).toBe(1)
+    expect(guideReadingMinutes(null)).toBe(1)
   })
 })
 
-describe('оглавление гайда в любом формате', () => {
-  it('Markdown важнее старого Lexical, пустой Markdown — нет', () => {
-    const legacy = doc(heading('h2', 'Старый раздел'))
-    expect(guideContents({ markdown: '## Новый раздел\n\nТекст', content: legacy }).map((h) => h.title)).toEqual(['Новый раздел'])
-    expect(guideContents({ markdown: ' \n', content: legacy }).map((h) => h.title)).toEqual(['Старый раздел'])
+describe('категории гайдов', () => {
+  it('из шапки принимается код и подпись без учёта регистра', () => {
+    expect(guideCategoryFromText('ai')).toBe('ai')
+    expect(guideCategoryFromText(' Свой бизнес ')).toBe('business')
+    expect(guideCategoryFromText('КАРЬЕРА')).toBe('career')
+    expect(guideCategoryFromText('финансы')).toBeNull()
+  })
+
+  it('подпись категории; неизвестная или пустая — без подписи', () => {
+    expect(guideCategoryLabel('ai')).toBe('ИИ в работе')
+    expect(guideCategoryLabel('nope')).toBeNull()
+    expect(guideCategoryLabel(null)).toBeNull()
+  })
+})
+
+describe('пересмотр гайда', () => {
+  const now = Date.parse('2026-10-23T12:00:00.000Z')
+
+  it('срок по умолчанию — через 90 дней после проверки', () => {
+    expect(defaultGuideReviewBy('2026-10-22T12:00:00.000Z')).toBe('2027-01-20T12:00:00.000Z')
+  })
+
+  it('прошедший срок — просрочен, ближайшие две недели — скоро, дальше — в порядке', () => {
+    expect(guideReviewState(new Date(now - DAY).toISOString(), now)).toBe('overdue')
+    expect(guideReviewState(new Date(now).toISOString(), now)).toBe('overdue')
+    expect(guideReviewState(new Date(now + 10 * DAY).toISOString(), now)).toBe('soon')
+    expect(guideReviewState(new Date(now + 15 * DAY).toISOString(), now)).toBe('ok')
+  })
+
+  it('без срока или с испорченной датой — состояния нет', () => {
+    expect(guideReviewState(null, now)).toBeNull()
+    expect(guideReviewState('не дата', now)).toBeNull()
+  })
+
+  it('граница списка «пора пересмотреть» — через 14 дней', () => {
+    expect(guideReviewHorizon(now)).toBe(new Date(now + 14 * DAY).toISOString())
+  })
+})
+
+describe('«Новое» в списке гайдов', () => {
+  const now = Date.parse('2026-10-23T12:00:00.000Z')
+  const daysAgo = (days: number) => new Date(now - days * DAY).toISOString()
+
+  it('недавно опубликованный и не открытый гайд — новый', () => {
+    expect(guideIsNew(daysAgo(1), false, now)).toBe(true)
+  })
+
+  it('открытый, давний или ещё не опубликованный — не новый', () => {
+    expect(guideIsNew(daysAgo(1), true, now)).toBe(false)
+    expect(guideIsNew(daysAgo(GUIDE_NEW_DAYS), false, now)).toBe(false)
+    expect(guideIsNew(null, false, now)).toBe(false)
+    expect(guideIsNew('не дата', false, now)).toBe(false)
   })
 })

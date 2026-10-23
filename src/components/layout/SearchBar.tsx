@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useRef, useEffect, useId } from 'react'
-import { Search, Loader2, BookOpen, Code2, GraduationCap, Map } from 'lucide-react'
+import { Search, Loader2, BookOpen, Code2, Compass, GraduationCap, Map } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 import { cn } from '@/lib/utils'
 import { useHydrated } from '@/hooks/use-hydrated'
 
-type ResultType = 'roadmap' | 'course' | 'lesson' | 'task'
+type ResultType = 'roadmap' | 'course' | 'lesson' | 'task' | 'guide'
 
 type SearchResult = {
   id: string
@@ -32,6 +32,7 @@ const TYPE_LABELS: Record<ResultType, string> = {
   course: 'Курс',
   lesson: 'Урок',
   task: 'Задача тренажёра',
+  guide: 'Гайд',
 }
 
 const TYPE_ICONS: Record<ResultType, typeof Map> = {
@@ -39,11 +40,15 @@ const TYPE_ICONS: Record<ResultType, typeof Map> = {
   course: GraduationCap,
   lesson: BookOpen,
   task: Code2,
+  guide: Compass,
 }
 
-async function fetchDocs<T>(collection: string, q: string, limit: number, extra = ''): Promise<T[]> {
+/** `fields` — где искать: у гайда название короткое, а суть часто только в описании. */
+async function fetchDocs<T>(collection: string, q: string, limit: number, extra = '', fields = ['title']): Promise<T[]> {
+  const value = encodeURIComponent(q)
+  const match = fields.length === 1 ? `where[${fields[0]}][contains]=${value}` : fields.map((field, i) => `where[or][${i}][${field}][contains]=${value}`).join('&')
   const res = await fetch(
-    `/api/${collection}?where[title][contains]=${encodeURIComponent(q)}&where[isPublished][equals]=true&limit=${limit}${extra || '&depth=0&select[title]=true&select[slug]=true'}`,
+    `/api/${collection}?${match}&where[isPublished][equals]=true&limit=${limit}${extra || '&depth=0&select[title]=true&select[slug]=true'}`,
     { credentials: 'include' },
   )
   if (!res.ok) throw new Error(`GET /api/${collection} → ${res.status}`)
@@ -113,11 +118,13 @@ export function SearchBar({ autoFocus, onNavigate, hotkey, trainerEnabled = true
 
     setLoading(true)
     try {
-      const [roadmaps, courses, lessons, tasks] = await Promise.all([
+      // Закрытые гайды и черновики отсекает access коллекции, как и закрытые курсы.
+      const [roadmaps, courses, lessons, tasks, guides] = await Promise.all([
         fetchDocs<Doc>('roadmaps', q, 3),
         fetchDocs<Doc>('courses', q, 5),
         fetchDocs<Doc>('lessons', q, 5),
         trainerEnabled ? fetchDocs<TaskDoc>('trainer-tasks', q, 5, '&depth=1&select[title]=true&select[slug]=true&select[topic]=true') : Promise.resolve([]),
+        fetchDocs<Doc>('guides', q, 3, '', ['title', 'summary']),
       ])
       if (request !== requestRef.current) return
 
@@ -131,6 +138,7 @@ export function SearchBar({ autoFocus, onNavigate, hotkey, trainerEnabled = true
             ? [{ id: String(d.id), title: d.title, href: `/trainer/${d.topic.slug}/${d.slug}`, type: 'task' as const }]
             : [],
         ),
+        ...guides.map((d) => ({ id: String(d.id), title: d.title, href: `/guides/${d.slug}`, type: 'guide' as const })),
       ]
 
       setResults(combined)

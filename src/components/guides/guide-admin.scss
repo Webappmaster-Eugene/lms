@@ -1,0 +1,449 @@
+/* Гайды в CMS: редактор Markdown с предпросмотром, статистика и список к пересмотру.
+   В админке нет Tailwind — только переменные темы Payload, поэтому светлая и тёмная темы работают сами. */
+
+.guide-editor {
+  margin-bottom: var(--base);
+
+  &--fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 16px 24px;
+    background: var(--theme-bg);
+
+    .guide-editor__panes {
+      flex: 1;
+      min-height: 0;
+    }
+
+    .guide-editor__input,
+    .guide-editor__preview {
+      height: 100%;
+      max-height: none;
+    }
+  }
+
+  &__bar {
+    position: sticky;
+    top: var(--doc-controls-height, 0);
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    align-items: center;
+    padding: 8px;
+    border: 1px solid var(--theme-elevation-150);
+    border-bottom: 0;
+    border-radius: var(--style-radius-s) var(--style-radius-s) 0 0;
+    background: var(--theme-elevation-50);
+  }
+
+  &__group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+
+    &--end {
+      margin-left: auto;
+    }
+  }
+
+  &__tool,
+  &__modes button,
+  &__select {
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--theme-elevation-150);
+    border-radius: var(--style-radius-s);
+    background: var(--theme-elevation-0);
+    color: var(--theme-text);
+    font: inherit;
+    font-size: 13px;
+    line-height: 30px;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--theme-elevation-100);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--theme-text);
+      outline-offset: 1px;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+  }
+
+  &__modes {
+    display: inline-flex;
+
+    button {
+      border-radius: 0;
+
+      &:first-child {
+        border-radius: var(--style-radius-s) 0 0 var(--style-radius-s);
+      }
+
+      &:last-child {
+        border-radius: 0 var(--style-radius-s) var(--style-radius-s) 0;
+      }
+
+      & + button {
+        margin-left: -1px;
+      }
+
+      &[aria-pressed='true'] {
+        background: var(--theme-text);
+        color: var(--theme-bg);
+      }
+    }
+  }
+
+  &__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  &__panes {
+    display: grid;
+    border: 1px solid var(--theme-elevation-150);
+    border-radius: 0 0 var(--style-radius-s) var(--style-radius-s);
+    overflow: hidden;
+
+    &--split {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+
+      .guide-editor__preview {
+        border-left: 1px solid var(--theme-elevation-150);
+      }
+    }
+
+    @media (max-width: 900px) {
+      &--split {
+        grid-template-columns: minmax(0, 1fr);
+
+        .guide-editor__preview {
+          border-left: 0;
+          border-top: 1px solid var(--theme-elevation-150);
+        }
+      }
+    }
+  }
+
+  &__input {
+    display: block;
+    width: 100%;
+    min-height: 480px;
+    height: 70vh;
+    padding: 16px;
+    border: 0;
+    background: var(--theme-input-bg, var(--theme-elevation-0));
+    color: var(--theme-text);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1.65;
+    resize: vertical;
+    tab-size: 2;
+
+    &:focus {
+      outline: none;
+      box-shadow: inset 0 0 0 2px var(--theme-elevation-400);
+    }
+  }
+
+  &__preview {
+    height: 70vh;
+    min-height: 480px;
+    padding: 16px 24px;
+    overflow-y: auto;
+    background: var(--theme-elevation-0);
+  }
+
+  &__empty {
+    color: var(--theme-elevation-500);
+  }
+
+  &__status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    justify-content: space-between;
+    margin-top: 6px;
+    color: var(--theme-elevation-600);
+    font-size: 12px;
+  }
+
+  &__status-error {
+    color: var(--theme-error-500);
+  }
+}
+
+/* Предпросмотр: близко к странице гайда на сайте, но на переменных Payload. */
+.guide-prose {
+  color: var(--theme-text);
+  font-size: 15px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    margin: 1.6em 0 0.6em;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  h2 {
+    font-size: 1.4em;
+  }
+
+  h3 {
+    font-size: 1.15em;
+  }
+
+  > :first-child {
+    margin-top: 0;
+  }
+
+  p,
+  ul,
+  ol {
+    margin: 0 0 1em;
+  }
+
+  ul,
+  ol {
+    padding-left: 1.5em;
+  }
+
+  li + li {
+    margin-top: 0.3em;
+  }
+
+  .contains-task-list {
+    padding-left: 0;
+    list-style: none;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  code {
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: var(--theme-elevation-100);
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+  }
+
+  pre {
+    margin: 0 0 1em;
+    padding: 12px 16px;
+    border: 1px solid var(--theme-elevation-150);
+    border-radius: 8px;
+    background: var(--theme-elevation-50);
+    overflow-x: auto;
+
+    code {
+      padding: 0;
+      background: none;
+    }
+  }
+
+  blockquote {
+    margin: 0 0 1em;
+    padding: 4px 16px;
+    border-left: 3px solid var(--theme-elevation-400);
+    background: var(--theme-elevation-50);
+  }
+
+  hr {
+    margin: 2em 0;
+    border: 0;
+    border-top: 1px solid var(--theme-elevation-150);
+  }
+
+  &__table {
+    margin: 0 0 1em;
+    overflow-x: auto;
+    border: 1px solid var(--theme-elevation-150);
+    border-radius: 8px;
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--theme-elevation-150);
+      text-align: left;
+    }
+
+    th {
+      background: var(--theme-elevation-50);
+    }
+  }
+
+  &__figure {
+    display: block;
+    margin: 0 0 1em;
+    text-align: center;
+
+    img {
+      max-width: 100%;
+      max-height: 420px;
+      border: 1px solid var(--theme-elevation-150);
+      border-radius: 8px;
+    }
+
+    span {
+      display: block;
+      color: var(--theme-elevation-600);
+      font-size: 13px;
+    }
+  }
+
+  &__callout {
+    margin: 0 0 1em;
+    padding: 10px 16px;
+    border-left: 4px solid;
+    border-radius: 0 8px 8px 0;
+
+    > :last-child {
+      margin-bottom: 0;
+    }
+
+    &--note {
+      border-color: rgb(14 165 233 / 70%);
+      background: rgb(14 165 233 / 10%);
+    }
+
+    &--tip {
+      border-color: rgb(16 185 129 / 70%);
+      background: rgb(16 185 129 / 10%);
+    }
+
+    &--important {
+      border-color: rgb(139 92 246 / 70%);
+      background: rgb(139 92 246 / 10%);
+    }
+
+    &--warning {
+      border-color: rgb(245 158 11 / 70%);
+      background: rgb(245 158 11 / 10%);
+    }
+
+    &--caution {
+      border-color: rgb(239 68 68 / 70%);
+      background: rgb(239 68 68 / 10%);
+    }
+  }
+
+  &__callout-title {
+    margin-bottom: 0.3em;
+    font-weight: 600;
+  }
+}
+
+.guide-stats {
+  margin-bottom: var(--base);
+  padding: 12px;
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: var(--style-radius-s);
+
+  &__title {
+    margin: 0 0 8px;
+    font-weight: 600;
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 0 0 8px;
+
+    div {
+      display: flex;
+      flex-direction: column;
+    }
+  }
+
+  dt {
+    color: var(--theme-elevation-600);
+    font-size: 12px;
+  }
+
+  dd {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  a {
+    color: var(--theme-text);
+    font-size: 13px;
+  }
+}
+
+.guide-review-notice {
+  margin: 0 var(--gutter-h) var(--base);
+  padding: 12px 16px;
+  border: 1px solid var(--theme-warning-500, var(--theme-elevation-200));
+  border-radius: var(--style-radius-s);
+  background: var(--theme-warning-50, var(--theme-elevation-50));
+
+  h2 {
+    margin: 0 0 8px;
+    font-size: 16px;
+  }
+
+  ul {
+    margin: 0 0 8px;
+    padding-left: 18px;
+  }
+
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+
+    a {
+      color: var(--theme-text);
+      font-weight: 500;
+    }
+
+    span {
+      color: var(--theme-elevation-600);
+    }
+
+    .guide-review-notice__overdue {
+      color: var(--theme-error-500);
+    }
+  }
+
+  p {
+    margin: 0 0 4px;
+  }
+
+  &__hint {
+    color: var(--theme-elevation-600);
+    font-size: 12px;
+  }
+}

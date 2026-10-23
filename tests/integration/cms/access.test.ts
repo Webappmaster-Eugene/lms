@@ -50,6 +50,8 @@ const MATRIX: Record<string, Matrix> = {
   'points-transactions': { create: 'admin', read: 'own', update: 'nobody', delete: 'admin' },
   notes: { create: 'auth', read: 'own', update: 'own', delete: 'own' },
   bookmarks: { create: 'auth', read: 'own', update: 'own', delete: 'own' },
+  // Отзыв удаляет только админ: ученик меняет ответ, а не стирает историю.
+  'guide-reads': { create: 'auth', read: 'own', update: 'own', delete: 'admin' },
   comments: { create: 'auth', read: 'own', update: 'own', delete: 'admin' },
   notifications: { create: 'admin', read: 'own', update: 'own', delete: 'admin' },
   'notification-preferences': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
@@ -96,6 +98,7 @@ const PATCH: Record<string, Record<string, unknown>> = {
   'points-transactions': { description: 'обновлено' },
   notes: { content: 'обновлено' },
   bookmarks: { task: null },
+  'guide-reads': { helpful: 'yes' },
   comments: { content: 'обновлено' },
   notifications: { isRead: true },
   'notification-preferences': { remindersEnabled: false },

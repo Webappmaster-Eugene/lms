@@ -5,6 +5,7 @@ import { isAdmin } from '@/payload/access/isAdmin'
 import { auditLearningGrantChange, auditLearningGrantDelete, validateLearningGrant } from '@/payload/hooks/learningAccessGrants'
 import { lockLearningGrantChange, lockLearningGrantDelete } from '@/payload/hooks/learningAccessLock'
 import { captureRawCollectionPatch } from '@/payload/hooks/rawCollectionPatch'
+import { notifyGuideGrant } from '@/server/guide-announcements'
 
 export const LearningAccessGrants: CollectionConfig = {
   slug: 'learning-access-grants',
@@ -17,7 +18,7 @@ export const LearningAccessGrants: CollectionConfig = {
     update: isAdmin,
     delete: isAdmin,
   },
-  hooks: { beforeOperation: [captureRawCollectionPatch], beforeValidate: [validateLearningGrant], beforeChange: [lockLearningGrantChange], beforeDelete: [lockLearningGrantDelete], afterChange: [auditLearningGrantChange], afterDelete: [auditLearningGrantDelete] },
+  hooks: { beforeOperation: [captureRawCollectionPatch], beforeValidate: [validateLearningGrant], beforeChange: [lockLearningGrantChange], beforeDelete: [lockLearningGrantDelete], afterChange: [auditLearningGrantChange, notifyGuideGrant], afterDelete: [auditLearningGrantDelete] },
   fields: [
     { name: 'user', type: 'relationship', relationTo: 'users', required: true, index: true, label: 'Ученик' },
     { name: 'target', type: 'relationship', relationTo: [...learningTargetCollections], required: true, label: 'Роадмап, курс, урок, тема или задача тренажёра, гайд' },

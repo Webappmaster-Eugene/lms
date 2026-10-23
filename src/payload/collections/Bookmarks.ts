@@ -1,7 +1,6 @@
 import { ValidationError, type CollectionBeforeValidateHook, type CollectionConfig } from 'payload'
 
 import { isAuthenticated } from '@/payload/access/isAuthenticated'
-import { isAdminOrSelf } from '@/payload/access/isAdminOrSelf'
 import { assignOwner } from '@/payload/hooks/assignOwner'
 import { guardLearningLessonWrite } from '@/payload/hooks/learningLessonWrite'
 import { guardTrainerTaskBookmark } from '@/payload/hooks/trainerTaskBookmark'
@@ -31,8 +30,9 @@ export const Bookmarks: CollectionConfig = {
   access: {
     create: isAuthenticated,
     read: learningStateRead({ allowTask: true, allowGuide: true }),
-    update: isAdminOrSelf,
-    delete: isAdminOrSelf,
+    // Массовые PATCH/DELETE с where по полям материала — тот же оракул, что и чтение: те же рамки.
+    update: learningStateRead({ allowTask: true, allowGuide: true }),
+    delete: learningStateRead({ allowTask: true, allowGuide: true }),
   },
   hooks: {
     beforeValidate: [oneTarget],

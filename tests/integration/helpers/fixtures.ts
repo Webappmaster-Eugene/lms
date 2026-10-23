@@ -39,7 +39,7 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   courses: (ctx) => ({ title: `Курс ${uid()}`, roadmap: ctx.roadmapId }),
   sections: (ctx) => ({ title: `Секция ${uid()}`, course: ctx.courseId }),
   lessons: (ctx) => ({ title: `Урок ${uid()}`, course: ctx.courseId }),
-  guides: () => ({ title: `Гайд ${uid()}`, summary: 'Кратко о гайде', content: lexical('Текст гайда') }),
+  guides: () => ({ title: `Гайд ${uid()}`, summary: 'Кратко о гайде', markdown: 'Текст гайда' }),
   'learning-access-grants': (ctx) => ({ user: ctx.studentId, target: { relationTo: 'lessons', value: ctx.lessonId }, effect: 'allow', ruleKey: 'server-generated' }),
   'learning-access-audit': (ctx) => ({ actorId: ctx.userId, userId: ctx.studentId, targetType: 'lessons', targetId: ctx.lessonId, effect: 'allow', operation: 'create' }),
   'learning-access-policies': (ctx) => ({ user: ctx.studentId, mode: 'assigned', role: 'student' }),
@@ -54,6 +54,8 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   'points-transactions': (ctx) => ({ user: ctx.studentId, amount: 1, reason: 'admin_adjustment' }),
   notes: (ctx) => ({ user: ctx.studentId, lesson: ctx.lessonId, content: 'Заметка' }),
   bookmarks: (ctx) => ({ user: ctx.studentId, lesson: ctx.lessonId }),
+  // Гайд у каждой копии свой — его создаёт makeValid вместе с назначением владельцу.
+  'guide-reads': (ctx) => ({ user: ctx.studentId }),
   comments: (ctx) => ({ user: ctx.studentId, lesson: ctx.lessonId, content: 'Комментарий' }),
   notifications: (ctx) => ({ user: ctx.studentId, title: 'Заголовок', message: 'Текст' }),
   'notification-preferences': (ctx) => ({ user: ctx.studentId, timezone: 'Europe/Moscow', reminderHour: 18 }),
@@ -112,6 +114,16 @@ export async function makeValid(payload: Payload, slug: string, ctx: FixtureCont
   // Закладка уникальна по паре «пользователь + урок» — каждой копии свой урок.
   if (slug === 'bookmarks' || slug === 'lesson-learning-states') {
     data.lesson = (await payload.create({ collection: 'lessons', data: { title: `Урок ${uid()}`, course: ctx.courseId, isPublished: true } as never })).id
+  }
+  if (slug === 'guide-reads') {
+    // Пара (ученик, гайд) уникальна, а прочтение видно владельцу, только пока гайд ему открыт.
+    const guide = await payload.create({ collection: 'guides', context: { skipHooks: true }, data: { title: `Гайд ${uid()}`, slug: uid('read-guide'), summary: 'Кратко', markdown: 'Текст', isPublished: true } })
+    data.guide = guide.id
+    const reader = await payload.findByID({ collection: 'users', id: Number(owner ?? data.user), depth: 0 })
+    if (reader.role !== 'admin') {
+      const admin = await payload.findByID({ collection: 'users', id: ctx.userId, depth: 0 })
+      await payload.create({ collection: 'learning-access-grants', user: admin, context: { skipHooks: true }, data: { user: reader.id, target: { relationTo: 'guides', value: guide.id }, effect: 'allow', ruleKey: 'server-generated' } })
+    }
   }
   if (slug === 'learning-access-grants') {
     const key = uid('grant-fixture-lesson')

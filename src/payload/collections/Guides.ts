@@ -1,17 +1,18 @@
 import type { CollectionConfig } from 'payload'
 
-import { lexicalPlainText } from '@/lib/lexical-text'
+import { GUIDE_CATEGORIES } from '@/lib/guides'
 import { isAdmin } from '@/payload/access/isAdmin'
 import { cleanupGuideRelations } from '@/payload/hooks/cleanupOwnedRelations'
 import { generateSlug } from '@/payload/hooks/generateSlug'
-import { applyGuideFile } from '@/payload/hooks/guideFrontmatter'
+import { applyGuideFile, computeGuideMeta } from '@/payload/hooks/guideFrontmatter'
 import { cleanupLearningTargetGrants } from '@/payload/hooks/learningAccessCleanup'
+import { announceGuide } from '@/server/guide-announcements'
 import { guideReadAccess } from '@/server/guide-access'
 
 /**
  * Самостоятельные инструкции вне программы курсов, баллов не дают. Доступ к обучению их
  * не открывает: ученик видит гайд только по отдельному назначению или режиму «все гайды».
- * Текст — Markdown; Lexical-поле `content` осталось у гайдов, созданных до него.
+ * Текст — Markdown. Каждое сохранение пишет версию: перезалитый файл можно откатить.
  */
 export const Guides: CollectionConfig = {
   slug: 'guides',
@@ -21,18 +22,28 @@ export const Guides: CollectionConfig = {
   },
   admin: {
     useAsTitle: 'title',
-    defaultColumns: ['title', 'order', 'isPublished', 'updatedAt'],
+    defaultColumns: ['title', 'category', 'isPublished', 'reviewBy', 'order'],
     group: 'Контент',
+    preview: (doc) => (typeof doc?.slug === 'string' && doc.slug ? `/guides/${encodeURIComponent(doc.slug)}` : null),
+    components: {
+      beforeList: ['/components/guides/GuideReviewNotice#GuideReviewNotice'],
+    },
   },
+  // Без drafts: версия — снимок после сохранения, а опубликованность по-прежнему решает isPublished.
+  versions: { maxPerDoc: 50 },
   access: {
     create: isAdmin,
     read: guideReadAccess,
+    // Версии хранят и черновые, и закрытые гайды: читать их может только администратор.
+    readVersions: isAdmin,
     update: isAdmin,
     delete: isAdmin,
   },
   hooks: {
     // Файл раскладывается по полям раньше, чем slug генерируется из названия.
     beforeValidate: [applyGuideFile, generateSlug],
+    beforeChange: [computeGuideMeta],
+    afterChange: [announceGuide],
     beforeDelete: [cleanupLearningTargetGrants('guides'), cleanupGuideRelations],
   },
   fields: [
@@ -73,25 +84,64 @@ export const Guides: CollectionConfig = {
     {
       name: 'markdown',
       type: 'textarea',
-      label: 'Текст гайда (Markdown)',
-      validate: (value: string | null | undefined, { data }: { data: unknown }) => {
-        if (value?.trim()) return true
-        const legacy = (data as { content?: unknown } | null)?.content
-        return lexicalPlainText(legacy).trim() ? true : 'Добавьте текст гайда в Markdown'
-      },
+      label: 'Текст гайда',
+      // Обязательность проверяет validate: required у textarea пропускает строку из пробелов.
+      validate: (value: string | null | undefined) => (value?.trim() ? true : 'Добавьте текст гайда'),
       admin: {
-        rows: 30,
-        description: 'Разделы — заголовки «## …», из них строится оглавление. Таблицы, код и цитаты — обычный Markdown',
+        components: { Field: '/components/guides/GuideMarkdownEditor#GuideMarkdownEditor' },
       },
     },
     {
-      name: 'content',
-      type: 'richText',
-      label: 'Текст гайда (старый формат)',
+      name: 'category',
+      type: 'select',
+      label: 'Категория',
+      options: GUIDE_CATEGORIES.map((category) => ({ ...category })),
       admin: {
-        condition: (data) => !(typeof data?.markdown === 'string' && data.markdown.trim()) && Boolean(data?.content),
-        description: 'Используется, пока поле Markdown пустое. Загрузите .md, чтобы перевести гайд в Markdown',
+        position: 'sidebar',
+        description: 'По ней ученик фильтрует список гайдов',
       },
+    },
+    {
+      name: 'reviewedAt',
+      type: 'date',
+      label: 'Данные проверены',
+      admin: {
+        position: 'sidebar',
+        date: { pickerAppearance: 'dayOnly', displayFormat: 'd MMMM yyyy' },
+        description: 'Когда цифры и ссылки в гайде сверены с источниками. Видно ученику',
+      },
+    },
+    {
+      name: 'reviewBy',
+      type: 'date',
+      label: 'Пересмотреть до',
+      admin: {
+        position: 'sidebar',
+        date: { pickerAppearance: 'dayOnly', displayFormat: 'd MMMM yyyy' },
+        description: 'Пустое — через 3 месяца после проверки. Просроченные гайды видны над списком',
+      },
+    },
+    {
+      name: 'stats',
+      type: 'ui',
+      admin: {
+        position: 'sidebar',
+        components: { Field: '/components/guides/GuideStats#GuideStats' },
+      },
+    },
+    {
+      name: 'readingMinutes',
+      type: 'number',
+      label: 'Минут чтения',
+      admin: { position: 'sidebar', readOnly: true, description: 'Считается из текста при сохранении' },
+    },
+    {
+      name: 'announcedAt',
+      type: 'date',
+      label: 'Впервые опубликован',
+      // Ставит сервер при первой публикации: от него отсчитывается «Новое» и рассылаются уведомления.
+      access: { create: () => false, update: () => false },
+      admin: { position: 'sidebar', readOnly: true, date: { pickerAppearance: 'dayAndTime' } },
     },
     {
       name: 'order',

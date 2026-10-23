@@ -57,6 +57,7 @@ export const cleanupUserRelations = cleanupDependents('пользователь'
   { collection: 'streaks', field: 'user' },
   { collection: 'notes', field: 'user' },
   { collection: 'bookmarks', field: 'user' },
+  { collection: 'guide-reads', field: 'user' },
   { collection: 'comments', field: 'user' },
   { collection: 'interview-rooms', field: 'owner' },
 ])
@@ -80,4 +81,5 @@ export const cleanupTaskRelations = cleanupDependents('задача тренаж
 /** Закладки на гайд: без них «Сохранённое» держало бы запись без цели */
 export const cleanupGuideRelations = cleanupDependents('гайд', [
   { collection: 'bookmarks', field: 'guide' },
+  { collection: 'guide-reads', field: 'guide' },
 ])

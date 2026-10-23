@@ -155,6 +155,40 @@ test('гайд из .md-файла: шапка заполняет поля, те
   await request.delete(`/api/guides/${id}`)
 })
 
+test('гайд пишется в редакторе CMS: шаблон, панель форматирования, предпросмотр, версия после сохранения', async ({ page, request }) => {
+  const stamp = Date.now()
+  await page.goto('/admin/collections/guides/create')
+  await page.locator('#field-title').fill(`Гайд из редактора ${stamp}`)
+  await page.locator('#field-summary').fill('Написан прямо в CMS')
+  const editor = page.locator('#field-markdown')
+  await page.getByRole('button', { name: 'Вставить шаблон гайда' }).click()
+  await expect(editor).toHaveValue(/^Вступление: для кого этот гайд/)
+
+  // Панель меняет выделенную строку, Ctrl+Z отменяет правку панели.
+  await editor.evaluate((element: HTMLTextAreaElement) => {
+    const start = element.value.indexOf('Текст шага.')
+    element.focus()
+    element.setSelectionRange(start, start + 'Текст шага.'.length)
+  })
+  await page.getByRole('button', { name: 'Жирный' }).click()
+  await expect(editor).toHaveValue(/\*\*Текст шага\.\*\*/)
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(editor).not.toHaveValue(/\*\*Текст шага\.\*\*/)
+
+  await page.getByRole('group', { name: 'Вид редактора' }).getByRole('button', { name: 'Рядом' }).click()
+  const preview = page.getByLabel('Предпросмотр гайда')
+  await expect(preview.getByRole('heading', { name: 'Что понадобится', level: 2 })).toBeVisible()
+  await expect(preview.locator('.guide-prose__callout--warning')).toContainText('Внимание')
+  await expect(page.getByText(/≈ \d+ мин чтения · разделов: 4/)).toBeVisible()
+
+  await save(page)
+  await expect(page).toHaveURL(/\/admin\/collections\/guides\/\d+/)
+  const id = page.url().match(/guides\/(\d+)/)![1]
+  const versions = await request.get(`/api/guides/versions?where[parent][equals]=${id}`)
+  expect((await versions.json()).totalDocs).toBe(1)
+  await request.delete(`/api/guides/${id}`)
+})
+
 test('контакты из «Настроек сайта» появляются на странице контактов', async ({ page, browser, request }) => {
   const channel = `https://t.me/e2e_changed_${Date.now()}`
   await page.goto('/admin/globals/site-settings')

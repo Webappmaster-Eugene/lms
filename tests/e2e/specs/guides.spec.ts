@@ -6,9 +6,9 @@ import { CONTENT, NOT_FOUND_HEADING } from '../fixtures/data'
 import { storageStateOf } from '../fixtures/env'
 
 /**
- * Раздел «Гайды»: список, оглавление, Markdown-вёрстка, скачивание .md, «Сохранённое», черновики
- * и выборочный доступ. По сиду гайд студенту назначен отдельно, а у leader доступа к гайдам нет
- * при открытых курсах. Черновик хранится в старом формате Lexical.
+ * Раздел «Гайды»: список с категориями, оглавление, Markdown-вёрстка, скачивание .md, «Сохранённое»,
+ * отзыв, черновики и выборочный доступ. По сиду оба гайда студенту назначены отдельно (первый он
+ * уже открывал), а у leader доступа к гайдам нет при открытых курсах.
  */
 test.describe('ученик', () => {
   test.use({ storageState: storageStateOf('student') })
@@ -35,12 +35,61 @@ test.describe('ученик', () => {
     await expect(page).toHaveURL(/\/guides$/)
   })
 
-  test('Markdown свёрстан: таблица, врезка, код в строке и подсвеченный блок кода', async ({ page }) => {
+  test('Markdown свёрстан: таблица, цитата, врезка, код в строке и подсвеченный блок кода с кнопкой копирования', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
     await page.goto(`/guides/${CONTENT.guide.slug}`)
     await expect(page.getByRole('table')).toContainText('Отдельный профиль')
     await expect(page.locator('blockquote')).toContainText('первую неделю не меняйте устройство')
+    const warning = page.locator('aside[data-callout="warning"]')
+    await expect(warning).toContainText('Внимание')
+    await expect(warning).toContainText('Не входите в аккаунт с телефона.')
+    await expect(warning).not.toContainText('[!WARNING]')
     await expect(page.locator('p code', { hasText: 'pnpm dev' })).toBeVisible()
     await expect(page.locator('pre.shiki')).toContainText('pnpm install')
+    await page.getByRole('button', { name: 'Копировать' }).click()
+    await expect(page.getByRole('button', { name: 'Скопировано' })).toBeVisible()
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('pnpm install')
+  })
+
+  test('список: категории фильтруют гайды, у непрочитанного — «Новое», у открытого — «Прочитан»', async ({ page }) => {
+    await page.goto('/guides')
+    const filters = page.getByRole('navigation', { name: 'Категории гайдов' })
+    await expect(filters.getByRole('link')).toHaveText(['Все', 'Карьера', 'ИИ в работе'])
+    await expect(page.getByRole('link', { name: new RegExp(CONTENT.aiGuide.title) }).getByText('Новое', { exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: new RegExp(CONTENT.guide.title) }).getByText('Прочитан')).toBeVisible()
+
+    await filters.getByRole('link', { name: 'ИИ в работе' }).click()
+    await expect(page).toHaveURL(/\/guides\?category=ai$/)
+    await expect(filters.getByRole('link', { name: 'ИИ в работе' })).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByRole('link', { name: new RegExp(CONTENT.aiGuide.title) })).toBeVisible()
+    await expect(page.getByRole('link', { name: new RegExp(CONTENT.guide.title) })).toHaveCount(0)
+  })
+
+  test('на широком экране оглавление сбоку и подсвечивает текущий раздел', async ({ page }) => {
+    await page.setViewportSize({ width: 1600, height: 900 })
+    await page.goto(`/guides/${CONTENT.guide.slug}`)
+    const side = page.getByRole('navigation', { name: 'Содержание гайда' })
+    await expect(side).toBeVisible()
+    await expect(page.getByRole('navigation', { name: 'Содержание', exact: true })).toBeHidden()
+    const [, , last] = CONTENT.guide.sections
+    await side.getByRole('link', { name: last }).click()
+    await expect(side.getByRole('link', { name: last })).toHaveAttribute('aria-current', 'location')
+    // Прокрутили к концу — оглавление едет вместе со страницей и остаётся на экране.
+    await expect(side).toBeInViewport()
+  })
+
+  test('отвечает «Гайд помог?», оставляет комментарий, после перезагрузки ответ на месте', async ({ page }) => {
+    await page.goto(`/guides/${CONTENT.guide.slug}`)
+    const feedback = page.getByRole('region', { name: 'Гайд помог?' })
+    await feedback.getByRole('button', { name: 'Нет' }).click()
+    await expect(feedback.getByRole('button', { name: 'Нет' })).toHaveAttribute('aria-pressed', 'true')
+    await feedback.getByLabel('Что было непонятно или устарело? Ментор поправит гайд.').fill('Не понял, где взять прокси')
+    await feedback.getByRole('button', { name: 'Отправить' }).click()
+    await expect(feedback.getByRole('status')).toHaveText('Отзыв отправлен')
+
+    await page.reload()
+    await expect(feedback.getByRole('button', { name: 'Нет' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(feedback.getByRole('textbox')).toHaveValue('Не понял, где взять прокси')
   })
 
   test('скачивает гайд файлом .md с названием, текстом и ссылкой на источник', async ({ page }) => {
@@ -50,7 +99,7 @@ test.describe('ученик', () => {
     const file = await readFile(await download.path(), 'utf8')
     expect(file.startsWith(`# ${CONTENT.guide.title}\n\n> ${CONTENT.guide.summary}`)).toBe(true)
     expect(file).toContain(`## ${CONTENT.guide.sections[0]}`)
-    expect(file).toMatch(new RegExp(`Источник: http\\S+/guides/${CONTENT.guide.slug}`))
+    expect(file).toMatch(new RegExp(`Источник: http\\S+/guides/${CONTENT.guide.slug} · данные проверены 22 октября 2026 г\\.`))
   })
 
   test('сохраняет гайд и находит его в «Сохранённом»', async ({ page }) => {
@@ -75,7 +124,7 @@ test.describe('ученик', () => {
 test.describe('ученик без назначенных гайдов', () => {
   test.use({ storageState: storageStateOf('leader') })
 
-  test('не видит раздела в меню, список объясняет, где взять доступ, прямая ссылка — 404', async ({ page }) => {
+  test('не видит раздела в меню, список объясняет, где взять доступ, прямая ссылка — что гайд закрыт', async ({ page }) => {
     await page.goto('/courses')
     await expect(page.locator('aside').last().getByRole('link', { name: 'Курсы', exact: true })).toBeVisible()
     await expect(page.locator('aside').last().getByRole('link', { name: 'Гайды', exact: true })).toHaveCount(0)
@@ -84,8 +133,10 @@ test.describe('ученик без назначенных гайдов', () => {
     await expect(page.getByText('Вам пока не открыт ни один гайд')).toBeVisible()
     await expect(page.getByRole('link', { name: new RegExp(CONTENT.guide.title) })).toHaveCount(0)
 
-    const response = await page.goto(`/guides/${CONTENT.guide.slug}`)
-    expect(response?.status()).toBe(404)
+    await page.goto(`/guides/${CONTENT.guide.slug}`)
+    await expect(page.getByRole('heading', { name: 'Этот гайд вам пока не открыт', level: 1 })).toBeVisible()
+    // Название закрытого гайда не раскрывается.
+    await expect(page.getByText(CONTENT.guide.title)).toHaveCount(0)
     expect((await page.request.get(`/guides/${CONTENT.guide.slug}/download`)).status()).toBe(404)
   })
 })
@@ -100,9 +151,10 @@ test.describe('администратор', () => {
     await draft.click()
     await expect(page.getByRole('heading', { name: CONTENT.draftGuide.title, level: 1 })).toBeVisible()
     await expect(page.getByText('Черновик — ученики его пока не видят')).toBeVisible()
-    // Старый Lexical-гайд читается, но файлом не скачивается; черновик в «Сохранённое» не кладут.
+    // Черновик админ скачивает для проверки, но в «Сохранённое» его не кладут и отзыв не спрашивают.
     await expect(page.getByText('Черновик.')).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Скачать .md' })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Скачать .md' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'В сохранённое' })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'Гайд помог?' })).toHaveCount(0)
   })
 })

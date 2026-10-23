@@ -17,6 +17,7 @@
     "seed": "cross-env NODE_OPTIONS=--no-deprecation payload run src/seed.ts",
     "seed:trainer": "cross-env NODE_OPTIONS=--no-deprecation payload run src/seed-trainer.ts",
     "guide:publish": "node scripts/guide-publish.mjs",
+    "guide:check-links": "node scripts/guide-check-links.mjs",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

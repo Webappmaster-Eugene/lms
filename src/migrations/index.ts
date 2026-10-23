@@ -30,6 +30,7 @@ import * as migration_20261022_093223_guides from './20261022_093223_guides';
 import * as migration_20261022_131120_guides_access from './20261022_131120_guides_access';
 import * as migration_20261022_191842_guides_markdown from './20261022_191842_guides_markdown';
 import * as migration_20261022_204749_bootcamp_manuals from './20261022_204749_bootcamp_manuals';
+import * as migration_20261023_105821_guides_v2 from './20261023_105821_guides_v2';
 
 export const migrations = [
   {
@@ -190,6 +191,11 @@ export const migrations = [
   {
     up: migration_20261022_204749_bootcamp_manuals.up,
     down: migration_20261022_204749_bootcamp_manuals.down,
-    name: '20261022_204749_bootcamp_manuals'
+    name: '20261022_204749_bootcamp_manuals',
+  },
+  {
+    up: migration_20261023_105821_guides_v2.up,
+    down: migration_20261023_105821_guides_v2.down,
+    name: '20261023_105821_guides_v2',
   },
 ];

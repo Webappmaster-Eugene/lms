@@ -87,6 +87,7 @@ export interface Config {
     'points-transactions': PointsTransaction;
     notes: Note;
     bookmarks: Bookmark;
+    'guide-reads': GuideRead;
     comments: Comment;
     notifications: Notification;
     'notification-preferences': NotificationPreference;
@@ -136,6 +137,7 @@ export interface Config {
     'points-transactions': PointsTransactionsSelect<false> | PointsTransactionsSelect<true>;
     notes: NotesSelect<false> | NotesSelect<true>;
     bookmarks: BookmarksSelect<false> | BookmarksSelect<true>;
+    'guide-reads': GuideReadsSelect<false> | GuideReadsSelect<true>;
     comments: CommentsSelect<false> | CommentsSelect<true>;
     notifications: NotificationsSelect<false> | NotificationsSelect<true>;
     'notification-preferences': NotificationPreferencesSelect<false> | NotificationPreferencesSelect<true>;
@@ -636,28 +638,24 @@ export interface Guide {
    * Одна-две фразы о том, чему научит гайд. Видны в списке гайдов и в описании страницы
    */
   summary: string;
-  /**
-   * Разделы — заголовки «## …», из них строится оглавление. Таблицы, код и цитаты — обычный Markdown
-   */
   markdown?: string | null;
   /**
-   * Используется, пока поле Markdown пустое. Загрузите .md, чтобы перевести гайд в Markdown
+   * По ней ученик фильтрует список гайдов
    */
-  content?: {
-    root: {
-      type: string;
-      children: {
-        type: any;
-        version: number;
-        [k: string]: unknown;
-      }[];
-      direction: ('ltr' | 'rtl') | null;
-      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
-      indent: number;
-      version: number;
-    };
-    [k: string]: unknown;
-  } | null;
+  category?: ('career' | 'ai' | 'business' | 'other') | null;
+  /**
+   * Когда цифры и ссылки в гайде сверены с источниками. Видно ученику
+   */
+  reviewedAt?: string | null;
+  /**
+   * Пустое — через 3 месяца после проверки. Просроченные гайды видны над списком
+   */
+  reviewBy?: string | null;
+  /**
+   * Считается из текста при сохранении
+   */
+  readingMinutes?: number | null;
+  announcedAt?: string | null;
   order?: number | null;
   isPublished?: boolean | null;
   updatedAt: string;
@@ -1207,6 +1205,22 @@ export interface Bookmark {
   lesson?: (number | null) | Lesson;
   task?: (number | null) | TrainerTask;
   guide?: (number | null) | Guide;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Создаётся, когда ученик впервые открывает гайд. «Помог ли гайд» и комментарий ученик оставляет внизу страницы гайда.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "guide-reads".
+ */
+export interface GuideRead {
+  id: number;
+  user: number | User;
+  guide: number | Guide;
+  helpful?: ('yes' | 'no') | null;
+  comment?: string | null;
+  feedbackAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1767,6 +1781,10 @@ export interface PayloadLockedDocument {
         value: number | Bookmark;
       } | null)
     | ({
+        relationTo: 'guide-reads';
+        value: number | GuideRead;
+      } | null)
+    | ({
         relationTo: 'comments';
         value: number | Comment;
       } | null)
@@ -2109,7 +2127,11 @@ export interface GuidesSelect<T extends boolean = true> {
   slug?: T;
   summary?: T;
   markdown?: T;
-  content?: T;
+  category?: T;
+  reviewedAt?: T;
+  reviewBy?: T;
+  readingMinutes?: T;
+  announcedAt?: T;
   order?: T;
   isPublished?: T;
   updatedAt?: T;
@@ -2302,6 +2324,19 @@ export interface BookmarksSelect<T extends boolean = true> {
   lesson?: T;
   task?: T;
   guide?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "guide-reads_select".
+ */
+export interface GuideReadsSelect<T extends boolean = true> {
+  user?: T;
+  guide?: T;
+  helpful?: T;
+  comment?: T;
+  feedbackAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

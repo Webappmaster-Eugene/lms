@@ -1,7 +1,6 @@
 import { createLocalReq } from 'payload'
 
 import { guideDownloadDisposition, guideMarkdownFile } from '@/lib/guide-file'
-import { guideMarkdown } from '@/lib/guides'
 import { getPayload } from '@/lib/payload'
 import { routeSlug } from '@/lib/route-slug'
 import { siteUrl } from '@/lib/site-metadata'
@@ -19,7 +18,7 @@ export async function GET(request: Request, { params }: Context): Promise<Respon
   const result = await payload.find({
     collection: 'guides',
     where: { slug: { equals: slug } },
-    select: { title: true, slug: true, summary: true, markdown: true, updatedAt: true },
+    select: { title: true, slug: true, summary: true, markdown: true, updatedAt: true, reviewedAt: true },
     limit: 1,
     depth: 0,
     overrideAccess: false,
@@ -27,7 +26,7 @@ export async function GET(request: Request, { params }: Context): Promise<Respon
     req,
   })
   const guide = result.docs[0]
-  const markdown = guide ? guideMarkdown(guide) : null
+  const markdown = guide?.markdown?.trim()
   if (!guide || !markdown) return new Response('Гайд не найден', { status: 404 })
 
   return new Response(guideMarkdownFile({ ...guide, markdown }, siteUrl()), {

@@ -1,6 +1,7 @@
 import { Forbidden, type CollectionConfig } from 'payload'
 
 import { isAdminOrSelf } from '@/payload/access/isAdminOrSelf'
+import { notifyGuidesModeOpened } from '@/server/guide-announcements'
 
 export const LearningAccessPolicies: CollectionConfig = {
   slug: 'learning-access-policies', lockDocuments: false,
@@ -15,6 +16,7 @@ export const LearningAccessPolicies: CollectionConfig = {
   hooks: {
     beforeChange: [({ data, req }) => { if (req.context?.syncLearningAccessPolicy !== true) throw new Forbidden(req.t); return data }],
     beforeDelete: [({ req }) => { if (req.context?.syncLearningAccessPolicy !== true) throw new Forbidden(req.t) }],
+    afterChange: [notifyGuidesModeOpened],
   },
   fields: [
     { name: 'user', type: 'relationship', relationTo: 'users', required: true, unique: true, label: 'Ученик' },

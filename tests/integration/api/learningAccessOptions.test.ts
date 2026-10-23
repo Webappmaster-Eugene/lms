@@ -27,7 +27,7 @@ beforeAll(async () => {
   topicId = topic.id
   const task = await payload.create({ collection: 'trainer-tasks', data: { title: 'Закрытый стартовый код', slug: `assignment-task-${Date.now()}`, topic: topicId, starterCode: 'PRIVATE_STARTER', difficulty: 'easy', languages: ['js'], checkMode: 'stdout', expectedOutput: 'PRIVATE_OUTPUT', isPublished: true } })
   taskId = task.id
-  const guide = await payload.create({ collection: 'guides', data: { title: 'Гайд для назначения', slug: `assignment-guide-${Date.now()}`, summary: 'Кратко', content: { root: { type: 'root', direction: 'ltr', format: '', indent: 0, version: 1, children: [{ type: 'paragraph', version: 1, children: [{ type: 'text', version: 1, text: 'Текст' }] }] } }, isPublished: true } })
+  const guide = await payload.create({ collection: 'guides', data: { title: 'Гайд для назначения', slug: `assignment-guide-${Date.now()}`, summary: 'Кратко', markdown: 'Текст', isPublished: true } })
   guideId = guide.id
 })
 beforeEach(async () => {

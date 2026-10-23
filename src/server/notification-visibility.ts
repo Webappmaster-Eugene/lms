@@ -1,6 +1,7 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { learningRelationId } from '@/lib/learning-access'
 
+import { getGuideAccess } from '@/server/guide-access'
 import { getLearningAccess } from '@/server/learning-access'
 import { getTrainerAccess } from '@/server/trainer-access'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
@@ -29,6 +30,15 @@ export async function notificationLinkIsVisible(payload: Payload, userId: number
     }
     const result = await payload.find({ collection: 'trainer-tasks', where: { slug: { equals: parts[2] } }, select: { topic: true }, limit: 1, depth: 0, overrideAccess: true, req })
     return Boolean(result.docs[0] && scope.canBrowseTask(result.docs[0].id))
+  }
+  if (parts[0] === 'guides') {
+    if (!parts[1]) return true
+    // Уведомление о гайде гаснет, когда гайд закрыли или сняли с публикации.
+    const [result, scope] = await Promise.all([
+      payload.find({ collection: 'guides', where: { slug: { equals: parts[1] } }, select: { slug: true }, limit: 1, depth: 0, overrideAccess: true, req }),
+      getGuideAccess(payload, user, req),
+    ])
+    return Boolean(result.docs[0] && scope.canAccessGuide(result.docs[0].id))
   }
   // Открытый каталог тоже проверяется: курс «только по назначению» в нём скрыт.
   const scope = await getLearningAccess(payload, user, req)

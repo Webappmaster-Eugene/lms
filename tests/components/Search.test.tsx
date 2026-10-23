@@ -22,14 +22,16 @@ function mockApi({
   courses = [],
   lessons = [],
   tasks = [],
+  guides = [],
   fail = false,
-}: { roadmaps?: Doc[]; courses?: Doc[]; lessons?: Doc[]; tasks?: Doc[]; fail?: boolean } = {}) {
+}: { roadmaps?: Doc[]; courses?: Doc[]; lessons?: Doc[]; tasks?: Doc[]; guides?: Doc[]; fail?: boolean } = {}) {
   global.fetch = vi.fn(async (input: RequestInfo | URL) => {
     if (fail) throw new Error('сеть недоступна')
     const url = String(input)
     if (url.includes('/api/roadmaps')) return Response.json({ docs: roadmaps })
     if (url.includes('/api/courses')) return Response.json({ docs: courses })
     if (url.includes('/api/trainer-tasks')) return Response.json({ docs: tasks })
+    if (url.includes('/api/guides')) return Response.json({ docs: guides })
     return Response.json({ docs: lessons })
   }) as unknown as typeof fetch
 }
@@ -65,13 +67,28 @@ describe('строка поиска', () => {
       expect(global.fetch).not.toHaveBeenCalled()
     })
 
-    it('от двух символов ищем в роадмапах, курсах, уроках и задачах тренажёра', async () => {
+    it('от двух символов ищем в роадмапах, курсах, уроках, задачах тренажёра и гайдах', async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
       render(<SearchBar />)
 
       await type(user, 'ре')
 
-      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(4))
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(5))
+    })
+
+    it('гайд ищется и по названию, и по описанию, и ведёт на свою страницу', async () => {
+      mockApi({ guides: [{ id: '7', title: 'Зарубежное ИП', slug: 'foreign-ip' }] })
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      render(<SearchBar />)
+
+      await type(user, 'налог')
+
+      const option = await screen.findByRole('option', { name: /Зарубежное ИП/ })
+      expect(option).toHaveTextContent('Гайд')
+      const url = String(vi.mocked(global.fetch).mock.calls.find(([input]) => String(input).includes('/api/guides'))?.[0])
+      expect(url).toContain('where[or][0][title][contains]=%D0%BD%D0%B0%D0%BB%D0%BE%D0%B3')
+      expect(url).toContain('where[or][1][summary][contains]=%D0%BD%D0%B0%D0%BB%D0%BE%D0%B3')
+      expect(url).toContain('where[isPublished][equals]=true')
     })
 
     it('при закрытом тренажёре поиск курсов работает без запроса задач и их заголовков', async () => {
@@ -83,7 +100,7 @@ describe('строка поиска', () => {
 
       expect(await screen.findByRole('option', { name: /Доступный курс/ })).toBeInTheDocument()
       expect(screen.queryByText('Закрытая задача')).not.toBeInTheDocument()
-      expect(global.fetch).toHaveBeenCalledTimes(3)
+      expect(global.fetch).toHaveBeenCalledTimes(4)
       expect(vi.mocked(global.fetch).mock.calls.every(([url]) => !String(url).includes('trainer-tasks'))).toBe(true)
       expect(input()).toHaveAccessibleName('Поиск по курсам и урокам')
     })
@@ -191,12 +208,13 @@ describe('строка поиска', () => {
 
       await type(user, 're')
       await type(user, 'act')
-      await waitFor(() => expect(resolvers).toHaveLength(8))
+      // Пять запросов на каждый поиск: роадмапы, курсы, уроки, задачи, гайды.
+      await waitFor(() => expect(resolvers).toHaveLength(10))
       await act(async () => {
-        resolvers.slice(4).forEach((r) => r())
+        resolvers.slice(5).forEach((r) => r())
       })
       await act(async () => {
-        resolvers.slice(0, 4).forEach((r) => r())
+        resolvers.slice(0, 5).forEach((r) => r())
       })
 
       expect(screen.getByRole('option', { name: /Свежий/ })).toBeInTheDocument()

@@ -45,6 +45,7 @@ import { InterviewDirections, InterviewRecordings, InterviewAnalysisUsage } from
 import { InterviewRooms } from '@/payload/collections/InterviewRooms'
 import { FaqItems } from '@/payload/collections/FaqItems'
 import { Guides } from '@/payload/collections/Guides'
+import { GuideReads } from '@/payload/collections/GuideReads'
 import { YandexDiskImports } from '@/payload/collections/YandexDiskImports'
 import { withLessonSourceGuard } from '@/payload/hooks/denyLessonSourceQueries'
 import { SiteSettings } from '@/payload/globals/SiteSettings'
@@ -107,6 +108,7 @@ export default buildConfig({
     PointsTransactions,
     Notes,
     Bookmarks,
+    GuideReads,
     Comments,
     Notifications,
     NotificationPreferences,

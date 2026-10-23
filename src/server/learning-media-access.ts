@@ -2,12 +2,14 @@ import { sql } from '@payloadcms/db-postgres'
 import type { Access, Payload, PayloadRequest, Where } from 'payload'
 
 import { collectAllPages } from '@/lib/paginate'
+import { getGuideAccess } from '@/server/guide-access'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 
 interface ReferenceRow { media_id: number; lesson_id: number | null; public: boolean }
-interface QueryResult { rows: ReferenceRow[] }
+interface GuideReferenceRow { media_id: number; guide_id: number }
+interface QueryResult<Row = ReferenceRow> { rows: Row[] }
 interface ReadAdapter {
-  drizzle: { execute: (query: ReturnType<typeof sql>) => Promise<QueryResult> }
+  drizzle: { execute: <Row = ReferenceRow>(query: ReturnType<typeof sql>) => Promise<QueryResult<Row>> }
   sessions: Record<string | number, { db: ReadAdapter['drizzle'] } | undefined>
 }
 
@@ -107,9 +109,20 @@ async function readableMediaWhere(payload: Payload, req: PayloadRequest, filenam
       where a.raster and m.filesize > 0 and m.filesize <= 2097152 and m.uploaded_by_id = ${req.user?.id ?? 0}
     ) select distinct media_id, lesson_id, public from media_refs
   `)
+  // Картинки гайда вставлены в Markdown ссылкой /api/media/file/<имя> — видны тем, кому открыт гайд.
+  const guideRefs = await db.execute<GuideReferenceRow>(sql`
+    with aliases as (
+      select * from jsonb_to_recordset(${JSON.stringify(aliases)}::jsonb)
+      as x(media_id integer, path text, regex text, raster boolean)
+    ) select distinct a.media_id, g.id as guide_id from aliases a join guides g on g.markdown ~ a.regex
+  `)
   // A public reference must not publish private course material (including sizes).
-  const privateIds = new Set(result.rows.filter((row) => row.lesson_id !== null).map((row) => row.media_id))
+  const privateIds = new Set([...result.rows.filter((row) => row.lesson_id !== null).map((row) => row.media_id), ...guideRefs.rows.map((row) => row.media_id)])
   const allowedIds = new Set(result.rows.filter((row) => row.public && !privateIds.has(row.media_id)).map((row) => row.media_id))
+  if (req.user && guideRefs.rows.length) {
+    const guides = await getGuideAccess(payload, req.user, req)
+    for (const row of guideRefs.rows) if (guides.canAccessGuide(row.guide_id)) allowedIds.add(row.media_id)
+  }
   const candidates = [...new Set(result.rows.flatMap((row) => row.lesson_id === null || allowedIds.has(row.media_id) ? [] : [row.lesson_id]))]
   if (req.user && candidates.length) {
     // The collection's central policy checks assignments and all parent publication.
