@@ -234,7 +234,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
 
   // Трансформация в формат ReactFlow
   const { graphNodes, graphEdges, placedCourseIds } = buildGraphData(
-    nodeDocs.filter((node) => access.canBrowseNode(node.id)).map((node) => access.catalogVisibility === 'assigned' ? { ...node, description: null, bullets: [] } : node),
+    nodeDocs.filter((node) => access.canBrowseNode(node.id)).map((node) => access.canReadNodeDescription(node.id) ? node : { ...node, description: null, bullets: [] }),
     edgeDocs,
     coursesWithProgress,
     nextStep?.id ?? null,

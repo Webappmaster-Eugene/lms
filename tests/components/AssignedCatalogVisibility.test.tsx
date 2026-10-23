@@ -7,6 +7,7 @@ const fixture = vi.hoisted(() => ({
   find: vi.fn(),
   findByID: vi.fn(),
   courseAllowed: true,
+  wholeCourse: false,
 }))
 
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }))
@@ -25,6 +26,7 @@ vi.mock('@/server/learning-access', () => ({ getLearningAccess: async () => ({
   canBrowseSection: (id: number) => fixture.visibility === 'catalog' || id === 10,
   canBrowseLessonMetadata: (lesson: { id: number }) => fixture.visibility === 'catalog' || lesson.id === 11,
   canAccessLessonMetadata: (lesson: { id: number }) => lesson.id === 11,
+  canReadCourseDescription: (id: number) => fixture.visibility === 'catalog' || (fixture.wholeCourse && id === 1),
 }) }))
 vi.mock('@/components/ui/ShareButton', () => ({ ShareButton: () => null }))
 vi.mock('@/components/course/CourseLessonItem', () => ({ CourseLessonItem: ({ lesson }: { lesson: { title: string } }) => <span>{lesson.title}</span> }))
@@ -36,6 +38,7 @@ describe('назначенная программа не раскрывает с
   beforeEach(() => {
     fixture.visibility = 'assigned'
     fixture.courseAllowed = true
+    fixture.wholeCourse = false
     fixture.find.mockReset()
     fixture.findByID.mockReset()
     fixture.findByID.mockResolvedValue({ description: null })
@@ -59,6 +62,16 @@ describe('назначенная программа не раскрывает с
     expect(html).not.toContain('50ч')
     expect(html).toContain('Прогресс назначенных уроков')
     expect(fixture.findByID).not.toHaveBeenCalled()
+  })
+
+  it('курс, назначенный целиком, показывает описание и при скрытом каталоге', async () => {
+    fixture.wholeCourse = true
+    fixture.findByID.mockResolvedValue({ description: { root: { type: 'root', format: '', indent: 0, version: 1, direction: null, children: [
+      { type: 'paragraph', format: '', indent: 0, version: 1, direction: null, textFormat: 0, children: [{ type: 'text', text: 'Описание всего курса', format: 0, detail: 0, mode: 'normal', style: '', version: 1 }] },
+    ] } } })
+    const html = renderToStaticMarkup(await CoursePage(params))
+    expect(fixture.findByID).toHaveBeenCalledOnce()
+    expect(html).toContain('Описание всего курса')
   })
 
   it('загружает названия курса с проверкой прав и минимальной проекцией', async () => {

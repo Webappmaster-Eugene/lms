@@ -237,3 +237,72 @@ describe('курс только по назначению', () => {
     expect(admin.canBrowseLessonMetadata(inSection)).toBe(true)
   })
 })
+
+describe('описания родителей при скрытом каталоге', () => {
+  const strict = { ...student, learningCatalogVisibility: 'assigned' as const }
+  const strictAll = { ...strict, learningAccessMode: 'all' as const }
+  const reads = (policy: ReturnType<typeof buildLearningAccess>) => ({
+    courses: [10, 11, 20].filter(policy.canReadCourseDescription),
+    sections: [30, 31].filter(policy.canReadSectionDescription),
+    nodes: [100, 101].filter(policy.canReadNodeDescription),
+    roadmaps: [1, 2].filter(policy.canReadRoadmapDescription),
+  })
+
+  it('курс целиком открывает описания курса, его разделов и темы только из этого курса', () => {
+    // Тема 100 объединяет курс 10 (через roadmapNode) и курс 11 (основной курс темы), то есть всю карту 1.
+    expect(reads(buildLearningAccess(strict, [grant('courses', 10)], metadata))).toEqual({ courses: [10], sections: [30], nodes: [101], roadmaps: [] })
+    expect(reads(buildLearningAccess(strict, [grant('roadmap-nodes', 100)], metadata))).toEqual({ courses: [10, 11], sections: [30, 31], nodes: [100, 101], roadmaps: [1] })
+  })
+
+  it('назначенный урок или раздел не раскрывают описание родителя', () => {
+    const lesson = buildLearningAccess(strict, [grant('lessons', 40)], metadata)
+    expect(lesson.canBrowseCourse(10) && lesson.canBrowseSection(30) && lesson.canBrowseNode(101) && lesson.canBrowseRoadmap(1)).toBe(true)
+    expect(reads(lesson)).toEqual({ courses: [], sections: [], nodes: [], roadmaps: [] })
+    expect(reads(buildLearningAccess(strict, [grant('sections', 30)], metadata))).toEqual({ courses: [], sections: [30], nodes: [], roadmaps: [] })
+  })
+
+  it('исключение внутри назначенного курса скрывает описание курса и затронутого раздела', () => {
+    expect(reads(buildLearningAccess(strict, [grant('courses', 10), grant('lessons', 40, 'deny')], metadata))).toEqual({ courses: [], sections: [], nodes: [], roadmaps: [] })
+    expect(reads(buildLearningAccess(strict, [grant('courses', 10), grant('lessons', 41, 'deny')], metadata))).toEqual({ courses: [], sections: [30], nodes: [], roadmaps: [] })
+    expect(reads(buildLearningAccess(strict, [grant('courses', 10), grant('sections', 30, 'deny')], metadata))).toEqual({ courses: [], sections: [], nodes: [], roadmaps: [] })
+    expect(reads(buildLearningAccess(strict, [grant('courses', 10), grant('lessons', 40)], metadata)).courses).toEqual([10])
+  })
+
+  it('режим «все курсы» и назначение карты открывают описания только полностью доступной карты', () => {
+    expect(reads(buildLearningAccess(strictAll, [], metadata))).toEqual({ courses: [10, 11, 20], sections: [30, 31], nodes: [100, 101], roadmaps: [1, 2] })
+    const withCategory = { ...metadata, nodes: [...metadata.nodes, { id: 105, roadmap: 1, course: null }] }
+    // Категория без курсов видна только при назначении карты — без него карта открыта не целиком.
+    const allMode = buildLearningAccess(strictAll, [], withCategory)
+    expect(allMode.canReadRoadmapDescription(1)).toBe(false)
+    expect(allMode.canReadNodeDescription(105)).toBe(false)
+    const roadmap = buildLearningAccess(strict, [grant('roadmaps', 1)], withCategory)
+    expect(roadmap.canReadRoadmapDescription(1)).toBe(true)
+    expect(roadmap.canReadNodeDescription(105)).toBe(true)
+    const excluded = buildLearningAccess(strict, [grant('roadmaps', 1), grant('courses', 11, 'deny')], withCategory)
+    expect(excluded.canReadRoadmapDescription(1)).toBe(false)
+    expect(excluded.canReadNodeDescription(105)).toBe(false)
+    expect(excluded.canReadNodeDescription(100)).toBe(false)
+    expect(excluded.canReadNodeDescription(101)).toBe(true)
+  })
+
+  it('закрытый курс, назначенный целиком, показывает свои описания; карта с ним без назначения — нет', () => {
+    const closed: LearningPolicyMetadata = {
+      ...metadata,
+      courses: [...metadata.courses, { id: 50, roadmap: 1, roadmapNode: 102, isPublished: true, assignedOnly: true }],
+      nodes: [...metadata.nodes, { id: 102, roadmap: 1, course: 50 }],
+      sections: [...metadata.sections, { id: 60, course: 50, isPublished: true }],
+    }
+    const assigned = buildLearningAccess(strict, [grant('courses', 50)], closed)
+    expect([assigned.canReadCourseDescription(50), assigned.canReadSectionDescription(60), assigned.canReadNodeDescription(102)]).toEqual([true, true, true])
+    expect(assigned.canReadRoadmapDescription(1)).toBe(false)
+    expect(buildLearningAccess(strictAll, [grant('roadmaps', 1)], closed).canReadRoadmapDescription(1)).toBe(false)
+  })
+
+  it('общий каталог и администратор видят описания как раньше, истёкшее назначение их не открывает', () => {
+    const all = { courses: [10, 11, 20], sections: [30, 31], nodes: [100, 101], roadmaps: [1, 2] }
+    expect(reads(buildLearningAccess({ ...strict, learningCatalogVisibility: 'catalog' }, [], metadata))).toEqual(all)
+    expect(reads(buildLearningAccess({ id: 1, role: 'admin', learningCatalogVisibility: 'assigned' }, [], metadata))).toEqual(all)
+    const expired = { ...grant('courses', 10), expiresAt: new Date(500).toISOString() }
+    expect(reads(buildLearningAccess(strict, [expired], metadata, 1000)).courses).toEqual([])
+  })
+})

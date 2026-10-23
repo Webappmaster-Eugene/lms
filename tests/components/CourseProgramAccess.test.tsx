@@ -44,7 +44,7 @@ describe('серверная программа курса', () => {
   })
 
   it('начинает с назначенного урока, сохраняя общий знаменатель прогресса', async () => {
-    mocks.policy.mockResolvedValue({ canBrowseCourse: () => true, canBrowseLessonMetadata: () => true, canAccessCourse: () => true, canAccessLessonMetadata: ({ id }: { id: number }) => id === 2 })
+    mocks.policy.mockResolvedValue({ canBrowseCourse: () => true, canBrowseLessonMetadata: () => true, canAccessCourse: () => true, canReadCourseDescription: () => false, canAccessLessonMetadata: ({ id }: { id: number }) => id === 2 })
     render(await CourseDetailPage({ params: Promise.resolve({ slug: 'node' }) }))
     expect(screen.getByText('0/2 (0%)')).toBeInTheDocument()
     expect(screen.getByText(/Вам назначено 1 из 2 уроков/)).toBeInTheDocument()
@@ -76,7 +76,7 @@ describe('серверная программа курса', () => {
   })
 
   it('показывает описание раздела под названием, читая его с проверкой доступа', async () => {
-    mocks.policy.mockResolvedValue({ canBrowseCourse: () => true, canBrowseSection: () => true, canBrowseLessonMetadata: () => true, canAccessCourse: () => true, canAccessLessonMetadata: () => true })
+    mocks.policy.mockResolvedValue({ canBrowseCourse: () => true, canBrowseSection: () => true, canBrowseLessonMetadata: () => true, canAccessCourse: () => true, canReadCourseDescription: () => false, canAccessLessonMetadata: () => true })
     mocks.find.mockImplementation(async ({ collection }: { collection: string }) => {
       if (collection === 'courses') return page([{ id: 10, title: 'Node.js', slug: 'node', roadmap: null }])
       if (collection === 'sections') return page([{ id: 5, title: 'Неделя 1', order: 0, description: 'Рантайм Node.js и событийный цикл' }, { id: 6, title: 'Неделя 2', order: 1, description: null }])

@@ -56,6 +56,11 @@ export type LearningAccessSnapshot = {
   canBrowseLessonMetadata: (lesson: LearningLessonMetadata) => boolean
   canAccessCourse: (id: number) => boolean
   canAccessLessonMetadata: (lesson: LearningLessonMetadata) => boolean
+  /** Описание выдаётся при скрытом каталоге, только если доступен весь материал, а не его часть. */
+  canReadRoadmapDescription: (id: number) => boolean
+  canReadNodeDescription: (id: number) => boolean
+  canReadCourseDescription: (id: number) => boolean
+  canReadSectionDescription: (id: number) => boolean
 }
 
 /** Builds a relational filter from parent metadata; lesson content is never fetched. */
@@ -218,6 +223,50 @@ export function buildLearningAccess(
       browseRoadmaps.add(roadmapId)
     }
   }
+  // Описание родителя может перечислять всё его содержимое, включая неназначенное. Поэтому при
+  // скрытом каталоге оно положено лишь тому, кому открыт весь родитель. Назначение отдельных
+  // уроков этого не даёт: полный список уроков политика не загружает и полноту доказать не может.
+  const partialSections = new Set<number>()
+  const partialCourses = new Set<number>()
+  for (const lesson of metadata.lessons) {
+    if (!isPublishedLesson(lesson) || canAccessLessonMetadata(lesson)) continue
+    const sectionId = learningRelationId(lesson.section)
+    const courseId = learningRelationId(lesson.course)
+    if (sectionId !== null) partialSections.add(sectionId)
+    if (courseId !== null) partialCourses.add(courseId)
+  }
+  const wholeSections = new Set([...sections.values()].filter((section) => sectionAllowed(section) && !partialSections.has(section.id)).map((section) => section.id))
+  const wholeCourses = new Set([...courses.keys()].filter((id) => courseEffects.get(id) && !partialCourses.has(id) &&
+    (sectionsByCourse.get(id) ?? []).every((section) => wholeSections.has(section.id))))
+  const coursesByNode = new Map<number, number[]>()
+  const linkCourse = (nodeId: number | null, courseId: number) => {
+    if (nodeId === null) return
+    const linked = coursesByNode.get(nodeId) ?? []
+    linked.push(courseId)
+    coursesByNode.set(nodeId, linked)
+  }
+  for (const course of courses.values()) linkCourse(learningRelationId(course.roadmapNode), course.id)
+  for (const node of nodes.values()) {
+    const courseId = learningRelationId(node.course)
+    if (courseId !== null && courses.has(courseId)) linkCourse(node.id, courseId)
+  }
+  // Текст роадмапа и темы без курсов может упоминать любую часть карты, включая закрытые курсы.
+  const partialRoadmaps = new Set<number>()
+  for (const course of courses.values()) {
+    const roadmapId = learningRelationId(course.roadmap)
+    if (roadmapId !== null && !wholeCourses.has(course.id)) partialRoadmaps.add(roadmapId)
+  }
+  for (const node of nodes.values()) {
+    const roadmapId = learningRelationId(node.roadmap)
+    if (roadmapId !== null && !browseNodes.has(node.id)) partialRoadmaps.add(roadmapId)
+  }
+  const wholeRoadmaps = new Set([...browseRoadmaps].filter((id) => !partialRoadmaps.has(id)))
+  const wholeNodes = new Set([...browseNodes].filter((id) => {
+    const nodeCourses = coursesByNode.get(id)
+    if (nodeCourses) return nodeCourses.every((courseId) => wholeCourses.has(courseId))
+    return wholeRoadmaps.has(learningRelationId(nodes.get(id)?.roadmap) ?? -1)
+  }))
+  const describes = (whole: Set<number>) => (id: number) => admin || catalogVisibility === 'catalog' || whole.has(id)
   const publishedWhere: Where = { and: [
     { isPublished: { equals: true } }, { course: { in: [...courses.keys()].filter((id) => !hidden.has(id)) } },
     { or: [{ section: { exists: false } }, { section: { in: [...sections.keys()] } }] },
@@ -232,6 +281,8 @@ export function buildLearningAccess(
     canBrowseRoadmap: id => admin || browseRoadmaps.has(id),
     canBrowseNode: id => admin || browseNodes.has(id),
     canBrowseLessonMetadata: lesson => isPublishedLesson(lesson) && (inCatalog(learningRelationId(lesson.course)) || canAccessLessonMetadata(lesson)),
-    canAccessCourse: id => admin || accessible.has(id), canAccessLessonMetadata }
+    canAccessCourse: id => admin || accessible.has(id), canAccessLessonMetadata,
+    canReadRoadmapDescription: describes(wholeRoadmaps), canReadNodeDescription: describes(wholeNodes),
+    canReadCourseDescription: describes(wholeCourses), canReadSectionDescription: describes(wholeSections) }
 
 }

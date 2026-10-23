@@ -69,7 +69,7 @@ export default async function CourseDetailPage({ params }: Props) {
             isPublished: { equals: true },
           },
           sort: ['order', 'id'],
-          // Описание раздела при скрытом каталоге обнуляет хук protectSectionMetadata: читаем без overrideAccess.
+          // Описание раздела, открытого не целиком, при скрытом каталоге обнуляет хук protectSectionMetadata: читаем без overrideAccess.
           select: { title: true, order: true, description: true },
           depth: 0,
           overrideAccess: false,
@@ -117,7 +117,7 @@ export default async function CourseDetailPage({ params }: Props) {
         )
       : [],
     course.roadmap ? payload.find({ collection: 'roadmaps', where: { id: { equals: relationKey(course.roadmap) }, isPublished: { equals: true } }, select: { title: true, slug: true }, depth: 0, limit: 1, overrideAccess: false, req }) : null,
-    access.canAccessCourse(course.id) && access.catalogVisibility === 'catalog' ? payload.findByID({ collection: 'courses', id: course.id, select: { description: true }, depth: 0, overrideAccess: true, req }) : null,
+    access.canAccessCourse(course.id) && access.canReadCourseDescription(course.id) ? payload.findByID({ collection: 'courses', id: course.id, select: { description: true }, depth: 0, overrideAccess: true, req }) : null,
   ])
 
   const lessonDocs = loadedLessonDocs.filter((lesson) => access.canBrowseLessonMetadata(lesson))
