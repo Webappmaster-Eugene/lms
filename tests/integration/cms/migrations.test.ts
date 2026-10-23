@@ -46,14 +46,7 @@ async function raw(sql: string) {
  * одновременных отправок, а в конфиге коллекции он не объявлен. Drizzle
  * поэтому предлагает его удалить. См. отчёт: лучше объявить его в `indexes`.
  */
-const KNOWN_MIGRATION_ONLY = [
-  'DROP INDEX "user_trainer_progress_user_task_unique_idx";',
-  // Фаза expand: прежнее значение-перечисление категории гайда живёт в БД до contract-выката.
-  'ALTER TABLE "guides" DROP COLUMN "category";',
-  'ALTER TABLE "_guides_v" DROP COLUMN "version_category";',
-  'DROP TYPE "public"."enum__guides_v_version_category";',
-  'DROP TYPE "public"."enum_guides_category";',
-]
+const KNOWN_MIGRATION_ONLY = ['DROP INDEX "user_trainer_progress_user_task_unique_idx";']
 
 const SET_DEFAULT = /^ALTER TABLE "(\w+)" ALTER COLUMN "(\w+)" SET DEFAULT (.+);$/
 
@@ -109,6 +102,21 @@ async function publicTables(): Promise<string[]> {
     `select table_name from information_schema.tables where table_schema = 'public' order by table_name`,
   )
   return rows.map((r) => String(r.table_name))
+}
+
+/**
+ * Откатывает (снимая отметки) от головы до миграции с суффиксом `targetSuffix` включительно,
+ * в обратном порядке. Голову восстанавливает вызывающий через `db().migrate({ migrations })`:
+ * так тест «живых данных» ставит схему в нужную точку и возвращает её, не завися от соседей.
+ */
+async function rollbackTo(targetSuffix: string, req: unknown): Promise<void> {
+  const reversed = [...migrations].reverse()
+  const end = reversed.findIndex((migration) => migration.name.endsWith(targetSuffix))
+  if (end < 0) throw new Error(`Миграция ${targetSuffix} не зарегистрирована`)
+  for (const migration of reversed.slice(0, end + 1)) {
+    await migration.down({ db: db().drizzle, payload, req } as never)
+    await raw(`delete from payload_migrations where name = '${migration.name}'`)
+  }
 }
 
 beforeAll(async () => {
@@ -204,10 +212,9 @@ describe('миграции на чистой базе', () => {
   })
 
   it('миграция гайдов v2 на живых данных: дата публикации, минуты чтения и первая версия', async () => {
-    const v2 = migrations.find((migration) => migration.name.endsWith('_guides_v2'))
-    if (!v2) throw new Error('Миграция guides_v2 не зарегистрирована')
     const req = await createLocalReq({}, payload)
-    await v2.down({ db: db().drizzle, payload, req } as never)
+    // Откатываемся до состояния перед v2 (снимая v2 и все миграции после неё), потом накатываем цепочку заново.
+    await rollbackTo('_guides_v2', req)
     const words = Array.from({ length: 480 }, (_, i) => `слово${i}`).join(' ')
     // До миграции гайды пишет старый код: колонок v2 ещё нет. Ссылки и разметка в минуты не считаются.
     const markdown = `## Раздел\n\n**${words}** [ссылка](https://example.com/${'очень/длинный/путь/'.repeat(20)})`
@@ -215,7 +222,7 @@ describe('миграции на чистой базе', () => {
       ('Опубликован', 'v2-published', 'Кратко', '${markdown}', 1, true, '2026-10-20T10:00:00Z', '2026-10-19T10:00:00Z'),
       ('Черновик', 'v2-draft', 'Кратко', 'Коротко', 2, false, '2026-10-21T10:00:00Z', '2026-10-21T10:00:00Z')
       returning id`)
-    await v2.up({ db: db().drizzle, payload, req } as never)
+    await db().migrate({ migrations })
     const ids = rows.map((row) => Number(row.id)).join(',')
     expect(await raw(`select slug, announced_at = updated_at as announced_on_update, announced_at is null as not_announced, reading_minutes from guides where id in (${ids}) order by id`)).toEqual([
       { slug: 'v2-published', announced_on_update: true, not_announced: false, reading_minutes: '3' },
@@ -225,24 +232,21 @@ describe('миграции на чистой базе', () => {
       { version_slug: 'v2-published', has_text: true, version_is_published: true },
       { version_slug: 'v2-draft', has_text: true, version_is_published: false },
     ])
-    // Схему проверяет отдельный тест парности: здесь v2.up накатан в одиночку, без более поздних
-    // миграций (они добавляют _guides_v.version_category_id), поэтому drift тут неизбежен.
+    expect(await drift()).toEqual([])
     await raw(`delete from _guides_v where parent_id in (${ids})`)
     await raw(`delete from guides where id in (${ids})`)
   })
 
   it('миграция категорий на живых данных: прежнее значение-перечисление переносится в связь', async () => {
-    const cats = migrations.find((migration) => migration.name.endsWith('_guides_categories'))
-    if (!cats) throw new Error('Миграция guides_categories не зарегистрирована')
     const req = await createLocalReq({}, payload)
-    await cats.down({ db: db().drizzle, payload, req } as never)
-    // До миграции категория хранится перечислением в колонке category.
+    // Откатываемся до состояния перед guides_categories (сняв её и contract): категория — колонка-перечисление.
+    await rollbackTo('_guides_categories', req)
     const inserted = await raw(`insert into guides (title, slug, summary, markdown, category, "order", is_published, updated_at, created_at) values
       ('С категорией', 'cat-backfill', 'Кратко', 'Текст', 'career', 1, true, '2026-10-20T10:00:00Z', '2026-10-19T10:00:00Z')
       returning id`)
     const id = Number(inserted[0].id)
-    await cats.up({ db: db().drizzle, payload, req } as never)
-    // После миграции значение разложилось в связь с одноимённой по slug категорией.
+    // Накатываем заново: guides_categories.up переносит значение в связь, contract.up убирает перечисление.
+    await db().migrate({ migrations })
     expect(await raw(`select c.slug from guides g join guide_categories c on c.id = g.category_id where g.id = ${id}`)).toEqual([{ slug: 'career' }])
     expect(await drift()).toEqual([])
     await raw(`delete from guides where id = ${id}`)
