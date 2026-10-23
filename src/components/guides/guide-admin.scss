@@ -1,6 +1,9 @@
 /* Гайды в CMS: редактор Markdown с предпросмотром, статистика и список к пересмотру.
    В админке нет Tailwind — только переменные темы Payload, поэтому светлая и тёмная темы работают сами. */
 
+/* --font-mono админки называет JetBrains Mono, которого там нет: macOS подставляла Courier. */
+$mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+
 .guide-editor {
   margin-bottom: var(--base);
 
@@ -150,7 +153,7 @@
     border: 0;
     background: var(--theme-input-bg, var(--theme-elevation-0));
     color: var(--theme-text);
-    font-family: var(--font-mono);
+    font-family: $mono;
     font-size: 14px;
     line-height: 1.65;
     resize: vertical;
@@ -247,7 +250,7 @@
     padding: 2px 5px;
     border-radius: 4px;
     background: var(--theme-elevation-100);
-    font-family: var(--font-mono);
+    font-family: $mono;
     font-size: 0.88em;
   }
 

@@ -46,11 +46,7 @@ async function raw(sql: string) {
  * одновременных отправок, а в конфиге коллекции он не объявлен. Drizzle
  * поэтому предлагает его удалить. См. отчёт: лучше объявить его в `indexes`.
  */
-const KNOWN_MIGRATION_ONLY = [
-  'DROP INDEX "user_trainer_progress_user_task_unique_idx";',
-  // Фаза contract: старый Lexical-текст гайдов удаляется следующим выкатом, пока колонка есть только в БД.
-  'ALTER TABLE "guides" DROP COLUMN "content";',
-]
+const KNOWN_MIGRATION_ONLY = ['DROP INDEX "user_trainer_progress_user_task_unique_idx";']
 
 const SET_DEFAULT = /^ALTER TABLE "(\w+)" ALTER COLUMN "(\w+)" SET DEFAULT (.+);$/
 
