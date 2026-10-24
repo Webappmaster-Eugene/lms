@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { VideoPlayer } from '@/components/lesson/VideoPlayer'
 import { ArrowLeft, Loader2, Sparkles, Trash2 } from 'lucide-react'
 import { RECORDING_CATEGORIES, type InterviewRecordingDTO } from '@/lib/interviews/types'
 import { InterviewReportView, type InterviewAnalysisDTO } from './InterviewReportView'
@@ -80,7 +81,7 @@ export function InterviewDetail({ initial }: { initial: InterviewDetailsDTO }) {
   return <div className="mx-auto w-full max-w-5xl space-y-6 pb-8">
     <Link href={`/interviews?direction=${encodeURIComponent(recording.direction.slug)}&category=${recording.category}`} className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"><ArrowLeft className="h-4 w-4" aria-hidden="true" />К записям собеседований</Link>
     <header><p className="mb-2 text-sm text-muted-foreground">{recording.direction.title} · {RECORDING_CATEGORIES[recording.category]}</p><h1 className="break-words text-2xl font-bold tracking-tight sm:text-3xl">{recording.title}</h1>{recording.description && <p className="mt-3 max-w-3xl whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{recording.description}</p>}</header>
-    {recording.status === 'ready' ? <div className="overflow-hidden rounded-xl bg-black"><video src={`/api/interviews/${recording.id}/stream`} controls playsInline preload="metadata" className="aspect-video w-full" aria-label={`Собеседование: ${recording.title}`} onError={() => setError('Не удалось воспроизвести видео. Проверьте подключение и обновите страницу.')} /></div> : <div className="rounded-xl border border-border bg-muted p-6"><p className="font-medium">{recording.status === 'uploading' ? 'Загрузка записи не завершена' : 'Не удалось загрузить запись'}</p><p className="mt-2 text-sm text-muted-foreground">Удалите незавершённую запись и загрузите видео ещё раз.</p></div>}
+    {recording.status === 'ready' ? <VideoPlayer title={recording.title} videoUrl={`/api/interviews/${recording.id}/stream`} displayMode="embed" /> : <div className="rounded-xl border border-border bg-muted p-6"><p className="font-medium">{recording.status === 'uploading' ? 'Загрузка записи не завершена' : 'Не удалось загрузить запись'}</p><p className="mt-2 text-sm text-muted-foreground">Удалите незавершённую запись и загрузите видео ещё раз.</p></div>}
     {error && !analysisOpen && !deleteOpen && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{error}</p>}
     {recording.isOwner && recording.category === 'personal' && <div className="flex flex-wrap justify-end gap-2"><button type="button" disabled={pending || deleting} onClick={() => setDeleteOpen(true)} className={`${interviewButton} border border-border text-destructive`}><Trash2 className="h-4 w-4" aria-hidden="true" />Удалить запись</button></div>}
     {canAnalyze && <section aria-labelledby="interview-analysis-title" className="space-y-5 border-t border-border pt-6">

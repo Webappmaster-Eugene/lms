@@ -8,7 +8,8 @@ import { InterviewUpload } from '@/components/interviews/InterviewUpload'
 import { InterviewReportView, type InterviewAnalysisDTO } from '@/components/interviews/InterviewReportView'
 
 vi.mock('next/link', async () => (await import('../helpers/component-mocks')).linkMock())
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
+vi.mock('@/hooks/use-video-memory', () => ({ useVideoMemory: () => ({}) }))
 
 const direction = { id: 1, slug: 'react', title: 'React.js', description: '' }
 const recording: InterviewRecordingDTO = { id: 4, title: 'Техническое интервью', description: '', direction, category: 'personal', status: 'ready', size: 100, createdAt: '2026-10-11T10:00:00.000Z', isOwner: true, analysisStatus: 'idle', analysisProgress: '', analysisError: '' }

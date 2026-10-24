@@ -52,12 +52,17 @@ function playbackUrl(url: string, attempt: number): string {
 
 /** Прокси нужен только там, где плеер читает файл из JS. */
 function getProxyUrl(videoUrl: string): string {
+  if (isRecordingSource(videoUrl)) return videoUrl
   if (isLessonSource(videoUrl)) return videoUrl.replace('/stream?', '/proxy?')
   return `/api/yandex-disk/proxy?url=${encodeURIComponent(videoUrl)}`
 }
 
 function isLessonSource(videoUrl: string): boolean {
   return videoUrl.startsWith('/api/yandex-disk/stream?')
+}
+
+function isRecordingSource(videoUrl: string): boolean {
+  return /^\/api\/interviews\/[1-9]\d*\/stream(?:\?[^#]*)?$/.test(videoUrl)
 }
 
 /** Файлы медиатеки воспроизводятся непосредственно, без iframe стороннего сервиса. */
@@ -92,7 +97,7 @@ export function VideoPlayer({ memoryId, title, videoUrl, displayMode, descriptio
   const [mediaFailed, setMediaFailed] = useState(false)
   const handleMediaFailure = useCallback(() => setMediaFailed(true), [])
 
-  if (isLessonSource(videoUrl)) {
+  if (isLessonSource(videoUrl) || isRecordingSource(videoUrl)) {
     return <LessonVideo memoryId={memoryId} key={videoUrl} title={title} videoUrl={videoUrl} description={description} durationMinutes={durationMinutes} />
   }
 
@@ -207,7 +212,8 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
   const lastFailure = useRef(0)
   const pending = useRef<{ controller: AbortController; timer?: ReturnType<typeof setTimeout> } | null>(null)
   // У ученика адрес потока уже готов, исходник скрыт; у администратора в блоке лежит ссылка на Диск.
-  const protectedSource = isLessonSource(videoUrl)
+  const recording = isRecordingSource(videoUrl)
+  const protectedSource = isLessonSource(videoUrl) || recording
   const streamUrl = protectedSource ? videoUrl : getStreamUrl(videoUrl)
   const proxyUrl = getProxyUrl(videoUrl)
   const isMedia = protectedSource && new URL(videoUrl, 'https://local.invalid').searchParams.get('source') === 'media'
@@ -285,7 +291,7 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
 
   return (
     <div className="space-y-3">
-      <VideoHeading title={title} description={description} durationMinutes={durationMinutes} />
+      {!recording && <VideoHeading title={title} description={description} durationMinutes={durationMinutes} />}
       {mode === 'retrying' ? (
         <div role="status" className="flex aspect-video w-full items-center justify-center gap-3 rounded-xl border border-border bg-card p-6 text-muted-foreground">
           <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin" />
@@ -295,7 +301,9 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
         <div role="alert" className="space-y-3 rounded-xl border border-border bg-card p-6">
           <p className="font-medium text-foreground">Видео сейчас не загружается</p>
           <p className="text-sm text-muted-foreground">
-            Хранилище записей не отдало этот файл. Обычно это проходит само: попробуйте ещё раз через несколько минут. Текст, файлы и заметки урока доступны.
+            {recording
+              ? 'Хранилище записей не отдало этот файл. Попробуйте ещё раз через несколько минут. Если ошибка сохраняется, сообщите название записи в поддержку.'
+              : 'Хранилище записей не отдало этот файл. Обычно это проходит само: попробуйте ещё раз через несколько минут. Текст, файлы и заметки урока доступны.'}
           </p>
           {actions}
         </div>
@@ -303,7 +311,7 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
         <div role="alert" className="space-y-3 rounded-xl border border-border bg-card p-6">
           <p className="font-medium text-foreground">Запись не воспроизводится</p>
           <p className="text-sm text-muted-foreground">
-            Этот браузер не может воспроизвести запись. Откройте урок в актуальной версии Chrome, Edge или Яндекс Браузера на компьютере. Если запись раньше открывалась, попробуйте ещё раз.
+            Этот браузер не может воспроизвести запись. Откройте {recording ? 'запись' : 'урок'} в актуальной версии Chrome, Edge или Яндекс Браузера на компьютере. Если запись раньше открывалась, попробуйте ещё раз.
           </p>
           {actions}
         </div>
@@ -311,7 +319,7 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
         <div role="alert" className="space-y-3 rounded-xl border border-border bg-card p-6">
           <p className="font-medium text-foreground">Не удалось воспроизвести запись</p>
           <p className="text-sm text-muted-foreground">
-            Начало файла доступно, но воспроизведение не запустилось. Повторите загрузку. Если ошибка сохраняется, сообщите название урока в поддержку — нужно проверить запись и её загрузку.
+            Начало файла доступно, но воспроизведение не запустилось. Повторите загрузку. Если ошибка сохраняется, сообщите название {recording ? 'записи' : 'урока'} в поддержку — нужно проверить запись и её загрузку.
           </p>
           {actions}
         </div>
@@ -324,13 +332,13 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
           onFailure={handleStreamFailure}
         />
       ) : (
-        <NativeVideo key={attempt} memoryId={memoryId} videoUrl={videoUrl} playbackAttempt={attempt} direct={protectedSource} onFailure={handleNativeFailure} />
+        <NativeVideo key={attempt} memoryId={memoryId} videoUrl={videoUrl} playbackAttempt={attempt} direct={protectedSource} label={recording ? `Собеседование: ${title}` : undefined} onFailure={handleNativeFailure} />
       )}
     </div>
   )
 }
 
-function NativeVideo({ memoryId, videoUrl, playbackAttempt = 0, direct = false, onFailure }: { memoryId?: string; videoUrl: string; playbackAttempt?: number; direct?: boolean; onFailure: (code?: number) => void }) {
+function NativeVideo({ memoryId, videoUrl, playbackAttempt = 0, direct = false, label, onFailure }: { memoryId?: string; videoUrl: string; playbackAttempt?: number; direct?: boolean; label?: string; onFailure: (code?: number) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const memory = useVideoMemory(videoRef, memoryId ?? videoUrl)
   const source = playbackUrl(direct ? videoUrl : getStreamUrl(videoUrl), playbackAttempt)
@@ -391,6 +399,7 @@ function NativeVideo({ memoryId, videoUrl, playbackAttempt = 0, direct = false, 
           ref={videoRef}
           src={source}
           className="aspect-video w-full"
+          aria-label={label}
           controls
           preload="none"
           controlsList="nodownload"

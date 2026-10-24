@@ -408,7 +408,7 @@ test('большой набор слов', function () {
       tags: ['leetcode', 'arrays'],
       companies: ['faang', 'tbank'],
       leetcodeNumber: 238,
-      sourceUrl: 'https://leetcode.com/problems/product-except-self/',
+      sourceUrl: 'https://leetcode.com/problems/product-of-array-except-self/',
       descriptionMd: `Верните массив, в котором \`result[i]\` — произведение всех элементов исходного
 массива, **кроме** \`nums[i]\`.
 

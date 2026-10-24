@@ -32,6 +32,46 @@ beforeEach(() => { fetchMock.mockReset(); vi.stubGlobal('fetch', fetchMock) })
 afterEach(() => { vi.unstubAllGlobals() })
 
 describe('встроенное воспроизведение видео', () => {
+  it('восстанавливает собеседование через его защищённый адрес без исходной ссылки и iframe', async () => {
+    vi.useFakeTimers()
+    try {
+      fetchMock.mockResolvedValue(new Response(null, { status: 502 }))
+      const url = '/api/interviews/63/stream'
+      const { container } = render(<VideoPlayer title="Запись собеседования" videoUrl={url} displayMode="embed" />)
+      expect(container.querySelector('video')).toHaveAttribute('src', url)
+      expect(container.querySelector('video')).toHaveAttribute('aria-label', 'Собеседование: Запись собеседования')
+      expect(container.querySelector('iframe')).not.toBeInTheDocument()
+      for (const delay of [2000, 5000]) {
+        await failNative(container)
+        expect(fetchMock).toHaveBeenLastCalledWith(url, expect.objectContaining({ headers: { Range: 'bytes=0-375' } }))
+        await wait(delay)
+      }
+      await failNative(container)
+      expect(screen.getByRole('alert')).toHaveTextContent('Хранилище записей не отдало этот файл')
+      expect(screen.queryByText(/заметки урока/)).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /Яндекс Диске/ })).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Попробовать снова' }))
+      expect(container.querySelector('video')).toHaveAttribute('src', `${url}?playbackAttempt=3`)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('переключает MPEG-TS собеседования на потоковый плеер с сохранением проверки доступа', async () => {
+    vi.useFakeTimers()
+    try {
+      fetchMock.mockResolvedValue(sourceResponse(transportStream))
+      const url = '/api/interviews/62/stream'
+      const { container } = render(<VideoPlayer title="Собеседование" videoUrl={url} displayMode="embed" />)
+      await failNative(container)
+      expect(screen.getByTestId('transport-stream')).toHaveAttribute('data-src', `${url}?playbackAttempt=1`)
+      expect(container.querySelector('video')).not.toBeInTheDocument()
+      expect(fetchMock.mock.calls.every(([target]) => target === url)).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('проигрывает видео медиатеки нативно, без iframe и обращения к API Яндекса', () => {
     const url = 'https://learn.mentorcareer.ru/api/media/file/repaired.mp4'
     const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
