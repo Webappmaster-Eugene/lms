@@ -86,7 +86,8 @@ export function mediaFilePath(rawUrl: string): string | null {
 export function isLessonVideoUrl(rawUrl: string): boolean {
   const ref = parsePublicResourceUrl(rawUrl)
   const path = ref?.path ?? mediaFilePath(rawUrl)
-  return path !== null && path !== undefined && VIDEO_EXTENSION.test(path)
+  // .ts также используется исходниками TypeScript; MPEG-TS задаётся явным video-блоком.
+  return path !== null && path !== undefined && VIDEO_EXTENSION.test(path) && !/\.ts$/i.test(path)
 }
 
 export function blockVideoSource(block: ContentBlock): string | null {

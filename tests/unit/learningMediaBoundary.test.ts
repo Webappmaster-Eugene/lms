@@ -50,6 +50,13 @@ describe('native Range and closed upstream sources', () => {
     expect(response.headers.get('Content-Length')).toBe('3')
     expect(response.body).toBeNull()
   })
+  it.each(['video', 'asset'] as const)('serves a .ts %s with the matching MIME and disposition', async (kind) => {
+    const response = await upstreamLearningMedia(new Request('https://lms.test/media'), viewerId, { ...ref, path: '/index.ts' }, kind)
+    expect(response.headers.get('Content-Type')).toBe(kind === 'video' ? 'video/mp2t' : 'application/octet-stream')
+    expect(response.headers.get('Content-Disposition')).toBe(kind === 'video' ? 'inline' : "attachment; filename*=UTF-8''index.ts")
+    expect(response.headers.get('Content-Security-Policy')).toContain('sandbox')
+    expect((await response.arrayBuffer()).byteLength).toBe(3)
+  })
   it.each([403, 410])('a rejected temporary CDN link (%s) refreshes once without changing Range or leaking href', async (status) => {
     const old = 'https://downloader.disk.yandex.ru/disk/old/video.mp4'
     const fresh = 'https://downloader.disk.yandex.ru/disk/new/video.mp4'

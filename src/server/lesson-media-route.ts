@@ -23,7 +23,7 @@ export async function lessonMediaRoute(request: Request, allowMaterial = false):
       const source = await resolveLessonVideoSource(payload, user, new URL(request.url).searchParams, allowMaterial)
       const response = source.kind === 'media'
         ? await localLearningMedia(request, payload, user, decodeURIComponent(source.path.slice('/api/media/file/'.length)))
-        : await upstreamLearningMedia(request, user.id, source.ref)
+        : await upstreamLearningMedia(request, user.id, source.ref, allowMaterial ? 'asset' : 'video')
       recordLearningAccess({ resource: 'media', outcome: response.ok ? 'allow' : 'error', reason: response.ok ? 'assigned' : 'upstream_error', userId: user.id, durationMs: performance.now() - started })
       return response
     } catch (error) {

@@ -104,6 +104,24 @@ describe('источник только из опубликованного ур
     assetParams.delete('asset')
     await expect(resolveLessonVideoSource(payload, student, assetParams, true)).rejects.toMatchObject({ status: 404 })
   })
+
+  it('исходник TypeScript открывается как материал урока и не становится видео', async () => {
+    const { lessonAssetToken } = await import('@/lib/lesson-asset-source')
+    const file = `${ROOT}/sources/index.ts`
+    const doc = { ...lesson(), content: [{ id: 'code', blockType: 'link' as const, title: 'index.ts', url: file }] }
+    findByID.mockResolvedValue(doc)
+    const safe = protectLessonVideoSources(doc)
+    expect(safe.content?.[0]).toMatchObject({
+      id: 'code', blockType: 'link',
+      url: `/api/learning-assets?lesson=42&block=code&asset=${lessonAssetToken(file)}`,
+    })
+    expect(JSON.stringify(safe)).not.toContain(ROOT)
+    const source = new URLSearchParams({ lesson: '42', block: 'code', asset: lessonAssetToken(file) })
+    expect(await resolveLessonVideoSource(payload, student, source, true)).toEqual({
+      kind: 'yandex', ref: { publicKey: ROOT, path: '/sources/index.ts' },
+    })
+    await expect(resolveLessonVideoSource(payload, student, source)).rejects.toMatchObject({ status: 404 })
+  })
 })
 
 describe('данные, переданные ученику', () => {

@@ -14,11 +14,13 @@ describe('идентичность и состояние видео', () => {
 
   it('видео из link/file становится отдельной записью; внешние iframe не обещают точную позицию', () => {
     const content = [
-      { blockType: 'link', id: 'download', title: 'Запись TS', url: 'https://disk.yandex.ru/d/course/b.ts' },
+      { blockType: 'link', id: 'download', title: 'Запись MP4', url: 'https://disk.yandex.ru/d/course/b.mp4' },
+      { ...first, id: 'transport-stream', title: 'Запись TS', videoUrl: 'https://disk.yandex.ru/d/course/b.ts' },
+      { blockType: 'link', id: 'code', title: 'Исходники', url: 'https://disk.yandex.ru/d/course/index.ts' },
       { blockType: 'file', id: 'upload', title: 'Медиатека', file: { id: 1, url: '/api/media/file/demo.webm', mimeType: 'video/webm' } },
       { ...first, id: 'external', videoUrl: 'https://youtube.com/watch?v=external' },
     ] as Lesson['content']
-    expect(learningVideos({ content }).map((video) => video.title)).toEqual(['Запись TS', 'Медиатека'])
+    expect(learningVideos({ content }).map((video) => video.title)).toEqual(['Запись MP4', 'Запись TS', 'Медиатека'])
   })
 
   it('новизна определяется событием просмотра, а не большей секундой: перемотка назад сохраняется', () => {

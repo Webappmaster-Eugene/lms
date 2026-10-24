@@ -23,9 +23,9 @@ export function safeLearningUpstream(raw: string): URL {
   return url
 }
 
-function contentType(ref: PublicResourceRef, upstream: Headers): string {
+function contentType(ref: PublicResourceRef, upstream: Headers, kind: 'video' | 'asset'): string {
   const filename = ref.path ?? new URL(ref.publicKey).pathname
-  if (/\.ts$/i.test(filename)) return 'video/mp2t'
+  if (/\.ts$/i.test(filename)) return kind === 'video' ? 'video/mp2t' : 'application/octet-stream'
   const mime = upstream.get('content-type')
   // Active content served from our origin could execute with the student's session.
   if (mime && /^(video\/|audio\/|image\/(?:png|jpeg|gif|webp)|application\/(?:pdf|zip|octet-stream))/.test(mime)) return mime
@@ -74,7 +74,7 @@ function resumeBody(reader: ReadableStreamDefaultReader<Uint8Array>, first: Uint
   })
 }
 
-export async function upstreamLearningMedia(request: Request, userId: number, ref: PublicResourceRef): Promise<Response> {
+export async function upstreamLearningMedia(request: Request, userId: number, ref: PublicResourceRef, kind: 'video' | 'asset' = 'video'): Promise<Response> {
   const release = acquireLearningStream(userId)
   const controller = new AbortController()
   const onAbort = () => { controller.abort(); release() }
@@ -158,7 +158,7 @@ export async function upstreamLearningMedia(request: Request, userId: number, re
       recordLearningAccess({ resource: 'media', outcome: 'error', reason: 'upstream_error', userId })
       return mediaError('Источник файла временно недоступен', 502)
     }
-    headers.set('Content-Type', contentType(ref, upstream.headers))
+    headers.set('Content-Type', contentType(ref, upstream.headers, kind))
     headers.set('Accept-Ranges', headers.get('accept-ranges') ?? 'bytes')
     const filename = ref.path?.split('/').at(-1)
     headers.set('Content-Disposition', headers.get('Content-Type')?.startsWith('video/') ? 'inline' : filename
