@@ -28,7 +28,7 @@ export function CopyCodeButton({ code }: { code: string }) {
     <button
       type="button"
       onClick={copy}
-      className="absolute right-2 top-2 inline-flex min-h-[32px] items-center gap-1.5 rounded-md border border-border bg-background/90 px-2 text-xs text-muted-foreground shadow-sm transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+      className="guide-prose__copy"
     >
       {state === 'copied' ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
       <span aria-live="polite">{label}</span>

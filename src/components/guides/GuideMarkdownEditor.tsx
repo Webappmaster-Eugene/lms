@@ -1,19 +1,19 @@
 'use client'
 
 import { useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react'
-import Markdown, { type Components } from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { FieldDescription, FieldError, FieldLabel, useField } from '@payloadcms/ui'
 import type { TextareaFieldClientComponent } from 'payload'
 
-import { GUIDE_CALLOUTS, guideMarkdownHeadings, isGuideCalloutType, remarkGuideCallouts, type GuideCalloutType } from '@/lib/guide-markdown'
+import { GuideMarkdownPreview } from '@/components/guides/GuideMarkdownPreview'
+import { guideListEnter, normalizeGuidePaste, type GuideTextEdit } from '@/lib/guide-editor'
+import { GUIDE_CALLOUTS, guideMarkdownHeadings, isGuideCalloutType, type GuideCalloutType } from '@/lib/guide-markdown'
 import { guideReadingMinutes } from '@/lib/guides'
 
 import './guide-admin.scss'
 
 type Mode = 'write' | 'split' | 'preview'
 const MODES: { value: Mode; label: string }[] = [
-  { value: 'write', label: 'Текст' },
+  { value: 'write', label: 'Markdown' },
   { value: 'split', label: 'Рядом' },
   { value: 'preview', label: 'Просмотр' },
 ]
@@ -50,8 +50,6 @@ const TEMPLATE = `Вступление: для кого этот гайд и ч�
 - [ ] Что проверить
 `
 
-type Edit = { start: number; end: number; text: string; select?: [number, number] }
-
 const subscribeNever = () => () => {}
 
 function readMode(): Mode {
@@ -62,25 +60,6 @@ function readMode(): Mode {
     // Хранилище недоступно (приватный режим) — режим по ширине экрана.
   }
   return window.matchMedia('(min-width: 1100px)').matches ? 'split' : 'write'
-}
-
-/** Предпросмотр — тот же разбор, что на сайте (GFM, врезки), без подсветки кода. */
-const previewComponents: Components = {
-  aside: ({ node, children }) => {
-    const type = node?.properties?.dataCallout
-    if (!isGuideCalloutType(type)) return <aside>{children}</aside>
-    const title = node?.properties?.dataTitle
-    return (
-      <aside className={`guide-prose__callout guide-prose__callout--${type satisfies GuideCalloutType}`}>
-        <p className="guide-prose__callout-title">{typeof title === 'string' ? title : GUIDE_CALLOUTS[type]}</p>
-        {children}
-      </aside>
-    )
-  },
-  a: ({ node: _node, href, children }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>,
-  table: ({ node: _node, ...props }) => <div className="guide-prose__table"><table {...props} /></div>,
-  // eslint-disable-next-line @next/next/no-img-element -- предпросмотр Markdown: размеры картинки неизвестны
-  img: ({ node: _node, src, alt, title }) => (typeof src === 'string' && src ? <span className="guide-prose__figure"><img src={src} alt={alt ?? ''} />{title && <span>{title}</span>}</span> : null),
 }
 
 function ToolButton({ label, hint, onClick, disabled, children }: { label: string; hint?: string; onClick: () => void; disabled?: boolean; children: ReactNode }) {
@@ -100,6 +79,7 @@ export const GuideMarkdownEditor: TextareaFieldClientComponent = ({ field, path,
   const { value, setValue, showError } = useField<string>({ path })
   const text = value ?? ''
   const deferred = useDeferredValue(text)
+  const normalizedLists = useMemo(() => normalizeGuidePaste(deferred), [deferred])
   const area = useRef<HTMLTextAreaElement>(null)
   const preview = useRef<HTMLDivElement>(null)
   const imageInput = useRef<HTMLInputElement>(null)
@@ -134,9 +114,14 @@ export const GuideMarkdownEditor: TextareaFieldClientComponent = ({ field, path,
     }
   }
 
-  const apply = useCallback((edit: Edit) => {
+  const apply = useCallback((edit: GuideTextEdit) => {
     const element = area.current
     if (!element || disabled) return
+    // Панель доступна и в «Просмотре»: поле нужно показать до установки фокуса.
+    if (element.hidden) {
+      setMode('split')
+      element.hidden = false
+    }
     element.focus()
     element.setSelectionRange(edit.start, edit.end)
     // execCommand кладёт правку в историю отмены браузера; где его нет — меняем значение напрямую.
@@ -187,9 +172,9 @@ export const GuideMarkdownEditor: TextareaFieldClientComponent = ({ field, path,
   }
 
   const heading = (level: 2 | 3) => prefixLines(() => `${'#'.repeat(level)} `, /^#{1,6}\s+/)
-  const bullet = () => prefixLines(() => '- ', /^(\s*)([-*+]|\d+\.)\s+(\[[ xX]\]\s+)?/)
-  const numbered = () => prefixLines((index) => `${index + 1}. `, /^(\s*)([-*+]|\d+\.)\s+(\[[ xX]\]\s+)?/)
-  const checklist = () => prefixLines(() => '- [ ] ', /^(\s*)([-*+]|\d+\.)\s+(\[[ xX]\]\s+)?/)
+  const bullet = () => prefixLines(() => '- ', /^([ \t]*)([-*+•◦▪]|\d+[.)])[ \t]+(\[[ xX]\][ \t]+)?/)
+  const numbered = () => prefixLines((index) => `${index + 1}. `, /^([ \t]*)([-*+•◦▪]|\d+[.)])[ \t]+(\[[ xX]\][ \t]+)?/)
+  const checklist = () => prefixLines(() => '- [ ] ', /^([ \t]*)([-*+•◦▪]|\d+[.)])[ \t]+(\[[ xX]\][ \t]+)?/)
 
   function link() {
     const { start, end, selected } = selection()
@@ -257,6 +242,12 @@ export const GuideMarkdownEditor: TextareaFieldClientComponent = ({ field, path,
   }
 
   function keys(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (disabled || event.nativeEvent.isComposing) return
+    if (event.key === 'Enter' && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      const edit = guideListEnter(text, event.currentTarget.selectionStart, event.currentTarget.selectionEnd)
+      if (edit) { event.preventDefault(); apply(edit) }
+      return
+    }
     if (!(event.metaKey || event.ctrlKey) || event.altKey) return
     const key = event.key.toLowerCase()
     if (key === 'b' || key === 'и') { event.preventDefault(); wrap('**', '**', 'жирный текст') }
@@ -328,6 +319,23 @@ export const GuideMarkdownEditor: TextareaFieldClientComponent = ({ field, path,
         </div>
       </div>
       <input ref={imageInput} type="file" accept={IMAGE_TYPES.join(',')} hidden onChange={uploadImage} />
+      <details className="guide-editor__help">
+        <summary>Как оформить Markdown</summary>
+        <p>Выделите текст и нажмите кнопку панели — разметка вставится автоматически. Справа сразу виден результат.</p>
+        <dl>
+          <div><dt><code>## Раздел</code></dt><dd>Заголовок и пункт оглавления</dd></div>
+          <div><dt><code>- Пункт</code></dt><dd>Список. Enter продолжает, Enter на пустом пункте завершает</dd></div>
+          <div><dt><code>**жирный**</code> · <code>*курсив*</code> · <code>`код`</code></dt><dd>Также Ctrl/Cmd+B, I и K для ссылки</dd></div>
+          <div><dt>Пустая строка</dt><dd>Новый абзац. Для переноса внутри абзаца — два пробела в конце строки</dd></div>
+        </dl>
+        <p>Списки с символом • при вставке превращаются в Markdown. Код и HTML в примерах сохраняются. Предпросмотр обновляется до сохранения; для публикации правок нажмите «Сохранить».</p>
+      </details>
+      {normalizedLists !== deferred && (
+        <div className="guide-editor__notice">
+          <span>Символ • не создаёт список в Markdown. Можно преобразовать пункты, сохранив их текст.</span>
+          <ToolButton label="Преобразовать символы • в Markdown-списки" disabled={disabled} onClick={() => apply({ start: 0, end: text.length, text: normalizeGuidePaste(text) })}>Исправить списки •</ToolButton>
+        </div>
+      )}
       <div className={`guide-editor__panes guide-editor__panes--${mode}`}>
         <textarea
           ref={area}
@@ -339,14 +347,28 @@ export const GuideMarkdownEditor: TextareaFieldClientComponent = ({ field, path,
           spellCheck
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={keys}
+          onPaste={(event) => {
+            if (disabled) return
+            const pasted = event.clipboardData.getData('text/plain')
+            const { start, end } = selection()
+            const whole = text.slice(0, start) + pasted + text.slice(end)
+            // Контекст нужен, чтобы не менять «•» внутри уже открытого блока кода.
+            const normalized = normalizeGuidePaste(whole, start, start + pasted.length)
+            if (normalized === whole) return
+            // Заменяем только вставку; существующий текст не форматируем без команды.
+            const converted = normalized.slice(start, normalized.length - (text.length - end))
+            if (normalized.slice(0, start) !== text.slice(0, start) || !normalized.endsWith(text.slice(end))) return
+            event.preventDefault()
+            apply({ start, end, text: converted })
+          }}
           onScroll={syncScroll}
           placeholder="Начните с вступления, разделы — строкой «## Название». Пустой гайд можно начать с кнопки «Шаблон»."
           hidden={mode === 'preview'}
         />
         {mode !== 'write' && (
-          <div ref={preview} className="guide-editor__preview guide-prose" aria-label="Предпросмотр гайда">
+          <div ref={preview} className="guide-editor__preview" aria-label="Предпросмотр гайда">
             {deferred.trim()
-              ? <Markdown remarkPlugins={[remarkGfm, remarkGuideCallouts]} components={previewComponents}>{deferred}</Markdown>
+              ? <GuideMarkdownPreview markdown={deferred} />
               : <p className="guide-editor__empty">Здесь появится гайд таким, каким его увидит ученик.</p>}
           </div>
         )}
