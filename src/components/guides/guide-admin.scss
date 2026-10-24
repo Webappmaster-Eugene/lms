@@ -171,6 +171,8 @@ $mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospa
 
   &__preview {
     .guide-prose {
+      max-width: 768px;
+      margin-inline: auto;
       --guide-text: var(--theme-text);
       --guide-muted: var(--theme-elevation-600);
       --guide-surface: var(--theme-elevation-100);
