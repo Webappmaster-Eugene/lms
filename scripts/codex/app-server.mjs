@@ -3,15 +3,24 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { stopChild } from "./process.mjs";
 
+export function startupFailure(stderr) {
+  if (/failed to initialize sqlite state runtime/i.test(stderr) && /operation not permitted|permission denied|read.only/i.test(stderr)) {
+    return 'Codex app-server cannot initialize its user state: CODEX_HOME is not writable in this environment'
+  }
+  return 'Codex app-server exited before completing the request; inspect startup diagnostics outside the managed shell'
+}
+
 export async function openAppServer(cwd, clientName) {
   const child = spawn("codex", ["app-server", "--stdio", "--strict-config"], { cwd, stdio: ["pipe", "pipe", "pipe"] });
   const pending = new Map();
   let sequence = 0;
+  let startupStderr = ''
   const failAll = error => { for (const entry of pending.values()) entry.reject(error); };
-  child.stderr.on("data", () => {});
+  // Classify known startup failures without printing third-party paths or credentials.
+  child.stderr.on('data', data => { startupStderr = (startupStderr + data.toString()).slice(-8192) });
   child.stdin.on("error", failAll);
   child.on("error", failAll);
-  child.on("exit", () => failAll(new Error("Codex app-server exited")));
+  child.on('exit', () => failAll(new Error(startupFailure(startupStderr))));
   createInterface({ input: child.stdout }).on("line", line => {
     let message;
     try { message = JSON.parse(line); } catch { return; } // Non-protocol output.

@@ -5,7 +5,7 @@
 // only for this harness's hooks in this checkout's config files.
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { repo, workspace } from "./harness.mjs";
+import { repo, configRoots } from "./harness.mjs";
 import { openAppServer } from "./app-server.mjs";
 
 export function hooksToTrust(inventory, { configs, script }) {
@@ -16,9 +16,9 @@ export function hooksToTrust(inventory, { configs, script }) {
 }
 
 export async function trustProjectHooks() {
-  const cwds = [...new Set([workspace, repo])];
+  const cwds = configRoots;
   const expected = { configs: cwds.map(cwd => join(cwd, ".codex/config.toml")), script: join(repo, "scripts/codex/hooks.mjs") };
-  const server = await openAppServer(workspace, "lms_hook_trust");
+  const server = await openAppServer(configRoots[0], "lms_hook_trust");
   try {
     const pendingTrust = hooksToTrust(await server.rpc("hooks/list", { cwds }), expected);
     const unique = new Map(pendingTrust.map(hook => [hook.key, hook.currentHash]));

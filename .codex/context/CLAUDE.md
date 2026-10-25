@@ -12,17 +12,8 @@
 | Что | Где |
 |---|---|
 | Git-репозиторий, все команды | `app/` |
-| Страницы и API | `app/src/app/` — группы `(auth)`, `(frontend)`, `(payload)`, `api/` |
-| Payload: коллекции, хуки, доступы, письма | `app/src/payload/` |
-| Конфиг Payload и список коллекций | `app/src/payload.config.ts` |
-| Миграции БД | `app/src/migrations/` + реестр `index.ts` |
-| Бизнес-логика и утилиты | `app/src/lib/` |
-| Серверная песочница тренажёра | `app/src/server/trainer/` |
-| Каталог задач тренажёра (кодом) | `app/src/data/trainer/` |
-| Компоненты | `app/src/components/` |
 | Тесты | `app/tests/` — `unit/`, `components/`, `smoke/` (без БД), `integration/`, `e2e/` (Docker); см. `app/docs/testing.md` |
 | Лендинг (отдельный npm-пакет) | `app/landing/` |
-| Документация | `app/docs/` |
 | Инфраструктура агентов | `app/scripts/codex/`, `app/docs/CODEX.md` |
 
 `app/scripts/build-harness.mjs` — это харнесс **тренажёра** (рантайм песочницы),
@@ -33,37 +24,13 @@
 Пакетный менеджер — pnpm 10 (закреплён `packageManager`, обычно через corepack).
 Лендинг `landing/` — отдельный пакет со своим `package-lock.json` и `npm`.
 
-```sh
-pnpm dev           # предварительно копирует Monaco и собирает харнесс тренажёра
-pnpm lint
-pnpm typecheck
-pnpm test          # vitest: проекты unit (node) и components (jsdom)
-pnpm build
-pnpm smoke         # lint + typecheck + test + build именно в этом порядке
-```
-
 Тесты с настоящей БД — в одноразовом Docker-контейнере `lms-test-pg` (порт 55433),
-подробности в `app/docs/testing.md`:
-
-```sh
-pnpm test:integration   # Payload Local API + PostgreSQL: схема, права, хуки, миграции, сиды, API
-pnpm test:e2e           # Playwright против next start с фиксированным сидом (+ HTTP API)
-pnpm test:content       # SEO лендинга, битые ссылки, axe-core
-pnpm test:visual        # скриншоты в контейнере mcr.microsoft.com/playwright
-pnpm test:visual:update # переснять эталоны скриншотов
-pnpm test:db:down       # удалить тестовый контейнер
-```
+подробности в `app/docs/testing.md`.
 
 Порядок в `smoke` не случайный: линтер и типы отрабатывают за секунды, сборка —
 за минуты. Ставить сборку первой значит долго ждать ради неиспользованного импорта.
 
-```sh
-pnpm payload migrate:create   # миграция после изменения схемы коллекции
-pnpm generate:types           # src/payload-types.ts
-pnpm generate:importmap
-pnpm seed                     # базовый сид
-pnpm seed:trainer             # каталог задач тренажёра, идемпотентно
-```
+После изменения схемы коллекции — `pnpm payload migrate:create` и `pnpm generate:types`.
 
 `pnpm build` требует `DATABASE_URL` и `PAYLOAD_SECRET`: Payload собирает конфиг на
 этапе сборки. Без них сборка не проходит — это не повод объявлять её пройденной.
@@ -93,10 +60,7 @@ pnpm seed:trainer             # каталог задач тренажёра, и
 
 ## 4. Соглашения кода
 
-- TypeScript strict. `any`, non-null assertion и `console.log` запрещены линтером;
-  исключения перечислены в `eslint.config.mjs` и расширять их без причины не нужно.
-- React 19, App Router. Серверные компоненты по умолчанию; `'use client'` — только
-  там, где нужен браузер.
+- Исключения из правил линтера в `eslint.config.mjs` без причины не расширять.
 - Одинарные кавычки, без точек с запятой, 2 пробела — как в существующих файлах.
 - Импорты через алиасы `@/…` и `@payload-config`. Алиасы продублированы в
   `vitest.config.ts` — при изменении `tsconfig.json` править оба.
@@ -193,20 +157,3 @@ Codex видит те же скиллы через адаптеры в `app/.age
 В итоговом ответе: что сделано, какие проверки реально выполнены и что осталось
 непроверенным. Недоступный инструмент или отсутствующая переменная окружения —
 это пропущенная проверка, а не пройденная; так и пиши.
-
-## 10. Сайты `mentorcareer-site` и `webappmaster-site`: тесты
-
-Это отдельные Git-репозитории (Next.js 15 + Payload 3 + PostgreSQL), не часть `app/`.
-Инфраструктура тестов у них одинаковая; всё, что отличается, — в `tests/support/site.mjs`
-(порты, домен, тексты кнопок, известные дефекты). Подробности — раздел «Тесты» в
-`CLAUDE.md` каждого сайта.
-
-| Сайт | Тестовая PostgreSQL (Docker) | e2e-сервер |
-|---|---|---|
-| mentorcareer-site | `sites-test-mc-pg`, порт 55434 | 3200 |
-| webappmaster-site | `sites-test-wam-pg`, порт 55435 | 3210 |
-
-`pnpm test:integration` (Payload Local API), `pnpm test:e2e` (Playwright: API, e2e,
-контент/SEO/a11y, CMS → сайт, админка), `pnpm test:visual` (скриншоты только в
-контейнере Playwright). CI — `.github/workflows/tests.yml` в каждом репозитории.
-Контейнеры и тома тестов называются с префиксом `sites-test-`.

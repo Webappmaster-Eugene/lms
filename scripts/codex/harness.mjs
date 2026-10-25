@@ -8,6 +8,11 @@ import { homedir } from "node:os";
 
 export const repo = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 export const workspace = existsSync(join(repo, "../CLAUDE.md")) ? dirname(repo) : repo;
+// Sibling worktrees share source documents, but only app/ owns the parent config.
+export const configRoots = workspace !== repo && join(workspace, 'app') === repo
+  ? [workspace, repo]
+  : [repo]
+export const memoryContextLimit = 16000
 const read = (path) => readFileSync(path, "utf8");
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const q = (value) => JSON.stringify(value);
@@ -89,7 +94,7 @@ export function configText() {
   let config = read(join(repo, "scripts/codex/config.template.toml"));
   config += `\n[permissions.lms.workspace_roots]\n${q(workspace)} = true\n`;
   // pnpm/npm/npx keep their caches inside the authorized workspace.
-  config += `\n[shell_environment_policy.set]\nnpm_config_cache = ${q(join(state, "npm-cache"))}\nPNPM_HOME = ${q(join(state, "pnpm-home"))}\n`;
+  config += `\n[shell_environment_policy.set]\nnpm_config_cache = ${q(join(state, "npm-cache"))}\nPNPM_HOME = ${q(join(state, "pnpm-home"))}\nPYTHONPYCACHEPREFIX = ${q(join(state, 'python-cache'))}\n`;
   for (const [name, server] of Object.entries(configuredServers())) {
     config += `\n[mcp_servers.${q(name)}]\nenabled = true\nstartup_timeout_sec = 60\ntool_timeout_sec = 120\ndefault_tools_approval_mode = "approve"\n`;
     if (server.type === "http" || server.type === "sse" || server.url) {
@@ -186,7 +191,7 @@ export function sync() {
   }
   for (const [path] of retired) if (existsSync(join(repo, path))) unlinkSync(join(repo, path));
   write(join(repo, ".codex/config.toml"), configText());
-  if (workspace !== repo) {
+  if (configRoots.length > 1) {
     write(join(workspace, ".codex/config.toml"), configText());
     link(join(workspace, "AGENTS.md"), "app/AGENTS.md");
     link(join(workspace, ".agents/skills"), "../app/.agents/skills");
@@ -207,17 +212,26 @@ export function doctor() {
   const generated = join(repo, ".codex/generated.json");
   check(existsSync(generated), "Generated manifest missing: run pnpm codex:sync");
   if (existsSync(generated)) for (const [path, digest] of Object.entries(JSON.parse(read(generated)))) check(existsSync(join(repo, path)) && hash(read(join(repo, path))) === digest, `Generated file drift: ${path}`);
-  for (const root of new Set([repo, workspace])) check(existsSync(join(root, ".codex/config.toml")) && read(join(root, ".codex/config.toml")) === configText(), `Config drift: ${root}`);
+  const expectedConfig = configText()
+  for (const root of configRoots) check(existsSync(join(root, ".codex/config.toml")) && read(join(root, ".codex/config.toml")) === expectedConfig, `Config drift: ${root}`);
+  const checkReferences = (file, label) => {
+    for (const match of read(file).matchAll(/\]\(([^\s)#]+)(?:#[^\s)]*)?\)/g)) {
+      if (/^[a-z][a-z\d+.-]*:/i.test(match[1])) continue
+      check(existsSync(resolve(dirname(file), match[1])), `Broken ${label} reference: ${match[1]}`)
+    }
+  }
   for (const name of projectSkills()) {
     const path = join(repo, `.agents/skills/${name}/SKILL.md`);
     check(existsSync(path), `Missing skill: ${name}`);
     if (!existsSync(path)) continue;
-    for (const match of read(path).matchAll(/\]\(([^\s)#]+)(?:#[^\s)]*)?\)/g)) {
-      if (/^[a-z][a-z\d+.-]*:/i.test(match[1])) continue;
-      check(existsSync(resolve(dirname(path), match[1])), `Broken skill reference: ${name}: ${match[1]}`);
-    }
+    checkReferences(path, `skill ${name}`)
   }
-  if (workspace !== repo) {
+  const memory = join(repo, '.codex/memory/MEMORY.md')
+  if (existsSync(memory)) {
+    check(read(memory).length <= memoryContextLimit, 'Project memory exceeds SessionStart budget: move historical notes into linked topic files')
+    checkReferences(memory, 'memory')
+  }
+  if (configRoots.length > 1) {
     for (const [path, target] of Object.entries({ "AGENTS.md": "app/AGENTS.md", ".agents/skills": "../app/.agents/skills", ".codex/agents": "../app/.codex/agents", ".codex/memory": "../app/.codex/memory", ".codex/context": "../app/.codex/context" })) {
       const full = join(workspace, path);
       check(existsSync(full) && lstatSync(full).isSymbolicLink() && readlinkSync(full) === target, `Workspace link drift: ${path}`);
@@ -265,7 +279,8 @@ function verify() {
 function launch(args) {
   const failures = doctor();
   if (failures.length) throw new Error(failures.join("\n"));
-  const result = run("codex", ["-C", workspace, ...args], workspace, { stdio: "inherit" });
+  const cwd = configRoots[0]
+  const result = run("codex", ["-C", cwd, ...args], cwd, { stdio: "inherit" });
   process.exitCode = result.status ?? 1;
 }
 

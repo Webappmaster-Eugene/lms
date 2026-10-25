@@ -6,11 +6,21 @@ import { tmpdir } from "node:os";
 import { spawnSync, spawn } from "node:child_process";
 import { once } from "node:events";
 import { serverCommand } from "./mcp.mjs";
-import { handleEvent, deniedCommand, claudeDenyPatterns, claudeMemoryDir } from "./hooks.mjs";
+import { handleEvent, deniedCommand, claudeDenyPatterns, claudeMemoryDir, claudeMemory, contextExcerpt } from "./hooks.mjs";
 import { hooksToTrust } from "./trust.mjs";
 import { configText, verificationPlan, configuredServers, repo } from "./harness.mjs";
 import { validateNativeReport } from "./native-report.mjs";
 import { stopChild } from "./process.mjs";
+import { startupFailure } from './app-server.mjs'
+
+test('app-server startup diagnostics explain denied state access without exposing private stderr', () => {
+  const privateMarker = 'fixture-private-credential'
+  const denied = startupFailure(`Operation not permitted; failed to initialize sqlite state runtime under /private/user; ${privateMarker}`)
+  assert.match(denied, /CODEX_HOME is not writable/)
+  assert.ok(!denied.includes(privateMarker))
+  assert.ok(!denied.includes('/private/user'))
+  assert.ok(!startupFailure(`Unexpected startup error: ${privateMarker}`).includes(privateMarker))
+})
 
 test("stubborn child shutdown is bounded and reaped", { timeout: 5000 }, async () => {
   const child = spawn(process.execPath, ["-e", 'process.on("SIGTERM",()=>{});process.stdout.write("ready");setInterval(()=>{},1000);'], { stdio: ["ignore", "pipe", "pipe"] });
@@ -58,6 +68,33 @@ test("SessionStart restores memory without reading the conversation transcript",
   assert.equal(result.hookSpecificOutput.hookEventName, "SessionStart");
   assert.match(result.hookSpecificOutput.additionalContext, /AGENTS\.md/);
 });
+
+test('live Claude memory restores its index without injecting unrelated topic contents', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lms-memory-index-'))
+  try {
+    writeFileSync(join(dir, 'MEMORY.md'), 'Current facts. Read [media](media.md) when needed.\n')
+    writeFileSync(join(dir, 'media.md'), 'Large historical topic that should not be loaded on every turn.\n')
+    const first = claudeMemory(dir)
+    assert.ok(first.includes('[media](media.md)'))
+    assert.ok(!first.includes('Large historical topic'))
+    writeFileSync(join(dir, 'MEMORY.md'), 'Fresh index fact.\n')
+    assert.ok(claudeMemory(dir).includes('Fresh index fact.'))
+    rmSync(join(dir, 'MEMORY.md'))
+    assert.ok(claudeMemory(dir).includes('Large historical topic'))
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('context truncation keeps complete paragraphs and points to the full source', () => {
+  const text = 'Important first paragraph.\n\n' + 'Long second paragraph. '.repeat(100)
+  const excerpt = contextExcerpt(text, 140, '/project/memory.md')
+  assert.ok(excerpt.startsWith('Important first paragraph.\n\n['))
+  assert.ok(excerpt.includes('/project/memory.md'))
+  assert.ok(!excerpt.includes('Long second paragraph.'))
+  assert.ok(excerpt.length <= 140)
+  assert.equal(contextExcerpt('Short text', 140, '/project/memory.md'), 'Short text')
+})
 
 test("Stop continuation is bounded even when checks keep failing", () => {
   const result = handleEvent({ hook_event_name: "Stop", stop_hook_active: true });
@@ -176,6 +213,51 @@ test("native check rejects missing, disabled and untrusted capabilities", () => 
   }
 });
 
+test('sibling checkout sync preserves the shared workspace configuration and instructions', () => {
+  const sandbox = mkdtempSync(join(tmpdir(), 'lms-harness-worktree-'))
+  const checkout = join(sandbox, 'feature-worktree')
+  try {
+    mkdirSync(checkout)
+    for (const path of ['scripts/codex', '.claude/skills', '.agents', '.codex/context', '.codex/memory', 'AGENTS.md', 'package.json']) {
+      cpSync(join(repo, path), join(checkout, path), { recursive: true })
+    }
+    mkdirSync(join(sandbox, '.codex'))
+    writeFileSync(join(sandbox, 'CLAUDE.md'), 'Shared source instructions\n')
+    writeFileSync(join(sandbox, 'AGENTS.md'), 'Shared workspace entry point\n')
+    writeFileSync(join(sandbox, '.codex/config.toml'), '# Shared canonical configuration\n')
+    writeFileSync(join(sandbox, '.mcp.json'), JSON.stringify({ mcpServers: { shared: { command: 'node' } } }))
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', 'import {sync,configuredServers} from "./scripts/codex/harness.mjs"; sync(); console.log(JSON.stringify({shared:!!configuredServers().shared}));'], { cwd: checkout, encoding: 'utf8', timeout: 30000 })
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(readFileSync(join(sandbox, '.codex/config.toml'), 'utf8'), '# Shared canonical configuration\n')
+    assert.equal(readFileSync(join(sandbox, 'AGENTS.md'), 'utf8'), 'Shared workspace entry point\n')
+    assert.equal(readFileSync(join(checkout, '.codex/context/CLAUDE.md'), 'utf8'), 'Shared source instructions\n')
+    assert.ok(existsSync(join(checkout, '.codex/config.toml')))
+    const summary = JSON.parse(result.stdout.trim().split('\n').at(-1))
+    assert.deepEqual(summary, { shared: true })
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true })
+  }
+})
+
+test('canonical app checkout still synchronizes the parent entry point and shared config', () => {
+  const sandbox = mkdtempSync(join(tmpdir(), 'lms-harness-canonical-'))
+  const checkout = join(sandbox, 'app')
+  try {
+    mkdirSync(checkout)
+    for (const path of ['scripts/codex', '.claude/skills', '.agents', '.codex/context', '.codex/memory', 'AGENTS.md', 'package.json']) {
+      cpSync(join(repo, path), join(checkout, path), { recursive: true })
+    }
+    writeFileSync(join(sandbox, 'CLAUDE.md'), 'Shared canonical instructions\n')
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', 'import {sync} from "./scripts/codex/harness.mjs"; sync();'], { cwd: checkout, encoding: 'utf8', timeout: 30000 })
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(readFileSync(join(sandbox, '.codex/config.toml'), 'utf8'), readFileSync(join(checkout, '.codex/config.toml'), 'utf8'))
+    assert.equal(readFileSync(join(sandbox, 'AGENTS.md'), 'utf8'), readFileSync(join(checkout, 'AGENTS.md'), 'utf8'))
+    assert.equal(readFileSync(join(checkout, '.codex/context/CLAUDE.md'), 'utf8'), 'Shared canonical instructions\n')
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true })
+  }
+})
+
 test("standalone setup preserves memory and detects context, source and skill drift", () => {
   const sandbox = mkdtempSync(join(tmpdir(), "lms-harness-"));
   const checkout = join(sandbox, "checkout");
@@ -210,6 +292,12 @@ test("standalone setup preserves memory and detects context, source and skill dr
       return JSON.parse(result.stdout);
     };
     assert.deepEqual(diagnose(), []);
+    const originalMemory = readFileSync(memory, 'utf8')
+    writeFileSync(memory, 'Historical note. '.repeat(1100))
+    assert.ok(diagnose().some(message => message.includes('Project memory exceeds SessionStart budget')))
+    writeFileSync(memory, '[Missing topic](./missing-topic.md)\n')
+    assert.ok(diagnose().some(message => message.includes('Broken memory reference')))
+    writeFileSync(memory, originalMemory)
     // Removing a source must retire only unchanged generated files.
     const retiredRoleSource = join(checkout, ".codex/context/lms/agents/retired-example.md");
     writeFileSync(retiredRoleSource, "---\nname: retired-example\ndescription: Temporary fixture role\ntools: Read\n---\n\nFixture prompt.\n");
@@ -283,7 +371,7 @@ test("standalone setup preserves memory and detects context, source and skill dr
     rmSync(join(checkout, ".agents/skills/frontend-design"), { recursive: true });
     assert.ok(diagnose().some(message => message.includes("Missing skill: frontend-design")));
     writeFileSync(join(checkout, ".agents/skills/project-harness/SKILL.md"), "[missing](./missing.md)\n");
-    assert.ok(diagnose().some(message => message.includes("Broken skill reference: project-harness")));
+    assert.ok(diagnose().some(message => message.includes('Broken skill project-harness reference')));
   } finally {
     rmSync(sandbox, { recursive: true, force: true });
   }

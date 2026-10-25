@@ -1,7 +1,7 @@
 {
   "../.claude/settings.json": "9a159c8c0b5a585c307fca6fc6eb2b6a4927ce644464ee53b5e4ef1894e2c516",
   "../.claude/settings.local.json": "c530be885f980b0767a1c04e962dd0f7d63ca9214bb0a265b15fa1e51d8116e5",
-  "../CLAUDE.md": "d7251cafd6730514fa13602357bfa47c179e5749bad208841641b0fca1e607af",
+  "../CLAUDE.md": "b5e14f70d8eaf485bfe80e335b5862251912770d36fa687f9a034fa5d89d7328",
   "../expert_info/lms/agents/code-cartographer.md": "3d81a258a6489a881ad3b2ef27f3436f3d1ae806fccd9a38d116843397fdb0f6",
   "../expert_info/lms/agents/explorer.md": "acc7be79175c3867cb4f31bf8d593fab410dba7500dcd18b875386e7e29b91e8",
   "../expert_info/lms/agents/rev-correctness.md": "56729d3b421a5f3d8a47f4a8ed48f0bb54f88f1144903de1b087bb358943440c",
@@ -23,16 +23,16 @@
   ".claude/skills/lms-content/references/trainer.md": "fb843e9105206f6cb29dde6ea7372c8b2fb6ddc6f8473c4e414be5acb27c4d0e",
   ".claude/skills/lms-content/references/users.md": "32395ec09d371e67835fa21003518eb7ba653ea5dc9ef8471d5a9a1823179772",
   ".claude/skills/prod-check/SKILL.md": "6f57f6ed25e851deff8abd35a90e19aa05e0347d96e51f1cc0a2a4ab7fbb53b7",
-  ".claude/skills/self-review/SKILL.md": "ec3937c5665b0a34b236769bfb7b4ad01d4d8299c5fc02854a735f9439ececb6",
-  "scripts/codex/app-server.mjs": "e2b7c26660a5b9b32f9177a34e452cb8330f3ef3bf5bd2c4cedd349a786788f1",
+  ".claude/skills/self-review/SKILL.md": "4e60afb2c94627929ba453e62969a8884994d2f1e8de17bd718691f33f7bd19f",
+  "scripts/codex/app-server.mjs": "e6cacd4cf99e892a19c11aa89a39f81b8d5515af1a599b32347ba4077492d2e6",
   "scripts/codex/config.template.toml": "0dd9395c1054f872f2a003c4a30e23d03d675b98bd1885ff65434fc3536c3a10",
-  "scripts/codex/harness.mjs": "deb5ae6dbf9ee6197f7ad055bf169595dc7a0eb4732677ed5711237f25f69bc7",
-  "scripts/codex/harness.test.mjs": "a216de1db7cc12ea4d47d03ffe7ce397ef93435d092eacf2006f59dfa7cbf8c3",
-  "scripts/codex/hooks.mjs": "dea9d8130730d619aaee39743268a197522f3d09e1ef461bc0a87a33416e7fa5",
+  "scripts/codex/harness.mjs": "631be471ad440f74d465b32bedb3da98f945aa24c77ca90810e5632f5151fd54",
+  "scripts/codex/harness.test.mjs": "3fafefad72bd03141c7110bee8113dfb4f2e8b3927ebc4283c3e076ac2286f39",
+  "scripts/codex/hooks.mjs": "8103b2f7e15f82fb1fab68cc5674e757804ae40c0234fb59c7c59c0555f11b90",
   "scripts/codex/mcp.mjs": "2fd66b3d77051b0ddfbd6f7e3183ae3668421dbcdf107bca7c65dd8322d5230a",
-  "scripts/codex/native-check.mjs": "befe6e68e60091fa7f66420c93971f4de9b7dcdca165149d3d9f1117d5986056",
+  "scripts/codex/native-check.mjs": "9cf9095d05bd2a6efeac4369701f4b1e57b95dbd566ce69e4afffcdc603dac96",
   "scripts/codex/native-report.mjs": "71afc5ae10550726d01f1fd8f651ab18539171fcce3f52b505dfac9a9a36fd0f",
   "scripts/codex/process.mjs": "c401caafe842386136de39703e54ed2563063d61ee471da3f5ce952c9a8e5924",
   "scripts/codex/setup.mjs": "669f96978f11d09c483a6291a28ee814ae5061cffa8f11c62bb812cbc15edaba",
-  "scripts/codex/trust.mjs": "4f16ec1f84bb1c2149d0e60721ec0cf7c3eb0691ff883b1ae43af4ae2b53cb27"
+  "scripts/codex/trust.mjs": "9f615c358381587cd8c140abcfab73b395dfd9dbd991d180c02edd3e50eb642e"
 }

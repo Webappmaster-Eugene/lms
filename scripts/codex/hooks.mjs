@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { doctor, repo, workspace, run } from "./harness.mjs";
+import { doctor, repo, workspace, run, memoryContextLimit } from "./harness.mjs";
 
 // Claude keeps these denied even in bypass mode. Codex runs with
 // approval_policy = never, so this list is the matching guardrail; it is not a
@@ -69,19 +69,32 @@ export function claudeMemoryDir(home = homedir()) {
   return join(home, ".claude/projects", workspace.replace(/[^A-Za-z0-9]/g, "-"), "memory");
 }
 
-// Claude auto-memory is read live so facts saved by Claude reach Codex without a sync.
-function claudeMemory(dir = claudeMemoryDir()) {
+export function contextExcerpt(text, limit, source) {
+  if (text.length <= limit) return text
+  const notice = `\n\n[Контекст сокращён. Полный источник: ${source}]`
+  const budget = Math.max(0, limit - notice.length)
+  const paragraph = text.lastIndexOf('\n\n', budget)
+  const line = text.lastIndexOf('\n', budget)
+  const end = paragraph > 0 ? paragraph : line > 0 ? line : budget
+  return text.slice(0, end).trimEnd() + notice
+}
+
+// Restore Claude's live index; topic references are read only when needed.
+export function claudeMemory(dir = claudeMemoryDir()) {
   if (!existsSync(dir)) return null;
   const files = readdirSync(dir).filter(name => name.endsWith(".md")).sort((a, b) => (a === "MEMORY.md" ? -1 : b === "MEMORY.md" ? 1 : a.localeCompare(b)));
   if (!files.length) return null;
-  return `Claude auto-memory (${dir}), read-only for Codex:\n\n${files.map(name => `### ${name}\n${readFileSync(join(dir, name), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "").trim()}`).join("\n\n")}`.slice(0, 24000);
+  const selected = files.includes('MEMORY.md') ? ['MEMORY.md'] : files
+  const topics = selected.length < files.length ? `\n\nТематические заметки: ${dir}. Читай нужные файлы по ссылкам из индекса.` : ''
+  const text = `Claude auto-memory (${dir}), read-only for Codex:\n\n${selected.map(name => `### ${name}\n${readFileSync(join(dir, name), 'utf8').replace(/^---\n[\s\S]*?\n---\n/, '').trim()}`).join('\n\n')}${topics}`
+  return contextExcerpt(text, 24000, dir)
 }
 
 export function handleEvent(event) {
   if (event.hook_event_name === "SessionStart") {
     const notes = [".codex/memory/MEMORY.md", ".codex/state/handoff.md"]
       .filter(path => existsSync(join(repo, path)))
-      .map(path => `${path}\n${readFileSync(join(repo, path), "utf8").slice(0, 16000)}`);
+      .map(path => `${path}\n${contextExcerpt(readFileSync(join(repo, path), 'utf8'), memoryContextLimit, join(repo, path))}`);
     const claude = claudeMemory();
     if (claude) notes.push(claude);
     return { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: `LMS repository: ${repo}. Read AGENTS.md and .codex/context/CLAUDE.md before editing.\n\n${notes.join("\n\n")}` } };
