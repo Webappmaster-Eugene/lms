@@ -17,6 +17,16 @@ function headersFor(rules: Header[], pathname: string): Headers {
 }
 
 describe('итоговые HTTP-заголовки Next + Payload', () => {
+  it('гайды получают robots от своей страницы; остальная LMS остаётся noindex', async () => {
+    const rules = await config.headers()
+    for (const path of ['/guides', '/guides/harness-maintenance', '/guides/next.js']) {
+      expect(headersFor(rules, path).get('X-Robots-Tag'), path).toBeNull()
+      expect(headersFor(rules, path).get('X-Frame-Options'), path).toBe('DENY')
+    }
+    for (const path of ['/guides-private', '/courses', '/api/guides', '/admin']) {
+      expect(headersFor(rules, path).get('X-Robots-Tag'), path).toBe('noindex, nofollow')
+    }
+  })
   it('HSTS и Permissions-Policy на всех маршрутах, версии стека не раскрываются', async () => {
     const rules = await config.headers()
     // false выключает и встроенный заголовок Next, и тот, что withPayload добавляет своим правилом.

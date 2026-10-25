@@ -88,6 +88,66 @@ describe('выборочный доступ к гайдам', () => {
   })
 })
 
+describe('публичные гайды', () => {
+  it('администратор открывает гайд гостям, закрытые и черновики не раскрываются; выключение сразу отзывает доступ', async () => {
+    const reader = await createStudent(payload)
+    const token = await login(payload, reader)
+    const [item, closed, draft] = [await guide(), await guide(), await guide(false)]
+    const adminToken = await login(payload, admin)
+    const initial = await payload.findByID({ collection: 'guides', id: item.id })
+    expect(initial.isPublic).toBe(false)
+    expect((await rest('PATCH', `/guides/${item.id}`, { token, body: { isPublic: true } })).status).toBe(403)
+    expect((await rest('PATCH', `/guides/${item.id}`, { token: adminToken, body: { isPublic: true } })).status).toBe(200)
+    await payload.update({ collection: 'guides', id: draft.id, data: { isPublic: true } })
+    try {
+      await grant(reader.id, item.id, 'deny')
+      for (const requestToken of [undefined, token]) {
+        const list = await rest('GET', `/guides?where[id][in]=${item.id},${closed.id},${draft.id}&depth=0`, { token: requestToken })
+        expect(list.status).toBe(200)
+        expect(list.json.docs).toEqual([expect.objectContaining({ id: item.id })])
+        expect((await rest('GET', `/guides/${item.id}?depth=0`, { token: requestToken })).json.markdown).toBe(item.markdown)
+        expect((await rest('GET', `/guides/${closed.id}`, { token: requestToken })).status).toBe(404)
+        expect((await rest('GET', `/guides/${draft.id}`, { token: requestToken })).status).toBe(404)
+      }
+      expect((await getGuideAccess(payload, null)).canAccessGuide(item.id)).toBe(true)
+      expect((await rest('GET', `/guides/versions?where[parent][equals]=${item.id}`)).status).toBe(403)
+      expect((await rest('PATCH', `/guides/${item.id}`, { body: { isPublic: false } })).status).toBe(403)
+      expect((await rest('POST', '/guide-reads', { body: { guide: item.id } })).status).toBe(403)
+      await payload.update({ collection: 'guides', id: item.id, data: { isPublished: false } })
+      expect((await rest('GET', `/guides/${item.id}`)).status).toBe(404)
+      await payload.update({ collection: 'guides', id: item.id, data: { isPublished: true, isPublic: false } })
+      expect((await rest('GET', `/guides/${item.id}`)).status).toBe(404)
+      expect((await getGuideAccess(payload, reader)).canAccessGuide(item.id)).toBe(false)
+    } finally {
+      await payload.update({ collection: 'guides', id: item.id, data: { isPublic: false } })
+    }
+  })
+
+  it('public в Markdown задаёт публичность; отсутствие поля при обновлении её сохраняет', async () => {
+    const item = await payload.create({ collection: 'guides', data: { markdown: `---\ntitle: Публичность файла\nsummary: Кратко\nslug: ${uid('file-public')}\npublic: true\npublished: false\n---\nТекст` } as never })
+    expect(item).toMatchObject({ isPublic: true, isPublished: false })
+    const updated = await payload.update({ collection: 'guides', id: item.id, data: { markdown: '---\ntitle: Публичность файла\n---\nНовый текст' } })
+    expect(updated.isPublic).toBe(true)
+    expect((await rest('GET', `/guides/${item.id}`)).status).toBe(404)
+  })
+
+  it('вложение публичного гайда доступно гостю; черновик и отзыв публичности закрывают файл', async () => {
+    const bytes = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c636000000000050001a5f645400000000049454e44ae426082', 'hex')
+    const image = await payload.create({ collection: 'media', data: { alt: 'Открытая иллюстрация' }, file: { data: bytes, mimetype: 'image/png', name: `${uid('public-image')}.png`, size: bytes.length } })
+    const item = await payload.create({ collection: 'guides', context: { skipHooks: true }, data: { title: uid('Открытый гайд'), slug: uid('public-image-guide'), summary: 'Кратко', markdown: `![Схема](/api/media/file/${image.filename})`, isPublic: true, isPublished: false } })
+    const visible = async () => (await payload.find({ collection: 'media', where: { id: { equals: image.id } }, overrideAccess: false, depth: 0 })).totalDocs
+    expect(await visible()).toBe(0)
+    try {
+      await payload.update({ collection: 'guides', id: item.id, context: { skipHooks: true }, data: { isPublished: true } })
+      expect(await visible()).toBe(1)
+      await payload.update({ collection: 'guides', id: item.id, data: { isPublic: false } })
+      expect(await visible()).toBe(0)
+    } finally {
+      await payload.update({ collection: 'guides', id: item.id, data: { isPublic: false } })
+    }
+  })
+})
+
 describe('гайд в Markdown', () => {
   it('файл целиком: шапка раскладывается по полям, в тексте остаётся Markdown, минуты и срок пересмотра считает сервер', async () => {
     const slug = uid('md-guide')

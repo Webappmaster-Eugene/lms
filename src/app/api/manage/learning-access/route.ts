@@ -120,7 +120,7 @@ async function preview(payload: Payload, input: AssignmentInput, req: PayloadReq
     collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmap-nodes', page, limit, sort: 'id', depth: 0, select: { roadmap: true, course: true }, overrideAccess: false, req })),
     collectAllPages(({ page, limit }) => payload.find({ collection: 'trainer-topics', page, limit, sort: 'id', depth: 0, select: { title: true, isPublished: true }, overrideAccess: false, req })),
     collectAllPages(({ page, limit }) => payload.find({ collection: 'trainer-tasks', page, limit, sort: 'id', depth: 0, select: { title: true, topic: true, isPublished: true }, overrideAccess: false, req })),
-    collectAllPages(({ page, limit }) => payload.find({ collection: 'guides', page, limit, sort: ['order', 'id'], depth: 0, select: { title: true, isPublished: true }, overrideAccess: false, req })),
+    collectAllPages(({ page, limit }) => payload.find({ collection: 'guides', page, limit, sort: ['order', 'id'], depth: 0, select: { title: true, isPublished: true, isPublic: true }, overrideAccess: false, req })),
   ])
   const lessonIds = input.rules.filter((rule) => rule.target.relationTo === 'lessons').map((rule) => rule.target.value)
   const lessons = lessonIds.length ? await collectAllPages(({ page, limit }) => payload.find({ collection: 'lessons', where: { id: { in: lessonIds } }, page, limit, sort: 'id', depth: 0, select: { course: true, section: true, isPublished: true }, overrideAccess: false, req })) : []

@@ -21,7 +21,7 @@ export const Guides: CollectionConfig = {
   },
   admin: {
     useAsTitle: 'title',
-    defaultColumns: ['title', 'category', 'isPublished', 'reviewBy', 'order'],
+    defaultColumns: ['title', 'category', 'isPublished', 'isPublic', 'reviewBy', 'order'],
     group: 'Контент',
     preview: (doc) => (typeof doc?.slug === 'string' && doc.slug ? `/guides/${encodeURIComponent(doc.slug)}` : null),
     components: {
@@ -150,6 +150,16 @@ export const Guides: CollectionConfig = {
       label: 'Порядок',
       admin: {
         position: 'sidebar',
+      },
+    },
+    {
+      name: 'isPublic',
+      type: 'checkbox',
+      defaultValue: false,
+      label: 'Публичный гайд',
+      admin: {
+        position: 'sidebar',
+        description: 'После публикации доступен всем без входа, по ссылке и в поисковиках. Текст и прикреплённые файлы становятся публичными',
       },
     },
     {

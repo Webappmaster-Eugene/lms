@@ -4,7 +4,8 @@ import { learningGrantIsActive, learningRelationId, type LearningGrant } from '@
 
 export type GuidesAccessMode = 'all' | 'assigned'
 export type GuideAccessUser = { id: number; role?: string | null; guidesAccessMode?: GuidesAccessMode | null; isActive?: boolean | null }
-export type GuideMetadata = { id: number; isPublished?: boolean | null }
+export type GuideMetadata = { id: number; isPublished?: boolean | null; isPublic?: boolean | null }
+export const publicGuideWhere: Where = { and: [{ isPublished: { equals: true } }, { isPublic: { equals: true } }] }
 export type GuideAccessSnapshot = {
   admin: boolean
   mode: GuidesAccessMode
@@ -16,7 +17,7 @@ export type GuideAccessSnapshot = {
 
 /**
  * Гайды не входят в доступ к обучению: без режима «все» открыт только назначенный гайд.
- * Запрет на конкретный гайд сильнее режима и разрешения, как у курсов и тренажёра.
+ * Публичные опубликованные гайды доступны всем. Для остальных запрет сильнее назначения.
  */
 export function buildGuideAccess(user: GuideAccessUser | null | undefined, grants: LearningGrant[], guides: GuideMetadata[], now = Date.now()): GuideAccessSnapshot {
   const admin = user?.role === 'admin'
@@ -28,9 +29,11 @@ export function buildGuideAccess(user: GuideAccessUser | null | undefined, grant
     if (grant.effect === 'deny' || !rules.has(id)) rules.set(id, grant.effect)
   }
   const accessible = new Set<number>()
-  if (!admin && user && user.isActive !== false) {
+  if (!admin) {
     for (const guide of guides) {
       if (!guide.isPublished) continue
+      if (guide.isPublic) { accessible.add(guide.id); continue }
+      if (!user || user.isActive === false) continue
       const decision = rules.get(guide.id)
       if (decision ? decision === 'allow' : mode === 'all') accessible.add(guide.id)
     }

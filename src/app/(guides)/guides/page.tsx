@@ -1,15 +1,20 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { CheckCircle2, Clock, Compass } from 'lucide-react'
 import { collectAllPages } from '@/lib/paginate'
 import { guideIsNew } from '@/lib/guides'
 import { learningRelationId } from '@/lib/learning-access'
 import { cn, formatDate } from '@/lib/utils'
 import { getLearningRequest } from '@/server/learning-request'
+import { OG_IMAGE, SITE_NAME, siteUrl } from '@/lib/site-metadata'
 
 export const metadata: Metadata = {
   title: 'Гайды',
+  description: 'Практические гайды MentorCareer: карьера в IT, работа с ИИ и разработка. Открытые инструкции для чтения и пересылки.',
+  alternates: { canonical: new URL('/guides', siteUrl()).toString() },
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
+  openGraph: { type: 'website', title: 'Гайды MentorCareer', description: 'Практические инструкции: карьера, работа с ИИ и разработка.', url: new URL('/guides', siteUrl()).toString(), siteName: SITE_NAME, locale: 'ru_RU', images: [OG_IMAGE] },
+  twitter: { card: 'summary_large_image', title: 'Гайды MentorCareer', description: 'Практические инструкции: карьера, работа с ИИ и разработка.', images: [OG_IMAGE.url] },
 }
 
 type Props = {
@@ -18,7 +23,6 @@ type Props = {
 
 export default async function GuidesPage({ searchParams }: Props) {
   const { payload, user, req } = await getLearningRequest()
-  if (!user) redirect('/login?redirect=%2Fguides')
   const requestedParam = (await searchParams).category
   const requestedSlug = Array.isArray(requestedParam) ? requestedParam[0] : requestedParam
 
@@ -38,10 +42,10 @@ export default async function GuidesPage({ searchParams }: Props) {
         }),
       { label: 'гайды' },
     ),
-    collectAllPages(
+    user ? collectAllPages(
       ({ page, limit }) => payload.find({ collection: 'guide-reads', where: { user: { equals: user.id } }, select: { guide: true }, depth: 0, sort: 'id', overrideAccess: false, req, page, limit }),
       { label: 'прочитанные гайды' },
-    ),
+    ) : Promise.resolve([]),
     collectAllPages(
       ({ page, limit }) => payload.find({ collection: 'guide-categories', sort: ['order', 'title'], select: { title: true, slug: true }, depth: 0, overrideAccess: true, req, page, limit }),
       { label: 'категории гайдов' },
@@ -91,6 +95,8 @@ export default async function GuidesPage({ searchParams }: Props) {
         <div className="rounded-xl border border-border bg-card px-5 py-12 text-center text-muted-foreground">
           {activeCategory ? (
             <p>В этой категории гайдов пока нет. <Link href="/guides" className="font-medium text-primary underline-offset-2 hover:underline">Показать все</Link></p>
+          ) : !user ? (
+            <p>Открытых гайдов пока нет. <Link href="/login?redirect=%2Fguides" className="font-medium text-primary underline-offset-2 hover:underline">Войти в LMS</Link></p>
           ) : user.role === 'admin' ? (
             <p>Гайдов пока нет. Создайте первый в CMS — раздел «Гайды»</p>
           ) : (
@@ -101,7 +107,7 @@ export default async function GuidesPage({ searchParams }: Props) {
         <ul className="grid gap-4 sm:grid-cols-2">
           {shown.map((guide) => {
             const isRead = read.has(guide.id)
-            const isNew = user.role !== 'admin' && guideIsNew(guide.announcedAt, isRead)
+            const isNew = !!user && user.role !== 'admin' && guideIsNew(guide.announcedAt, isRead)
             const categoryId = guideCategoryId(guide)
             const label = categoryId != null ? categoryById.get(categoryId)?.title ?? null : null
             return (

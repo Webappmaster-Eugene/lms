@@ -1,18 +1,19 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import { cache } from 'react'
 import { ArrowLeft, Clock, Download, Lock } from 'lucide-react'
 import { BookmarkButton } from '@/components/bookmarks/BookmarkButton'
 import { GuideFeedback, type GuideReadState } from '@/components/guides/GuideFeedback'
 import { GuideMarkdown } from '@/components/guides/GuideMarkdown'
 import { GuideSideToc } from '@/components/guides/GuideSideToc'
+import { ShareGuideButton } from '@/components/guides/ShareGuideButton'
 import { findBookmarkId } from '@/lib/bookmarks'
 import { guideMarkdownHeadings } from '@/lib/guide-markdown'
 import { guideReadingMinutes } from '@/lib/guides'
+import { guideSeo, guideStructuredData } from '@/lib/guide-seo'
 import { learningRelationId } from '@/lib/learning-access'
 import { routeSlug } from '@/lib/route-slug'
-import { metaDescription } from '@/lib/site-metadata'
 import { formatDate } from '@/lib/utils'
 import { GUIDE_FEEDBACK_MAX } from '@/payload/collections/GuideReads'
 import { getLearningRequest } from '@/server/learning-request'
@@ -27,7 +28,6 @@ type LoadedGuide = Awaited<ReturnType<typeof getLearningRequest>> & { guide: Gui
 /** Метаданные и страница читают один гайд — запрос к базе один на рендер. */
 const loadGuide = cache(async (slug: string): Promise<LoadedGuide> => {
   const { payload, user, req } = await getLearningRequest()
-  if (!user) return { payload, user, req, guide: undefined }
   const result = await payload.find({
     collection: 'guides',
     where: { slug: { equals: slug } },
@@ -42,7 +42,7 @@ const loadGuide = cache(async (slug: string): Promise<LoadedGuide> => {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { guide } = await loadGuide(routeSlug((await params).slug))
   if (!guide) return { title: 'Гайд' }
-  return { title: guide.title, description: metaDescription(guide.summary) }
+  return guideSeo(guide)
 }
 
 /** Ссылка на гайд из урока или чата ведёт сюда, даже если гайд ученику не выдан: объясняем, что делать. */
@@ -65,17 +65,17 @@ function ClosedGuide() {
 export default async function GuidePage({ params }: Props) {
   const slug = routeSlug((await params).slug)
   const { payload, user, req, guide } = await loadGuide(slug)
-  if (!user) redirect(`/login?redirect=${encodeURIComponent(`/guides/${slug}`)}`)
   if (!guide) {
+    if (!user) notFound()
     const exists = await payload.count({ collection: 'guides', where: { and: [{ slug: { equals: slug } }, { isPublished: { equals: true } }] }, overrideAccess: true, req })
     return exists.totalDocs ? <ClosedGuide /> : notFound()
   }
 
   const markdown = guide.markdown ?? ''
   const headings = guideMarkdownHeadings(markdown)
-  const isAdmin = user.role === 'admin'
+  const isAdmin = user?.role === 'admin'
   // Закладка и отзыв на черновик не показываются — их не дают создать.
-  const [bookmarkId, read] = guide.isPublished
+  const [bookmarkId, read] = guide.isPublished && user
     ? await Promise.all([
       findBookmarkId(payload, user.id, { guide: guide.id }),
       isAdmin ? null : payload.find({ collection: 'guide-reads', where: { and: [{ user: { equals: user.id } }, { guide: { equals: guide.id } }] }, select: { helpful: true, comment: true }, limit: 1, depth: 0, overrideAccess: false, req }).then((result) => result.docs[0] ?? null),
@@ -90,6 +90,7 @@ export default async function GuidePage({ params }: Props) {
   return (
     <div className="mx-auto max-w-3xl min-[1400px]:grid min-[1400px]:max-w-[calc(48rem+15rem+2.5rem)] min-[1400px]:grid-cols-[minmax(0,48rem)_15rem] min-[1400px]:gap-10">
       <article className="min-w-0 space-y-6">
+        {guide.isPublic && guide.isPublished && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: guideStructuredData(guide) }} />}
         <Link href="/guides" className="inline-flex min-h-[44px] items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           Все гайды
@@ -115,7 +116,8 @@ export default async function GuidePage({ params }: Props) {
               <Download className="h-4 w-4" aria-hidden="true" />
               Скачать .md
             </a>
-            {guide.isPublished && <BookmarkButton target={{ guide: guide.id }} initialId={bookmarkId} />}
+            {guide.isPublished && user && <BookmarkButton target={{ guide: guide.id }} initialId={bookmarkId} />}
+            <ShareGuideButton title={guide.title} />
           </div>
         </header>
 
@@ -134,7 +136,7 @@ export default async function GuidePage({ params }: Props) {
 
         <GuideMarkdown markdown={markdown} />
 
-        {guide.isPublished && !isAdmin && <GuideFeedback guideId={guide.id} initial={readState} maxComment={GUIDE_FEEDBACK_MAX} />}
+        {guide.isPublished && user && !isAdmin && <GuideFeedback guideId={guide.id} initial={readState} maxComment={GUIDE_FEEDBACK_MAX} />}
         {isAdmin && (
           <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
             Ученики видят здесь вопрос «Гайд помог?». Ответы — в CMS: <Link href={`/admin/collections/guide-reads?where[guide][equals]=${guide.id}`} className="font-medium text-primary underline-offset-2 hover:underline">прочтения и отзывы</Link>.

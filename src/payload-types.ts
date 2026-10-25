@@ -659,6 +659,10 @@ export interface Guide {
   readingMinutes?: number | null;
   announcedAt?: string | null;
   order?: number | null;
+  /**
+   * После публикации доступен всем без входа, по ссылке и в поисковиках. Текст и прикреплённые файлы становятся публичными
+   */
+  isPublic?: boolean | null;
   isPublished?: boolean | null;
   updatedAt: string;
   createdAt: string;
@@ -2157,6 +2161,7 @@ export interface GuidesSelect<T extends boolean = true> {
   readingMinutes?: T;
   announcedAt?: T;
   order?: T;
+  isPublic?: T;
   isPublished?: T;
   updatedAt?: T;
   createdAt?: T;

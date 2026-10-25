@@ -20,7 +20,7 @@ const ROUTE_GROUP = /^\(.+\)$/
 const CMS_GROUP = '(payload)'
 
 /** Должен совпадать с PUBLIC_PATHS в middleware. */
-const PUBLIC_PAGES = new Set(['/login', '/forgot-password', '/reset-password', '/unsubscribe'])
+const PUBLIC_PAGES = new Set(['/login', '/forgot-password', '/reset-password', '/unsubscribe', '/guides', '/guides/[slug]'])
 
 /**
  * Пропускаются по префиксу `/admin`, отданному админке Payload, поэтому

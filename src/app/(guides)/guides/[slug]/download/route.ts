@@ -14,7 +14,6 @@ export async function GET(request: Request, { params }: Context): Promise<Respon
   // Доступ к гайдам кэшируется на запрос Payload — один req на авторизацию и выборку.
   const req = await createLocalReq({}, payload)
   const { user } = await payload.auth({ headers: request.headers, req })
-  if (!user) return new Response('Войдите, чтобы скачать гайд', { status: 401 })
   const result = await payload.find({
     collection: 'guides',
     where: { slug: { equals: slug } },
@@ -36,6 +35,7 @@ export async function GET(request: Request, { params }: Context): Promise<Respon
       // Файл зависит от выданного доступа — общие кэши его хранить не должны.
       'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff',
+      'X-Robots-Tag': 'noindex, nofollow',
     },
   })
 }

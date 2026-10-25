@@ -6,7 +6,7 @@ import { getGuideAccess } from '@/server/guide-access'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 
 interface ReferenceRow { media_id: number; lesson_id: number | null; public: boolean }
-interface GuideReferenceRow { media_id: number; guide_id: number }
+interface GuideReferenceRow { media_id: number; guide_id: number; public: boolean }
 interface QueryResult<Row = ReferenceRow> { rows: Row[] }
 interface ReadAdapter {
   drizzle: { execute: <Row = ReferenceRow>(query: ReturnType<typeof sql>) => Promise<QueryResult<Row>> }
@@ -114,11 +114,14 @@ async function readableMediaWhere(payload: Payload, req: PayloadRequest, filenam
     with aliases as (
       select * from jsonb_to_recordset(${JSON.stringify(aliases)}::jsonb)
       as x(media_id integer, path text, regex text, raster boolean)
-    ) select distinct a.media_id, g.id as guide_id from aliases a join guides g on g.markdown ~ a.regex
+    ) select distinct a.media_id, g.id as guide_id, (g.is_published = true and g.is_public = true) as public
+    from aliases a join guides g on g.markdown ~ a.regex
   `)
   // A public reference must not publish private course material (including sizes).
   const privateIds = new Set([...result.rows.filter((row) => row.lesson_id !== null).map((row) => row.media_id), ...guideRefs.rows.map((row) => row.media_id)])
   const allowedIds = new Set(result.rows.filter((row) => row.public && !privateIds.has(row.media_id)).map((row) => row.media_id))
+  // Публичность гайда — явное решение администратора открыть и его вложения.
+  for (const row of guideRefs.rows) if (row.public) allowedIds.add(row.media_id)
   if (req.user && guideRefs.rows.length) {
     const guides = await getGuideAccess(payload, req.user, req)
     for (const row of guideRefs.rows) if (guides.canAccessGuide(row.guide_id)) allowedIds.add(row.media_id)

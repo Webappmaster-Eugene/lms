@@ -35,6 +35,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Коллекция сама отбирает публичные гайды; личные данные остаются за access Payload.
+  if (pathname === '/guides' || /^\/guides\/[^/]+(?:\/download)?\/?$/.test(pathname)) {
+    return NextResponse.next()
+  }
+
   // Проверяем наличие payload-token cookie
   const token = request.cookies.get('payload-token')
 

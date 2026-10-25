@@ -9,6 +9,15 @@ const student = (overrides: Partial<GuideAccessUser> = {}): GuideAccessUser => (
 const grant = (id: number, effect: 'allow' | 'deny' = 'allow', extra: Partial<LearningGrant> = {}): LearningGrant => ({ target: { relationTo: 'guides', value: id }, effect, ...extra })
 
 describe('доступ к гайдам', () => {
+  it('публичный опубликованный гайд открыт всем, включая гостя и ученика с запретом', () => {
+    const publicGuides = [...guides, { id: 4, isPublished: true, isPublic: true }, { id: 5, isPublished: false, isPublic: true }]
+    for (const user of [null, student(), student({ isActive: false })]) {
+      const access = buildGuideAccess(user, [grant(4, 'deny')], publicGuides, NOW)
+      expect(access.accessibleGuideIds).toEqual([4])
+      expect(access.canAccessGuide(5)).toBe(false)
+      expect(access.canAccessGuide(1)).toBe(false)
+    }
+  })
   it('по умолчанию ученику не открыт ни один гайд', () => {
     const access = buildGuideAccess(student(), [], guides, NOW)
     expect(access.mode).toBe('assigned')

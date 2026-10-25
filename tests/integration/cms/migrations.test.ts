@@ -237,6 +237,18 @@ describe('миграции на чистой базе', () => {
     await raw(`delete from guides where id in (${ids})`)
   })
 
+  it('добавление публичности оставляет прежние гайды закрытыми и сохраняет их текст', async () => {
+    const req = await createLocalReq({}, payload)
+    await rollbackTo('_guides_public', req)
+    const inserted = await raw(`insert into guides (title, slug, summary, markdown, is_published, updated_at, created_at) values
+      ('Прежний гайд', 'private-before-migration', 'Кратко', 'Сохранённый текст', true, now(), now()) returning id`)
+    const id = Number(inserted[0].id)
+    await db().migrate({ migrations })
+    expect(await raw(`select is_public, markdown from guides where id = ${id}`)).toEqual([{ is_public: false, markdown: 'Сохранённый текст' }])
+    expect(await drift()).toEqual([])
+    await raw(`delete from guides where id = ${id}`)
+  })
+
   it('миграция категорий на живых данных: прежнее значение-перечисление переносится в связь', async () => {
     const req = await createLocalReq({}, payload)
     // Откатываемся до состояния перед guides_categories (сняв её и contract): категория — колонка-перечисление.

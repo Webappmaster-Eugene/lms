@@ -31,8 +31,8 @@ async function guideGrants(payload: Payload, req: PayloadRequest, guideId: numbe
   return grants as unknown as GrantRow[]
 }
 
-function canRead(user: Recipient, grants: GrantRow[], guideId: number, now: number): boolean {
-  return buildGuideAccess(user, grants, [{ id: guideId, isPublished: true }], now).canAccessGuide(guideId)
+function canRead(user: Recipient, grants: GrantRow[], guideId: number, now: number, isPublic = false): boolean {
+  return buildGuideAccess(user, grants, [{ id: guideId, isPublished: true, isPublic }], now).canAccessGuide(guideId)
 }
 
 async function notify(payload: Payload, req: PayloadRequest, userIds: number[], data: { title: string; message: string; link: string }) {
@@ -43,13 +43,16 @@ async function notify(payload: Payload, req: PayloadRequest, userIds: number[], 
 
 /** Кому открыт опубликованный гайд прямо сейчас: режим «все гайды» или действующее назначение, без запрета. */
 export async function guideRecipients(payload: Payload, req: PayloadRequest, guideId: number, now = Date.now()): Promise<number[]> {
-  const [users, grants] = await Promise.all([students(payload, req), guideGrants(payload, req, guideId)])
+  const [users, grants, guide] = await Promise.all([
+    students(payload, req), guideGrants(payload, req, guideId),
+    payload.findByID({ collection: 'guides', id: guideId, select: { isPublic: true }, depth: 0, overrideAccess: true, req }),
+  ])
   const byUser = new Map<number, GrantRow[]>()
   for (const grant of grants) {
     const user = learningRelationId(grant.user)
     if (user !== null) byUser.set(user, [...(byUser.get(user) ?? []), grant])
   }
-  return users.filter((user) => canRead(user, byUser.get(user.id) ?? [], guideId, now)).map((user) => user.id)
+  return users.filter((user) => canRead(user, byUser.get(user.id) ?? [], guideId, now, guide.isPublic === true)).map((user) => user.id)
 }
 
 /** Первая публикация гайда (computeGuideMeta проставил announcedAt) — уведомление всем, кому он открыт. */
@@ -78,8 +81,9 @@ export const notifyGuideGrant: CollectionAfterChangeHook = async ({ doc, previou
   const userId = learningRelationId(doc.user)
   if (guideId === null || userId === null) return doc
   try {
-    const guide = await req.payload.findByID({ collection: 'guides', id: guideId, select: { title: true, slug: true, isPublished: true, announcedAt: true }, depth: 0, overrideAccess: true, req, disableErrors: true })
+    const guide = await req.payload.findByID({ collection: 'guides', id: guideId, select: { title: true, slug: true, isPublished: true, isPublic: true, announcedAt: true }, depth: 0, overrideAccess: true, req, disableErrors: true })
     if (!guide?.isPublished || !guide.announcedAt) return doc
+    if (guide.isPublic) return doc
     const [user] = await students(req.payload, req, [userId])
     if (!user) return doc
     const grants = await guideGrants(req.payload, req, guideId, userId)

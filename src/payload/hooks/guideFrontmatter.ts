@@ -40,6 +40,7 @@ export const applyGuideFile: CollectionBeforeValidateHook = async ({ data, origi
     ...(fields.slug !== undefined ? { slug: fields.slug } : !data.slug && originalDoc?.slug ? { slug: originalDoc.slug } : {}),
     ...(fields.order !== undefined && { order: fields.order }),
     ...(fields.published !== undefined && { isPublished: fields.published }),
+    ...(fields.public !== undefined && { isPublic: fields.public }),
     ...(categoryId !== undefined && { category: categoryId }),
     ...(fields.reviewedAt !== undefined && { reviewedAt: fields.reviewedAt }),
     // Новая дата проверки без своего срока сбрасывает старый срок: он относился к прошлой проверке.

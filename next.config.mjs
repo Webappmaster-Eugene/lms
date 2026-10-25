@@ -46,7 +46,6 @@ const nextConfig = {
       {
         source: '/:path*',
         headers: [
-          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
           // Срок короткий, пока HSTS обкатывается: если HTTPS сломается, браузер не пустит на сайт до его конца.
           { key: 'Strict-Transport-Security', value: 'max-age=86400' },
           // Полноэкранный режим (слайды, видео, роадмап) и буфер обмена («Поделиться») нужны — их не ограничиваем.
@@ -55,6 +54,11 @@ const nextConfig = {
             value: 'accelerometer=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()',
           },
         ],
+      },
+      {
+        // У гайдов индексацию определяет metadata страницы по isPublic + isPublished.
+        source: '/((?!guides(?:/|$)).*)',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
       },
       {
         source: '/sw.js',

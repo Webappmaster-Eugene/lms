@@ -7,6 +7,7 @@ export type GuideFileFields = {
   slug?: string
   order?: number
   published?: boolean
+  public?: boolean
   /** Название или slug категории как написано в шапке; в id его переводит серверный хук, у которого есть база. */
   category?: string
   /** Даты — ISO-строки. */
@@ -48,6 +49,7 @@ function readFrontmatter(block: string): { fields: GuideFileFields; problems: st
     if (key === 'title' || key === 'summary' || key === 'slug') fields[key] = value
     else if (key === 'order' && /^-?\d+$/.test(value)) fields.order = Number(value)
     else if (key === 'published' && /^(true|false)$/i.test(value)) fields.published = value.toLowerCase() === 'true'
+    else if (key === 'public' && /^(true|false)$/i.test(value)) fields.public = value.toLowerCase() === 'true'
     else if (key === 'category') fields.category = value
     else if (key === 'reviewed' || key === 'reviewby') {
       const date = headerDate(value)
