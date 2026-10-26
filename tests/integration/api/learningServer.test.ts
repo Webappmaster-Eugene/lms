@@ -3,7 +3,8 @@ import { APIError, createLocalReq, type Payload } from 'payload'
 
 import { learningVideos } from '@/lib/learning-state'
 import { loadCourseLessons } from '@/lib/course-lessons'
-import { accessibleLearningLesson, LearningStateError, saveLearningState } from '@/server/learning-state'
+import { accessibleLearningLesson, getLearningState, LearningStateError, saveLearningState } from '@/server/learning-state'
+import { POST as activityPOST } from '@/app/api/activity/route'
 import { canAccessCourse, canAccessLesson } from '@/server/learning-access'
 import { getAuthoritativeLearningMode } from '@/server/learning-access-policy'
 import { notificationLinkIsVisible } from '@/server/notification-visibility'
@@ -59,6 +60,15 @@ describe('состояние просмотра урока', () => {
     await expect(accessibleLearningLesson(payload, student, tree.lessons[0].id)).rejects.toThrow('connection reset')
   })
 
+  it('сбой чтения урока и сбой проверки доступа при чтении состояния пробрасываются как есть', async () => {
+    const student = await asUser(await createStudent(payload))
+    failWhen('findByID', 'lessons', new Error('read replica lag'))
+    await expect(accessibleLearningLesson(payload, student, tree.lessons[0].id)).rejects.toThrow('read replica lag')
+    vi.restoreAllMocks()
+    failWhen('find', 'courses', new Error('connection reset'))
+    await expect(getLearningState(payload, student, tree.lessons[0])).rejects.toThrow('connection reset')
+  })
+
   it('сбой отметки активности откатывает сохранение позиции видео целиком', async () => {
     const student = await asUser(await createStudent(payload))
     const lesson: Lesson = await payload.update({ collection: 'lessons', id: tree.lessons[1].id, data: { content: [{ blockType: 'video', id: uid('rollback-clip'), title: 'Ролик', videoUrl: 'https://disk.yandex.ru/d/rollback-fixture/video.mp4' }] } })
@@ -98,11 +108,30 @@ describe('проверка доступа к уроку и курсу', () => {
     expect(await canAccessCourse(payload, student, tree.course.id, req)).toBe(false)
   })
 
+  it('сбой чтения политики ученика пробрасывается, а не открывает и не закрывает доступ молча', async () => {
+    const student = await asUser(await createStudent(payload))
+    failWhen('find', 'learning-access-policies', new Error('statement timeout'))
+    await expect(canAccessCourse(payload, student, tree.course.id, await createLocalReq({ user: student }, payload))).rejects.toThrow('statement timeout')
+  })
+
   it('режим доступа читается из политики, а не из подделанного поля профиля', async () => {
     const student = await createStudent(payload, { learningAccessMode: 'assigned' })
     expect(await getAuthoritativeLearningMode(payload, student.id)).toBe('assigned')
     await payload.update({ collection: 'users', id: student.id, data: { learningAccessMode: 'all' }, req: await createLocalReq({ user: await asUser(admin) }, payload) })
     expect(await getAuthoritativeLearningMode(payload, student.id)).toBe('all')
+  })
+})
+
+describe('журнал посещений: страница курса', () => {
+  it('просмотр страницы курса записывается событием с курсом, но без урока', async () => {
+    const student = await createStudent(payload)
+    const token = await login(payload, student)
+    const response = await activityPOST(new Request('http://lms.test/api/activity', { method: 'POST', headers: { Authorization: `JWT ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ path: `/courses/${tree.course.slug}`, expectedUserId: student.id }) }))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ recorded: true })
+    const events = await payload.find({ collection: 'student-learning-events', where: { and: [{ user: { equals: student.id } }, { type: { equals: 'page_view' } }] }, depth: 0, overrideAccess: true })
+    expect(events.docs).toHaveLength(1)
+    expect(events.docs[0]).toMatchObject({ path: `/courses/${tree.course.slug}`, course: tree.course.id, lesson: null, source: 'observed' })
   })
 })
 

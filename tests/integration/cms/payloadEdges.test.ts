@@ -108,6 +108,16 @@ describe('ссылки контактов в настройках сайта', (
   })
 })
 
+describe('журнал назначений доступа неизменяем', () => {
+  it('запись аудита нельзя удалить и изменить даже серверным вызовом с overrideAccess', async () => {
+    const student = await createStudent(payload)
+    const audit = await payload.create({ collection: 'learning-access-audit', overrideAccess: true, data: { actorId: student.id, userId: student.id, targetType: 'lessons', targetId: 1, effect: 'allow', operation: 'create' } })
+    await expect(payload.delete({ collection: 'learning-access-audit', id: audit.id, overrideAccess: true })).rejects.toMatchObject({ status: 403 })
+    await expect(payload.update({ collection: 'learning-access-audit', id: audit.id, overrideAccess: true, data: { effect: 'deny' } })).rejects.toMatchObject({ status: 403 })
+    expect(await payload.findByID({ collection: 'learning-access-audit', id: audit.id, overrideAccess: true })).toMatchObject({ effect: 'allow' })
+  })
+})
+
 describe('фоновые очистки телеметрии: сбой на одном владельце', () => {
   async function oldReport(user: number) {
     return payload.create({ collection: 'web-vitals-reports', overrideAccess: true, context: { syncWebVitals: true }, data: {

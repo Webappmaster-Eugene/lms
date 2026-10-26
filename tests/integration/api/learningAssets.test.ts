@@ -178,6 +178,21 @@ describe('GET /api/media/file — квота и сбои', () => {
     expect(await unavailable.json()).toEqual({ error: 'Сервис файлов временно недоступен' })
   })
 
+  it('запись медиатеки есть, а файла на диске нет — 404, а не ошибка сервера', async () => {
+    const lost = await payload.create({ collection: 'media', data: { alt: 'Потерянный файл' }, file: { data: PNG, mimetype: 'image/png', name: `${uid('lost')}.png`, size: PNG.length } })
+    const location = path.resolve('media', lost.filename ?? '')
+    const original = await readFile(location)
+    await unlink(location)
+    try {
+      const response = await file(lost.filename ?? '', adminToken)
+      expect(response.status).toBe(404)
+      expect(await response.json()).toEqual({ error: 'Файл не найден' })
+    } finally {
+      await writeFile(location, original)
+      await payload.delete({ collection: 'media', id: lost.id })
+    }
+  })
+
   it('файл, который не удалось прочитать на диске, обрывает поток и освобождает слот', async () => {
     const quotaAdmin = await createAdmin(payload)
     const token = await login(payload, quotaAdmin)
