@@ -5,11 +5,6 @@ import { storageStateOf } from '../fixtures/env'
 
 test.use({ storageState: storageStateOf('admin') })
 
-/** Собственный font-family у pre расходится (дефект, см. «БАГ» ниже); текст блока — в code, его шрифт сравнивается. */
-function withoutPreFont(rows: string[][]) {
-  return rows.map((row) => row[0] === 'pre' ? [row[0], ...row.slice(2)] : row)
-}
-
 async function preFont(root: Locator) {
   return root.locator('pre').first().evaluate(async (element) => {
     await document.fonts.ready
@@ -72,17 +67,14 @@ test('Markdown: исправление списков, отмена, Enter, со
     const article = page.locator('article .guide-prose')
     await expect(article.getByRole('heading', { name: 'Раздел' })).toBeVisible()
     await expect(article.locator('pre.shiki')).toContainText('pnpm install')
-    expect(withoutPreFont(await typography(article))).toEqual(withoutPreFont(before))
+    expect(await typography(article)).toEqual(before)
   } finally {
     await request.delete(`/api/guides/${id}`)
   }
 })
 
-test('БАГ: у блока кода (pre) разный font-family в превью CMS и в статье', async ({ page, request }) => {
-  // src/components/guides/guide-prose.css: у `.guide-prose pre` нет font-family. В статье его задаёт
-  // preflight Tailwind (ui-monospace, …, monospace), в админке Payload preflight нет — остаётся
-  // браузерный `monospace`. Текст блока внутри code со своим шрифтом, поэтому глазу разница почти не видна.
-  test.fail()
+// В админке Payload нет preflight Tailwind, поэтому шрифт блока кода задаёт сам guide-prose.css.
+test('у блока кода (pre) одинаковый font-family в превью CMS и в статье', async ({ page, request }) => {
   const found = await request.get(`/api/guides?where[slug][equals]=${CONTENT.guide.slug}&depth=0`)
   const id = (await found.json()).docs[0].id as number
   await page.setViewportSize({ width: 1440, height: 1000 })
