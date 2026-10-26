@@ -122,22 +122,19 @@ test('неизвестный адрес — своя страница 404 с м�
   await expect(page.locator('aside').last().getByRole('link', { name: 'Курсы', exact: true })).toBeVisible()
 })
 
-// loading.tsx есть только у списков (группа (lists)): иначе ответ начинал
-// стримиться до notFound(), и неизвестный адрес отдавал 200.
+// loading.tsx есть только у списков (группы (lists), в том числе внутри manage и
+// interviews): иначе ответ начинал стримиться до notFound(), и неизвестный адрес отдавал 200.
 test('неизвестный адрес отвечает HTTP 404', async ({ request }) => {
   const response = await request.get('/definitely-not-a-page')
   expect(response.status()).toBe(404)
 })
 
-test('БАГ: ненайденная запись в разделах со своим loading.tsx отвечает HTTP 200 вместо 404', async ({ request, playwright }) => {
-  // manage/loading.tsx и interviews/loading.tsx начинают стримить ответ до notFound() страницы:
-  // пользователь видит страницу 404, а сервер отвечает 200 — та же причина, что у списков выше.
-  test.fail()
+test('ненайденная запись в собеседованиях и управлении контентом отвечает HTTP 404', async ({ request, playwright }) => {
   const admin = await playwright.request.newContext({ baseURL: APP_URL, extraHTTPHeaders: { Origin: APP_URL }, storageState: storageStateOf('admin') })
   try {
     // Без перехода по редиректу: уход на /login не должен выглядеть как ответ страницы.
     expect((await request.get('/interviews/999999', { maxRedirects: 0 })).status(), '/interviews/999999').toBe(404)
-    for (const path of ['/manage/courses/999999', '/manage/broadcasts/999999', '/manage/lessons/new']) {
+    for (const path of ['/manage/courses/999999', '/manage/courses/999999/settings', '/manage/roadmaps/999999', '/manage/lessons/999999', '/manage/broadcasts/999999', '/manage/broadcasts/999999/edit', '/manage/lessons/new']) {
       expect((await admin.get(path, { maxRedirects: 0 })).status(), path).toBe(404)
     }
   } finally { await admin.dispose() }

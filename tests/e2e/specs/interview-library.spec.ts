@@ -49,8 +49,7 @@ test('библиотека и личный отчёт на телефоне: ф�
     expect((await stranger.request.get(`/api/interviews/${privateId}/stream`)).status()).toBe(404)
     expect((await stranger.request.get(`/api/interviews/${privateId}/report`)).status()).toBe(404)
     const strangerPage = await stranger.newPage()
-    // HTTP-статус здесь 200 из-за interviews/loading.tsx — см. БАГ-тест в navigation.spec.
-    await strangerPage.goto(detailUrl)
+    expect((await strangerPage.goto(detailUrl))?.status()).toBe(404)
     await expect(strangerPage.getByRole('heading', { name: NOT_FOUND_HEADING })).toBeVisible()
     await expect(strangerPage.getByText('Мой тестовый React собес')).toHaveCount(0)
     const report = await learner.request.get(`/api/interviews/${privateId}/report`)
