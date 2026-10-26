@@ -4,13 +4,15 @@ import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { contentKey } from '@/lib/content-management/keys'
+import { savedNotice, savedNoticeHref } from '@/lib/content-management/saved-notice'
 
 import type { Course, Lesson, Section } from '@/payload-types'
 import { EditorActions } from '@/components/content-management/EditorActions'
 import { LessonBlocks } from '@/components/content-management/LessonBlocks'
+import { useDropSavedNoticeParam } from '@/components/content-management/SavedNotice'
 import { inputClass, optionalNumber, panelClass, relationId, saveContent, saveError, useContentDraft } from '@/components/content-management/form-utils'
 
-type Props = { lesson?: Lesson; course: Course; sections: Section[]; defaultSection?: number }
+type Props = { lesson?: Lesson; course: Course; sections: Section[]; defaultSection?: number; notice?: string }
 
 function lessonDraft(lesson?: Lesson, defaultSection?: number) {
   return {
@@ -21,14 +23,15 @@ function lessonDraft(lesson?: Lesson, defaultSection?: number) {
   }
 }
 
-export function LessonForm({ lesson, course, sections, defaultSection }: Props) {
+export function LessonForm({ lesson, course, sections, defaultSection, notice = '' }: Props) {
   const router = useRouter()
   const [saved, setSaved] = useState(lesson)
   const [createKey] = useState(() => contentKey())
   const { draft, setDraft, dirty, markSaved, canLeave } = useContentDraft(lessonDraft(lesson, defaultSection))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [success, setSuccess] = useState(notice)
+  useDropSavedNoticeParam()
   const courseSections = sections.filter((section) => relationId(section.course) === course.id)
   const selectedSection = courseSections.find((section) => section.id === draft.section)
   function change<K extends keyof typeof draft>(key: K, value: typeof draft[K]) {
@@ -49,8 +52,10 @@ export function LessonForm({ lesson, course, sections, defaultSection }: Props) 
       }, createKey)
       setSaved(doc)
       markSaved(lessonDraft(doc))
-      setSuccess(doc.isPublished ? 'Урок опубликован.' : 'Черновик урока сохранён.')
-      router.replace(`/manage/lessons/${doc.id}`)
+      setSuccess(savedNotice('lessons', doc.isPublished))
+      const path = `/manage/lessons/${doc.id}`
+      // Новый урок открывается другой страницей, и форма там монтируется заново.
+      router.replace(saved ? path : savedNoticeHref(path, doc.isPublished))
       router.refresh()
     } catch (cause) {
       setError(saveError(cause))

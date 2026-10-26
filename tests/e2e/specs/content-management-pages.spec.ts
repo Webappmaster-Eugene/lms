@@ -98,6 +98,7 @@ test.describe('администратор', () => {
       expect((await saved).status()).toBe(200)
       await expect(page).toHaveURL(new RegExp(`/manage/courses/${course.id}$`))
       await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible()
+      await expect(page.getByRole('status').filter({ hasText: 'Курс опубликован.' })).toBeVisible()
       await expect(page.getByRole('link', { name: 'Посмотреть как ученик', exact: true })).toHaveAttribute('href', `/courses/${course.slug}`)
       const stored = (await (await admin.request.get(`/api/courses/${course.id}?depth=0`)).json()) as { roadmapNode: number; prerequisites: number[]; estimatedHours: number; isPublished: boolean }
       expect(stored).toMatchObject({ estimatedHours: 6, prerequisites: [ids.course], isPublished: true })
@@ -205,10 +206,8 @@ test.describe('администратор', () => {
     } finally { await admin.close() }
   })
 
-  test('БАГ: после создания урока нет подтверждения «Черновик урока сохранён.»', async ({ page, browser }) => {
-    // LessonForm ставит сообщение и сразу делает router.replace на /manage/lessons/<id>: это другая
-    // страница, форма монтируется заново, и сообщение пропадает. То же у CourseForm при создании курса.
-    test.fail()
+  // Новый документ открывается другой страницей: подтверждение сохранения должно дойти и туда.
+  test('после создания урока видно подтверждение «Черновик урока сохранён.», и обновление его не повторяет', async ({ page, browser }) => {
     const admin = await adminContext(browser)
     let lessonId: number | undefined
     try {
@@ -219,9 +218,33 @@ test.describe('администратор', () => {
       await page.getByRole('button', { name: 'Создать черновик', exact: true }).click()
       lessonId = (await (await created).json()).doc.id as number
       await expect(page).toHaveURL(new RegExp(`/manage/lessons/${lessonId}$`))
-      await expect(page.getByRole('status').filter({ hasText: 'Черновик урока сохранён.' })).toBeVisible({ timeout: 5_000 })
+      const notice = page.getByRole('status').filter({ hasText: 'Черновик урока сохранён.' })
+      await expect(notice).toBeVisible({ timeout: 5_000 })
+      await page.reload()
+      await expect(page.getByRole('heading', { name: 'Редактор урока', level: 1 })).toBeVisible()
+      await expect(notice).toHaveCount(0)
     } finally {
       if (lessonId) await admin.request.delete(`/api/lessons/${lessonId}`)
+      await admin.close()
+    }
+  })
+
+  test('после создания курса программа курса показывает подтверждение «Черновик курса сохранён.»', async ({ page, browser }) => {
+    const admin = await adminContext(browser)
+    let courseId: number | undefined
+    try {
+      const ids = await seedIds(admin.request)
+      const title = `Подтверждение курса ${Date.now()}`
+      await page.goto(`/manage/courses/new?roadmap=${ids.roadmap}`)
+      await page.getByRole('textbox', { name: 'Название курса', exact: true }).fill(title)
+      const created = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/manage/content/courses' && response.request().method() === 'POST')
+      await page.getByRole('button', { name: 'Создать черновик', exact: true }).click()
+      courseId = (await (await created).json()).doc.id as number
+      await expect(page).toHaveURL(new RegExp(`/manage/courses/${courseId}$`))
+      await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible()
+      await expect(page.getByRole('status').filter({ hasText: 'Черновик курса сохранён. Теперь добавьте разделы и уроки в программу.' })).toBeVisible({ timeout: 5_000 })
+    } finally {
+      if (courseId) await admin.request.delete(`/api/courses/${courseId}`)
       await admin.close()
     }
   })

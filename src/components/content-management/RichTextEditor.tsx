@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { $createParagraphNode, $getSelection, $isRangeSelection, $setSelection, FORMAT_TEXT_COMMAND, REDO_COMMAND, UNDO_COMMAND, type RangeSelection } from '@payloadcms/richtext-lexical/lexical'
 import { LinkNode, TOGGLE_LINK_COMMAND } from '@payloadcms/richtext-lexical/lexical/link'
 import { INSERT_ORDERED_LIST_COMMAND, INSERT_UNORDERED_LIST_COMMAND, ListItemNode, ListNode } from '@payloadcms/richtext-lexical/lexical/list'
@@ -47,20 +47,26 @@ const nodeKeys: Record<string, readonly string[]> = {
   link: ['type', 'children', 'direction', 'format', 'indent', 'version', 'fields', 'id'],
 }
 
+// На пункте вне списка Lexical падает, а прочие узлы прямо в списке молча перестраивает
+// (блоки — в простой текст): такие документы не открываем, чтобы не испортить исходник.
+const fitsListNesting = (type: string, parent: string) => (type === 'listitem') === (parent === 'list')
+
 export function canEditRichText(value: RichValue): boolean {
-  const visit = (node: unknown): boolean => {
+  const visit = (node: unknown, parent: string): boolean => {
     if (!node || typeof node !== 'object') return false
     const record = node as Record<string, unknown>
     if (typeof record.type !== 'string' || !nodeKeys[record.type]) return false
-    const allowed = nodeKeys[record.type]
+    const type = record.type
+    if (!fitsListNesting(type, parent)) return false
+    const allowed = nodeKeys[type]
     if (Object.keys(record).some((key) => !allowed.includes(key) && !(Array.isArray(record.children) && (key === 'textFormat' || key === 'textStyle')))) return false
-    if (record.type === 'link') {
+    if (type === 'link') {
       const fields = record.fields as Record<string, unknown> | undefined
       if (fields?.linkType !== 'custom') return false
     }
-    return !('children' in record) || (Array.isArray(record.children) && record.children.every(visit))
+    return !('children' in record) || (Array.isArray(record.children) && record.children.every((child) => visit(child, type)))
   }
-  return Object.keys(value).every((key) => key === 'root') && visit(value.root)
+  return Object.keys(value).every((key) => key === 'root') && visit(value.root, '')
 }
 
 const toolClass = 'min-h-[44px] rounded px-3 py-2 text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50'
@@ -131,6 +137,19 @@ function Tools({ disabled }: { disabled: boolean }) {
   </>
 }
 
+const openFailed = 'Не удалось открыть этот текст для редактирования. Исходное форматирование сохранено. Остальные поля можно изменить.'
+
+/** Часть ошибок Lexical вылетает при отрисовке и в эффектах, мимо onError: без границы падала бы вся форма с несохранёнными полями. */
+class EditorBoundary extends Component<{ onError: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch(error: unknown) {
+    console.error('Редактор текста не смог открыть документ', error)
+    this.props.onError()
+  }
+  render() { return this.state.failed ? null : this.props.children }
+}
+
 export function RichTextEditor({ value, onChange, label, id, disabled = false }: {
   value: Course['description'] | null | undefined
   onChange: (value: RichValue) => void
@@ -148,17 +167,19 @@ export function RichTextEditor({ value, onChange, label, id, disabled = false }:
     editorState: supported ? JSON.stringify(adaptLinkTypes(initial, 'content-link')) : null,
     nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, ContentLinkNode, { replace: LinkNode, with: (node: LinkNode) => new ContentLinkNode(node.getURL()), withKlass: ContentLinkNode }],
     theme: { paragraph: 'my-2', heading: { h1: 'text-2xl font-bold', h2: 'text-xl font-semibold', h3: 'text-lg font-semibold' }, text: { bold: 'font-bold', italic: 'italic', underline: 'underline', strikethrough: 'line-through', code: 'rounded bg-muted px-1 font-mono' }, list: { ul: 'list-disc pl-6', ol: 'list-decimal pl-6', listitem: 'my-1' }, link: 'text-info underline' },
-    onError: () => setError('Не удалось открыть этот текст для редактирования. Исходное форматирование сохранено. Остальные поля можно изменить.'),
+    onError: () => setError(openFailed),
   }), [id, initial, supported, disabled])
   return <div className="space-y-2">
     <p id={`${id}-label`} className="text-sm font-medium">{label}</p>
     {!supported || error ? <p role="alert" className="rounded border border-warning/40 bg-warning/10 p-3 text-sm">{error || 'Этот текст содержит сложные элементы, которые пока нельзя править здесь. Исходный текст сохранён; остальные поля доступны для редактирования.'}</p> : <div className="overflow-hidden rounded border bg-background">
-      <LexicalComposer initialConfig={config}>
-        <Tools disabled={disabled} />
-        <RichTextPlugin contentEditable={<ContentEditable id={id} aria-labelledby={`${id}-label`} className="min-h-40 px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring" />} ErrorBoundary={LexicalErrorBoundary} />
-        <HistoryPlugin /><ListPlugin /><LinkPlugin validateUrl={(url) => /^(https?:\/\/)/i.test(url)} />
-        <Changes value={current} onChange={onChange} />
-      </LexicalComposer>
+      <EditorBoundary onError={() => setError(openFailed)}>
+        <LexicalComposer initialConfig={config}>
+          <Tools disabled={disabled} />
+          <RichTextPlugin contentEditable={<ContentEditable id={id} aria-labelledby={`${id}-label`} className="min-h-40 px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring" />} ErrorBoundary={LexicalErrorBoundary} />
+          <HistoryPlugin /><ListPlugin /><LinkPlugin validateUrl={(url) => /^(https?:\/\/)/i.test(url)} />
+          <Changes value={current} onChange={onChange} />
+        </LexicalComposer>
+      </EditorBoundary>
     </div>}
   </div>
 }

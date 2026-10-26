@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { CourseForm } from '@/components/content-management/CourseForm'
 import { SectionForm } from '@/components/content-management/SectionForm'
 import { LessonForm } from '@/components/content-management/LessonForm'
+import { SavedNotice } from '@/components/content-management/SavedNotice'
+import { savedNoticeFromQuery } from '@/lib/content-management/saved-notice'
 import type { Course, Lesson, Roadmap, RoadmapNode, Section } from '@/payload-types'
 
 const navigation = vi.hoisted(() => ({ replace: vi.fn(), refresh: vi.fn(), push: vi.fn() }))
@@ -35,6 +37,7 @@ describe('формы управления учебным контентом', ()
   beforeEach(() => {
     vi.clearAllMocks()
     vi.stubGlobal('fetch', vi.fn())
+    window.history.replaceState(null, '', '/')
   })
 
   it('создаёт черновик курса с числовыми связями и автоматически создаваемым адресом', async () => {
@@ -43,7 +46,7 @@ describe('формы управления учебным контентом', ()
     render(<CourseForm roadmaps={[roadmap]} nodes={[]} courses={[]} defaultRoadmap={1} />)
     await user.type(screen.getByLabelText('Название курса'), 'Node.js')
     await user.click(screen.getByRole('button', { name: 'Создать черновик' }))
-    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/manage/courses/5'))
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/manage/courses/5?saved=draft'))
     const request = requestBody()
     expect(request.url).toBe('/api/manage/content/courses')
     expect(request.method).toBe('POST')
@@ -51,6 +54,39 @@ describe('формы управления учебным контентом', ()
     expect(request.body).not.toHaveProperty('slug')
     expect(request.body).not.toHaveProperty('expectedUpdatedAt')
     expect(screen.queryByRole('link', { name: 'Открыть сохранённую версию' })).not.toBeInTheDocument()
+  })
+
+  // Новый документ открывается другой страницей, и подтверждение из состояния формы туда не доходит.
+  it('новый урок передаёт подтверждение странице урока через адрес', async () => {
+    const user = userEvent.setup()
+    mockSaved({ ...lesson, isPublished: false })
+    render(<LessonForm course={course} sections={[section]} />)
+    await user.type(screen.getByLabelText('Название урока'), 'Установка Node')
+    await user.click(screen.getByRole('button', { name: 'Создать черновик' }))
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/manage/lessons/15?saved=draft'))
+  })
+
+  it('страница нового урока показывает подтверждение и убирает его из адреса', () => {
+    window.history.replaceState(null, '', '/manage/lessons/15?saved=draft#materials')
+    render(<LessonForm lesson={lesson} course={course} sections={[section]} notice={savedNoticeFromQuery('lessons', 'draft')} />)
+    expect(screen.getByRole('status')).toHaveTextContent('Черновик урока сохранён.')
+    expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe('/manage/lessons/15#materials')
+  })
+
+  it('программа курса показывает подтверждение и не теряет его, когда данные страницы обновились без параметра', () => {
+    window.history.replaceState(null, '', '/manage/courses/5?saved=published')
+    const { rerender } = render(<SavedNotice text={savedNoticeFromQuery('courses', 'published')} />)
+    expect(screen.getByRole('status')).toHaveTextContent('Курс опубликован.')
+    expect(window.location.search).toBe('')
+    rerender(<SavedNotice text="" />)
+    expect(screen.getByRole('status')).toHaveTextContent('Курс опубликован.')
+  })
+
+  it('неизвестный код в адресе не становится сообщением', () => {
+    expect(savedNoticeFromQuery('courses', 'Курс удалён')).toBe('')
+    expect(savedNoticeFromQuery('lessons', ['draft'])).toBe('')
+    render(<SavedNotice text="" />)
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   it.each(['courses', 'lessons', 'sections'] as const)('%s: повтор создания после потери ответа использует тот же ключ и данные', async (collection) => {
