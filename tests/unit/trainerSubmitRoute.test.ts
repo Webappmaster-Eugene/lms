@@ -340,6 +340,17 @@ describe('POST /api/trainer/submit: отказы инфраструктуры', 
     expect(create).not.toHaveBeenCalled()
   })
 
+  it('непредвиденный сбой проверки — 500 без текста исключения и без записи прогресса', async () => {
+    runSolution.mockRejectedValue(new Error('isolate crashed at /srv/app'))
+
+    const response = await POST(request({ taskId: '42', language: 'js', code: 'x' }))
+
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({ error: 'Не удалось проверить решение' })
+    expect(create).not.toHaveBeenCalled()
+    expect(update).not.toHaveBeenCalled()
+  })
+
   it('сбой записи прогресса — 500', async () => {
     create.mockRejectedValue(new Error('сеть отвалилась'))
 

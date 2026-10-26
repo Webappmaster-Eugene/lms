@@ -85,6 +85,14 @@ describe('toLiteral: структуры', () => {
 
     expect(Object.getPrototypeOf(restored)).toBe(null)
   })
+
+  it('ошибка восстанавливается как Error с исходным сообщением, кавычки не ломают код', () => {
+    for (const error of [new Error('сбой "сети"'), new TypeError('не функция')]) {
+      const restored = evaluate(toLiteral(error))
+      expect(restored).toBeInstanceOf(Error)
+      expect((restored as Error).message).toBe(error.message)
+    }
+  })
 })
 
 describe('toLiteral: недопустимые значения', () => {
