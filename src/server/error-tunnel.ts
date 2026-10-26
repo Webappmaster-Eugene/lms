@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { browserSentryDsn, type SentryDsn } from '@/lib/error-reporting/dsn'
 import { logger } from '@/lib/telemetry'
-import { trustedClientIp } from '@/server/student-analytics'
+import { trustedClientIp } from '@/server/client-ip'
 
 /** Конверт браузерной ошибки с полусотней хлебных крошек весит десятки килобайт. */
 export const MAX_ENVELOPE_BYTES = 256 * 1024

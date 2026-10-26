@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto'
-import { isIP } from 'node:net'
 import { sql } from '@payloadcms/db-postgres'
 import { commitTransaction, createLocalReq, initTransaction, killTransaction, type CollectionAfterChangeHook, type CollectionAfterLoginHook, type CollectionAfterLogoutHook, type CollectionBeforeChangeHook, type Payload, type PayloadRequest, type Where } from 'payload'
 import type { StudentSessionTelemetry, User } from '@/payload-types'
@@ -10,6 +9,7 @@ import { relationId } from '@/lib/relation-id'
 import { collectAllPages } from '@/lib/paginate'
 import { authSessionHash } from '@/payload/hooks/authSessionRevocations'
 import { requireLessonAccess } from '@/server/learning-access'
+import { trustedClientIp } from '@/server/client-ip'
 import { lookupGeoIp } from '@/server/geoip'
 import { getUserWebVitals } from '@/server/web-vitals'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
@@ -37,15 +37,6 @@ async function event(req: PayloadRequest, userId: number, input: EventInput) {
   const data = { ...input }
   delete (data as Partial<EventInput>).key
   await req.payload.create({ collection: 'student-learning-events', data: { ...data, eventKey, user: userId, at: new Date().toISOString() }, req: analyticsReq(req), overrideAccess: true, depth: 0 })
-}
-
-/** Traefik appends its actual peer to XFF. Never trust an arbitrary client-supplied first entry. */
-export function trustedClientIp(headers: Headers): string | null {
-  if (process.env.LMS_TRUST_PROXY !== 'true') return null
-  const forwarded = headers.get('x-forwarded-for')
-  if (!forwarded || forwarded.length > 1024) return null
-  const ip = forwarded.split(',').at(-1)?.trim() ?? ''
-  return isIP(ip) ? ip : null
 }
 
 async function location(headers: Headers) {
