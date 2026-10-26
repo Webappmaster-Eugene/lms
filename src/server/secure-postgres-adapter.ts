@@ -46,7 +46,18 @@ export function securePostgresAdapter(args: Parameters<typeof postgresAdapter>[0
       const commitTransaction = adapter.commitTransaction.bind(adapter)
       adapter.commitTransaction = async (incomingID) => {
         const id = incomingID instanceof Promise ? await incomingID : incomingID
-        const tasks = (adapter.sessions[id] as SessionWithTasks | undefined)?.[COMMIT_TASKS]
+        const session = adapter.sessions[id]
+        let tasks = (session as SessionWithTasks | undefined)?.[COMMIT_TASKS]
+        // Ошибку COMMIT адаптер наружу не отдаёт, а прерванную транзакцию Postgres на COMMIT
+        // молча откатывает. Пробный запрос в ней падает (25P02): тогда задачи не выполняются.
+        if (tasks?.length && session) {
+          try {
+            await session.db.execute(sql`select 1`)
+          } catch (error) {
+            logger.warn('Транзакция прервана до фиксации: отложенные действия отменены', { 'error.type': error instanceof Error ? error.name : 'unknown' })
+            tasks = undefined
+          }
+        }
         await commitTransaction(id)
         await runCommitTasks(tasks)
       }

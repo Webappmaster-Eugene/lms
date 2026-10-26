@@ -140,13 +140,17 @@ function Tools({ disabled }: { disabled: boolean }) {
 
 const openFailed = 'Не удалось открыть этот текст для редактирования. Исходное форматирование сохранено. Остальные поля можно изменить.'
 
+function reportEditorError(error: unknown) {
+  console.error('Редактор текста не смог открыть документ', error)
+  Sentry.captureException(error, { tags: { component: 'rich-text-editor' } })
+}
+
 /** Часть ошибок Lexical вылетает при отрисовке и в эффектах, мимо onError: без границы падала бы вся форма с несохранёнными полями. */
 class EditorBoundary extends Component<{ onError: () => void; children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
   static getDerivedStateFromError() { return { failed: true } }
   componentDidCatch(error: unknown) {
-    console.error('Редактор текста не смог открыть документ', error)
-    Sentry.captureException(error, { tags: { component: 'rich-text-editor' } })
+    reportEditorError(error)
     this.props.onError()
   }
   render() { return this.state.failed ? null : this.props.children }
@@ -169,7 +173,10 @@ export function RichTextEditor({ value, onChange, label, id, disabled = false }:
     editorState: supported ? JSON.stringify(adaptLinkTypes(initial, 'content-link')) : null,
     nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, ContentLinkNode, { replace: LinkNode, with: (node: LinkNode) => new ContentLinkNode(node.getURL()), withKlass: ContentLinkNode }],
     theme: { paragraph: 'my-2', heading: { h1: 'text-2xl font-bold', h2: 'text-xl font-semibold', h3: 'text-lg font-semibold' }, text: { bold: 'font-bold', italic: 'italic', underline: 'underline', strikethrough: 'line-through', code: 'rounded bg-muted px-1 font-mono' }, list: { ul: 'list-disc pl-6', ol: 'list-decimal pl-6', listitem: 'my-1' }, link: 'text-info underline' },
-    onError: () => setError(openFailed),
+    onError: (error: Error) => {
+      reportEditorError(error)
+      setError(openFailed)
+    },
   }), [id, initial, supported, disabled])
   return <div className="space-y-2">
     <p id={`${id}-label`} className="text-sm font-medium">{label}</p>

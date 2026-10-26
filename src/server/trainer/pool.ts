@@ -274,6 +274,8 @@ class RunnerPool {
     this.disposed = true
     for (const worker of this.workers) this.kill(worker)
     this.workers.length = 0
+    // Задания в работе отклонит exit их процессов, а очереди больше некому достаться.
+    for (const job of this.queue.splice(0)) job.reject(new TrainerRunnerError('Песочница остановлена'))
   }
 }
 

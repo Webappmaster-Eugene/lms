@@ -186,4 +186,15 @@ describe('пул песочницы: отказы и перегрузка', () =
     const overflow = run(pool, { action: 'echo', value: 'лишнее' })
     await expect(overflow).rejects.toMatchObject({ name: 'TrainerRunnerError', overloaded: true, message: 'Проверка перегружена, попробуйте через несколько секунд' })
   })
+
+  it('остановка пула отклоняет и задания в работе, и очередь, а не оставляет их висеть', async () => {
+    const pool = getRunnerPool()
+    const outcomes = Array.from({ length: 3 }, () => run(pool, { action: 'hang' }).then(() => 'выполнено', (error: Error) => error.message))
+    pool.dispose()
+    expect(await Promise.all(outcomes)).toEqual([
+      expect.stringMatching(/^Песочница завершилась досрочно/),
+      expect.stringMatching(/^Песочница завершилась досрочно/),
+      'Песочница остановлена',
+    ])
+  })
 })

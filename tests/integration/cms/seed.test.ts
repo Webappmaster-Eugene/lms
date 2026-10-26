@@ -216,7 +216,8 @@ describe('pnpm seed (базовый сид src/seed.ts)', () => {
     const run = cli(['seed'], { PAYLOAD_MIGRATING: 'true' })
     expect(run.status, run.out).toBe(0)
     const { rows } = await sql.query('select count(*)::int as n from faq_items')
-    expect(rows[0].n).toBeGreaterThan(0)
+    // Вывод сида — в сообщении: при коде 0 без FAQ иначе не понять, где он остановился.
+    expect(rows[0].n, run.out).toBeGreaterThan(0)
 
     // Повторный запуск не падает на уникальных полях и не плодит дубли
     const count = async () =>
