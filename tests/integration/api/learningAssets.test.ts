@@ -15,6 +15,8 @@ import { createAdmin, createCourseTree, createStudent, getTestPayload, login, ui
  * Яндекс.Диск подменён на уровне fetch — реальной сети нет.
  */
 const ROOT = `https://disk.yandex.com/d/${uid('assets')}`
+// ID блоков уникальны во всей таблице блоков, а не в уроке: фиксированный ID столкнулся бы с другими файлами.
+const BLOCK = Object.fromEntries(['zip', 'pdf', 'root', 'missing', 'forbidden', 'rich'].map((name) => [name, uid(`${name}-block`)])) as Record<'zip' | 'pdf' | 'root' | 'missing' | 'forbidden' | 'rich', string>
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64')
 
 let payload: Payload
@@ -54,12 +56,12 @@ beforeAll(async () => {
   adminToken = await login(payload, admin)
   tree = await createCourseTree(payload, { lessons: 1 })
   await payload.update({ collection: 'lessons', id: tree.lessons[0].id, data: { content: [
-    { id: 'zip-1', blockType: 'link', title: 'Исходники', url: `${ROOT}/source.zip` },
-    { id: 'pdf-1', blockType: 'link', title: 'Конспект', url: `${ROOT}/notes.pdf` },
-    { id: 'root-1', blockType: 'link', title: 'Вся папка', url: ROOT },
-    { id: 'missing-1', blockType: 'link', title: 'Удалённый файл', url: `${ROOT}/missing.zip` },
-    { id: 'forbidden-1', blockType: 'link', title: 'Закрытый файл', url: `${ROOT}/forbidden.zip` },
-    { id: 'rich-1', blockType: 'text', content: { root: { type: 'root', direction: 'ltr', format: '', indent: 0, version: 1, children: [
+    { id: BLOCK.zip, blockType: 'link', title: 'Исходники', url: `${ROOT}/source.zip` },
+    { id: BLOCK.pdf, blockType: 'link', title: 'Конспект', url: `${ROOT}/notes.pdf` },
+    { id: BLOCK.root, blockType: 'link', title: 'Вся папка', url: ROOT },
+    { id: BLOCK.missing, blockType: 'link', title: 'Удалённый файл', url: `${ROOT}/missing.zip` },
+    { id: BLOCK.forbidden, blockType: 'link', title: 'Закрытый файл', url: `${ROOT}/forbidden.zip` },
+    { id: BLOCK.rich, blockType: 'text', content: { root: { type: 'root', direction: 'ltr', format: '', indent: 0, version: 1, children: [
       { type: 'paragraph', version: 1, children: [{ type: 'link', version: 3, fields: { linkType: 'custom', url: `${ROOT}/handout.pdf`, newTab: false }, children: [{ type: 'text', text: 'Раздаточный материал', version: 1 }] }] },
     ] } } },
   ] } })
@@ -75,9 +77,9 @@ afterAll(async () => {
 describe('GET /api/learning-assets — материалы урока', () => {
   it('гость — 401, ученик без назначения — 403, ни одного обращения к Диску', async () => {
     disk.mockClear()
-    expect((await asset('zip-1')).status).toBe(401)
+    expect((await asset(BLOCK.zip)).status).toBe(401)
     const { token } = await viewer({ learningAccessMode: 'assigned' })
-    const denied = await asset('zip-1', token)
+    const denied = await asset(BLOCK.zip, token)
     expect(denied.status).toBe(403)
     expect(denied.headers.get('Cache-Control')).toBe('private, no-store')
     expect(disk).not.toHaveBeenCalled()
@@ -85,13 +87,13 @@ describe('GET /api/learning-assets — материалы урока', () => {
 
   it('ученик с доступом получает файл байтами: тип по расширению, скачивание, без подписанной ссылки', async () => {
     const { token } = await viewer()
-    const response = await asset('zip-1', token)
+    const response = await asset(BLOCK.zip, token)
     expect(response.status).toBe(200)
     expect(response.headers.get('Content-Type')).toBe('application/zip')
     expect(response.headers.get('Content-Disposition')).toBe("attachment; filename*=UTF-8''source.zip")
     expect(response.headers.get('Location')).toBeNull()
     expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([80, 75, 5, 6])
-    const pdf = await asset('pdf-1', token, '', 'HEAD')
+    const pdf = await asset(BLOCK.pdf, token, '', 'HEAD')
     expect(pdf.status).toBe(200)
     expect(pdf.headers.get('Content-Type')).toBe('application/pdf')
     expect(pdf.body).toBeNull()
@@ -99,7 +101,7 @@ describe('GET /api/learning-assets — материалы урока', () => {
 
   it('ссылка внутри форматированного текста урока выдаётся как материал', async () => {
     const { token } = await viewer()
-    const response = await asset('rich-1', token)
+    const response = await asset(BLOCK.rich, token)
     expect(response.status).toBe(200)
     expect(response.headers.get('Content-Type')).toBe('application/pdf')
     expect(response.headers.get('Content-Disposition')).toBe("attachment; filename*=UTF-8''handout.pdf")
@@ -109,7 +111,7 @@ describe('GET /api/learning-assets — материалы урока', () => {
   it('несуществующий урок — 404 без обращения к Диску', async () => {
     disk.mockClear()
     const { token } = await viewer()
-    const response = await assetGET(new Request('http://lms.test/api/learning-assets?lesson=2000000000&block=zip-1', { headers: { Authorization: `JWT ${token}` } }))
+    const response = await assetGET(new Request(`http://lms.test/api/learning-assets?lesson=2000000000&block=${BLOCK.zip}`, { headers: { Authorization: `JWT ${token}` } }))
     expect(response.status).toBe(404)
     expect(await response.json()).toEqual({ error: 'Видео не найдено' })
     expect(disk).not.toHaveBeenCalled()
@@ -117,16 +119,16 @@ describe('GET /api/learning-assets — материалы урока', () => {
 
   it('папка целиком, неизвестный блок и испорченный идентификатор материала не выдаются', async () => {
     const { token } = await viewer()
-    expect((await asset('root-1', token)).status).toBe(404)
+    expect((await asset(BLOCK.root, token)).status).toBe(404)
     expect((await asset('no-such-block', token)).status).toBe(404)
-    expect((await asset('zip-1', token, '&asset=../../etc')).status).toBe(400)
+    expect((await asset(BLOCK.zip, token, '&asset=../../etc')).status).toBe(400)
   })
 
   it('удалённый на Диске файл — 404, отказ Диска — 502, текст ошибки без адресов', async () => {
     const { token } = await viewer()
-    const missing = await asset('missing-1', token)
+    const missing = await asset(BLOCK.missing, token)
     expect(missing.status).toBe(404)
-    const forbidden = await asset('forbidden-1', token)
+    const forbidden = await asset(BLOCK.forbidden, token)
     expect(forbidden.status).toBe(502)
     for (const body of [await missing.json(), await forbidden.json()]) {
       expect(body).toEqual({ error: 'Не удалось открыть файл. Попробуйте ещё раз' })
@@ -135,13 +137,13 @@ describe('GET /api/learning-assets — материалы урока', () => {
 
   it('седьмой одновременный поток — 429 с Retry-After, после закрытия потоков доступ возвращается', async () => {
     const { token } = await viewer()
-    const open = await Promise.all(Array.from({ length: 6 }, () => asset('zip-1', token)))
+    const open = await Promise.all(Array.from({ length: 6 }, () => asset(BLOCK.zip, token)))
     expect(open.map((response) => response.status)).toEqual([200, 200, 200, 200, 200, 200])
-    const limited = await asset('zip-1', token)
+    const limited = await asset(BLOCK.zip, token)
     expect(limited.status).toBe(429)
     expect(limited.headers.get('Retry-After')).toBe('60')
     await Promise.all(open.map((response) => response.body?.cancel()))
-    const again = await asset('zip-1', token)
+    const again = await asset(BLOCK.zip, token)
     expect(again.status).toBe(200)
     await again.arrayBuffer()
   })

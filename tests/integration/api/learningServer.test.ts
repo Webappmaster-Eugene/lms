@@ -61,7 +61,7 @@ describe('состояние просмотра урока', () => {
 
   it('сбой отметки активности откатывает сохранение позиции видео целиком', async () => {
     const student = await asUser(await createStudent(payload))
-    const lesson: Lesson = await payload.update({ collection: 'lessons', id: tree.lessons[1].id, data: { content: [{ blockType: 'video', id: 'rollback-clip', title: 'Ролик', videoUrl: 'https://disk.yandex.ru/d/rollback-fixture/video.mp4' }] } })
+    const lesson: Lesson = await payload.update({ collection: 'lessons', id: tree.lessons[1].id, data: { content: [{ blockType: 'video', id: uid('rollback-clip'), title: 'Ролик', videoUrl: 'https://disk.yandex.ru/d/rollback-fixture/video.mp4' }] } })
     const videoId = learningVideos(lesson)[0].id
     // Настройки уже есть и старше просмотра: отметка активности обязана их обновить.
     await payload.create({ collection: 'notification-preferences', data: { user: student.id, lastLearningAt: new Date(Date.now() - 3_600_000).toISOString(), timezone: 'Europe/Moscow', reminderHour: 18 }, overrideAccess: true })

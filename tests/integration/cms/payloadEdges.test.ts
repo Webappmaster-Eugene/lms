@@ -95,6 +95,11 @@ describe('ссылки контактов в настройках сайта', (
     expect((await payload.findGlobal({ slug: 'site-settings', depth: 0 })).contacts?.links ?? []).not.toEqual(expect.arrayContaining([expect.objectContaining({ url })]))
   })
 
+  it('пустая ссылка — просьба ввести ссылку', async () => {
+    const error = await payload.updateGlobal({ slug: 'site-settings', depth: 0, data: { contacts: { ...settings.contacts, links: [{ title: 'Канал' } as never] } } }).catch((caught: unknown) => caught)
+    expect(error).toMatchObject({ data: { errors: [expect.objectContaining({ message: 'Введите ссылку' })] } })
+  })
+
   it('https и http без учётных данных сохраняются', async () => {
     for (const url of ['https://t.me/mentorcareer', 'http://example.com/path?x=1']) {
       const saved = await save(url)
