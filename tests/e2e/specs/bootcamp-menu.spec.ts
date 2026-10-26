@@ -39,6 +39,11 @@ test('буткемп появляется в меню только после н
 
     expect((await admin.request.post(`${APP_URL}/api/learning-access-grants`, { data: { user: created.users, target: { relationTo: 'courses', value: created.courses }, effect: 'allow' } })).status()).toBe(201)
 
+    // Сервер отвечает настоящим редиректом, а не страницей с клиентским переходом.
+    const direct = await learner.request.get(`${APP_URL}/bootcamp`, { maxRedirects: 0, headers: { 'Sec-Fetch-Site': 'same-origin' } })
+    expect(direct.status()).toBe(307)
+    expect(direct.headers()['location']).toBe(`/bootcamp/bootcamp-e2e-${key}`)
+
     await page.goto('/')
     await menu.getByRole('link', { name: 'Буткемп' }).click()
     // Единственный буткемп открывается сразу, без промежуточного списка.

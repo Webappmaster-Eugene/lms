@@ -13,7 +13,8 @@ export default async function BootcampPage() {
   const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login')
   const bootcamps = await getBootcamps(payload, user, req)
-  // Обычно ученик проходит один буткемп: сразу его программа, без лишнего шага.
+  // Обычно ученик проходит один буткемп: сразу его программа, без лишнего шага. Страница вне (lists):
+  // их loading.tsx начинает потоковый ответ, и редирект стал бы клиентским — 200 и мелькание заглушки.
   const [only] = bootcamps
   if (only && bootcamps.length === 1) redirect(`/bootcamp/${only.slug}`)
 
