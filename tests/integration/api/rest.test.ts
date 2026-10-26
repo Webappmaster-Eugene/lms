@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { Payload } from 'payload'
 
-import { captureEmails, createAdmin, createCourseTree, createStudent, createSumTask, getTestPayload, login, rest, type TestUser } from '../helpers/payload'
+import { captureEmails, createAdmin, createCourseTree, createStudent, createSumTask, getTestPayload, login, rest, uid, type TestUser } from '../helpers/payload'
 
 /**
  * REST API Payload через тот же обработчик, что стоит за /api/[...slug]
@@ -78,12 +78,23 @@ describe('аутентификация', () => {
 })
 
 describe('коллекции через REST', () => {
-  it('аноним не читает закрытые коллекции, но читает FAQ и медиа', async () => {
-    for (const path of ['/courses', '/lessons', '/guides', '/users', '/trainer-tasks', '/points-transactions', '/globals/site-settings']) {
+  it('аноним не читает закрытые коллекции, но читает FAQ, медиа и только публичные гайды', async () => {
+    for (const path of ['/courses', '/lessons', '/users', '/trainer-tasks', '/points-transactions', '/globals/site-settings']) {
       expect((await rest('GET', path)).status, path).toBe(403)
     }
     expect((await rest('GET', '/faq-items')).status).toBe(200)
     expect((await rest('GET', '/media')).status).toBe(200)
+    const guide = (isPublic: boolean) => payload.create({ collection: 'guides', context: { skipHooks: true }, data: { title: uid('Гайд'), slug: uid('rest-guide'), summary: 'Кратко', markdown: 'Текст', isPublished: true, isPublic } })
+    const [open, closed] = await Promise.all([guide(true), guide(false)])
+    try {
+      const guides = await rest('GET', '/guides?limit=0&depth=0')
+      expect(guides.status).toBe(200)
+      const ids = (guides.json.docs as { id: number }[]).map((doc) => doc.id)
+      expect(ids).toContain(open.id)
+      expect(ids).not.toContain(closed.id)
+    } finally {
+      await Promise.all([open, closed].map((item) => payload.delete({ collection: 'guides', id: item.id })))
+    }
   })
 
   it('студент читает курсы, но не может их создавать, менять и удалять', async () => {

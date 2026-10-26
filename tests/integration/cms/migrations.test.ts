@@ -3,6 +3,7 @@ import type { Payload } from 'payload'
 import { createLocalReq } from 'payload'
 
 import { databaseUrl, reset } from '../../../scripts/test-db.mjs'
+import { auxiliaryDb } from '../setup/constants'
 
 /**
  * Миграции на отдельной чистой базе — тем же программным путём, что и
@@ -11,7 +12,7 @@ import { databaseUrl, reset } from '../../../scripts/test-db.mjs'
  * Конфиг импортируется динамически после подмены DATABASE_URL: адаптер
  * запоминает строку подключения в момент сборки конфига.
  */
-const DB = 'lms_migrations'
+const DB = auxiliaryDb('lms_migrations')
 
 let payload: Payload
 let migrations: { name: string; up: (args: never) => Promise<void>; down: (args: never) => Promise<void> }[]

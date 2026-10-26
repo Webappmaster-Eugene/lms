@@ -12,7 +12,7 @@ import { solutionCodeFor, starterCodeFor, taskLanguages } from '@/lib/trainer/sp
 import { runSolution } from '@/server/trainer/sandbox'
 import type { TrainerTask, TrainerTopic } from '@/payload-types'
 import { databaseUrl, migrateFresh } from '../../../scripts/test-db.mjs'
-import { TEST_SECRET } from '../setup/constants'
+import { auxiliaryDb, TEST_SECRET } from '../setup/constants'
 
 /**
  * Сиды — штатными CLI-командами на отдельной чистой базе, как их запускают
@@ -21,7 +21,7 @@ import { TEST_SECRET } from '../setup/constants'
  * JS/TS дополнительно исполняются в isolated-vm + tsc. Каталог Go/frontend
  * исполняет Docker-набор; маршруты и запись прогресса — runtime integration.
  */
-const DB = 'lms_seed'
+const DB = auxiliaryDb('lms_seed')
 const APP_DIR = fileURLToPath(new URL('../../../', import.meta.url))
 
 let payload: Payload
