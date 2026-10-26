@@ -4,7 +4,7 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import type { Course } from '@/payload-types'
-import { RichTextEditor, emptyRichText } from '@/components/content-management/RichTextEditor'
+import { RichTextEditor, canEditRichText, emptyRichText } from '@/components/content-management/RichTextEditor'
 
 /**
  * Панель форматирования текста урока на настоящем Lexical: каждая кнопка
@@ -146,16 +146,34 @@ describe('панель форматирования текста', () => {
     expect(changed).not.toHaveBeenCalled()
   })
 
-  // Дефект: canEditRichText (RichTextEditor.tsx:50) проверяет только типы узлов, но не вложенность,
-  // а ошибку разбора начального состояния LexicalComposer (строка 156) бросает при отрисовке, мимо onError.
-  // Пункт списка без списка роняет всю форму урока до ближайшей границы ошибок вместе с несохранёнными полями.
-  it.fails('пункт списка вне списка не роняет форму, а показывает предупреждение — дефект: исключение при отрисовке', async () => {
+  // Ошибка редактора текста не должна уносить остальные поля формы вместе с несохранёнными правками.
+  it('пункт списка вне списка не роняет форму, а показывает предупреждение', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const listItem = { type: 'listitem', children: [textNode('Шаг')], direction: null, format: '', indent: 0, version: 1, value: 1 }
     render(<Boundary><RichTextEditor id="list" label="Текст" value={doc([listItem])} onChange={vi.fn()} /></Boundary>)
 
     expect(screen.queryByText(/Форма упала/)).not.toBeInTheDocument()
     expect(await screen.findByRole('alert')).toHaveTextContent('Исходный текст сохранён')
+  })
+
+  it('абзац прямо в списке не открывается, а вложенный список — открывается', () => {
+    const list = (children: unknown[]) => ({ type: 'list', listType: 'bullet', start: 1, tag: 'ul', children, direction: null, format: '', indent: 0, version: 1 })
+    const item = (children: unknown[]) => ({ type: 'listitem', children, direction: null, format: '', indent: 0, version: 1, value: 1 })
+
+    // Lexical переписал бы такой абзац в простой текст, и первое же сохранение потеряло бы форматирование.
+    expect(canEditRichText(doc([list([paragraph([textNode('Шаг')])])]))).toBe(false)
+    expect(canEditRichText(doc([list([item([textNode('Шаг')]), item([list([item([textNode('Подшаг')])])])])]))).toBe(true)
+  })
+
+  it('документ с пустым корнем, на котором Lexical падает при открытии, тоже не роняет форму', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const changed = vi.fn()
+    render(<Boundary><RichTextEditor id="empty-root" label="Текст" value={doc([])} onChange={changed} /></Boundary>)
+
+    expect(screen.queryByText(/Форма упала/)).not.toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось открыть этот текст для редактирования. Исходное форматирование сохранено.')
+    expect(changed).not.toHaveBeenCalled()
+    expect(log).toHaveBeenCalledWith('Редактор текста не смог открыть документ', expect.any(Error))
   })
 
   it('без начального значения открывает пустой документ и не сообщает об изменениях', () => {
