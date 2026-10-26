@@ -129,7 +129,7 @@ test('robots.txt разрешает индексацию и указывает s
   expect(text).toMatch(/^Clean-param: utm_source&[^\n]*utm_campaign[^\n]* \/$/m)
 })
 
-test('sitemap.xml — валидный XML с главной и свежим lastmod', async ({ request, page }) => {
+test('sitemap.xml — валидный XML со страницами лендинга и свежим lastmod', async ({ request, page }) => {
   const response = await request.get('/sitemap.xml')
   expect(response.status()).toBe(200)
   const xml = await response.text()
@@ -142,7 +142,7 @@ test('sitemap.xml — валидный XML с главной и свежим las
     }
   }, xml)
   expect(parsed.error).toBe(false)
-  expect(parsed.locs).toEqual([`${SITE}/`])
+  expect(parsed.locs).toEqual([`${SITE}/`, `${SITE}/bootcamp/nodejs/`, `${SITE}/privacy/`])
   expect(parsed.lastmod[0]).toMatch(/^\d{4}-\d{2}-\d{2}$/)
 })
 

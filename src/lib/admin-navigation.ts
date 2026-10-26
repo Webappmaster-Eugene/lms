@@ -20,6 +20,12 @@ export const ADMIN_NAV_GROUPS = [
     ],
   },
   {
+    label: 'Буткемп',
+    items: [
+      { href: '/admin/collections/bootcamp-leads', label: 'Заявки на буткемп' },
+    ],
+  },
+  {
     label: 'Настройки контента в CMS',
     items: [
       { href: '/admin/collections/roadmaps', label: 'Роадмапы' },

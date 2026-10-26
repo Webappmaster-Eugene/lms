@@ -1,0 +1,188 @@
+---
+import BootcampLayout from '../../layouts/BootcampLayout.astro'
+import { AUTHOR_URL, LMS_URL, SITE_URL } from '../../config'
+import {
+  BOOTCAMP_PATH, COMPUTER, CONSENT_VERSION, FACTS, FAQ, HARD_PARTS, LOG, MENTOR_FACTS, NEED, OUTCOMES, PRIVACY_PATH,
+  PROGRAM, PROVIDED, RENTAL_FLOW, START, WEEK,
+} from '../../data/bootcamp'
+
+const title = 'Буткемп Node.js: backend сервиса проката — MentorCareer'
+const description = 'Backend одного продукта за 20 недель: PostgreSQL, деньги без двойных списаний, события, Kafka и ClickHouse. Личный проект и ревью каждой работы.'
+const pageUrl = new URL(BOOTCAMP_PATH, SITE_URL).href
+const schema = [
+  {
+    '@type': 'Course', '@id': `${pageUrl}#course`, name: 'Буткемп Node.js: backend сервиса проката', description, inLanguage: 'ru',
+    provider: { '@id': `${SITE_URL}/#organization` },
+    hasCourseInstance: { '@type': 'CourseInstance', courseMode: 'online', courseWorkload: 'PT20H', instructor: { '@type': 'Person', name: 'Евгений Надточеев', url: AUTHOR_URL } },
+  },
+  { '@type': 'FAQPage', '@id': `${pageUrl}#faq`, mainEntity: FAQ.map(({ question, answer }) => ({ '@type': 'Question', name: question, acceptedAnswer: { '@type': 'Answer', text: answer } })) },
+]
+---
+<BootcampLayout title={title} description={description} schema={schema}>
+  <header class="bc-header">
+    <a class="bc-brand" href={BOOTCAMP_PATH}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v14c-3-1-6-1-9 1-3-2-6-2-9-1zM12 6v14" /></svg><span>MentorCareer</span><span class="bc-brand-product">Буткемп Node.js</span></a>
+    <a class="bc-header-cta" href="#apply">Оставить заявку</a>
+  </header>
+
+  <main id="main">
+    <section class="bc-hero" aria-labelledby="hero-title">
+      <div class="bc-hero-copy">
+        <p class="bc-tape">Идёт предзапись на поток, старт планируется {START}</p>
+        <h1 id="hero-title">Буткемп Node.js: backend сервиса проката</h1>
+        <p class="bc-lede">Соберите backend одного продукта — от первого HTTP-маршрута до надёжных платежей, событий и аналитики. Личный проект, задача каждую неделю и ревью каждой работы.</p>
+        <dl class="bc-facts">
+          {FACTS.map(({ term, value }) => <div><dt>{term}</dt><dd>{value}</dd></div>)}
+        </dl>
+        <div class="bc-actions"><a class="bc-button" href="#apply">Оставить заявку</a><a class="bc-link" href="#program">Программа по неделям</a></div>
+      </div>
+      <figure class="bc-log" aria-labelledby="log-caption">
+        <div class="bc-log-bar"><span>журнал сервиса проката</span><span>сб, 13 марта</span></div>
+        <ol class="bc-log-lines">
+          {LOG.map((line) => (
+            <li class={`bc-log-line is-${line.tone}`}>
+              <span class="bc-log-time">{line.time}</span>
+              <span class="bc-log-request"><b>{line.request}</b> {line.detail}</span>
+              <span class="bc-log-result"><b>{line.code}</b> {line.result}</span>
+            </li>
+          ))}
+        </ol>
+        <figcaption id="log-caption">Одна дрель, два клиента в одну миллисекунду и повтор оплаты после обрыва связи. Код, после которого журнал выглядит именно так, вы пишете в неделях 3–8.</figcaption>
+      </figure>
+    </section>
+
+    <section class="bc-section bc-two" id="fit" aria-labelledby="fit-title">
+      <div>
+        <h2 id="fit-title">Подходит ли вам</h2>
+        <p>Буткемп рассчитан на разработчиков, которые уверенно пишут на JavaScript и хотят перейти в backend или закрыть в нём пробелы. Чаще всего это frontend-разработчики.</p>
+      </div>
+      <div class="bc-columns">
+        <div>
+          <h3>Нужно уметь</h3>
+          <ul class="bc-list">{NEED.map((item) => <li>{item}</li>)}</ul>
+        </div>
+        <div>
+          <h3>Не нужно знать заранее</h3>
+          <p>NestJS, SQL, брокеры сообщений и Docker — им посвящена программа.</p>
+          <p>Перед допуском вы выполняете короткое входное задание. Если в JavaScript или Git есть пробелы, мы предложим маршрут подготовки и следующий поток, а не возьмём оплату.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="bc-section" id="product" aria-labelledby="product-title">
+      <h2 id="product-title">Что вы построите</h2>
+      <p class="bc-intro">Сервис проката инструментов: клиент находит дрель, бронирует её на выходные, оплачивает, получает в пункте и возвращает.</p>
+      <ol class="bc-flow" aria-label="Путь клиента в сервисе проката">
+        {RENTAL_FLOW.map((step) => <li>{step}</li>)}
+      </ol>
+      <div class="bc-two bc-two-tight">
+        <p>За этим простым сценарием — задачи, которые встречаются в любом backend. Каждую неделю проект получает одно изменение, которое принимается по ревью и автоматическим проверкам.</p>
+        <ul class="bc-list">{HARD_PARTS.map((item) => <li>{item}</li>)}</ul>
+      </div>
+    </section>
+
+    <section class="bc-section" id="week" aria-labelledby="week-title">
+      <h2 id="week-title">Как устроена неделя</h2>
+      <ol class="bc-steps">
+        {WEEK.map(({ title: step, text }) => <li><h3>{step}</h3><p>{text}</p></li>)}
+      </ol>
+      <p class="bc-note">Как в команде: GitLab с доской задач, ветками, merge request, ревью и CI. Ревью отвечает на вопрос «что сломается в продакшене и почему», а не «поменяйте отступы».</p>
+    </section>
+
+    <section class="bc-section" id="program" aria-labelledby="program-title">
+      <h2 id="program-title">Программа</h2>
+      <table class="bc-program">
+        <caption class="sr-only">Темы программы по неделям</caption>
+        <thead><tr><th scope="col">Недели</th><th scope="col">Что изучаем на проекте</th></tr></thead>
+        <tbody>{PROGRAM.map(({ weeks, topic }) => <tr><th scope="row">{weeks}</th><td>{topic}</td></tr>)}</tbody>
+      </table>
+      <p class="bc-note">Kafka и ClickHouse — обязательная часть программы, а не бонус.</p>
+    </section>
+
+    <section class="bc-section bc-columns bc-columns-three" aria-label="Дополнительные треки и результат">
+      <div>
+        <h2>Если вы строите свой SaaS</h2>
+        <p>Неделя 12 посвящена тарифам, подпискам, пробному периоду и лимитам. Для тех, кто делает собственный продукт, есть необязательный трек основателя. Запуск бизнеса и доход мы не обещаем: трек помогает построить эту часть продукта правильно.</p>
+      </div>
+      <div>
+        <h2>Карьерный трек</h2>
+        <p>Резюме и профиль, разбор вопросов собеседований по каждой теме программы, пробное собеседование. Трудоустройство мы не гарантируем: трек помогает показать то, что вы действительно умеете.</p>
+      </div>
+      <div>
+        <h2>После выпуска вы сможете</h2>
+        <ul class="bc-list">{OUTCOMES.map((item) => <li>{item}</li>)}</ul>
+        <p>Всё это вы показываете на защите проекта, а не только в тестах.</p>
+      </div>
+    </section>
+
+    <section class="bc-section bc-columns" id="setup" aria-label="Компьютер и среда">
+      <div>
+        <h2>Компьютер</h2>
+        <ul class="bc-list">{COMPUTER.map((item) => <li>{item}</li>)}</ul>
+        <p>До оплаты вы запускаете скрипт проверки окружения. Если компьютер не тянет весь стенд, вы узнаете об этом заранее.</p>
+      </div>
+      <div>
+        <h2>Среда</h2>
+        <p>Организатор даёт {PROVIDED.join(', ')}.</p>
+        <p>Сервисы курса работают локально в Docker на вашем компьютере. Если машина не тянет недели с Kafka и ClickHouse, предложим серверную среду.</p>
+      </div>
+    </section>
+
+    <section class="bc-section bc-mentor" id="mentor" aria-labelledby="mentor-title">
+      <div>
+        <h2 id="mentor-title">Наставник</h2>
+        <p class="bc-mentor-name">Евгений Надточеев</p>
+        <p>Fullstack-разработчик с backend-фокусом. Лично ведёт занятия, проверяет работы и принимает защиты всех 20 участников.</p>
+        <a class="bc-link" href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Подробнее на nadtocheev.ru</a>
+      </div>
+      <div>
+        <ul class="bc-list">{MENTOR_FACTS.map((item) => <li>{item}</li>)}</ul>
+        <p class="bc-note">Отзывов о буткемпе пока нет: это первый поток. Отзывы о консультациях и других курсах мы за отзывы буткемпа не выдаём.</p>
+      </div>
+    </section>
+
+    <section class="bc-section" id="faq" aria-labelledby="faq-title">
+      <h2 id="faq-title">Частые вопросы</h2>
+      <div class="bc-faq">{FAQ.map(({ question, answer }) => <details><summary>{question}</summary><p>{answer}</p></details>)}</div>
+    </section>
+
+    <section class="bc-section bc-apply" id="apply" aria-labelledby="apply-title">
+      <div class="bc-apply-copy">
+        <h2 id="apply-title">Оставьте заявку — пришлём входное задание и даты</h2>
+        <p>Стоимость, точные даты занятий и условия опубликуем, когда откроется набор. Сейчас идёт предзапись: заявка ни к чему не обязывает, оплаты на этой странице нет.</p>
+      </div>
+      <form class="bc-form" data-lead-form data-consent-version={CONSENT_VERSION} novalidate>
+        <div class="bc-field">
+          <label for="lead-email">Email</label>
+          <input id="lead-email" name="email" type="email" autocomplete="email" inputmode="email" required maxlength="254" aria-describedby="lead-email-error" />
+          <p class="bc-error" id="lead-email-error" data-error-for="email" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-name">Имя <span class="bc-optional">необязательно</span></label>
+          <input id="lead-name" name="name" type="text" autocomplete="given-name" maxlength="100" />
+        </div>
+        <div class="bc-trap" aria-hidden="true">
+          <label for="lead-website">Сайт</label>
+          <input id="lead-website" name="website" type="text" tabindex="-1" autocomplete="off" />
+        </div>
+        <div class="bc-consent">
+          <input id="lead-consent" name="consent" type="checkbox" required aria-describedby="lead-consent-error" />
+          <label for="lead-consent">Соглашаюсь на обработку email и имени для ответа на заявку по <a href={PRIVACY_PATH} target="_blank">политике обработки персональных данных</a></label>
+          <p class="bc-error" id="lead-consent-error" data-error-for="consent" hidden></p>
+        </div>
+        <button class="bc-button" type="submit" data-submit>Оставить заявку</button>
+        <p class="bc-form-status" data-status role="status" aria-live="polite"></p>
+        <noscript><p class="bc-form-status">Чтобы отправить заявку, включите JavaScript.</p></noscript>
+      </form>
+      <div class="bc-done" data-done tabindex="-1" hidden>
+        <h3>Заявка сохранена</h3>
+        <p>Мы напишем на <strong data-done-email></strong>: пришлём входное задание и даты потока.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bc-footer">
+    <p>MentorCareer — буткемп Node.js</p>
+    <nav aria-label="Ссылки в подвале"><a href={PRIVACY_PATH}>Политика обработки персональных данных</a><a href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Сайт наставника — nadtocheev.ru</a><a href={LMS_URL}>Вход для учеников</a></nav>
+  </footer>
+  <script src="../../scripts/bootcamp-form.ts"></script>
+</BootcampLayout>

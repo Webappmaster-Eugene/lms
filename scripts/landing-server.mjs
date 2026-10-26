@@ -6,12 +6,14 @@
  */
 import { spawnSync } from 'node:child_process'
 import { createReadStream, existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { createServer } from 'node:http'
+import { createServer, request as httpRequest } from 'node:http'
 import { extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const LANDING = fileURLToPath(new URL('../landing/', import.meta.url))
 const PORT = process.env.E2E_LANDING_PORT ?? '3101'
+// LMS для формы предзаписи: в проде её проксирует nginx лендинга (location /api/bootcamp/leads).
+const APP_URL = process.env.E2E_APP_URL ?? `http://localhost:${process.env.E2E_APP_PORT ?? '3100'}`
 
 function newest(dir) {
   let max = 0
@@ -59,11 +61,31 @@ function resolveFile(pathname) {
   return candidates.find((file) => file.startsWith(DIST) && existsSync(file) && statSync(file).isFile())
 }
 
-// Те же редиректы дублей главной, что в nginx.conf: /index.html и //… → чистый адрес.
+// Те же редиректы дублей, что в nginx.conf: /index.html и //… → чистый адрес, страница-каталог → с косой чертой.
 function duplicateRedirect(url) {
   if (/^\/index\.html(?:\?|$)/.test(url)) return `/${url.slice('/index.html'.length)}`.replace(/^\/\?$/, '/')
   if (/^\/{2,}/.test(url)) return url.replace(/^\/+/, '/')
+  const page = url.match(/^\/(bootcamp\/nodejs|privacy)(\?.*)?$/)
+  if (page) return `/${page[1]}/${page[2] ?? ''}`
   return null
+}
+
+// Как location /api/bootcamp/leads в nginx.conf: только POST, заголовки клиента как есть.
+function proxyLead(req, res) {
+  if (req.method !== 'POST') {
+    res.writeHead(403, SECURITY_HEADERS)
+    return res.end()
+  }
+  const upstream = httpRequest(new URL('/api/bootcamp/leads', APP_URL), { method: 'POST', headers: { ...req.headers, 'x-forwarded-host': req.headers.host } }, (answer) => {
+    res.writeHead(answer.statusCode ?? 502, { 'Content-Type': answer.headers['content-type'] ?? 'application/json', ...SECURITY_HEADERS, 'Cache-Control': 'no-store' })
+    answer.pipe(res)
+  })
+  upstream.on('error', (error) => {
+    console.error(`LMS для формы недоступна (${APP_URL}): ${error.message}`)
+    res.writeHead(502, SECURITY_HEADERS)
+    res.end()
+  })
+  req.pipe(upstream)
 }
 
 const server = createServer((req, res) => {
@@ -73,6 +95,7 @@ const server = createServer((req, res) => {
     return res.end()
   }
   const { pathname } = new URL(req.url ?? '/', 'http://landing')
+  if (pathname === '/api/bootcamp/leads') return proxyLead(req, res)
   const file = resolveFile(pathname)
   const status = file ? 200 : 404
   const body = file ?? join(DIST, '404.html')

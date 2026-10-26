@@ -1,0 +1,63 @@
+---
+import '../styles/bootcamp.css'
+import { LMS_URL, SITE_URL } from '../config'
+
+interface Props {
+  title: string
+  description: string
+  /** Дополнительные узлы schema.org для @graph страницы. */
+  schema?: Record<string, unknown>[]
+  noindex?: boolean
+}
+
+const { title, description, schema = [], noindex = false } = Astro.props
+const canonicalUrl = new URL(Astro.url.pathname, SITE_URL).href
+const ogImage = new URL('/bootcamp/og-nodejs.png', SITE_URL).href
+const ogImageAlt = 'Буткемп Node.js: backend сервиса проката — предзапись на поток'
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    { '@type': 'Organization', '@id': `${SITE_URL}/#organization`, name: 'MentorCareer', url: LMS_URL, logo: { '@type': 'ImageObject', url: new URL('/apple-touch-icon.png', SITE_URL).href, width: 180, height: 180 } },
+    { '@type': 'WebPage', '@id': `${canonicalUrl}#webpage`, name: title, description, url: canonicalUrl, inLanguage: 'ru', publisher: { '@id': `${SITE_URL}/#organization` } },
+    ...schema,
+  ],
+}
+---
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content={noindex ? 'noindex, follow' : 'index, follow'} />
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="preload" href="/fonts/golos-text-400-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/golos-text-800-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ru_RU" />
+    <meta property="og:site_name" content="MentorCareer" />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={ogImageAlt} />
+    <meta property="og:image:type" content="image/png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={ogImageAlt} />
+    {!noindex && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
+  </head>
+  <body class="bootcamp">
+    <a href="#main" class="skip-link">К содержимому</a>
+    <slot />
+  </body>
+</html>

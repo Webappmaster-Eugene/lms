@@ -121,7 +121,8 @@ export default defineConfig({
           // Лендинг статичен — уже запущенный можно переиспользовать.
           reuseExistingServer: !CI,
           timeout: 5 * 60_000,
-          env: { E2E_LANDING_PORT: LANDING_PORT },
+          // Форма предзаписи отправляет заявку через этот сервер в приложение e2e.
+          env: { E2E_LANDING_PORT: LANDING_PORT, E2E_APP_URL: APP_URL },
         },
       ],
 })
