@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useId } from 'react'
 
 import { useAsyncData } from '@/hooks/use-async-data'
 import { X, Trash2, Plus, GripVertical } from 'lucide-react'
@@ -138,7 +138,7 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #3a3a5c', padding: '12px 16px' }}>
         <h2 style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', margin: 0 }}>Свойства узла</h2>
-        <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: 4, borderRadius: 4 }}>
+        <button type="button" onClick={onClose} aria-label="Закрыть свойства узла" style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: 4, borderRadius: 4 }}>
           <X style={{ width: 16, height: 16 }} />
         </button>
       </div>
@@ -151,89 +151,108 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
         </div>
 
         <Field label="Название">
-          <input type="text" value={data.label} onChange={(e) => update({ label: e.target.value })} style={inputStyle} placeholder="Название узла" />
+          {(id) => <input id={id} type="text" value={data.label} onChange={(e) => update({ label: e.target.value })} style={inputStyle} placeholder="Название узла" />}
         </Field>
 
         <Field label="Node ID">
-          <input
-            type="text"
-            value={data.nodeId}
-            readOnly={data.payloadId != null}
-            onChange={(e) => data.payloadId == null && update({ nodeId: e.target.value })}
-            style={data.payloadId != null ? readonlyStyle : { ...inputStyle, fontFamily: 'monospace' }}
-          />
+          {(id) => (
+            <input
+              id={id}
+              type="text"
+              value={data.nodeId}
+              readOnly={data.payloadId != null}
+              onChange={(e) => data.payloadId == null && update({ nodeId: e.target.value })}
+              style={data.payloadId != null ? readonlyStyle : { ...inputStyle, fontFamily: 'monospace' }}
+            />
+          )}
         </Field>
 
         <Field label="Тип узла">
-          <select value={data.nodeType} onChange={(e) => update({ nodeType: e.target.value as EditorNodeData['nodeType'] })} style={selectStyle}>
-            {NODE_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          {(id) => (
+            <select id={id} value={data.nodeType} onChange={(e) => update({ nodeType: e.target.value as EditorNodeData['nodeType'] })} style={selectStyle}>
+              {NODE_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          )}
         </Field>
 
         <Field label="Стадия">
-          <select value={data.stage ?? ''} onChange={(e) => update({ stage: (e.target.value || null) as NodeStage | null })} style={selectStyle}>
-            {STAGE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          {(id) => (
+            <select id={id} value={data.stage ?? ''} onChange={(e) => update({ stage: (e.target.value || null) as NodeStage | null })} style={selectStyle}>
+              {STAGE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          )}
         </Field>
 
         <Field label="Цвет">
-          <select value={data.color ?? ''} onChange={(e) => update({ color: (e.target.value || null) as NodeColor | null })} style={selectStyle}>
-            {COLOR_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          {(id) => (
+            <select id={id} value={data.color ?? ''} onChange={(e) => update({ color: (e.target.value || null) as NodeColor | null })} style={selectStyle}>
+              {COLOR_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          )}
         </Field>
 
         <Field label="Иконка">
-          <select value={data.icon ?? ''} onChange={(e) => update({ icon: e.target.value || null })} style={selectStyle}>
-            {ICON_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          {(id) => (
+            <select id={id} value={data.icon ?? ''} onChange={(e) => update({ icon: e.target.value || null })} style={selectStyle}>
+              {ICON_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          )}
         </Field>
 
         <Field label="Описание (tooltip)">
-          <textarea
-            value={data.description ?? ''}
-            onChange={(e) => update({ description: e.target.value || null })}
-            maxLength={300}
-            rows={2}
-            style={{ ...inputStyle, resize: 'none' }}
-            placeholder="Краткое описание (max 300)"
-          />
-          <span style={{ fontSize: 10, color: '#666' }}>{(data.description ?? '').length}/300</span>
+          {(id) => (
+            <>
+              <textarea
+                id={id}
+                value={data.description ?? ''}
+                onChange={(e) => update({ description: e.target.value || null })}
+                maxLength={300}
+                rows={2}
+                style={{ ...inputStyle, resize: 'none' }}
+                placeholder="Краткое описание (max 300)"
+              />
+              <span style={{ fontSize: 10, color: '#666' }}>{(data.description ?? '').length}/300</span>
+            </>
+          )}
         </Field>
 
         <Field label="Порядок">
-          <input type="number" value={data.order} onChange={(e) => update({ order: Number(e.target.value) || 0 })} style={inputStyle} />
+          {(id) => <input id={id} type="number" value={data.order} onChange={(e) => update({ order: Number(e.target.value) || 0 })} style={inputStyle} />}
         </Field>
 
         <Field label="Привязанный курс">
-          <select
-            value={data.courseId ?? ''}
-            onChange={(e) => {
-              const id = e.target.value ? Number(e.target.value) : null
-              const course = courses.find((c) => c.id === id)
-              update({ courseId: id, courseName: course?.title ?? null })
-            }}
-            disabled={coursesLoading}
-            style={selectStyle}
-          >
-            <option value="">Не привязан</option>
-            {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
-          </select>
+          {(id) => (
+            <select
+              id={id}
+              value={data.courseId ?? ''}
+              onChange={(e) => {
+                const courseId = e.target.value ? Number(e.target.value) : null
+                const course = courses.find((c) => c.id === courseId)
+                update({ courseId, courseName: course?.title ?? null })
+              }}
+              disabled={coursesLoading}
+              style={selectStyle}
+            >
+              <option value="">Не привязан</option>
+              {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+            </select>
+          )}
         </Field>
 
-        <Field label="Позиция">
+        <FieldGroup label="Позиция">
           <div style={{ display: 'flex', gap: 8 }}>
-            <div style={{ flex: 1 }}>
+            <label style={{ flex: 1 }}>
               <span style={{ fontSize: 10, color: '#666' }}>X</span>
               <input type="text" value={Math.round(node.position.x)} readOnly style={readonlyStyle} />
-            </div>
-            <div style={{ flex: 1 }}>
+            </label>
+            <label style={{ flex: 1 }}>
               <span style={{ fontSize: 10, color: '#666' }}>Y</span>
               <input type="text" value={Math.round(node.position.y)} readOnly style={readonlyStyle} />
-            </div>
+            </label>
           </div>
-        </Field>
+        </FieldGroup>
 
-        <Field label={`Под-темы (${data.bullets.length})`}>
+        <FieldGroup label={`Под-темы (${data.bullets.length})`}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {data.bullets.map((bullet, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -244,8 +263,14 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
                   onChange={(e) => updateBullet(i, e.target.value)}
                   style={{ ...inputStyle, flex: 1, padding: '4px 8px', fontSize: 12 }}
                   placeholder={`Под-тема ${i + 1}`}
+                  aria-label={`Под-тема ${i + 1}`}
                 />
-                <button type="button" onClick={() => removeBullet(i)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: 2 }}>
+                <button
+                  type="button"
+                  onClick={() => removeBullet(i)}
+                  aria-label={bullet.trim() ? `Удалить под-тему «${bullet.trim()}»` : `Удалить под-тему ${i + 1}`}
+                  style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: 2 }}
+                >
                   <X style={icoSm} />
                 </button>
               </div>
@@ -261,7 +286,7 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
               </button>
             )}
           </div>
-        </Field>
+        </FieldGroup>
       </div>
 
       {/* Delete */}
@@ -283,10 +308,24 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+const fieldLabelStyle: React.CSSProperties = { display: 'block', marginBottom: 4, fontSize: 12, fontWeight: 500, color: '#888' }
+
+function Field({ label, children }: { label: string; children: (id: string) => React.ReactNode }) {
+  const id = useId()
   return (
     <div>
-      <label style={{ display: 'block', marginBottom: 4, fontSize: 12, fontWeight: 500, color: '#888' }}>{label}</label>
+      <label htmlFor={id} style={fieldLabelStyle}>{label}</label>
+      {children(id)}
+    </div>
+  )
+}
+
+// <label> подписывает только одно поле, а здесь под общей подписью несколько.
+function FieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  const id = useId()
+  return (
+    <div role="group" aria-labelledby={id}>
+      <span id={id} style={fieldLabelStyle}>{label}</span>
       {children}
     </div>
   )

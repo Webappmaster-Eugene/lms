@@ -158,18 +158,16 @@ describe('панель свойств узла', () => {
     expect(screen.getByText('Preview')).toBeInTheDocument()
   })
 
-  // Дефект: подписи Field (NodeSidePanel.tsx:289) — отдельный <label> без htmlFor и без вложенного поля,
-  // поэтому ни одно поле панели не имеет доступного имени: экранный диктор читает «поле ввода» без подписи.
-  it.fails('поля панели находятся по своим подписям — дефект: label не связан с полем', () => {
+  // Подпись связана с полем: иначе диктор читает «поле ввода» без названия, а клик по подписи не ставит фокус.
+  it('поля панели находятся по своим подписям', () => {
     panel({ label: 'React' })
 
     expect(screen.getByLabelText('Название')).toHaveValue('React')
     expect(screen.getByLabelText('Тип узла')).toHaveValue('topic')
   })
 
-  // Дефект: кнопки-иконки закрытия панели (NodeSidePanel.tsx:141) и удаления под-темы (:248) без aria-label —
-  // с клавиатурой и диктором их назначение не узнать.
-  it.fails('кнопки-иконки названы для экранного диктора — дефект: нет aria-label', () => {
+  // У кнопок-иконок нет текста — без aria-label их назначение с клавиатурой и диктором не узнать.
+  it('кнопки-иконки названы для экранного диктора', () => {
     panel({ bullets: ['Хуки'] })
 
     expect(screen.getByRole('button', { name: /Закрыть/ })).toBeInTheDocument()
@@ -193,9 +191,8 @@ describe('меню добавления узла', () => {
     expect(onAddNode).not.toHaveBeenCalled()
   })
 
-  // Дефект: кнопка «Добавить» (EditorToolbar.tsx:118) раскрывает меню, но не сообщает это через
-  // aria-expanded/aria-haspopup — диктор не знает, что под кнопкой появился список видов узла.
-  it.fails('кнопка «Добавить» сообщает, раскрыто ли меню — дефект: нет aria-expanded', async () => {
+  // Без aria-expanded диктор не узнает, что под кнопкой появился список видов узла.
+  it('кнопка «Добавить» сообщает, раскрыто ли меню', async () => {
     const user = userEvent.setup()
     toolbar()
     const add = screen.getByRole('button', { name: /Добавить/ })
@@ -205,16 +202,20 @@ describe('меню добавления узла', () => {
     expect(add).toHaveAttribute('aria-expanded', 'true')
   })
 
-  // Дефект: у меню (EditorToolbar.tsx:132) нет обработчика клавиш — Escape его не закрывает,
-  // с клавиатуры закрыть меню можно только выбрав вид узла или повторным нажатием «Добавить».
-  it.fails('Escape закрывает меню — дефект: клавиша не обрабатывается', async () => {
+  // С клавиатуры меню закрывают Escape; фокус возвращается на кнопку, чтобы не потерять место на панели.
+  it('Escape закрывает меню и возвращает фокус на кнопку', async () => {
     const user = userEvent.setup()
     toolbar()
-    await user.click(screen.getByRole('button', { name: /Добавить/ }))
+    const add = screen.getByRole('button', { name: /Добавить/ })
+    await user.click(add)
+    // Как в Safari: клик не оставляет фокус на кнопке.
+    add.blur()
 
     await user.keyboard('{Escape}')
 
     expect(screen.queryByRole('button', { name: 'Категория' })).not.toBeInTheDocument()
+    expect(add).toHaveAttribute('aria-expanded', 'false')
+    expect(add).toHaveFocus()
   })
 })
 
@@ -353,10 +354,9 @@ describe('сохранение: отказ на каждом шаге', () => {
     await act(async () => { await expect(second).resolves.toEqual({ ok: true }) })
   })
 
-  // Дефект: finally отменённого сохранения (use-editor-save.ts:181-183) снимает isSaving и обнуляет abortRef,
-  // хотя новое сохранение ещё идёт. Кнопка «Сохранить» снова доступна посреди записи, а третье
-  // сохранение уже не отменит второе. Сейчас из интерфейса не воспроизводится: кнопка заблокирована на время записи.
-  it.fails('пока идёт новое сохранение, признак сохранения не снимается — дефект: его снимает отменённое', async () => {
+  // Признак принадлежит текущему сохранению: иначе посреди записи снова доступна кнопка «Сохранить»,
+  // а следующее сохранение уже не сможет отменить идущее.
+  it('пока идёт новое сохранение, отменённое предыдущее не снимает признак сохранения', async () => {
     let finish: (() => void) | undefined
     api({ save: (_url, init) => new Promise<Response>((resolve, reject) => {
       init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
@@ -372,6 +372,7 @@ describe('сохранение: отказ на каждом шаге', () => {
 
     expect(result.current.isSaving).toBe(true)
     await act(async () => { finish?.() })
+    await waitFor(() => expect(result.current.isSaving).toBe(false))
   })
 })
 

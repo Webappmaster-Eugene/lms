@@ -109,7 +109,7 @@ describe('панель правки узла', () => {
     const user = userEvent.setup()
     renderPanel()
 
-    await user.click(screen.getByRole('button', { name: /Удалить/ }))
+    await user.click(screen.getByRole('button', { name: 'Удалить узел' }))
 
     expect(onDelete).toHaveBeenCalled()
   })
