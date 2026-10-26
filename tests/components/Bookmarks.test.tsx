@@ -108,6 +108,34 @@ describe('«Сохранённое»', () => {
     expect(calls[0]).toMatchObject({ url: '/api/bookmarks/1', init: { method: 'DELETE' } })
   })
 
+  it('если убрать не удалось, запись остаётся, сбой виден и можно повторить', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockApi(false)
+    render(<SavedList items={items} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Убрать «Хуки» из сохранённого' }))
+
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('Не удалось убрать — попробуйте ещё раз', 'error'))
+    expect(toast).not.toHaveBeenCalledWith('Убрано из сохранённого', 'info')
+    expect(screen.getByRole('link', { name: 'Хуки' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Убрать «Хуки» из сохранённого' })).toBeEnabled()
+    expect(log).toHaveBeenCalledWith('Не удалось убрать закладку', expect.any(Error))
+  })
+
+  it('пока запись убирается, её кнопка заблокирована от повторного нажатия', async () => {
+    let finish: (response: Response) => void = () => {}
+    global.fetch = vi.fn(() => new Promise<Response>((resolve) => { finish = resolve })) as unknown as typeof fetch
+    render(<SavedList items={items} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Убрать «Сумма» из сохранённого' }))
+
+    expect(screen.getByRole('button', { name: 'Убрать «Сумма» из сохранённого' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Убрать «Хуки» из сохранённого' })).toBeEnabled()
+    finish(Response.json({}))
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Сумма' })).not.toBeInTheDocument())
+    expect(toast).toHaveBeenCalledWith('Убрано из сохранённого', 'info')
+  })
+
   it('пустой список объясняет, как сохранять', () => {
     render(<SavedList items={[]} />)
 

@@ -1,9 +1,11 @@
-import { act, cleanup, render } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Metric } from 'web-vitals'
 import { StudentActivityBridge } from '@/components/analytics/StudentActivityBridge'
+import { AdminActivityProvider } from '@/components/analytics/AdminActivityProvider'
 
-const state = vi.hoisted(() => ({ path: '/courses', callbacks: {} as Record<string, (metric: Metric) => void> }))
+const state = vi.hoisted(() => ({ path: '/courses', callbacks: {} as Record<string, (metric: Metric) => void>, adminUser: null as { id: number } | null }))
+vi.mock('@payloadcms/ui', () => ({ useAuth: () => ({ user: state.adminUser }) }))
 vi.mock('next/navigation', () => ({ usePathname: () => state.path }))
 vi.mock('web-vitals', () => ({
   onLCP: (callback: (metric: Metric) => void) => { state.callbacks.LCP = callback },
@@ -68,5 +70,22 @@ describe('наблюдения страниц и реальные Web Vitals', (
     const count = fetchMock.mock.calls.length
     await act(() => vi.advanceTimersByTimeAsync(120000))
     expect(fetchMock).toHaveBeenCalledTimes(count)
+  })
+})
+
+describe('активность в админке', () => {
+  it('записывает посещения вошедшего админа и показывает саму админку', () => {
+    state.path = '/admin/collections/users/34'
+    state.adminUser = { id: 1 }
+    render(<AdminActivityProvider><p>Панель Payload</p></AdminActivityProvider>)
+    expect(screen.getByText('Панель Payload')).toBeInTheDocument()
+    expect(bodies()).toEqual([{ route: '/api/activity', body: expect.objectContaining({ expectedUserId: 1, path: '/admin' }) }])
+  })
+
+  it('на экране входа в админку ничего не отправляет', () => {
+    state.adminUser = null
+    render(<AdminActivityProvider><p>Вход</p></AdminActivityProvider>)
+    expect(screen.getByText('Вход')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
