@@ -152,6 +152,17 @@ class RunnerPool {
     worker.busy = false
   }
 
+  /**
+   * Выводит процесс из пула сразу, а не по событию exit: между SIGKILL и exit
+   * он выглядел бы свободным и получил бы следующее задание, которое умрёт вместе с ним.
+   */
+  private retire(worker: Worker): void {
+    this.finish(worker)
+    const index = this.workers.indexOf(worker)
+    if (index !== -1) this.workers.splice(index, 1)
+    this.kill(worker)
+  }
+
   /** Убивает зависший процесс: изолят мог застрять в микрозадачах после таймаута. */
   private kill(worker: Worker): void {
     try {
@@ -217,16 +228,15 @@ class RunnerPool {
 
     job.timer = setTimeout(() => {
       // Процесс не ответил в срок — он больше не пригоден, поднимаем новый.
-      this.finish(worker)
-      this.kill(worker)
+      this.retire(worker)
       job.reject(new TrainerRunnerError('Песочница не ответила в отведённое время'))
+      if (!this.disposed) this.drain()
     }, job.timeoutMs)
 
     try {
       worker.child.send({ id: job.id, kind: job.kind, payload: job.payload })
     } catch (error) {
-      this.finish(worker)
-      this.kill(worker)
+      this.retire(worker)
       job.reject(
         new TrainerRunnerError(
           `Не удалось передать задание песочнице: ${error instanceof Error ? error.message : String(error)}`,
