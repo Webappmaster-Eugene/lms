@@ -100,10 +100,8 @@ describe('текст урока из редактора CMS', () => {
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
   })
 
-  // Дефект: компонент LexicalNode (ContentBlockRenderer.tsx:235) выводит только узлы type 'text', а узел табуляции
-  // 'tab', который ставит редактор Payload, в обычном абзаце уходит в default без детей и пропадает: «Имя\tЗначение»
-  // превращается в «ИмяЗначение». В листингах табуляция сохраняется — их собирает extractText.
-  it.fails('табуляция в обычном абзаце не склеивает слова — дефект: узел tab не выводится', () => {
+  // Редактор Payload хранит табуляцию отдельным узлом 'tab', а не символом внутри текста.
+  it('табуляция в обычном абзаце не склеивает слова', () => {
     const { container } = renderText({ type: 'paragraph', children: [text('Имя'), { type: 'tab', text: '\t' }, text('Значение')] })
 
     expect(container.querySelector('p')?.textContent).toBe('Имя\tЗначение')

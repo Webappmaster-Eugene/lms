@@ -233,6 +233,8 @@ type LexicalNode = {
 }
 
 function LexicalNode({ node }: { node: LexicalNode }) {
+  // Табуляция — отдельный узел Lexical; без него соседние слова склеиваются.
+  if (node.type === 'tab') return <>{'\t'}</>
   if (node.type === 'text') {
     let content: React.ReactNode = node.text ?? ''
 
