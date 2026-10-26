@@ -10,9 +10,11 @@ const nginx = readFileSync(new URL('../../landing/nginx.conf', import.meta.url),
 describe('лендинг буткемпа: форма предзаписи', () => {
   // Без оператора в политике собирать заявки нельзя (152-ФЗ, ст. 18.1): тест не пускает выкат.
   it('в политике указан оператор персональных данных', () => {
-    for (const key of ['name', 'inn', 'ogrn', 'address', 'email'] as const) {
+    for (const key of ['name', 'status', 'inn', 'address', 'email'] as const) {
       expect(OPERATOR[key].trim(), `landing/src/data/privacy.ts: заполните OPERATOR.${key}`).not.toBe('')
     }
+    // ИНН физлица — 12 цифр; у организации 10, но тогда в политике нужен ещё ОГРН.
+    expect(OPERATOR.inn).toMatch(/^\d{12}$/)
   })
 
   it('версию согласия со страницы принимает сервер', () => {

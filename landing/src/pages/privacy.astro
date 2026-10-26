@@ -3,7 +3,7 @@ import BootcampLayout from '../layouts/BootcampLayout.astro'
 import { BOOTCAMP_PATH, CONSENT_VERSION } from '../data/bootcamp'
 import { OPERATOR, POLICY_DATE } from '../data/privacy'
 
-const operator = [OPERATOR.name, OPERATOR.inn && `ИНН ${OPERATOR.inn}`, OPERATOR.ogrn && `ОГРН ${OPERATOR.ogrn}`, OPERATOR.address].filter(Boolean).join(', ')
+const operator = `${OPERATOR.name}, ${OPERATOR.status}, ИНН ${OPERATOR.inn}, адрес: ${OPERATOR.address}`
 ---
 <BootcampLayout title="Политика обработки персональных данных — MentorCareer" description="Какие данные собирает форма предзаписи на буткемп MentorCareer, зачем, где и сколько они хранятся и как отозвать согласие.">
   <header class="bc-header">
