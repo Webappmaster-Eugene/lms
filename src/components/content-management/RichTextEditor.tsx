@@ -1,6 +1,7 @@
 'use client'
 
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import * as Sentry from '@sentry/nextjs'
 import { $createParagraphNode, $getSelection, $isRangeSelection, $setSelection, FORMAT_TEXT_COMMAND, REDO_COMMAND, UNDO_COMMAND, type RangeSelection } from '@payloadcms/richtext-lexical/lexical'
 import { LinkNode, TOGGLE_LINK_COMMAND } from '@payloadcms/richtext-lexical/lexical/link'
 import { INSERT_ORDERED_LIST_COMMAND, INSERT_UNORDERED_LIST_COMMAND, ListItemNode, ListNode } from '@payloadcms/richtext-lexical/lexical/list'
@@ -145,6 +146,7 @@ class EditorBoundary extends Component<{ onError: () => void; children: ReactNod
   static getDerivedStateFromError() { return { failed: true } }
   componentDidCatch(error: unknown) {
     console.error('Редактор текста не смог открыть документ', error)
+    Sentry.captureException(error, { tags: { component: 'rich-text-editor' } })
     this.props.onError()
   }
   render() { return this.state.failed ? null : this.props.children }
