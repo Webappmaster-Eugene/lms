@@ -416,6 +416,10 @@ export interface Course {
    * Открывается только назначением на курс, его тему, раздел или урок. Режим «все опубликованные курсы» и доступ ко всей карте его не открывают, каталог не показывает.
    */
   assignedOnly?: boolean | null;
+  /**
+   * Показывается в разделе «Буткемп», а не в «Курсах» и роадмапах. Назначается только целиком, поэтому всегда «Только по назначению»; если снять флажок, «Только по назначению» останется — снимите его отдельно.
+   */
+  isBootcamp?: boolean | null;
   estimatedHours?: number | null;
   /**
    * Курсы, которые нужно завершить перед началом этого курса
@@ -2044,6 +2048,7 @@ export interface CoursesSelect<T extends boolean = true> {
   order?: T;
   isPublished?: T;
   assignedOnly?: T;
+  isBootcamp?: T;
   estimatedHours?: T;
   prerequisites?: T;
   updatedAt?: T;

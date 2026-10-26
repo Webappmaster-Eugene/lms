@@ -62,6 +62,17 @@ describe('боковое меню', () => {
     ])
   })
 
+  it('буткемп — отдельный пункт сразу после дашборда и только у того, кому он назначен', () => {
+    pathname.current = '/bootcamp/nodejs-bootcamp-manuals'
+    render(<Sidebar bootcampEnabled />)
+    const links = within(desktop()).getAllByRole('link').map((link) => link.textContent)
+    expect(links.slice(0, 4)).toEqual(['Дашборд', 'Буткемп', 'Роадмапы', 'Курсы'])
+    const bootcamp = within(desktop()).getByRole('link', { name: 'Буткемп' })
+    expect(bootcamp).toHaveAttribute('href', '/bootcamp')
+    expect(bootcamp).toHaveAttribute('aria-current', 'page')
+    expect(within(desktop()).getByRole('link', { name: 'Курсы' })).not.toHaveAttribute('aria-current')
+  })
+
   it('текущий раздел подсвечен', () => {
     pathname.current = '/courses'
     render(<Sidebar />)

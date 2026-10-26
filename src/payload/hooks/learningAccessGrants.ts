@@ -15,6 +15,14 @@ type GrantDocument = {
   expiresAt?: string | null
 }
 
+async function insideBootcamp(req: PayloadRequest, collection: 'sections' | 'lessons', id: number): Promise<boolean> {
+  const part = await req.payload.findByID({ collection, id, select: { course: true }, depth: 0, overrideAccess: true, disableErrors: true, req })
+  const courseId = learningRelationId(part?.course)
+  if (courseId === null) return false
+  const course = await req.payload.findByID({ collection: 'courses', id: courseId, select: { isBootcamp: true }, depth: 0, overrideAccess: true, disableErrors: true, req })
+  return course?.isBootcamp === true
+}
+
 export const validateLearningGrant: CollectionBeforeValidateHook = async ({ data, originalDoc, req }) => {
   if (!req.user || (await getAuthoritativeLearningPolicy(req.payload, req.user.id, req)).role !== 'admin') throw new Forbidden(req.t)
   if (!data) return data
@@ -32,6 +40,9 @@ export const validateLearningGrant: CollectionBeforeValidateHook = async ({ data
   const expiresAt = merged.expiresAt ? Date.parse(merged.expiresAt) : null
   if ((startsAt !== null && !Number.isFinite(startsAt)) || (expiresAt !== null && !Number.isFinite(expiresAt)) || (startsAt !== null && expiresAt !== null && expiresAt <= startsAt)) {
     throw new ValidationError({ collection: 'learning-access-grants', errors: [{ path: 'expiresAt', message: 'Окончание доступа должно быть позже начала; даты должны быть корректны' }] })
+  }
+  if ((target.relationTo === 'sections' || target.relationTo === 'lessons') && await insideBootcamp(req, target.relationTo, targetId)) {
+    throw new ValidationError({ collection: 'learning-access-grants', errors: [{ path: 'target', message: 'Буткемп назначается только целиком: выберите сам курс буткемпа, а не раздел или урок' }] })
   }
   data.ruleKey = `${userId}:${target.relationTo}:${targetId}`
   return data

@@ -44,7 +44,7 @@ export async function notificationLinkIsVisible(payload: Payload, userId: number
   const scope = await getLearningAccess(payload, user, req)
   const slug = parts[1]
   if (!slug) return true
-  if (parts[0] === 'courses') {
+  if (parts[0] === 'courses' || parts[0] === 'bootcamp') {
     const result = await payload.find({ collection: 'courses', where: { slug: { equals: slug } }, select: { slug: true }, limit: 1, depth: 0, overrideAccess: true, req })
     return Boolean(result.docs[0] && scope.canBrowseCourse(result.docs[0].id))
   }

@@ -19,6 +19,7 @@ import { StudentActivityBridge } from '@/components/analytics/StudentActivityBri
 import { VideoViewportRecovery } from '@/components/layout/VideoViewportRecovery'
 import { getTrainerAccess } from '@/server/trainer-access'
 import { getGuideAccess } from '@/server/guide-access'
+import { getBootcamps } from '@/server/bootcamps'
 import { ErrorReportingUser } from '@/components/errors/ErrorReportingUser'
 
 export const viewport: Viewport = {
@@ -35,9 +36,10 @@ export default async function FrontendLayout({ children }: { children: React.Rea
   const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login')
   const isAdmin = user.role === 'admin'
-  const [trainerEnabled, guidesEnabled] = await Promise.all([
+  const [trainerEnabled, guidesEnabled, bootcampEnabled] = await Promise.all([
     getTrainerAccess(payload, user, req).then((access) => access.hasAccess),
     getGuideAccess(payload, user, req).then((access) => access.hasAccess),
+    getBootcamps(payload, user, req).then((bootcamps) => bootcamps.length > 0),
   ])
 
   return (
@@ -57,7 +59,7 @@ export default async function FrontendLayout({ children }: { children: React.Rea
             <SidebarProvider>
               <div className="flex min-h-dvh overflow-x-hidden">
                 <div className="contents print:hidden">
-                  <Sidebar isAdmin={isAdmin} trainerEnabled={trainerEnabled} guidesEnabled={guidesEnabled} />
+                  <Sidebar isAdmin={isAdmin} trainerEnabled={trainerEnabled} guidesEnabled={guidesEnabled} bootcampEnabled={bootcampEnabled} />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col lg:ml-64 print:ml-0">
                   <div className="contents print:hidden">
@@ -65,11 +67,11 @@ export default async function FrontendLayout({ children }: { children: React.Rea
                   </div>
                   <main className="flex-1 overflow-x-hidden px-[max(1rem,env(safe-area-inset-left),env(safe-area-inset-right))] py-6 lg:px-8">{children}</main>
                   <div className="contents print:hidden">
-                    <Footer trainerEnabled={trainerEnabled} />
+                    <Footer trainerEnabled={trainerEnabled} bootcampEnabled={bootcampEnabled} />
                   </div>
                 </div>
                 <div className="contents print:hidden">
-                  <BottomNav />
+                  <BottomNav bootcampEnabled={bootcampEnabled} />
                 </div>
               </div>
             </SidebarProvider>

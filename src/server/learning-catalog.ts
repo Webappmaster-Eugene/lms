@@ -5,6 +5,7 @@ import { collectAllPages } from '@/lib/paginate'
 import type { LearningPolicyMetadata } from '@/lib/learning-access'
 import type { Course, RoadmapNode, RoadmapEdge } from '@/payload-types'
 import { cachedContent, contentCacheKey } from '@/server/content-cache'
+import { notBootcamp } from '@/lib/course-path'
 
 export type LearningCatalog = Omit<LearningPolicyMetadata, 'lessons'>
 export type RoadmapContent = {
@@ -116,9 +117,10 @@ export async function getLearningCatalog(payload: Payload, req?: Partial<Payload
 /** Internal metadata only. Callers must apply fresh browsing policy and text protection. */
 export async function getRoadmapContent(payload: Payload, roadmapId: number, req?: Partial<PayloadRequest>): Promise<RoadmapContent> {
   if (!Number.isSafeInteger(roadmapId) || roadmapId < 1) throw new APIError('Некорректный роадмап', 400)
-  return revisionCached(payload, `roadmap-${roadmapId}`, req, async (internalReq) => {
+  // Новое имя: запись прежнего кода с буткемпом в Redis под той же ревизией не должна читаться.
+  return revisionCached(payload, `roadmap-courses-${roadmapId}`, req, async (internalReq) => {
     const [courses, nodes, edges] = await Promise.all([
-      collectAllPages(({ page, limit }) => payload.find({ collection: 'courses', where: { roadmap: { equals: roadmapId }, isPublished: { equals: true } }, select: { title: true, slug: true, estimatedHours: true, prerequisites: true, roadmapNode: true, order: true, isPublished: true, roadmap: true }, depth: 0, sort: ['order', 'id'], page, limit, overrideAccess: true, req: internalReq }), { label: 'курсы карты' }),
+      collectAllPages(({ page, limit }) => payload.find({ collection: 'courses', where: { and: [{ roadmap: { equals: roadmapId }, isPublished: { equals: true } }, notBootcamp] }, select: { title: true, slug: true, estimatedHours: true, prerequisites: true, roadmapNode: true, order: true, isPublished: true, roadmap: true }, depth: 0, sort: ['order', 'id'], page, limit, overrideAccess: true, req: internalReq }), { label: 'курсы карты' }),
       collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmap-nodes', where: { roadmap: { equals: roadmapId } }, select: { nodeId: true, nodeType: true, course: true, label: true, positionX: true, positionY: true, bullets: true, icon: true, description: true, stage: true, color: true, order: true, roadmap: true }, depth: 0, sort: ['order', 'id'], page, limit, overrideAccess: true, req: internalReq }), { label: 'темы карты' }),
       collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmap-edges', where: { roadmap: { equals: roadmapId } }, select: { edgeId: true, source: true, target: true, edgeType: true, animated: true, roadmap: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req: internalReq }), { label: 'связи карты' }),
     ])

@@ -30,13 +30,13 @@ function onlyKeys(value: Record<string, unknown>, keys: readonly string[]) {
   if (Object.keys(value).some((key) => !keys.includes(key))) throw new WebVitalsError('Лишние поля показателей страницы')
 }
 
-const staticRoutes = new Set(['/', '/courses', '/roadmaps', '/trainer', '/trainer/interview', '/profile', '/profile/edit', '/achievements', '/certificates', '/notifications', '/settings/notifications', '/settings/app', '/notes', '/saved', '/leaderboard', '/help', '/contacts', '/questions', '/manage'])
+const staticRoutes = new Set(['/', '/courses', '/bootcamp', '/roadmaps', '/trainer', '/trainer/interview', '/profile', '/profile/edit', '/achievements', '/certificates', '/notifications', '/settings/notifications', '/settings/app', '/notes', '/saved', '/leaderboard', '/help', '/contacts', '/questions', '/manage'])
 
 export function webVitalRoute(path: unknown): string {
   if (path === undefined) return 'other'
   if (typeof path !== 'string' || path.length > 240 || !/^\/[A-Za-z0-9_/-]*$/.test(path) || path.includes('//')) throw new WebVitalsError('Передайте путь без параметров и полного адреса')
   if (staticRoutes.has(path)) return path
-  if (/^\/(lessons|courses|roadmaps)\/[A-Za-z0-9_-]+$/.test(path)) return `/${path.split('/')[1]}/[slug]`
+  if (/^\/(lessons|courses|bootcamp|roadmaps)\/[A-Za-z0-9_-]+$/.test(path)) return `/${path.split('/')[1]}/[slug]`
   if (/^\/trainer\/[A-Za-z0-9_-]+$/.test(path)) return '/trainer/[topic]'
   if (/^\/trainer\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+$/.test(path)) return '/trainer/[topic]/[task]'
   if (/^\/certificates\/\d+$/.test(path)) return '/certificates/[id]'

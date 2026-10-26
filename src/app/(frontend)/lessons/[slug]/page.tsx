@@ -25,6 +25,7 @@ import { loadPublishedProgrammeLessons } from '@/lib/course-completion'
 import { getLearningRequest } from '@/server/learning-request'
 import { getLearningState } from '@/server/learning-state'
 import { metaDescription, titleWithContext } from '@/lib/site-metadata'
+import { coursePath } from '@/lib/course-path'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -313,7 +314,7 @@ export default async function LessonPage({ params }: Props) {
         {/* Навигация */}
         {course && (
           <Link
-            href={`/courses/${course.slug}`}
+            href={coursePath(course)}
             className="inline-flex min-h-11 max-w-full items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft aria-hidden="true" className="h-4 w-4 shrink-0" />
@@ -366,7 +367,7 @@ export default async function LessonPage({ params }: Props) {
             progressId={progressId}
             next={nextLesson}
             completesCourse={othersDone}
-            courseHref={course ? `/courses/${course.slug}` : null}
+            courseHref={course ? coursePath(course) : null}
           />
         </div>
 

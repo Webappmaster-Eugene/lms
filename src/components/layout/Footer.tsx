@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import { readSiteContacts } from '@/lib/site-settings'
 import { AUTHOR_NAME, AUTHOR_URL, GUIDE_URL } from '@/lib/site-links'
+import { visibleSections } from '@/lib/platform-sections'
 
 const SECTIONS = [
+  { href: '/bootcamp', label: 'Буткемп' },
   { href: '/courses', label: 'Курсы' },
   { href: '/roadmaps', label: 'Роадмапы' },
   { href: '/trainer', label: 'Тренажёр' },
@@ -13,7 +15,7 @@ const SECTIONS = [
 
 const linkClass = 'text-muted-foreground transition-colors hover:text-primary'
 
-export async function Footer({ trainerEnabled = true }: { trainerEnabled?: boolean } = {}) {
+export async function Footer({ trainerEnabled = true, bootcampEnabled = false }: { trainerEnabled?: boolean; bootcampEnabled?: boolean } = {}) {
   const contacts = await readSiteContacts()
   const year = new Date().getFullYear()
 
@@ -42,7 +44,7 @@ export async function Footer({ trainerEnabled = true }: { trainerEnabled?: boole
         <nav aria-label="Разделы платформы" className="space-y-2">
           <p className="font-semibold text-foreground">Разделы</p>
           <ul className="space-y-1.5">
-            {SECTIONS.filter((item) => trainerEnabled || item.href !== '/trainer').map(({ href, label }) => (
+            {visibleSections(SECTIONS, { trainerEnabled, guidesEnabled: false, bootcampEnabled }).map(({ href, label }) => (
               <li key={href}>
                 <Link href={href} className={linkClass}>
                   {label}

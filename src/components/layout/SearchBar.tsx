@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useRef, useEffect, useId } from 'react'
-import { Search, Loader2, BookOpen, Code2, Compass, GraduationCap, Map } from 'lucide-react'
+import { Search, Loader2, BookOpen, Code2, Compass, GraduationCap, Map, Tent } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 import { cn } from '@/lib/utils'
 import { useHydrated } from '@/hooks/use-hydrated'
+import { coursePath } from '@/lib/course-path'
 
-type ResultType = 'roadmap' | 'course' | 'lesson' | 'task' | 'guide'
+type ResultType = 'roadmap' | 'course' | 'bootcamp' | 'lesson' | 'task' | 'guide'
 
 type SearchResult = {
   id: string
@@ -30,6 +31,7 @@ type TaskDoc = Doc & { topic?: { slug?: string } | number | null }
 const TYPE_LABELS: Record<ResultType, string> = {
   roadmap: 'Роадмап',
   course: 'Курс',
+  bootcamp: 'Буткемп',
   lesson: 'Урок',
   task: 'Задача тренажёра',
   guide: 'Гайд',
@@ -38,6 +40,7 @@ const TYPE_LABELS: Record<ResultType, string> = {
 const TYPE_ICONS: Record<ResultType, typeof Map> = {
   roadmap: Map,
   course: GraduationCap,
+  bootcamp: Tent,
   lesson: BookOpen,
   task: Code2,
   guide: Compass,
@@ -121,7 +124,7 @@ export function SearchBar({ autoFocus, onNavigate, hotkey, trainerEnabled = true
       // Закрытые гайды и черновики отсекает access коллекции, как и закрытые курсы.
       const [roadmaps, courses, lessons, tasks, guides] = await Promise.all([
         fetchDocs<Doc>('roadmaps', q, 3),
-        fetchDocs<Doc>('courses', q, 5),
+        fetchDocs<Doc & { isBootcamp?: boolean | null }>('courses', q, 5, '&depth=0&select[title]=true&select[slug]=true&select[isBootcamp]=true'),
         fetchDocs<Doc>('lessons', q, 5),
         trainerEnabled ? fetchDocs<TaskDoc>('trainer-tasks', q, 5, '&depth=1&select[title]=true&select[slug]=true&select[topic]=true') : Promise.resolve([]),
         fetchDocs<Doc>('guides', q, 3, '', ['title', 'summary']),
@@ -130,7 +133,7 @@ export function SearchBar({ autoFocus, onNavigate, hotkey, trainerEnabled = true
 
       const combined: SearchResult[] = [
         ...roadmaps.map((d) => ({ id: String(d.id), title: d.title, href: `/roadmaps/${d.slug}`, type: 'roadmap' as const })),
-        ...courses.map((d) => ({ id: String(d.id), title: d.title, href: `/courses/${d.slug}`, type: 'course' as const })),
+        ...courses.map((d) => ({ id: String(d.id), title: d.title, href: coursePath(d), type: d.isBootcamp ? 'bootcamp' as const : 'course' as const })),
         ...lessons.map((d) => ({ id: String(d.id), title: d.title, href: `/lessons/${d.slug}`, type: 'lesson' as const })),
         // Задача без раскрытой темы — ссылку не собрать; такое бывает, если тема снята с публикации.
         ...tasks.flatMap((d) =>
