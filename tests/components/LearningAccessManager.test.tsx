@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { LearningAccessManager } from '@/components/learning-access/LearningAccessManager'
-import type { AssignmentSnapshot } from '@/components/learning-access/contracts'
+import { maximumLearningRules, type AssignmentSnapshot } from '@/components/learning-access/contracts'
 
 const original: AssignmentSnapshot = { userId: 34, student: { id: 34, title: 'Александр Студент' }, mode: 'all', catalogVisibility: 'catalog', trainerMode: 'all', guidesMode: 'assigned', revision: 'a'.repeat(64), rules: [] }
 let saved: Record<string, unknown> | null
@@ -180,5 +180,133 @@ describe('админ назначает обучение', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Открыть' }))
     await userEvent.click(screen.getByRole('button', { name: 'Сохранить назначения' }))
     await waitFor(() => expect(saved).toMatchObject({ rules: [{ target: { relationTo: 'courses', value: 20 } }] }))
+  })
+})
+
+describe('назначения: выбор ученика, ошибки и правка правил', () => {
+  type Override = (address: URL, init?: RequestInit) => Response | undefined
+  /** Свой ответ для части запросов, остальное — общий макет API выше. */
+  function api(override: Override) {
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) => override(new URL(String(url), 'http://localhost'), init) ?? fetchMock(url, init)))
+  }
+  const rule = { target: { relationTo: 'roadmaps' as const, value: 1 }, title: 'Backend Node.js', effect: 'allow' as const, startsAt: '2026-11-01T07:00:00.000Z', expiresAt: null, note: '' }
+  const withRules = (rules: AssignmentSnapshot['rules']) => api((address, init) => !init?.method && address.searchParams.has('user') ? Response.json({ ...original, rules }) : undefined)
+  const rulesList = () => screen.getByRole('region', { name: 'Список назначений' })
+
+  it('выбор ученика из списка загружает его назначения', async () => {
+    api((address, init) => !init?.method && address.searchParams.get('user') === '35' ? Response.json({ ...original, userId: 35, student: { id: 35, title: 'Другой ученик' } }) : undefined)
+    const user = userEvent.setup()
+    render(<LearningAccessManager />)
+    expect(screen.getByText('Выберите ученика, которому хотите открыть обучение.')).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Другой ученик' }))
+    expect(await screen.findByRole('heading', { name: 'Другой ученик' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Другой ученик' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('ошибка поиска учеников видна текстом сервера, без текста — общей фразой', async () => {
+    let message: unknown = 'Нет доступа к списку учеников'
+    api((address) => address.searchParams.get('kind') === 'students' ? Response.json({ error: message }, { status: 403 }) : undefined)
+    const { unmount } = render(<LearningAccessManager />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Нет доступа к списку учеников')
+    expect(screen.queryByRole('button', { name: 'Другой ученик' })).not.toBeInTheDocument()
+    unmount()
+
+    message = { detail: 'internal' }
+    render(<LearningAccessManager />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось выполнить запрос. Повторите попытку')
+  })
+
+  // Прокси перед приложением отдаёт 502/504 страницей HTML. result() сначала парсит JSON,
+  // и админ видит сообщение парсера вместо собственной фразы компонента об ошибке запроса.
+  it.fails('ответ не в JSON (502 от прокси) показывается понятной фразой — дефект: админ видит ошибку разбора JSON', async () => {
+    api((address, init) => !init?.method && address.searchParams.has('user') ? new Response('<html>502 Bad Gateway</html>', { status: 502 }) : undefined)
+    render(<LearningAccessManager initialUserId={34} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось выполнить запрос. Повторите попытку')
+  })
+
+  it('после сбоя загрузки назначений «Обновить назначения» загружает их снова', async () => {
+    let fail = true
+    api((address, init) => !init?.method && address.searchParams.has('user') && fail ? Response.json({ error: 'База недоступна' }, { status: 503 }) : undefined)
+    const user = userEvent.setup()
+    render(<LearningAccessManager initialUserId={34} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('База недоступна')
+    expect(screen.queryByRole('link', { name: 'Открыть список назначений' })).not.toBeInTheDocument()
+    fail = false
+    await user.click(screen.getByRole('button', { name: 'Обновить назначения' }))
+    expect(await screen.findByRole('heading', { name: 'Александр Студент' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('срок, действие и комментарий правила сохраняются; дата показывается в местном времени того же момента', async () => {
+    withRules([rule])
+    const user = userEvent.setup()
+    render(<LearningAccessManager initialUserId={34} />)
+    await screen.findByRole('heading', { name: 'Александр Студент' })
+    const list = rulesList()
+    const starts = within(list).getByLabelText<HTMLInputElement>('Начало доступа')
+    expect(new Date(starts.value).toISOString()).toBe(rule.startsAt)
+    expect(within(list).getByLabelText('Окончание доступа')).toHaveValue('')
+
+    await user.selectOptions(within(list).getByLabelText('Действие'), 'deny')
+    fireEvent.change(within(list).getByLabelText('Окончание доступа'), { target: { value: '2026-12-31T18:00' } })
+    fireEvent.change(starts, { target: { value: '' } })
+    await user.type(within(list).getByLabelText('Комментарий для администратора'), 'Пробный период')
+    expect(screen.getByText('Есть несохранённые изменения')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Сохранить назначения' }))
+    await screen.findByText(/Назначения сохранены/)
+    expect(saved).toMatchObject({ rules: [{ target: rule.target, effect: 'deny', startsAt: null, expiresAt: new Date('2026-12-31T18:00').toISOString(), note: 'Пробный период' }] })
+  })
+
+  it('удаление правила возвращает пустой список и уходит в сохранение', async () => {
+    withRules([rule])
+    const user = userEvent.setup()
+    render(<LearningAccessManager initialUserId={34} />)
+    await screen.findByRole('heading', { name: 'Александр Студент' })
+    await user.click(screen.getByRole('button', { name: 'Удалить назначение Backend Node.js' }))
+    expect(within(rulesList()).getByText(/Назначений пока нет/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Сохранить назначения' }))
+    await screen.findByText(/Назначения сохранены/)
+    expect(saved).toMatchObject({ rules: [] })
+  })
+
+  it('второе назначение на тот же материал не добавляется и объясняет, где его менять', async () => {
+    withRules([rule])
+    const user = userEvent.setup()
+    render(<LearningAccessManager initialUserId={34} />)
+    await user.click(await screen.findByRole('button', { name: 'Открыть' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Для этого материала уже есть назначение. Измените действие в списке ниже.')
+    expect(within(rulesList()).getAllByRole('listitem')).toHaveLength(1)
+  })
+
+  it('сверх предела назначений не добавляет и предлагает назначить крупнее', async () => {
+    withRules(Array.from({ length: maximumLearningRules }, (_, index) => ({ ...rule, target: { relationTo: 'lessons' as const, value: 1000 + index }, title: `Урок ${index}`, startsAt: null })))
+    const user = userEvent.setup()
+    const { container } = render(<LearningAccessManager initialUserId={34} />)
+    // Три сотни правил делают запросы по ролям медленными: ищем в панели добавления.
+    await screen.findByText('Александр Студент', { selector: 'h2' }, { timeout: 5000 })
+    const picker = container.querySelector('.learning-access__picker') as HTMLElement
+    await user.click(await within(picker).findByRole('button', { name: 'Открыть' }, { timeout: 5000 }))
+    expect(container.querySelector('[role="alert"]')).toHaveTextContent(`Можно сохранить не более ${maximumLearningRules} назначений`)
+    expect(screen.getByText('Все изменения сохранены')).toBeInTheDocument()
+  })
+
+  it('поиск материала уходит на сервер с введённым текстом', async () => {
+    const user = userEvent.setup()
+    render(<LearningAccessManager initialUserId={34} />)
+    await screen.findByRole('heading', { name: 'Александр Студент' })
+    await user.type(screen.getByRole('searchbox', { name: 'Поиск по названию' }), 'Node')
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => { const address = new URL(String(url), 'http://localhost'); return address.searchParams.get('kind') === 'targets' && address.searchParams.get('search') === 'Node' })).toBe(true))
+  })
+
+  it('с несохранёнными изменениями браузер предупреждает при уходе со страницы', async () => {
+    const user = userEvent.setup()
+    render(<LearningAccessManager initialUserId={34} />)
+    await screen.findByRole('heading', { name: 'Александр Студент' })
+    const leave = () => { const event = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(event); return event.defaultPrevented }
+    expect(leave()).toBe(false)
+    await user.click(screen.getByRole('radio', { name: /Только назначенные материалы/ }))
+    expect(leave()).toBe(true)
+    await user.click(screen.getByRole('button', { name: 'Отменить изменения' }))
+    expect(leave()).toBe(false)
   })
 })

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { MobileSheet } from '@/components/layout/MobileSheet'
 import { CourseSidebar } from '@/components/course/CourseSidebar'
@@ -93,6 +93,79 @@ describe('мобильные панели', () => {
     }
   })
 
+  it('на широком экране панель не открывается модально, а сразу закрывается', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })))
+    const onClose = vi.fn()
+    try {
+      render(<MobileSheet open onClose={onClose} title="Содержание курса"><p>Уроки</p></MobileSheet>)
+      expect(onClose).toHaveBeenCalledOnce()
+      expect(document.body.style.overflow).toBe('')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('Tab, когда фокус оказался вне панели, возвращает его на первый элемент; Tab с модификатором не перехватывается', () => {
+    render(<><button>Снаружи</button><MobileSheet open onClose={vi.fn()} title="Содержание курса"><Link href="/courses">К курсу</Link></MobileSheet></>)
+    const dialog = screen.getByRole('dialog')
+    const close = screen.getByRole('button', { name: 'Закрыть содержание' })
+    const link = screen.getByRole('link', { name: 'К курсу' })
+    const rectangles = [new DOMRect(0, 0, 100, 44)] as unknown as DOMRectList
+    const spies = [close, link].map((element) => vi.spyOn(element, 'getClientRects').mockReturnValue(rectangles))
+    try {
+      act(() => screen.getByRole('button', { name: 'Снаружи', hidden: true }).focus())
+      expect(fireEvent.keyDown(dialog, { key: 'Tab' })).toBe(false)
+      expect(close).toHaveFocus()
+      expect(fireEvent.keyDown(dialog, { key: 'Tab', ctrlKey: true })).toBe(true)
+      expect(fireEvent.keyDown(dialog, { key: 'Tab', altKey: true })).toBe(true)
+      expect(close).toHaveFocus()
+    } finally {
+      spies.forEach((spy) => spy.mockRestore())
+    }
+  })
+
+  it('элементы с положительным tabindex обходятся раньше остальных', () => {
+    render(<MobileSheet open onClose={vi.fn()} title="Содержание курса"><Link href="/a">Обычная</Link><Link href="/b" tabIndex={2}>Вторая</Link><Link href="/c" tabIndex={1}>Первая</Link></MobileSheet>)
+    const dialog = screen.getByRole('dialog')
+    const links = ['Первая', 'Вторая', 'Обычная'].map((name) => screen.getByRole('link', { name }))
+    const close = screen.getByRole('button', { name: 'Закрыть содержание' })
+    const rectangles = [new DOMRect(0, 0, 100, 44)] as unknown as DOMRectList
+    const spies = [close, ...links].map((element) => vi.spyOn(element, 'getClientRects').mockReturnValue(rectangles))
+    try {
+      act(() => links[2].focus())
+      fireEvent.keyDown(dialog, { key: 'Tab' })
+      expect(links[0]).toHaveFocus()
+      fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true })
+      expect(links[2]).toHaveFocus()
+    } finally {
+      spies.forEach((spy) => spy.mockRestore())
+    }
+  })
+
+  it('без видимых элементов Tab не перехватывается', () => {
+    render(<MobileSheet open onClose={vi.fn()} title="Содержание курса"><p>Пусто</p></MobileSheet>)
+    expect(fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Tab' })).toBe(true)
+  })
+
+  it('ставит фокус на указанный элемент и после закрытия возвращает его на заданную кнопку', () => {
+    function Example() {
+      const [open, setOpen] = useState(true)
+      const anchor = useRef<HTMLButtonElement>(null)
+      return <><button ref={anchor}>Меню</button><MobileSheet open={open} onClose={() => setOpen(false)} title="Поиск" returnFocusRef={anchor} initialFocusSelector="input"><input aria-label="Что ищем" /></MobileSheet></>
+    }
+    render(<Example />)
+    expect(screen.getByRole('textbox', { name: 'Что ищем' })).toHaveFocus()
+    fireEvent.click(screen.getByRole('button', { name: 'Закрыть поиск' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Меню' })).toHaveFocus()
+  })
+
+  it('кнопка закрытия подписана по смыслу панели или явной подписью', () => {
+    render(<><MobileSheet open onClose={vi.fn()} title="Меню платформы"><p>a</p></MobileSheet><MobileSheet open onClose={vi.fn()} title="Фильтры" closeLabel="Скрыть фильтры"><p>b</p></MobileSheet></>)
+    expect(screen.getByRole('button', { name: 'Закрыть меню', hidden: true })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Скрыть фильтры', hidden: true })).toBeInTheDocument()
+  })
+
   it('нажатие фона закрывает панель, а внутренние элементы сохраняют её', async () => {
     render(<SheetExample />)
     await userEvent.click(screen.getByRole('button', { name: 'Открыть' }))
@@ -135,6 +208,17 @@ describe('мобильные панели', () => {
     await userEvent.click(next)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(document.body.style.overflow).toBe('')
+  })
+
+  it('оглавление курса закрывается крестиком и возвращает фокус на кнопку', async () => {
+    render(<CourseSidebar courseTitle="Курс" sections={sections} completedLessonIds={new Set()} currentLessonId="1" totalLessons={2} totalCompleted={0} />)
+    const trigger = screen.getByRole('button', { name: 'Показать содержание' })
+    await userEvent.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Закрыть содержание' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    expect(trigger).toHaveFocus()
   })
 
   it('предыдущий и следующий урок имеют понятные полные названия', () => {

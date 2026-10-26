@@ -153,4 +153,26 @@ describe('аналитика ученика для администратора'
     expect(screen.getByText('Активность за последние 5 минут', { exact: true })).toBeInTheDocument()
     expect(screen.getByText('Скорость сайта у пользователя за 30 дней')).toBeInTheDocument()
   })
+
+  it('ошибка поиска пользователей видна в панели выбора, а не выдаётся за пустой результат', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (raw: string | URL | Request) => new URL(String(raw), 'http://localhost').searchParams.get('kind') === 'students'
+      ? Response.json({ error: 'Поиск временно недоступен' }, { status: 503 })
+      : fetchMock(raw)))
+    render(<StudentAnalyticsManager initialUserId={34} />)
+    const finder = screen.getByRole('complementary', { name: 'Выбор пользователя' })
+    expect(await within(finder).findByRole('alert')).toHaveTextContent('Поиск временно недоступен')
+    expect(within(finder).queryByText(/Пользователи не найдены/)).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Александр Студент' })).toBeInTheDocument()
+  })
+
+  // Тот же разбор, что в назначениях: JSON читается до проверки статуса, и HTML-страница
+  // 502/504 от прокси превращается в сообщение парсера вместо фразы компонента.
+  it.fails('ответ не в JSON (502 от прокси) показывается понятной фразой — дефект: админ видит ошибку разбора JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (raw: string | URL | Request) => new URL(String(raw), 'http://localhost').searchParams.has('user')
+      ? new Response('<html>502 Bad Gateway</html>', { status: 502 })
+      : fetchMock(raw)))
+    render(<StudentAnalyticsManager initialUserId={34} />)
+    const alert = await screen.findByText((_, element) => element?.getAttribute('role') === 'alert' && !element.closest('aside'))
+    expect(alert).toHaveTextContent('Не удалось загрузить данные. Повторите попытку')
+  })
 })

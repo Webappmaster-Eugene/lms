@@ -155,4 +155,52 @@ describe('вопросы учеников — страница ментора', 
 
     expect(screen.getByText('Все вопросы отвечены')).toBeInTheDocument()
   })
+
+  it('фильтры со счётчиками переключают ветки; решённый вопрос без поля ответа', async () => {
+    const resolved = thread(4, { question: { ...thread(4).question, isResolved: true } })
+    render(<MentorQuestions threads={[thread(1), answered, resolved]} />)
+
+    expect(screen.getByRole('button', { name: 'Ждёт ответа 1' })).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(screen.getByRole('button', { name: 'Есть ответ 1' }))
+    expect(screen.getByText('Вопрос 2')).toBeInTheDocument()
+    expect(screen.queryByText('Вопрос 1')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Решён 1' }))
+    expect(screen.getByText('Вопрос 4')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: /Ответ ученику/ })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Все 3' }))
+    expect(screen.getAllByRole('listitem').filter((li) => li.id.startsWith('comment-'))).toHaveLength(3)
+  })
+
+  it('пустой фильтр, отличный от «Ждёт ответа», говорит, что таких вопросов нет', async () => {
+    render(<MentorQuestions threads={[thread(1)]} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Решён 0' }))
+    expect(screen.getByText('Таких вопросов нет')).toBeInTheDocument()
+  })
+
+  it('ответ ментора выделен в ветке, реплика ученика — нет', async () => {
+    const followUp = thread(5, { replies: [
+      { id: 50, content: 'Ответ ментора', user: mentor, parentComment: 5, createdAt: '2026-09-06T10:00:00Z' },
+      { id: 51, content: 'А если без хука?', user: student, parentComment: 5, createdAt: '2026-09-07T10:00:00Z' },
+    ] })
+    render(<MentorQuestions threads={[followUp]} />)
+
+    expect(screen.getByText('Вопрос 5')).toBeInTheDocument()
+    expect(screen.getByText('Ответ ментора').closest('li')).toHaveClass('bg-primary/5')
+    expect(screen.getByText('А если без хука?').closest('li')).not.toHaveClass('bg-primary/5')
+  })
+
+  it('если закрыть вопрос не удалось, ментор видит ошибку, а вопрос остаётся открытым', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    global.fetch = vi.fn(async () => new Response(null, { status: 403 })) as unknown as typeof fetch
+    render(<MentorQuestions threads={[thread(1)]} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Отметить решённым' }))
+
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('Не удалось закрыть вопрос', 'error'))
+    expect(refresh).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Отметить решённым' })).toBeEnabled()
+    expect(log).toHaveBeenCalledWith('Не удалось закрыть вопрос', expect.any(Error))
+  })
 })

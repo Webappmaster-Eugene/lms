@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 vi.mock('next/navigation', async () => (await import('../helpers/url-navigation')).urlNavigationMock())
@@ -113,6 +113,74 @@ describe('каталог', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Backend' }))
 
     expect(screen.getAllByRole('link')).toHaveLength(1)
+  })
+
+  it('«Все роадмапы» снимает фильтр по роадмапу и убирает его из адреса', async () => {
+    render(<CourseCatalog courses={courses} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Backend' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Все роадмапы' }))
+
+    expect(screen.getAllByRole('link')).toHaveLength(3)
+    expect(screen.getByRole('button', { name: 'Все роадмапы' })).toHaveAttribute('aria-pressed', 'true')
+    expect(navigationURL()).toBe('/courses')
+  })
+
+  it('по прогрессу сначала идут самые продвинутые курсы, равные — по алфавиту; «По программе» убирает сортировку из адреса', async () => {
+    setNavigationURL('/courses?sort=progress')
+    render(<CourseCatalog courses={[
+      course('a', { title: 'Ярлыки', progressPercent: 10 }),
+      course('b', { title: 'Гит', progressPercent: 80 }),
+      course('c', { title: 'Докер', progressPercent: 10 }),
+    ]} />)
+    expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual(['Гит', 'Докер', 'Ярлыки'])
+
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Порядок курсов' }), 'program')
+
+    expect(navigationURL()).toBe('/courses')
+    expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual(['Ярлыки', 'Гит', 'Докер'])
+  })
+
+  it('листает страницы кнопками «Дальше» и «Назад», на краях кнопки неактивны', async () => {
+    const many = Array.from({ length: 50 }, (_, index) => course(String(index + 1), { title: `Курс ${String(index + 1).padStart(2, '0')}` }))
+    render(<CourseCatalog courses={many} />)
+    const pages = screen.getByRole('navigation', { name: 'Страницы каталога курсов' })
+    expect(within(pages).getByRole('button', { name: 'Назад' })).toBeDisabled()
+
+    await userEvent.click(within(pages).getByRole('button', { name: 'Дальше' }))
+    await userEvent.click(within(pages).getByRole('button', { name: 'Дальше' }))
+    expect(navigationURL()).toBe('/courses?page=3')
+    expect(within(pages).getByText('3 из 3')).toBeInTheDocument()
+    expect(within(pages).getByRole('button', { name: 'Дальше' })).toBeDisabled()
+    expect(screen.getAllByRole('link')).toHaveLength(2)
+
+    await userEvent.click(within(pages).getByRole('button', { name: 'Назад' }))
+    expect(navigationURL()).toBe('/courses?page=2')
+    await userEvent.click(within(pages).getByRole('button', { name: 'Назад' }))
+    expect(navigationURL()).toBe('/courses')
+  })
+
+  it('курсы одной страницы не показывают переключатель страниц, а длительность курса видна', () => {
+    render(<CourseCatalog courses={[course('1', { title: 'Linux', estimatedHours: 12 })]} />)
+    expect(screen.queryByRole('navigation', { name: 'Страницы каталога курсов' })).not.toBeInTheDocument()
+    expect(screen.getByText('12ч')).toBeInTheDocument()
+  })
+
+  it('ссылка «Поделиться» включает фильтры и уже введённый поиск, даже если он ещё не попал в адрес', async () => {
+    setNavigationURL('/courses?status=new')
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    render(<CourseCatalog courses={courses} />)
+    await userEvent.type(screen.getByRole('searchbox', { name: /Найти курс/ }), 'nest')
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Поделиться ссылкой' }))
+      await waitFor(() => expect(writeText).toHaveBeenCalledOnce())
+      const shared = new URL(writeText.mock.calls[0][0] as string)
+      expect(shared.origin + shared.pathname).toBe(`${window.location.origin}/courses`)
+      expect(Object.fromEntries(shared.searchParams)).toEqual({ status: 'new', q: 'nest' })
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('поиск без результата подсказывает сбросить фильтры', async () => {

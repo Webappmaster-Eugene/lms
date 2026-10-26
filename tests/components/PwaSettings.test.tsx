@@ -183,6 +183,39 @@ describe('notification settings: consent and device subscriptions', () => {
     expect(JSON.parse(String(request?.[1]?.body))).toEqual({ remindersEnabled: false, emailBroadcastsEnabled: false, pushEnabled: false, reminderHour: 10, timezone: 'Asia/Novosibirsk' })
   })
 
+  it('отключает только это устройство: удаляет его подписку на сервере и в браузере', async () => {
+    getSubscription.mockResolvedValue({ endpoint: 'https://push.example/device-one', unsubscribe })
+    render(<NotificationSettings />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Отключить на этом устройстве' }))
+    expect(await screen.findByText('Уведомления на этом устройстве отключены. Другие устройства продолжают работать.')).toBeInTheDocument()
+    const removal = api.mock.calls.find(([path, init]) => path === '/api/push/subscriptions' && init?.method === 'DELETE')
+    expect(JSON.parse(String(removal?.[1]?.body))).toEqual({ endpoint: 'https://push.example/device-one' })
+    expect(unsubscribe).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: 'Включить уведомления' })).toBeEnabled()
+  })
+
+  it('подписку, которой уже нет в браузере, повторно не удаляет', async () => {
+    getSubscription.mockResolvedValueOnce({ endpoint: 'https://push.example/device-one', unsubscribe }).mockResolvedValue(null)
+    render(<NotificationSettings />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Отключить на этом устройстве' }))
+    expect(await screen.findByText(/Уведомления на этом устройстве отключены/)).toBeInTheDocument()
+    expect(api.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
+    expect(unsubscribe).not.toHaveBeenCalled()
+  })
+
+  it('подключённое устройство ставит в очередь проверочное уведомление; при выключенном push кнопка недоступна', async () => {
+    getSubscription.mockResolvedValue({ endpoint: 'https://push.example/device-one', unsubscribe })
+    render(<NotificationSettings />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Отправить проверочное уведомление' }))
+    expect(await screen.findByText(/Проверочное уведомление поставлено в очередь/)).toBeInTheDocument()
+    expect(api).toHaveBeenCalledWith('/api/push/test', expect.objectContaining({ method: 'POST' }))
+    cleanup()
+
+    api.mockImplementation(async () => Response.json({ ...settings, preferences: { ...settings.preferences, pushEnabled: false } }))
+    render(<NotificationSettings />)
+    expect(await screen.findByRole('button', { name: 'Отправить проверочное уведомление' })).toBeDisabled()
+  })
+
   it('an iPhone browser guides installation before offering a push permission prompt', async () => {
     navigatorProperty('userAgent', 'Mozilla/5.0 iPhone Safari')
     render(<NotificationSettings />)
@@ -236,6 +269,14 @@ describe('application installation is separate from notification consent', () =>
     expect(requestPermission).not.toHaveBeenCalled()
   })
 
+  it('на компьютере объясняет установку и для Android, и для iPhone', () => {
+    navigatorProperty('userAgent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) Chrome/130.0')
+    navigatorProperty('maxTouchPoints', 0)
+    render(<AppSettings />)
+    expect(screen.getByText('Android:')).toBeInTheDocument()
+    expect(screen.getByText('iPhone и iPad:')).toBeInTheDocument()
+  })
+
   it('recognizes an installed application without offering installation again', () => {
     navigatorProperty('standalone', true)
     render(<AppSettings />)
@@ -266,6 +307,19 @@ describe('PWA provider: installation, updates and live notifications', () => {
     expect(postMessage).not.toHaveBeenCalled()
     fireEvent.click(button)
     expect(postMessage).toHaveBeenCalledWith({ type: 'ACTIVATE_UPDATE' })
+  })
+
+  it('перезагружает страницу на новую версию только после нажатия «Обновить»', async () => {
+    const reload = vi.fn()
+    vi.stubGlobal('location', { ...window.location, reload })
+    registration.waiting = { postMessage: vi.fn() }
+    render(<PwaProvider />)
+    const button = await screen.findByRole('button', { name: 'Обновить' })
+    act(() => { serviceWorker.dispatchEvent(new Event('controllerchange')) })
+    expect(reload).not.toHaveBeenCalled()
+    fireEvent.click(button)
+    act(() => { serviceWorker.dispatchEvent(new Event('controllerchange')) })
+    expect(reload).toHaveBeenCalledOnce()
   })
 
   it('forwards worker notifications while mounted and removes the listener on navigation', async () => {

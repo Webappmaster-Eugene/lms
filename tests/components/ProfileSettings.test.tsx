@@ -147,6 +147,24 @@ describe('Настройки профиля', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('слабый новый пароль объясняется до запроса на сервер', async () => {
+    await openForm()
+    edit('Текущий пароль', 'Oldword1234')
+    edit('Новый пароль', 'onlyletters')
+    edit('Повторите новый пароль', 'onlyletters')
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить пароль' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Пароль должен содержать от 10 до 128 символов, буквы и цифры')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('фамилия редактируется и уходит в сохранение', async () => {
+    await openForm()
+    edit('Фамилия', 'Петрова')
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить профиль' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({ lastName: 'Петрова' })
+  })
+
   it('показывает пароль по доступной кнопке и очищает пароли после успешной смены', async () => {
     await openForm()
     fillPasswords()

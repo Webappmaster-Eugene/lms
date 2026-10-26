@@ -78,4 +78,71 @@ describe('полный список уведомлений', () => {
     expect(screen.getByRole('link', { name: 'Войти' })).toHaveAttribute('href', '/login?redirect=%2Fnotifications')
     expect(screen.queryByRole('list')).not.toBeInTheDocument()
   })
+
+  it('истёкшая при отметке прочитанным сессия ведёт к повторному входу', async () => {
+    const original = global.fetch
+    global.fetch = vi.fn(async (input, init) => init?.method === 'PATCH' ? new Response(null, { status: 401 }) : original(input, init)) as typeof fetch
+    render(<NotificationInbox userId={34} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Прочитано: Уведомление 1' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Сессия истекла')
+    expect(screen.queryByText('Уведомление 2')).not.toBeInTheDocument()
+  })
+
+  it('«Открыть» у непрочитанного отмечает его прочитанным, у прочитанного — нет', async () => {
+    docs = [notification('1'), { ...notification('2'), isRead: true }]
+    render(<NotificationInbox userId={34} />)
+    await userEvent.click(await screen.findByRole('link', { name: 'Открыть: Уведомление 1' }))
+    await waitFor(() => expect(screen.getByText('Непрочитанных: 0')).toBeInTheDocument())
+    await userEvent.click(screen.getByRole('link', { name: 'Открыть: Уведомление 2' }))
+    const patches = vi.mocked(global.fetch).mock.calls.filter(([, init]) => init?.method === 'PATCH').map(([url]) => String(url))
+    expect(patches).toEqual(['/api/notifications/1'])
+  })
+
+  it('«Назад» возвращает на предыдущую страницу, на первой странице кнопка неактивна', async () => {
+    docs = Array.from({ length: 21 }, (_, index) => notification(String(index + 1)))
+    render(<NotificationInbox userId={34} />)
+    expect(await screen.findByText('Страница 1 из 2')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Назад' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Дальше' }))
+    expect(await screen.findByText('Уведомление 21')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Дальше' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Назад' }))
+    expect(await screen.findByText('Уведомление 1')).toBeInTheDocument()
+    expect(screen.getByText('Страница 1 из 2')).toBeInTheDocument()
+  })
+
+  it('когда страница опустела после прочтения, список переходит на последнюю существующую', async () => {
+    docs = Array.from({ length: 21 }, (_, index) => notification(String(index + 1)))
+    render(<NotificationInbox userId={34} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Непрочитанные' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Дальше' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Прочитано: Уведомление 21' }))
+    expect(await screen.findByText('Уведомление 1')).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Страницы уведомлений' })).not.toBeInTheDocument()
+    expect(screen.getByText('Непрочитанных: 20')).toBeInTheDocument()
+  })
+
+  it('без непрочитанных фильтр говорит, что всё прочитано', async () => {
+    docs = [{ ...notification('1'), isRead: true }]
+    render(<NotificationInbox userId={34} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Непрочитанные' }))
+    expect(await screen.findByText('Все уведомления прочитаны')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Непрочитанные' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('после сбоя «Повторить загрузку» и «Обновить» запрашивают список заново', async () => {
+    const original = global.fetch
+    let fail = true
+    global.fetch = vi.fn(async (input, init) => fail ? new Response(null, { status: 503 }) : original(input, init)) as typeof fetch
+    render(<NotificationInbox userId={34} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Проверьте подключение')
+    fail = false
+    await userEvent.click(screen.getByRole('button', { name: 'Повторить загрузку' }))
+    expect(await screen.findByText('Уведомление 1')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+
+    docs = [...docs, { ...notification('3'), title: 'Свежий ответ ментора' }]
+    await userEvent.click(screen.getByRole('button', { name: 'Обновить' }))
+    expect(await screen.findByText('Свежий ответ ментора')).toBeInTheDocument()
+  })
 })

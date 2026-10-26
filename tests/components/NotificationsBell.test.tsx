@@ -259,6 +259,78 @@ describe('колокольчик уведомлений', () => {
       expect(init.credentials).toBe('include')
     })
 
+    it('сбой загрузки виден в списке, «Повторить» загружает снова', async () => {
+      let fail = true
+      global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+        if (fail) return new Response(null, { status: 502 })
+        return String(input).includes('/count?') ? Response.json({ totalDocs: 1 }) : Response.json({ docs: [notification('1', { title: 'Ответ ментора' })] })
+      }) as unknown as typeof fetch
+      const user = userEvent.setup()
+      render(<NotificationsBell />)
+      await openBell(user)
+      expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось загрузить уведомления. Попробуйте ещё раз.')
+      expect(screen.queryByText('Нет уведомлений')).not.toBeInTheDocument()
+
+      fail = false
+      await user.click(screen.getByRole('button', { name: 'Повторить' }))
+      expect(await screen.findByText('Ответ ментора')).toBeInTheDocument()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+
+    it('истёкшая сессия при отметке прочитанным предлагает войти снова и обнуляет счётчик', async () => {
+      global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === 'PATCH') return new Response(null, { status: 401 })
+        return String(input).includes('/count?') ? Response.json({ totalDocs: 1 }) : Response.json({ docs: [notification('1')] })
+      }) as unknown as typeof fetch
+      const user = userEvent.setup()
+      render(<NotificationsBell />)
+      await openBell(user)
+      await user.click(await screen.findByRole('button', { name: 'Прочитать показанные' }))
+      expect(await screen.findByRole('link', { name: 'Войдите снова' })).toHaveAttribute('href', '/login')
+      expect(screen.queryByText('1', { exact: true })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Прочитать показанные' })).not.toBeInTheDocument()
+    })
+
+    it('крестик закрывает список и возвращает фокус на колокольчик', async () => {
+      const user = userEvent.setup()
+      render(<NotificationsBell />)
+      await openBell(user)
+      expect(screen.getByRole('button', { name: 'Закрыть уведомления' })).toHaveFocus()
+      await user.click(screen.getByRole('button', { name: 'Закрыть уведомления' }))
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Уведомления' })).toHaveFocus()
+    })
+
+    it('переход по непрочитанному уведомлению отмечает его прочитанным и закрывает список', async () => {
+      mockApi([notification('5', { link: '/questions' })])
+      const user = userEvent.setup()
+      render(<NotificationsBell />)
+      await openBell(user)
+      await user.click(await screen.findByRole('link', { name: /Уведомление 5/ }))
+      await waitFor(() => expect(patched).toEqual(['/api/notifications/5']))
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('переход по прочитанному уведомлению повторно его не отмечает', async () => {
+      mockApi([notification('6', { link: '/questions', isRead: true })])
+      const user = userEvent.setup()
+      render(<NotificationsBell />)
+      await openBell(user)
+      await user.click(await screen.findByRole('link', { name: /Уведомление 6/ }))
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(patched).toEqual([])
+    })
+
+    it.each(['Все уведомления', 'Настройки уведомлений'])('ссылка «%s» закрывает список', async (name) => {
+      const user = userEvent.setup()
+      render(<NotificationsBell />)
+      await openBell(user)
+      const link = screen.getByRole('link', { name })
+      expect(link).toHaveAttribute('href', name === 'Все уведомления' ? '/notifications' : '/settings/notifications')
+      await user.click(link)
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
     it('битый ответ не роняет шапку', async () => {
       global.fetch = vi.fn(async () => new Response('не json', { status: 200 })) as unknown as typeof fetch
 

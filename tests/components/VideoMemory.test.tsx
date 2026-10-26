@@ -99,6 +99,28 @@ describe('память видео', () => {
     window.removeEventListener('lms:video-ended', listener)
   })
 
+  it('перемотка ползунком запоминает новое место сразу, не дожидаясь паузы', () => {
+    const { container } = renderPlayer()
+    loadMetadata(video(container))
+    video(container).currentTime = 1500
+    fireEvent(video(container), new Event('seeked'))
+
+    expect(JSON.parse(window.localStorage.getItem('lms:video-positions') ?? '{}')[URL_A]).toMatchObject({ t: 1500 })
+  })
+
+  it('прыжок к месту остановки при открытии не сохраняется как перемотка, а следующая перемотка ученика — сохраняется', () => {
+    window.localStorage.setItem('lms:video-positions', JSON.stringify({ [URL_A]: { t: 300, at: 1 } }))
+    const { container } = renderPlayer()
+    loadMetadata(video(container))
+    expect(video(container).currentTime).toBe(300)
+    fireEvent(video(container), new Event('seeked'))
+    expect(JSON.parse(window.localStorage.getItem('lms:video-positions') ?? '{}')[URL_A]).toEqual({ t: 300, at: 1 })
+
+    video(container).currentTime = 900
+    fireEvent(video(container), new Event('seeked'))
+    expect(JSON.parse(window.localStorage.getItem('lms:video-positions') ?? '{}')[URL_A]).toMatchObject({ t: 900 })
+  })
+
   it('досмотренное видео начинается сначала', () => {
     const first = renderPlayer()
     loadMetadata(video(first.container))
