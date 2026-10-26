@@ -19,6 +19,9 @@ export default defineConfig({
     projects: [
       {
         resolve: { alias },
+        // Смоук-тесты импортируют данные лендинга, а landing/tsconfig.json наследует
+        // astro/tsconfigs/strict из landing/node_modules, которых в job quality нет.
+        tsconfig: fileURLToPath(new URL('./tsconfig.json', import.meta.url)),
         test: {
           name: 'unit',
           environment: 'node',

@@ -32,6 +32,8 @@ const MATRIX: Record<string, Matrix> = {
   // Справочник категорий: названия видят все вошедшие, меняет только админ.
   'guide-categories': CONTENT,
   'learning-access-grants': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
+  // Заявки с лендинга — персональные данные: публичная форма пишет через свой маршрут, а не REST.
+  'bootcamp-leads': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
   'learning-access-audit': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'learning-access-policies': { create: 'nobody', read: 'own', update: 'nobody', delete: 'nobody' },
   'auth-session-revocations': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
@@ -81,6 +83,7 @@ const PATCH: Record<string, Record<string, unknown>> = {
   guides: { order: 7 },
   'guide-categories': { order: 7 },
   'learning-access-grants': { note: 'Обновлено' },
+  'bootcamp-leads': { status: 'contacted' },
   'learning-access-audit': { effect: 'deny' },
   'learning-access-policies': { mode: 'all' },
   'auth-session-revocations': { expiresAt: new Date().toISOString() },
