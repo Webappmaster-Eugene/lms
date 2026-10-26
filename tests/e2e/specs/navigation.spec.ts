@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { CONTENT, USERS, NOT_FOUND_HEADING } from '../fixtures/data'
-import { storageStateOf } from '../fixtures/env'
+import { APP_URL, storageStateOf } from '../fixtures/env'
 
 /**
  * Навигация, тема, поиск, 404 и формы (поддержка, профиль).
@@ -99,6 +99,23 @@ test('роадмап: граф с узлами, клик по узлу откр�
   await expect(panel).toBeHidden()
 })
 
+test.describe('ученик без прогресса', () => {
+  test.use({ storageState: storageStateOf('student') })
+
+  test('список роадмапов: карточка с описанием, составом и прогрессом ведёт на карту', async ({ page }) => {
+    await page.goto('/roadmaps')
+    await expect(page.getByRole('heading', { name: 'Роадмапы', level: 1 })).toBeVisible()
+    const card = page.getByRole('link', { name: new RegExp(CONTENT.roadmap.title) })
+    await expect(card.getByRole('heading', { name: CONTENT.roadmap.title, level: 2 })).toBeVisible()
+    await expect(card).toContainText('Путь от первой HTML-страницы до уверенного фронтенда.')
+    await expect(card).toContainText(`1 курс · ${CONTENT.lessons.length} урока · Не начат`)
+    await expect(card.getByRole('progressbar', { name: `Прогресс роадмапа «${CONTENT.roadmap.title}»` })).toHaveAttribute('aria-valuenow', '0')
+    await card.click()
+    await expect(page).toHaveURL((url) => url.pathname === `/roadmaps/${CONTENT.roadmap.slug}`)
+    await expect(page.getByRole('heading', { name: CONTENT.roadmap.title, level: 1 })).toBeVisible()
+  })
+})
+
 test('неизвестный адрес — своя страница 404 с меню платформы', async ({ page }) => {
   await page.goto('/definitely-not-a-page')
   await expect(page.getByRole('heading', { name: NOT_FOUND_HEADING })).toBeVisible()
@@ -110,6 +127,20 @@ test('неизвестный адрес — своя страница 404 с м�
 test('неизвестный адрес отвечает HTTP 404', async ({ request }) => {
   const response = await request.get('/definitely-not-a-page')
   expect(response.status()).toBe(404)
+})
+
+test('БАГ: ненайденная запись в разделах со своим loading.tsx отвечает HTTP 200 вместо 404', async ({ request, playwright }) => {
+  // manage/loading.tsx и interviews/loading.tsx начинают стримить ответ до notFound() страницы:
+  // пользователь видит страницу 404, а сервер отвечает 200 — та же причина, что у списков выше.
+  test.fail()
+  const admin = await playwright.request.newContext({ baseURL: APP_URL, extraHTTPHeaders: { Origin: APP_URL }, storageState: storageStateOf('admin') })
+  try {
+    // Без перехода по редиректу: уход на /login не должен выглядеть как ответ страницы.
+    expect((await request.get('/interviews/999999', { maxRedirects: 0 })).status(), '/interviews/999999').toBe(404)
+    for (const path of ['/manage/courses/999999', '/manage/broadcasts/999999', '/manage/lessons/new']) {
+      expect((await admin.get(path, { maxRedirects: 0 })).status(), path).toBe(404)
+    }
+  } finally { await admin.dispose() }
 })
 
 test('FAQ на странице помощи раскрывает ответ', async ({ page }) => {

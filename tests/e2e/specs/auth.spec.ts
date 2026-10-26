@@ -11,7 +11,13 @@ import { APP_URL, storageStateOf } from '../fixtures/env'
  * Вход, выход, защищённые страницы, восстановление пароля и «регистрация» —
  * в LMS аккаунты заводит админ, студент задаёт пароль по ссылке из письма.
  */
-const PROTECTED = ['/', '/courses', '/lessons/e2e-html', '/trainer', '/roadmaps', '/leaderboard', '/profile', '/help', '/certificates']
+const PROTECTED = [
+  '/', '/courses', '/lessons/e2e-html', '/trainer', '/roadmaps', '/leaderboard', '/profile', '/help', '/certificates',
+  `/courses/${CONTENT.course.slug}`, `/roadmaps/${CONTENT.roadmap.slug}`, `/trainer/${CONTENT.topic.slug}`,
+  `/trainer/${CONTENT.topic.slug}/${CONTENT.task.slug}`, '/trainer/tasks', '/notes', '/questions', '/saved',
+  '/notifications', '/learning-history', '/contacts', '/profile/edit', '/certificates/1', '/interviews', '/interviews/1',
+  '/settings/app', '/settings/notifications',
+]
 
 test.describe('аноним', () => {
   for (const path of PROTECTED) {
