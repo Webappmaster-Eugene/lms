@@ -2,6 +2,7 @@ import { postgresAdapter, sql } from '@payloadcms/db-postgres'
 import { APIError } from 'payload'
 import { captureThrottled } from '@/lib/error-reporting/capture'
 import { logger } from '@/lib/telemetry'
+import { COMMIT_TASKS, runCommitTasks, type SessionWithTasks } from '@/server/after-commit'
 
 type StoredSession = { id: string; expiresAt: string | Date; [key: string]: unknown }
 function activeSessions(value: unknown): StoredSession[] {
@@ -39,6 +40,15 @@ export function securePostgresAdapter(args: Parameters<typeof postgresAdapter>[0
           await connect(options)
           watchPoolErrors(adapter.pool)
         }
+      }
+      // Задачи afterCommit: снимаются с сессии до commit, потому что commit её удаляет.
+      Object.assign(adapter, { [COMMIT_TASKS]: true })
+      const commitTransaction = adapter.commitTransaction.bind(adapter)
+      adapter.commitTransaction = async (incomingID) => {
+        const id = incomingID instanceof Promise ? await incomingID : incomingID
+        const tasks = (adapter.sessions[id] as SessionWithTasks | undefined)?.[COMMIT_TASKS]
+        await commitTransaction(id)
+        await runCommitTasks(tasks)
       }
       const updateOne = adapter.updateOne.bind(adapter)
       adapter.updateOne = async (options) => {

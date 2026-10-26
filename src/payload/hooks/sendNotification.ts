@@ -6,6 +6,23 @@ import {
   roadmapCompletedEmail,
 } from '@/payload/emails/templates'
 import { withSpan, logger } from '@/lib/telemetry'
+import { afterCommit } from '@/server/after-commit'
+
+type EmailMessage = { to: string; subject: string; html: string; text: string }
+
+/**
+ * Письмо не отозвать, поэтому оно уходит только после фиксации транзакции: при
+ * откате ученик получил бы письмо о награде или аккаунте, которых в базе нет.
+ */
+function sendAfterCommit(req: PayloadRequest, message: EmailMessage, failure: string, attributes: Record<string, string>): Promise<void> {
+  return afterCommit(req, async () => {
+    try {
+      await req.payload.sendEmail(message)
+    } catch (err) {
+      logger.error(failure, err, attributes)
+    }
+  })
+}
 
 /**
  * Передаётся поштучно в `forgotPassword`, а не в `Users.auth.forgotPassword.expiration`:
@@ -54,7 +71,7 @@ export const sendInviteEmail: CollectionAfterChangeHook = async ({ doc, operatio
       }
 
       const { subject, html, text } = inviteEmail(doc.firstName ?? '', doc.email, token, await communityUrl(req))
-      await req.payload.sendEmail({ to: doc.email, subject, html, text })
+      await sendAfterCommit(req, { to: doc.email, subject, html, text }, 'Failed to send invite email', { 'user.email': doc.email })
     } catch (err) {
       logger.error('Failed to send invite email', err, { 'user.email': doc.email })
     }
@@ -95,7 +112,7 @@ export const sendCompletionEmail: CollectionAfterChangeHook = async ({
           doc.amount ?? 0,
           course.slug,
         )
-        await req.payload.sendEmail({ to: user.email, subject, html, text })
+        await sendAfterCommit(req, { to: user.email, subject, html, text }, 'Failed to send completion email', { 'user.id': userId, 'points.reason': reason })
       }
 
       if (reason === 'roadmap_completed' && doc.relatedEntity) {
@@ -110,7 +127,7 @@ export const sendCompletionEmail: CollectionAfterChangeHook = async ({
           doc.amount ?? 0,
           roadmap.slug,
         )
-        await req.payload.sendEmail({ to: user.email, subject, html, text })
+        await sendAfterCommit(req, { to: user.email, subject, html, text }, 'Failed to send completion email', { 'user.id': userId, 'points.reason': reason })
       }
     } catch (err) {
       logger.error('Failed to send completion email', err, { 'user.id': userId, 'points.reason': reason })
@@ -151,7 +168,7 @@ export const sendAchievementEmail: CollectionAfterChangeHook = async ({
         achievement.pointsReward ?? 0,
       )
 
-      await req.payload.sendEmail({ to: user.email, subject, html, text })
+      await sendAfterCommit(req, { to: user.email, subject, html, text }, 'Failed to send achievement email', { 'user.id': userId })
     } catch (err) {
       logger.error('Failed to send achievement email', err, { 'user.id': userId })
     }
