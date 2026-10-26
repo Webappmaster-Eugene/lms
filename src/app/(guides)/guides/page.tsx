@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { CheckCircle2, Clock, Compass } from 'lucide-react'
+import { CheckCircle2, Clock, Compass, Globe } from 'lucide-react'
 import { collectAllPages } from '@/lib/paginate'
 import { guideIsNew } from '@/lib/guides'
 import { learningRelationId } from '@/lib/learning-access'
@@ -33,7 +33,7 @@ export default async function GuidesPage({ searchParams }: Props) {
         payload.find({
           collection: 'guides',
           sort: ['order', 'id'],
-          select: { title: true, slug: true, summary: true, category: true, readingMinutes: true, reviewedAt: true, announcedAt: true, isPublished: true, updatedAt: true },
+          select: { title: true, slug: true, summary: true, category: true, readingMinutes: true, reviewedAt: true, announcedAt: true, isPublished: true, isPublic: true, updatedAt: true },
           depth: 0,
           overrideAccess: false,
           req,
@@ -67,6 +67,12 @@ export default async function GuidesPage({ searchParams }: Props) {
           <h1 className="text-xl font-bold text-foreground sm:text-2xl">Гайды</h1>
         </div>
         <p className="text-sm text-muted-foreground">Практические инструкции: карьера, работа с ИИ, своё дело — открывайте в любом порядке</p>
+        {user && guides.some((guide) => guide.isPublished && guide.isPublic) && (
+          <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
+            <Globe className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />
+            С меткой «Публичный» гайд открывается без входа — ссылкой можно поделиться с кем угодно
+          </p>
+        )}
       </div>
 
       {/* Фильтр нужен, когда гайды есть хотя бы в двух категориях. */}
@@ -110,15 +116,23 @@ export default async function GuidesPage({ searchParams }: Props) {
             const isNew = !!user && user.role !== 'admin' && guideIsNew(guide.announcedAt, isRead)
             const categoryId = guideCategoryId(guide)
             const label = categoryId != null ? categoryById.get(categoryId)?.title ?? null : null
+            // Гость видит только публичные гайды — метка на каждой карточке ему ничего не сообщает.
+            const showPublic = !!user && guide.isPublic === true
             return (
               <li key={guide.id}>
                 <Link
                   href={`/guides/${guide.slug}`}
                   className="group flex h-full flex-col rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/50 hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring sm:p-5"
                 >
-                  {(!guide.isPublished || isNew || label) && (
+                  {(!guide.isPublished || showPublic || isNew || label) && (
                     <span className="mb-2 flex flex-wrap items-center gap-2">
                       {!guide.isPublished && <span className="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-muted-foreground">Черновик</span>}
+                      {showPublic && (
+                        <span className={cn('inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium', guide.isPublished ? 'bg-success/10 text-success' : 'bg-secondary text-muted-foreground')}>
+                          <Globe className="h-3 w-3" aria-hidden="true" />
+                          {guide.isPublished ? 'Публичный' : 'Публичный после публикации'}
+                        </span>
+                      )}
                       {isNew && <span className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground">Новое</span>}
                       {label && <span className="text-xs font-semibold uppercase tracking-wide text-primary">{label}</span>}
                     </span>

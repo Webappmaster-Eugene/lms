@@ -24,6 +24,11 @@ test('админ делает гайд публичным: гость читае
       page.waitForResponse((response) => response.url().includes(`/api/guides/${item.id}`) && response.request().method() === 'PATCH' && response.ok()),
       page.getByRole('button', { name: 'Save', exact: true }).first().click(),
     ])
+    await page.goto('/guides')
+    await expect(page.getByRole('link', { name: new RegExp(item.title) }).getByText('Публичный', { exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: new RegExp(closed.title) }).getByText('Публичный', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: new RegExp(draft.title) }).getByText('Публичный после публикации', { exact: true })).toBeVisible()
+    await expect(page.getByText('С меткой «Публичный» гайд открывается без входа')).toBeVisible()
 
     const reader = await guest.newPage()
     const response = await reader.goto(`/guides/${item.slug}`)
@@ -44,6 +49,7 @@ test('админ делает гайд публичным: гость читае
     expect(await download.text()).toContain('Текст инструкции.')
     await reader.goto('/guides')
     await expect(reader.getByRole('link', { name: new RegExp(item.title) })).toBeVisible()
+    await expect(reader.getByText('Публичный', { exact: true })).toHaveCount(0)
     await expect(reader.getByText(closed.title)).toHaveCount(0)
     await expect(reader.getByText(draft.title)).toHaveCount(0)
     const sitemap = await guest.request.get('/sitemap.xml')
