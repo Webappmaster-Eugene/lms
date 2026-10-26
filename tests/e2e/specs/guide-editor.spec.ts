@@ -1,13 +1,26 @@
 import { expect, test, type Locator } from '@playwright/test'
 
+import { CONTENT } from '../fixtures/data'
 import { storageStateOf } from '../fixtures/env'
 
 test.use({ storageState: storageStateOf('admin') })
 
+/** Собственный font-family у pre расходится (дефект, см. «БАГ» ниже); текст блока — в code, его шрифт сравнивается. */
+function withoutPreFont(rows: string[][]) {
+  return rows.map((row) => row[0] === 'pre' ? [row[0], ...row.slice(2)] : row)
+}
+
+async function preFont(root: Locator) {
+  return root.locator('pre').first().evaluate(async (element) => {
+    await document.fonts.ready
+    return getComputedStyle(element).fontFamily
+  })
+}
+
 async function typography(root: Locator) {
   return root.evaluate(async (element) => {
     await document.fonts.ready
-    return ['h2', 'p', 'ul', 'li', 'code', 'blockquote', 'th', 'td', 'pre'].map((selector) => {
+    return ['h2', 'p', 'ul', 'li', 'code', 'blockquote', 'th', 'td', 'pre', 'pre code'].map((selector) => {
       const node = element.querySelector(selector)
       if (!node) throw new Error(`Не найден ${selector}`)
       const style = getComputedStyle(node)
@@ -59,8 +72,27 @@ test('Markdown: исправление списков, отмена, Enter, со
     const article = page.locator('article .guide-prose')
     await expect(article.getByRole('heading', { name: 'Раздел' })).toBeVisible()
     await expect(article.locator('pre.shiki')).toContainText('pnpm install')
-    expect(await typography(article)).toEqual(before)
+    expect(withoutPreFont(await typography(article))).toEqual(withoutPreFont(before))
   } finally {
     await request.delete(`/api/guides/${id}`)
   }
+})
+
+test('БАГ: у блока кода (pre) разный font-family в превью CMS и в статье', async ({ page, request }) => {
+  // src/components/guides/guide-prose.css: у `.guide-prose pre` нет font-family. В статье его задаёт
+  // preflight Tailwind (ui-monospace, …, monospace), в админке Payload preflight нет — остаётся
+  // браузерный `monospace`. Текст блока внутри code со своим шрифтом, поэтому глазу разница почти не видна.
+  test.fail()
+  const found = await request.get(`/api/guides?where[slug][equals]=${CONTENT.guide.slug}&depth=0`)
+  const id = (await found.json()).docs[0].id as number
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.goto(`/admin/collections/guides/${id}`)
+  await page.getByRole('group', { name: 'Вид редактора' }).getByRole('button', { name: 'Рядом' }).click()
+  const preview = page.getByLabel('Предпросмотр гайда').locator('.guide-prose')
+  await expect(preview.locator('pre.shiki')).toContainText('pnpm install')
+  const inEditor = await preFont(preview)
+  await page.goto(`/guides/${CONTENT.guide.slug}`)
+  const article = page.locator('article .guide-prose')
+  await expect(article.locator('pre.shiki')).toContainText('pnpm install')
+  expect(await preFont(article)).toBe(inEditor)
 })

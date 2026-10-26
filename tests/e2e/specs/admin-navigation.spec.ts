@@ -89,6 +89,27 @@ test.describe('переходы администратора', () => {
     await expect(menu).toHaveCount(0)
   })
 
+  test('импорт из Яндекс.Диска: кнопка ждёт курс и ссылку, чужая ссылка отклоняется без изменений курса', async ({ page }) => {
+    const lessonsOf = async () => (await (await page.request.get(`/api/lessons?where[course.slug][equals]=${CONTENT.course.slug}&limit=0&depth=0`)).json()).totalDocs as number
+    const before = await lessonsOf()
+    await page.goto('/admin/import-yandex')
+    await expect(page.getByRole('heading', { name: 'Импорт из Яндекс.Диска', level: 1 })).toBeVisible()
+    await expect(page.getByText('1.1 - Название видео.mp4')).toBeVisible()
+    const submit = page.getByRole('button', { name: 'Импортировать', exact: true })
+    await expect(submit).toBeDisabled()
+    await page.getByLabel('Курс', { exact: true }).selectOption({ label: CONTENT.course.title })
+    await expect(submit).toBeDisabled()
+    await page.getByLabel('Публичная ссылка на папку Яндекс.Диска').fill('https://example.com/d/lessons')
+    await expect(submit).toBeEnabled()
+    // Адрес не Диска отклоняется до любого обращения наружу.
+    const rejected = page.waitForResponse((response) => response.url().endsWith('/api/yandex-disk/import') && response.request().method() === 'POST')
+    await submit.click()
+    expect((await rejected).status()).toBe(400)
+    await expect(page.getByText('Ссылка не похожа на публичную папку Яндекс.Диска')).toBeVisible()
+    await expect(page.getByText(/Импорт завершён/)).toHaveCount(0)
+    expect(await lessonsOf()).toBe(before)
+  })
+
   test('на странице карты есть переход прямо к её редактору', async ({ page }) => {
     await page.goto(`/roadmaps/${CONTENT.roadmap.slug}`)
     await page.getByRole('link', { name: 'Редактировать карту' }).click()
