@@ -263,7 +263,7 @@ describe('вкладка «Разбор»', () => {
   it('frontend-проект показывает эталон по файлам с подписью имени', async () => {
     vi.mocked(fetch).mockResolvedValue(solutionResponse({
       solutionCode: null,
-      solutionFiles: { 'App.tsx': 'export default function App() { return <h1>Привет</h1> }', 'styles.css': 'h1 { color: red }', 'README': 'Без расширения' },
+      solutionFiles: { 'App.tsx': 'export default function App() { return <h1>Привет</h1> }', 'styles.css': 'h1 { color: red }', 'main.js': 'render(App)', 'utils.ts': 'export const id = (x: number) => x', 'README': 'Без расширения' },
     }))
     renderPanel({ languages: ['react'], checkMode: 'dom' })
     await openTab('Разбор')
@@ -272,6 +272,8 @@ describe('вкладка «Разбор»', () => {
     expect(within(app).getByText(/<h1>Привет<\/h1>/).closest('code')).toHaveClass('language-tsx')
     const styles = screen.getByRole('heading', { name: 'styles.css' }).closest('section') as HTMLElement
     expect(within(styles).getByText('h1 { color: red }').closest('code')).toHaveClass('language-css')
+    expect(screen.getByText('render(App)').closest('code')).toHaveClass('language-javascript')
+    expect(screen.getByText('export const id = (x: number) => x').closest('code')).toHaveClass('language-typescript')
     expect(screen.getByRole('heading', { name: 'README' })).toBeInTheDocument()
     expect(screen.getByText('Без расширения')).toBeInTheDocument()
   })

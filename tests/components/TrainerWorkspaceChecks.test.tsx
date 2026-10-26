@@ -473,6 +473,18 @@ describe('язык, задача и черновик', () => {
     expect(editor()).toHaveValue('const ts = 1')
   })
 
+  it('повторный выбор текущего языка не трогает адрес и код', async () => {
+    const user = userEvent.setup()
+    setNavigationURL('/trainer/js-core/sum?lang=ts')
+    render(<TrainerWorkspace task={task} progress={progress} />)
+    fireEvent.change(editor(), { target: { value: 'const draft: number = 1' } })
+
+    await user.click(screen.getByRole('button', { name: 'TypeScript' }))
+
+    expect(window.history.pushState).not.toHaveBeenCalled()
+    expect(editor()).toHaveValue('const draft: number = 1')
+  })
+
   it('сохранённый язык, который задача больше не поддерживает, заменяется первым доступным', () => {
     render(<TrainerWorkspace task={task} progress={{ ...progress, savedCode: 'print(1)', savedLanguage: 'python' }} />)
 
@@ -562,6 +574,27 @@ describe('Go и предпросмотр frontend', () => {
     fireEvent(window, new Event('pagehide'))
 
     expect(fetchMock).toHaveBeenCalledWith(`/api/trainer/preview-release/${lease}`, { method: 'POST', keepalive: true, credentials: 'omit' })
+  })
+
+  it('если прежний предпросмотр не закрылся, новый запуск и отправка не начинаются', async () => {
+    const user = userEvent.setup()
+    const fetchMock = serve({
+      '/api/trainer/run': () => Response.json({ result: outcome(), preview: { leaseToken: lease, previewPath: `/api/trainer/preview/${lease}/` } }),
+      [`/api/trainer/preview-release/${lease}`]: () => new Response(null, { status: 503 }),
+    })
+    render(<TrainerWorkspace task={nextTask} progress={progress} />)
+    await screen.findByLabelText('Файлы проекта')
+    await user.click(screen.getByRole('button', { name: 'Запустить' }))
+    await screen.findByLabelText('Адрес предпросмотра')
+
+    await user.click(screen.getByRole('button', { name: 'Запустить' }))
+    expect(await screen.findByText('Не удалось закрыть предыдущий предпросмотр. Повторите запуск.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Отправить' }))
+    expect(await screen.findByText('Не удалось закрыть предыдущий предпросмотр. Повторите отправку.')).toBeInTheDocument()
+
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/trainer/run')).toHaveLength(1)
+    expect(fetchMock.mock.calls.some(([url]) => url === '/api/trainer/submit')).toBe(false)
+    expect(navigationRouter().refresh).not.toHaveBeenCalled()
   })
 
   it('ответ, пришедший после ухода со страницы, не оставляет сессию предпросмотра висеть', async () => {
