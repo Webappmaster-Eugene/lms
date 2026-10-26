@@ -179,8 +179,12 @@ export function useEditorSave(roadmapId: number) {
         }
         return { ok: false, error: String(err) }
       } finally {
-        setIsSaving(false)
-        abortRef.current = null
+        // Отменённое сохранение завершается позже, чем стартует новое, — сбросить признак
+        // и ссылку на контроллер вправе только то сохранение, которое ещё текущее.
+        if (abortRef.current === controller) {
+          abortRef.current = null
+          setIsSaving(false)
+        }
       }
     },
     [roadmapId],

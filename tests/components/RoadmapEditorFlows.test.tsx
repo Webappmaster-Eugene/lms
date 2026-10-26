@@ -353,10 +353,9 @@ describe('сохранение: отказ на каждом шаге', () => {
     await act(async () => { await expect(second).resolves.toEqual({ ok: true }) })
   })
 
-  // Дефект: finally отменённого сохранения (use-editor-save.ts:181-183) снимает isSaving и обнуляет abortRef,
-  // хотя новое сохранение ещё идёт. Кнопка «Сохранить» снова доступна посреди записи, а третье
-  // сохранение уже не отменит второе. Сейчас из интерфейса не воспроизводится: кнопка заблокирована на время записи.
-  it.fails('пока идёт новое сохранение, признак сохранения не снимается — дефект: его снимает отменённое', async () => {
+  // Признак принадлежит текущему сохранению: иначе посреди записи снова доступна кнопка «Сохранить»,
+  // а следующее сохранение уже не сможет отменить идущее.
+  it('пока идёт новое сохранение, отменённое предыдущее не снимает признак сохранения', async () => {
     let finish: (() => void) | undefined
     api({ save: (_url, init) => new Promise<Response>((resolve, reject) => {
       init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
@@ -372,6 +371,7 @@ describe('сохранение: отказ на каждом шаге', () => {
 
     expect(result.current.isSaving).toBe(true)
     await act(async () => { finish?.() })
+    await waitFor(() => expect(result.current.isSaving).toBe(false))
   })
 })
 
