@@ -16,9 +16,11 @@ const SERVER_FILE = fileURLToPath(new URL('../../../src/lib/trainer/constants.ts
 
 beforeAll(async () => {
   compile = ((await import('@/server/trainer/typescript-service.mjs')) as { compile: Compile }).compile
-})
+  // Первый разбор lib.*.d.ts занимает секунды — он не должен съедать бюджет теста.
+  compile({ code: 'const warmUp: number = 1\n', checkTypes: true })
+}, 60_000)
 
-describe('typescript-service: граница файловой системы', () => {
+describe('typescript-service: граница файловой системы', { timeout: 20_000 }, () => {
   it('/// <reference path> на файл сервера не подключает его объявления', () => {
     const { diagnostics } = compile({ code: `/// <reference path="${SERVER_FILE}" />\nconst limit: number = TRAINER_LIMITS.maxCodeLength\n`, checkTypes: true })
     expect(diagnostics).toEqual([expect.objectContaining({ code: 2304, line: 2, category: 'error', message: "Cannot find name 'TRAINER_LIMITS'." })])

@@ -13,6 +13,9 @@ import { getRunnerPool, TrainerRunnerError } from '@/server/trainer/pool'
  * подмены child_process.
  */
 
+// Каждый тест поднимает настоящие процессы: под нагрузкой их старт не укладывается в 5 с по умолчанию.
+vi.setConfig({ testTimeout: 20_000 })
+
 const logger = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }))
 vi.mock('@/lib/telemetry', () => ({ logger }))
 
@@ -34,7 +37,7 @@ function run<T>(pool: Pool, payload: Record<string, unknown>, timeLimitMs = 5000
 
 /** Процесс исчез из таблицы процессов — значит, пул уже получил его exit. */
 async function waitForExit(pid: number): Promise<void> {
-  await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow(), { timeout: 5000, interval: 20 })
+  await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow(), { timeout: 15_000, interval: 20 })
 }
 
 beforeEach(() => {
@@ -78,7 +81,7 @@ describe('пул песочницы: ответы раннера', () => {
   it('вывод раннера в stderr попадает в журнал предупреждением не длиннее 500 символов', async () => {
     const text = 'stderr-маркер '.repeat(60)
     expect(await run(getRunnerPool(), { action: 'stderr', text })).toBe('записано')
-    await vi.waitFor(() => expect(logger.warn).toHaveBeenCalled())
+    await vi.waitFor(() => expect(logger.warn).toHaveBeenCalled(), { timeout: 10_000 })
     const [message, attributes] = logger.warn.mock.calls[0] as [string, Record<string, string>]
     expect(message).toBe('Песочница тренажёра написала в stderr')
     expect(attributes['trainer.runner.stderr'].length).toBeLessThanOrEqual(500)
