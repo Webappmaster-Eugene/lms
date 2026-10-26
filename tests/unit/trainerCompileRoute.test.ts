@@ -163,6 +163,29 @@ describe('POST /api/trainer/compile', () => {
     expect(compileTypeScript.mock.calls[0][0].typeHarness).toBe('type case1 = 1')
   })
 
+  it('задача не найдена или снята с публикации — 404 без компиляции', async () => {
+    find.mockResolvedValue({ docs: [], totalDocs: 0 })
+    const response = await POST(compileRequest({ taskId: '42', code: 'x' }))
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({ error: 'Задача не найдена' })
+    expect(compileTypeScript).not.toHaveBeenCalled()
+  })
+
+  it('непредвиденный сбой компиляции — 500 без текста исключения', async () => {
+    compileTypeScript.mockRejectedValue(new Error('ENOMEM at /srv/app/secret-path'))
+    const response = await POST(compileRequest({ taskId: '42', code: 'x' }))
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({ error: 'Не удалось скомпилировать решение' })
+  })
+
+  it('перегруженный компилятор — 503 с просьбой подождать', async () => {
+    const { TrainerRunnerError } = await import('@/server/trainer/pool')
+    compileTypeScript.mockRejectedValue(new TrainerRunnerError('очередь', { overloaded: true }))
+    const response = await POST(compileRequest({ taskId: '42', code: 'x' }))
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ error: 'Компилятор перегружен, попробуйте через несколько секунд' })
+  })
+
   it('недоступный компилятор — 503', async () => {
     const { TrainerRunnerError } = await import('@/server/trainer/pool')
     compileTypeScript.mockRejectedValue(new TrainerRunnerError('нет процессов'))

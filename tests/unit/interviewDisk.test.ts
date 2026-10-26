@@ -5,7 +5,7 @@ const publicHref = vi.fn()
 const invalidateHref = vi.fn()
 vi.mock('@/lib/yandex-disk-href', () => ({ resolveHref: publicHref, invalidateHref }))
 
-const { assertPrivateRecordingPath, createUpload, fetchSharedRecordings, finishUpload, recordingFormat, removePrivateFile, resolveRecordingHref, safeInterviewUploadHref, uploadPrivateFile } = await import('@/server/interviews/disk')
+const { assertPrivateRecordingPath, createUpload, fetchSharedRecordings, finishUpload, InterviewStorageError, recordingFormat, removePrivateFile, resolveRecordingHref, safeInterviewUploadHref, uploadPrivateFile } = await import('@/server/interviews/disk')
 const fetchMock = vi.fn()
 const PATH = 'disk:/LMS interviews/23/45-7a3dc8a9-5b54-415b-a719-a4610b1408f2.mp4'
 const UPLOAD = 'https://uploader54j.disk.yandex.net/upload-target/secret'
@@ -245,5 +245,125 @@ describe('shared library folder import', () => {
     fetchMock.mockImplementation(async () => json({ _embedded: { items: [], total: 1 } }))
     await expect(fetchSharedRecordings()).rejects.toThrow('неполный список')
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('отказы Яндекс Диска', () => {
+  it.each([
+    [404, 404, 'Запись не найдена на Яндекс Диске'],
+    [401, 503, 'Доступ к хранилищу собеседований не настроен'],
+    [403, 503, 'Доступ к хранилищу собеседований не настроен'],
+    [507, 503, 'В хранилище собеседований закончилось место'],
+    [429, 429, 'Яндекс Диск временно недоступен. Повторите попытку позже'],
+    [500, 502, 'Яндекс Диск временно недоступен. Повторите попытку позже'],
+  ])('ответ API %s превращается в статус %s без тела ответа диска', async (remote, statusCode, message) => {
+    fetchMock.mockResolvedValue(new Response('{"description":"OAuth unit-secret"}', { status: remote }))
+    const error = await finishUpload({ diskPath: PATH, expectedSize: 3 }).catch((reason: unknown) => reason)
+    expect(error).toMatchObject({ statusCode, message })
+    expect(JSON.stringify(error)).not.toContain('unit-secret')
+  })
+  it('различает таймаут и обрыв соединения, не раскрывая сетевых деталей', async () => {
+    fetchMock.mockRejectedValue(new TypeError('connect ECONNREFUSED 10.0.0.1:443'))
+    await expect(finishUpload({ diskPath: PATH, expectedSize: 3 })).rejects.toMatchObject({ statusCode: 502, message: 'Не удалось подключиться к Яндекс Диску' })
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(AbortSignal.abort())
+    await expect(finishUpload({ diskPath: PATH, expectedSize: 3 })).rejects.toMatchObject({ statusCode: 502, message: 'Яндекс Диск не ответил вовремя. Повторите попытку' })
+  })
+  it('отмену вызывающим не выдаёт за сбой диска', async () => {
+    const controller = new AbortController()
+    fetchMock.mockImplementation(async () => {
+      controller.abort()
+      throw new DOMException('aborted', 'AbortError')
+    })
+    await expect(resolveRecordingHref({ diskPath: PATH }, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
+  })
+  it('уже существующая папка (409 и тип dir) не мешает резервированию', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 409 })).mockResolvedValueOnce(json({ type: 'dir' }))
+      .mockResolvedValueOnce(new Response(null, { status: 201 })).mockResolvedValueOnce(link())
+    const result = await createUpload({ ownerId: 23, recordingId: 45, size: 5, mimeType: 'video/mp4', extension: 'mp4' })
+    expect(result.uploadHref).toBe(UPLOAD)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+  })
+})
+
+describe('сбои потоковой загрузки', () => {
+  const upload = (request = new Request('http://localhost/upload', { method: 'PUT', body: new Uint8Array(3) })) => uploadPrivateFile(request, { diskPath: PATH, expectedSize: 3, mimeType: 'video/mp4' })
+  it('ошибка размера, всплывшая из потока внутри fetch, отдаётся как есть', async () => {
+    fetchMock.mockResolvedValueOnce(link()).mockRejectedValueOnce(new TypeError('fetch failed', { cause: new InterviewStorageError('Размер загружаемого видео изменился', 400) }))
+    await expect(upload()).rejects.toMatchObject({ statusCode: 400, message: 'Размер загружаемого видео изменился' })
+  })
+  it('обрыв загрузки браузером не выдаётся за сбой диска', async () => {
+    const controller = new AbortController()
+    fetchMock.mockResolvedValueOnce(link()).mockImplementationOnce(async () => {
+      controller.abort()
+      throw new TypeError('fetch failed')
+    })
+    const request = new Request('http://localhost/upload', { method: 'PUT', body: new Uint8Array(3), signal: controller.signal })
+    await expect(upload(request)).rejects.toMatchObject({ name: 'AbortError' })
+  })
+  it('прочий сетевой сбой — 502 с предложением повторить, без адреса загрузки', async () => {
+    fetchMock.mockResolvedValueOnce(link()).mockRejectedValueOnce(new TypeError(`fetch failed ${UPLOAD}`))
+    const error = await upload().catch((reason: unknown) => reason)
+    expect(error).toMatchObject({ statusCode: 502, message: 'Не удалось загрузить видео. Повторите попытку' })
+    expect((error as Error).message).not.toContain('upload-target')
+  })
+  it('отказ хранилища при приёме файла передаётся статусом', async () => {
+    fetchMock.mockResolvedValueOnce(link()).mockImplementationOnce(async (_url, init: RequestInit) => {
+      await new Response(init.body).arrayBuffer()
+      return new Response(null, { status: 507 })
+    })
+    await expect(upload()).rejects.toMatchObject({ statusCode: 503, message: 'В хранилище собеседований закончилось место' })
+  })
+})
+
+describe('удаление: подтверждение операции', () => {
+  const ACCEPTED = 'https://cloud-api.yandex.net/v1/disk/operations/own-operation-123'
+  it.each([{}, { href: 42 }, { href: 'не адрес' }])('202 без корректной ссылки на операцию (%j) — ошибка, а не тихий успех', async (body) => {
+    fetchMock.mockResolvedValueOnce(json(body, 202))
+    await expect(removePrivateFile(PATH)).rejects.toThrow('Яндекс Диск не подтвердил удаление записи')
+  })
+  it('сбой сети при опросе операции до истечения срока передаётся как есть', async () => {
+    fetchMock.mockResolvedValueOnce(json({ href: ACCEPTED }, 202)).mockRejectedValueOnce(new TypeError('socket hang up'))
+    await expect(removePrivateFile(PATH)).rejects.toMatchObject({ statusCode: 502, message: 'Не удалось подключиться к Яндекс Диску' })
+  })
+  it('срок, истёкший во время опроса, даёт 503 «ещё не завершено» для повтора позже', async () => {
+    const controller = new AbortController()
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal)
+    fetchMock.mockResolvedValueOnce(json({ href: ACCEPTED }, 202)).mockImplementationOnce(async () => {
+      controller.abort()
+      throw new DOMException('aborted', 'AbortError')
+    })
+    await expect(removePrivateFile(PATH)).rejects.toMatchObject({ statusCode: 503, message: 'Удаление записи ещё не завершено. Повторите попытку позже' })
+  })
+})
+
+describe('кэш ссылок на скачивание', () => {
+  const pathFor = (index: number) => `disk:/LMS interviews/23/${index}-7a3dc8a9-5b54-415b-a719-a4610b1408f2.mp4`
+  it('держит не больше 500 ссылок и вытесняет самую старую', async () => {
+    fetchMock.mockImplementation(async () => json({ href: DOWNLOAD }))
+    for (let index = 1; index <= 501; index++) await resolveRecordingHref({ diskPath: pathFor(index) })
+    expect(fetchMock).toHaveBeenCalledTimes(501)
+    await resolveRecordingHref({ diskPath: pathFor(2) })
+    expect(fetchMock).toHaveBeenCalledTimes(501)
+    await resolveRecordingHref({ diskPath: pathFor(1) })
+    expect(fetchMock).toHaveBeenCalledTimes(502)
+  })
+  it('устаревшие через 5 минут ссылки запрашиваются заново', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    fetchMock.mockImplementation(async () => json({ href: DOWNLOAD }))
+    await resolveRecordingHref({ diskPath: pathFor(1) })
+    vi.setSystemTime(Date.now() + 5 * 60 * 1000 + 1)
+    await resolveRecordingHref({ diskPath: pathFor(1) })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+  it('для общей записи повтор с fresh сбрасывает старую ссылку публичного ресурса', async () => {
+    publicHref.mockResolvedValueOnce('https://downloader.disk.yandex.ru/disk/old').mockResolvedValueOnce(DOWNLOAD)
+    const href = await resolveRecordingHref({ publicKey: 'https://disk.yandex.com/d/abc', publicPath: '/a.mp4' }, undefined, true)
+    expect(href).toBe(DOWNLOAD)
+    expect(invalidateHref).toHaveBeenCalledWith({ publicKey: 'https://disk.yandex.com/d/abc', path: '/a.mp4' }, 'https://downloader.disk.yandex.ru/disk/old')
+  })
+  it('общая запись без источника или со ссылкой на вложенный путь не разрешается', async () => {
+    await expect(resolveRecordingHref({})).rejects.toMatchObject({ statusCode: 404 })
+    await expect(resolveRecordingHref({ publicKey: 'https://evil.example/d/abc' })).rejects.toMatchObject({ statusCode: 400 })
+    expect(publicHref).not.toHaveBeenCalled()
   })
 })
