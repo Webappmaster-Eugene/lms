@@ -115,6 +115,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs
 
+# curl для HEALTHCHECK. До копирования сборки — иначе слой пересобирается на каждый выкат,
+# а DNS домашней VM теряет часть запросов, и apk падает с «DNS: transient error».
+RUN for attempt in 1 2 3; do apk add --no-cache curl && exit 0; sleep 5; done; exit 1
+
 # Public assets (icons, static files)
 COPY --from=builder /app/public ./public
 
@@ -160,9 +164,6 @@ if (await authenticateLocalStrategy({ doc: { id: 1, salt: 'build-check', hash: '
 # Media directory for Payload uploads (mounted as Docker volume)
 RUN mkdir -p media \
     && chown nextjs:nodejs media
-
-# curl for healthcheck
-RUN apk add --no-cache curl
 
 USER nextjs
 
