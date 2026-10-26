@@ -76,4 +76,61 @@ describe('«Гайд помог?»', () => {
     await waitFor(() => expect(toast).toHaveBeenCalledWith('Не удалось сохранить отзыв — попробуйте ещё раз', 'error'))
     expect(screen.getByRole('button', { name: 'Да' })).toHaveAttribute('aria-pressed', 'false')
   })
+
+  it('если прочтение не записалось, ответ создаёт запись сам — вместе с отметкой о прочтении', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    let failFirst = true
+    calls = []
+    global.fetch = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+      calls.push({ url: String(url), method: String(init?.method), body })
+      if (failFirst) { failFirst = false; return new Response(null, { status: 503 }) }
+      return Response.json({ doc: { id: 40, helpful: body.helpful } })
+    }) as unknown as typeof fetch
+    render(<GuideFeedback guideId={5} initial={null} maxComment={1000} />)
+    await waitFor(() => expect(log).toHaveBeenCalledWith('Не удалось отметить гайд прочитанным', expect.any(Error)))
+    expect(toast).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Да' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Да' })).toHaveAttribute('aria-pressed', 'true'))
+    expect(calls[1]).toEqual({ url: '/api/guide-reads?depth=0', method: 'POST', body: { guide: 5, helpful: 'yes' } })
+  })
+
+  it('пока ответ сохраняется, кнопки заблокированы и виден индикатор', async () => {
+    mockApi({ hold: true })
+    render(<GuideFeedback guideId={5} initial={{ id: 12, helpful: null, comment: null }} maxComment={1000} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Нет' }))
+    expect(screen.getByLabelText('Сохраняем')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Да' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Нет' })).toBeDisabled()
+    release?.()
+    await waitFor(() => expect(screen.queryByLabelText('Сохраняем')).not.toBeInTheDocument())
+    expect(screen.getByLabelText('Что было непонятно или устарело? Ментор поправит гайд.')).toBeInTheDocument()
+  })
+
+  it('неотправленный комментарий остаётся в поле, кнопка доступна для повтора', async () => {
+    mockApi({ ok: false })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    render(<GuideFeedback guideId={5} initial={{ id: 12, helpful: 'yes', comment: null }} maxComment={1000} />)
+    await userEvent.type(screen.getByRole('textbox'), 'Добавьте скриншоты')
+    await userEvent.click(screen.getByRole('button', { name: 'Отправить' }))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('Не удалось сохранить отзыв — попробуйте ещё раз', 'error'))
+    expect(toast).not.toHaveBeenCalledWith('Спасибо! Ментор прочитает отзыв', 'success')
+    expect(screen.queryByText('Отзыв отправлен')).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox')).toHaveValue('Добавьте скриншоты')
+    expect(screen.getByRole('button', { name: 'Отправить' })).toBeEnabled()
+  })
+
+  it('отправленный раньше комментарий виден; правка текста позволяет отправить его заново', async () => {
+    render(<GuideFeedback guideId={5} initial={{ id: 12, helpful: 'no', comment: 'Ссылка битая' }} maxComment={300} />)
+    const field = screen.getByRole('textbox')
+    expect(field).toHaveValue('Ссылка битая')
+    expect(field).toHaveAttribute('maxLength', '300')
+    expect(screen.getByRole('status')).toHaveTextContent('Отзыв отправлен')
+    expect(screen.getByRole('button', { name: 'Отправить' })).toBeDisabled()
+
+    await userEvent.type(field, ' в шаге 2')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Отправить' })).toBeEnabled()
+  })
 })
