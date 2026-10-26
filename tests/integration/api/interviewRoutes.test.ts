@@ -385,10 +385,9 @@ describe('POST /api/interviews/[id]/analyze', () => {
     expect((await payload.count({ collection: 'interview-analysis-usage', where: { owner: { equals: fresh.id } } })).totalDocs).toBe(0)
   })
 
-  // Дефект: interview_analysis_usage.owner_id объявлен NOT NULL, а внешний ключ —
-  // ON DELETE SET NULL; коллекции нет в cleanupOwnedRelations (cleanupUserRelations, src/payload/hooks/cleanupOwnedRelations.ts:39).
-  // Удаление ученика, хоть раз запускавшего анализ, падает на ограничении NOT NULL.
-  it.fails('ученика, запускавшего анализ записи, можно удалить — дефект: cleanupOwnedRelations.ts не чистит interview-analysis-usage, FK SET NULL нарушает NOT NULL', async () => {
+  // interview_analysis_usage.owner_id объявлен NOT NULL при внешнем ключе ON DELETE SET NULL:
+  // без очистки счётчика удаление ученика упиралось бы в ограничение.
+  it('ученика, запускавшего анализ записи, можно удалить', async () => {
     const fresh = await createStudent(payload)
     const mine = await recording(fresh)
     expect((await analyze(mine.id, { token: await login(payload, fresh), body: analysisBody })).status).toBe(202)
@@ -594,9 +593,8 @@ describe('POST /api/internal/interviews/run — планировщик', () => {
     expect(error).toHaveBeenCalledWith('Interview evaluation integration failed', expect.any(Error), expect.objectContaining({ recordingId: waiting.id }))
   })
 
-  // Тот же дефект cleanup.ts:14 на уровне планировщика: очистка идёт первой, её
-  // исключение превращает весь вызов в 503, и анализ записей больше не запускается.
-  it.fails('брошенная загрузка удалённого ученика не останавливает анализ записей — дефект: cleanup.ts:14 роняет run/route.ts в 503 до runInterviewAnalysisJobs', async () => {
+  // Очистка идёт первой: её исключение превратило бы весь вызов в 503, и анализ записей не запускался бы.
+  it('брошенная загрузка удалённого ученика не останавливает анализ записей', async () => {
     vi.stubEnv('YANDEX_DISK_TOKEN', 'test-not-real')
     const gone = await createStudent(payload)
     await makeOld((await recording(gone, { status: 'uploading' })).id)
@@ -671,22 +669,23 @@ describe('cleanupInterviewUploads — брошенные загрузки', () =
     expect(await stored(rows[5].id)).toBeUndefined()
   })
 
-  // Дефект cleanup.ts:14 — relationId(candidate.owner) бросает TypeError на owner = null
-  // ещё до try. Владелец обнуляется при удалении ученика (FK ON DELETE SET NULL, записи
-  // нет в cleanupOwnedRelations), и одна такая брошенная загрузка роняет каждый проход
-  // очистки. Если убрать исключение, останется второй дефект: строки без владельца
-  // пропускаются (`continue`), но снова попадают в пятёрку самых старых кандидатов
-  // и навсегда загораживают очистку остальных; их файлы на Диске не удаляются.
-  it.fails('брошенные загрузки удалённых учеников не блокируют очистку остальных — дефект: cleanup.ts:14 бросает TypeError, cleanup.ts:15 пропускает их в каждом проходе', async () => {
+  // Владелец обнуляется при удалении ученика (FK ON DELETE SET NULL). Такие строки
+  // попадают в пятёрку самых старых кандидатов: если их пропускать, они навсегда
+  // загораживают очистку остальных, а их файлы остаются на Диске.
+  it('брошенные загрузки удалённых учеников удаляются и не блокируют очистку остальных', async () => {
     vi.stubEnv('YANDEX_DISK_TOKEN', 'test-not-real')
     try {
+      const orphans: InterviewRecording[] = []
       for (let index = 0; index < 5; index += 1) {
         const gone = await createStudent(payload)
-        await staleUpload(gone, {}, 72)
+        orphans.push(await staleUpload(gone, {}, 72))
         await payload.delete({ collection: 'users', id: gone.id })
       }
       const blocked = await staleUpload(student)
-      await cleanupInterviewUploads(payload)
+      expect(await cleanupInterviewUploads(payload)).toBe(5)
+      for (const orphan of orphans) expect(await stored(orphan.id)).toBeUndefined()
+      expect(mocks.removePrivateFile.mock.calls).toEqual(orphans.map((orphan) => [orphan.diskPath]))
+      expect(await cleanupInterviewUploads(payload)).toBe(1)
       expect(await stored(blocked.id)).toBeUndefined()
     } finally {
       await removeStaleUploads()

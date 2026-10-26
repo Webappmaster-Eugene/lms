@@ -86,10 +86,7 @@ describe('подписанный источник видео', () => {
     expect(validInterviewSource({ ...doc, ...patch } as InterviewRecording, file, params, NOW)).toBe(false)
   })
 
-  // Дефект capability.ts:28 — проверка `!relationId(doc.owner)` задумана как отказ,
-  // но relationId бросает TypeError на пустой связи. Маршрут источника ловит
-  // исключение и отвечает 404, так что наружу это не выходит; другой вызывающий упадёт.
-  it.fails('запись без владельца даёт отказ, а не исключение — дефект: capability.ts:28 бросает TypeError из relationId', () => {
+  it('запись без владельца даёт отказ, а не исключение', () => {
     const { file, params } = signed()
     expect(validInterviewSource({ ...doc, owner: null } as unknown as InterviewRecording, file, params, NOW)).toBe(false)
   })

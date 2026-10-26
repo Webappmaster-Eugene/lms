@@ -25,7 +25,7 @@ export function createInterviewSource(doc: InterviewRecording): string {
   return url.href
 }
 export function validInterviewSource(doc: InterviewRecording, file: string, params: URLSearchParams, now = Date.now()): boolean {
-  if (doc.category !== 'personal' || !relationId(doc.owner) || doc.status !== 'ready' || doc.analysisBackend !== 'sovetnik' || !['queued', 'processing'].includes(doc.analysisStatus)) return false
+  if (doc.category !== 'personal' || doc.owner == null || doc.status !== 'ready' || doc.analysisBackend !== 'sovetnik' || !['queued', 'processing'].includes(doc.analysisStatus)) return false
   const expiresText = params.get('expires') ?? ''
   const token = params.get('token') ?? ''
   if (!/^\d{10}$/.test(expiresText) || !/^[a-f0-9]{64}$/.test(token) || [...params.keys()].some((key) => !['expires', 'token'].includes(key)) || params.getAll('expires').length !== 1 || params.getAll('token').length !== 1) return false

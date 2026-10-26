@@ -60,6 +60,8 @@ export const cleanupUserRelations = cleanupDependents('пользователь'
   { collection: 'guide-reads', field: 'user' },
   { collection: 'comments', field: 'user' },
   { collection: 'interview-rooms', field: 'owner' },
+  // owner_id NOT NULL при ON DELETE SET NULL: без этой строки удаление ученика падает
+  { collection: 'interview-analysis-usage', field: 'owner' },
 ])
 
 /** Журнал доставки рассылки: без него удаление рассылки упиралось бы в NOT NULL */
