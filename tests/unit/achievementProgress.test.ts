@@ -47,6 +47,24 @@ describe('прогресс к достижению', () => {
   it('перевыполнение не даёт больше 100%', () => {
     expect(achievementGoal({ id: 7, title: 'x', criteriaType: 'lesson_count', criteriaValue: 5 }, stats)?.percent).toBe(100)
   })
+
+  it('любые курсы: считается число завершённых курсов', () => {
+    expect(achievementGoal({ id: 8, title: 'Три вершины', criteriaType: 'course_completion', criteriaValue: 3 }, stats)).toMatchObject({
+      current: 1, target: 3, percent: 33, remaining: 'Ещё 2 курса',
+    })
+  })
+
+  it('конкретный роадмап — выполнено или нет, независимо от числа других роадмапов', () => {
+    const withRoadmap = { ...stats, roadmaps: 4, completedRoadmapIds: new Set(['frontend']) }
+    expect(achievementGoal({ id: 9, title: 'r', criteriaType: 'roadmap_completion', criteriaValue: 5, criteriaEntityId: 'frontend' }, withRoadmap)).toMatchObject({ current: 1, target: 1, percent: 100 })
+    expect(achievementGoal({ id: 10, title: 'r', criteriaType: 'roadmap_completion', criteriaValue: 5, criteriaEntityId: 'backend' }, withRoadmap)).toMatchObject({
+      current: 0, target: 1, remaining: 'Завершите нужный курс или роадмап',
+    })
+  })
+
+  it.each(['constructor', 'toString', '__proto__'])('тип условия с именем свойства объекта (%s) целью не становится', (criteriaType) => {
+    expect(achievementGoal({ id: 11, title: 'x', criteriaType, criteriaValue: 1 }, stats)).toBeNull()
+  })
 })
 
 describe('ближайшие цели', () => {
