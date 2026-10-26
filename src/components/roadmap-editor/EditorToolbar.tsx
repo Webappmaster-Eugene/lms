@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useId, useRef } from 'react'
 import {
   ArrowLeft,
   Plus,
@@ -64,6 +64,22 @@ export function EditorToolbar({
   onUndoAlignment,
 }: Props) {
   const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const addButtonRef = useRef<HTMLButtonElement>(null)
+  const addMenuId = useId()
+
+  // Слушаем документ, а не меню: Safari не ставит фокус на кнопку по клику,
+  // и событие клавиши до обёртки меню может не дойти.
+  useEffect(() => {
+    if (!addMenuOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setAddMenuOpen(false)
+      addButtonRef.current?.focus({ preventScroll: true })
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [addMenuOpen])
 
   const handleAdd = useCallback(
     (type: 'category' | 'topic' | 'subtopic') => {
@@ -116,8 +132,11 @@ export function EditorToolbar({
       {/* Add node dropdown */}
       <div style={{ position: 'relative' }}>
         <button
+          ref={addButtonRef}
           type="button"
           onClick={() => setAddMenuOpen(!addMenuOpen)}
+          aria-expanded={addMenuOpen}
+          aria-controls={addMenuOpen ? addMenuId : undefined}
           style={{
             ...btn(true),
             background: '#2d2d50',
@@ -133,6 +152,9 @@ export function EditorToolbar({
           <>
             <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setAddMenuOpen(false)} />
             <div
+              id={addMenuId}
+              role="group"
+              aria-label="Вид нового узла"
               style={{
                 position: 'absolute',
                 right: 0,

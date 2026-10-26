@@ -193,9 +193,8 @@ describe('меню добавления узла', () => {
     expect(onAddNode).not.toHaveBeenCalled()
   })
 
-  // Дефект: кнопка «Добавить» (EditorToolbar.tsx:118) раскрывает меню, но не сообщает это через
-  // aria-expanded/aria-haspopup — диктор не знает, что под кнопкой появился список видов узла.
-  it.fails('кнопка «Добавить» сообщает, раскрыто ли меню — дефект: нет aria-expanded', async () => {
+  // Без aria-expanded диктор не узнает, что под кнопкой появился список видов узла.
+  it('кнопка «Добавить» сообщает, раскрыто ли меню', async () => {
     const user = userEvent.setup()
     toolbar()
     const add = screen.getByRole('button', { name: /Добавить/ })
@@ -205,16 +204,20 @@ describe('меню добавления узла', () => {
     expect(add).toHaveAttribute('aria-expanded', 'true')
   })
 
-  // Дефект: у меню (EditorToolbar.tsx:132) нет обработчика клавиш — Escape его не закрывает,
-  // с клавиатуры закрыть меню можно только выбрав вид узла или повторным нажатием «Добавить».
-  it.fails('Escape закрывает меню — дефект: клавиша не обрабатывается', async () => {
+  // С клавиатуры меню закрывают Escape; фокус возвращается на кнопку, чтобы не потерять место на панели.
+  it('Escape закрывает меню и возвращает фокус на кнопку', async () => {
     const user = userEvent.setup()
     toolbar()
-    await user.click(screen.getByRole('button', { name: /Добавить/ }))
+    const add = screen.getByRole('button', { name: /Добавить/ })
+    await user.click(add)
+    // Как в Safari: клик не оставляет фокус на кнопке.
+    add.blur()
 
     await user.keyboard('{Escape}')
 
     expect(screen.queryByRole('button', { name: 'Категория' })).not.toBeInTheDocument()
+    expect(add).toHaveAttribute('aria-expanded', 'false')
+    expect(add).toHaveFocus()
   })
 })
 
