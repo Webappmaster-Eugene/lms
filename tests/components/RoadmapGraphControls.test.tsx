@@ -91,8 +91,12 @@ vi.mock('@xyflow/react', async () => {
 })
 
 vi.mock('next/link', async () => (await import('../helpers/component-mocks')).linkMock())
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(), usePathname: () => '/roadmaps/frontend' }))
 
 const { RoadmapGraph } = await import('@/components/roadmap/RoadmapGraph')
+const { RoadmapTopicList } = await import('@/components/roadmap/RoadmapTopicList')
+const { RoadmapExplorer } = await import('@/components/roadmap/RoadmapExplorer')
+const { renderToString } = await import('react-dom/server')
 const { RoadmapRouteEdge } = await import('@/components/roadmap/RoadmapRouteEdge')
 const { RoadmapEditorCanvas } = await import('@/components/roadmap-editor/RoadmapEditorCanvas')
 
@@ -221,6 +225,53 @@ describe('карта роадмапа: клавиатура и панель те
     view.rerender(<RoadmapGraph nodes={graph} edges={[]} selectedTopic="React" onTopicChange={onTopicChange} />)
     expect(panel('React')).toBeInTheDocument()
     await waitFor(() => expect(flow.setCenter).toHaveBeenCalledWith(expect.any(Number), expect.any(Number), { zoom: 1, duration: 300 }))
+  })
+})
+
+describe('карта роадмапа: состав', () => {
+  it('панель темы перечисляет, что в неё входит', async () => {
+    const user = userEvent.setup()
+    await renderMap({ nodes: [...graph.slice(0, 2), topic('React', { learningOrder: 2, bullets: ['Хуки', 'Контекст'] }, { x: 0, y: 500 })] })
+
+    await user.click(nodeElement('React'))
+
+    expect(screen.getByRole('heading', { level: 4, name: 'Что входит в тему' })).toBeInTheDocument()
+    expect(screen.getByRole('complementary', { name: 'Тема «React»' })).toHaveTextContent('ХукиКонтекст')
+  })
+
+  it('связи из CMS не добавляют лишних линий: карта рисует только цепочку шагов', async () => {
+    await renderMap({ edges: [
+      { id: 'cms-back', source: 'TypeScript', target: 'HTML' },
+      { id: 'cms-forward', source: 'HTML', target: 'React', label: 'дальше' },
+    ] })
+
+    const ids = Array.from(document.querySelectorAll('path[data-kind="route"]'), (path) => path.getAttribute('data-testid'))
+    expect(ids).toEqual(['Основы', 'HTML', 'React'].map((source, index) => `edge-sequence:${JSON.stringify([source, ['HTML', 'React', 'TypeScript'][index]])}`))
+  })
+
+  it('до гидратации сервер отдаёт список тем для телефона и место под карту, без переключателя вида', () => {
+    const page = document.createElement('div')
+    page.innerHTML = renderToString(<RoadmapExplorer nodes={graph} edges={[]} looseCourses={[]} nextStepNodeId={null} />)
+
+    expect(page.querySelector('.sm\\:hidden')).toHaveTextContent('React')
+    expect(page.querySelector('.animate-pulse')).toHaveClass('hidden', 'sm:block')
+    expect(page.querySelector('[role="tablist"]')).toBeNull()
+    expect(page.querySelector('.react-flow')).toBeNull()
+  })
+
+  it('в списке тем выбор управляется снаружи: повторный клик по теме снимает выбор', async () => {
+    const user = userEvent.setup()
+    const onTopicChange = vi.fn()
+    const view = render(<RoadmapTopicList nodes={graph.slice(1)} looseCourses={[]} selectedTopic={null} onTopicChange={onTopicChange} />)
+
+    await user.click(screen.getByText('React').closest('summary') as HTMLElement)
+    expect(onTopicChange).toHaveBeenLastCalledWith('React')
+    expect(screen.getByText('React').closest('details')).not.toHaveAttribute('open')
+
+    view.rerender(<RoadmapTopicList nodes={graph.slice(1)} looseCourses={[]} selectedTopic="React" onTopicChange={onTopicChange} />)
+    expect(screen.getByText('React').closest('details')).toHaveAttribute('open')
+    await user.click(screen.getByText('React').closest('summary') as HTMLElement)
+    expect(onTopicChange).toHaveBeenLastCalledWith(null)
   })
 })
 

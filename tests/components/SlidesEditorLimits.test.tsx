@@ -31,11 +31,13 @@ const manual = (count: number): Item[] => Array.from({ length: count }, (_, inde
 const png = (name: string) => new File(['png'], name, { type: 'image/png' })
 // В списке на лимит около полутора тысяч полей и кнопок: поиск по ролям пересчитывал бы их
 // на каждом опросе и под нагрузкой не укладывался в таймаут. Здесь элементы ищутся напрямую.
+// Список на лимит рисуется долго под покрытием и параллельными прогонами — запас времени явный.
+const HEAVY_TIMEOUT = 20_000
 const message = (role: 'alert' | 'status') => waitFor(() => {
   const element = document.querySelector(`[role="${role}"]`)
   if (!element) throw new Error(`Нет сообщения ${role}`)
   return element
-})
+}, { timeout: 10_000 })
 
 beforeEach(() => { vi.mocked(fetch).mockReset() })
 
@@ -58,7 +60,7 @@ describe('лимит файлов презентации', () => {
 
     expect(await message('status')).toHaveTextContent(`В папке ${SLIDES_LIMIT} файлов: добавлено ${SLIDES_LIMIT}, убрано 0.`)
     expect(latest.items).toHaveLength(SLIDES_LIMIT)
-  })
+  }, HEAVY_TIMEOUT)
 
   it('по ссылке нельзя добавить файл сверх лимита', () => {
     open({ items: manual(SLIDES_LIMIT) })
@@ -68,7 +70,7 @@ describe('лимит файлов презентации', () => {
 
     expect(document.querySelector('[role="alert"]')).toHaveTextContent(`В одной презентации не более ${SLIDES_LIMIT} файлов.`)
     expect(latest.items).toHaveLength(SLIDES_LIMIT)
-  })
+  }, HEAVY_TIMEOUT)
 
   it('с компьютера загружается только то, что помещается в лимит, остальное называется числом', async () => {
     vi.mocked(fetch).mockResolvedValue(json({ doc: { id: 1, filename: 'last.png' } }, 201))
@@ -79,7 +81,7 @@ describe('лимит файлов презентации', () => {
     expect(await message('alert')).toHaveTextContent(`Загружено файлов: 1. Не поместилось в лимит ${SLIDES_LIMIT}: 2. Сохраните урок`)
     expect(fetch).toHaveBeenCalledOnce()
     expect(latest.items).toHaveLength(SLIDES_LIMIT)
-  })
+  }, HEAVY_TIMEOUT)
 })
 
 describe('загрузка и поля презентации', () => {
