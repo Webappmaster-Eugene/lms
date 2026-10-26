@@ -3,7 +3,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, relative, isAbsolute } from "node:path";
 import { repo, configRoots, configuredServers, projectSkills } from "./harness.mjs";
-import { validateNativeReport } from "./native-report.mjs";
+import { mcpInventory, validateNativeReport } from "./native-report.mjs";
 import { openAppServer } from "./app-server.mjs";
 
 const report = { timestamp: new Date().toISOString(), configs: [], skills: [], hooks: [], mcp: [], failures: ["Native check did not complete"] };
@@ -23,16 +23,7 @@ try {
   }).map(skill => ({ name: skill.name, enabled: skill.enabled })) }));
   const hooks = await rpc("hooks/list", { cwds });
   report.hooks = hooks;
-  let cursor;
-  const seenCursors = new Set();
-  do {
-    const mcp = await rpc("mcpServerStatus/list", { detail: "toolsAndAuthOnly", ...(cursor ? { cursor } : {}) });
-    if (!Array.isArray(mcp.data)) throw new Error("Missing MCP status inventory");
-    report.mcp.push(...mcp.data.map(server => ({ name: server.name, authStatus: server.authStatus, tools: Object.keys(server.tools ?? {}).length })));
-    cursor = mcp.nextCursor;
-    if (cursor && seenCursors.has(cursor)) throw new Error("Repeated MCP inventory cursor");
-    seenCursors.add(cursor);
-  } while (cursor);
+  for (const cwd of cwds) report.mcp.push(await mcpInventory(rpc, cwd));
   report.failures = validateNativeReport(report, { cwds, skills: projectSkills(), servers: Object.keys(configuredServers()) });
   console.log(JSON.stringify({
     configs: report.configs.map(({ cwd, approval, permissions, contextWindow, autoCompactLimit, mcp }) => ({ cwd, approval, permissions, contextWindow, autoCompactLimit, mcp })),
