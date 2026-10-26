@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
-import { ArrowLeft, Clock, Download, Lock } from 'lucide-react'
+import { ArrowLeft, Clock, Download, Globe, Lock } from 'lucide-react'
 import { BookmarkButton } from '@/components/bookmarks/BookmarkButton'
 import { GuideFeedback, type GuideReadState } from '@/components/guides/GuideFeedback'
 import { GuideMarkdown } from '@/components/guides/GuideMarkdown'
@@ -14,7 +14,7 @@ import { guideReadingMinutes } from '@/lib/guides'
 import { guideSeo, guideStructuredData } from '@/lib/guide-seo'
 import { learningRelationId } from '@/lib/learning-access'
 import { routeSlug } from '@/lib/route-slug'
-import { formatDate } from '@/lib/utils'
+import { cn, formatDate } from '@/lib/utils'
 import { GUIDE_FEEDBACK_MAX } from '@/payload/collections/GuideReads'
 import { getLearningRequest } from '@/server/learning-request'
 import type { Guide } from '@/payload-types'
@@ -74,6 +74,8 @@ export default async function GuidePage({ params }: Props) {
   const markdown = guide.markdown ?? ''
   const headings = guideMarkdownHeadings(markdown)
   const isAdmin = user?.role === 'admin'
+  // Гость открывает здесь только публичные гайды — метка ему ничего не сообщает.
+  const showPublic = !!user && guide.isPublic === true
   // Закладка и отзыв на черновик не показываются — их не дают создать.
   const [bookmarkId, read] = guide.isPublished && user
     ? await Promise.all([
@@ -97,8 +99,18 @@ export default async function GuidePage({ params }: Props) {
         </Link>
 
         <header className="space-y-3">
-          {!guide.isPublished && <p className="inline-block rounded-md bg-secondary px-2 py-1 text-xs font-medium text-muted-foreground">Черновик — ученики его пока не видят</p>}
-          {category && <p className="text-xs font-semibold uppercase tracking-wide text-primary">{category}</p>}
+          {(!guide.isPublished || showPublic) && (
+            <div className="flex flex-wrap items-center gap-2">
+              {!guide.isPublished && <p className="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-muted-foreground">Черновик — ученики его пока не видят</p>}
+              {showPublic && (
+                <p className={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium', guide.isPublished ? 'bg-success/10 text-success' : 'bg-secondary text-muted-foreground')}>
+                  <Globe className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {guide.isPublished ? 'Публичный — открывается без входа, ссылкой можно поделиться' : 'Публичный после публикации'}
+                </p>
+              )}
+            </div>
+          )}
+          {category &&<p className="text-xs font-semibold uppercase tracking-wide text-primary">{category}</p>}
           <h1 className="text-2xl font-bold text-foreground sm:text-3xl">{guide.title}</h1>
           <p className="text-base leading-relaxed text-muted-foreground">{guide.summary}</p>
           <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
