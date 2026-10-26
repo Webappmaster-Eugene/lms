@@ -115,3 +115,61 @@ describe('Валидация управления учебным контент�
     expect(() => validateContentInput('lessons', { title: 'Урок', course: 1, content: [{ blockType: 'text', content: richText, id: 'same' }, { blockType: 'text', content: richText, id: 'same' }] })).toThrow('повторяться')
   })
 })
+
+describe('Lexical: внутренние ссылки, медиа и связи', () => {
+  const paragraphWith = (node: Record<string, unknown>) => ({
+    root: { type: 'root', version: 1, children: [{ type: 'paragraph', version: 1, children: [node] }] },
+  })
+  const internalLink = (doc: unknown) => paragraphWith({ type: 'link', version: 3, fields: { linkType: 'internal', doc, newTab: false }, children: [] })
+
+  it('внутренняя ссылка принимается только на курс, урок или роадмап с целым ID', () => {
+    expect(() => validateLexical(internalLink({ relationTo: 'lessons', value: 12 }))).not.toThrow()
+    expect(() => validateLexical(internalLink({ relationTo: 'users', value: 12 }))).toThrow('Неподдерживаемая внутренняя ссылка')
+    expect(() => validateLexical(internalLink({ relationTo: 'courses', value: '12' }))).toThrow('Внутренняя ссылка: требуется положительный целый ID')
+    expect(() => validateLexical(internalLink({ relationTo: 'courses', value: 12, url: 'javascript:alert(1)' }))).toThrow('нельзя изменять')
+    expect(() => validateLexical(internalLink(undefined))).toThrow('Внутренняя ссылка: требуется объект')
+  })
+
+  it('ссылка без fields проверяется по собственному url', () => {
+    expect(() => validateLexical(paragraphWith({ type: 'autolink', version: 2, url: 'https://nodejs.org/docs', children: [] }))).not.toThrow()
+    expect(() => validateLexical(paragraphWith({ type: 'autolink', version: 2, url: 'javascript:alert(1)', children: [] }))).toThrow('http')
+  })
+
+  it('картинка в тексте — только из медиатеки и с целым ID', () => {
+    expect(() => validateLexical(paragraphWith({ type: 'upload', version: 3, relationTo: 'media', value: 4 }))).not.toThrow()
+    expect(() => validateLexical(paragraphWith({ type: 'upload', version: 3, relationTo: 'users', value: 4 }))).toThrow('из медиатеки')
+    expect(() => validateLexical(paragraphWith({ type: 'upload', version: 3, relationTo: 'media', value: 0 }))).toThrow('Медиа')
+  })
+
+  it('неизвестный тип узла или неподдержанная версия узла отклоняются', () => {
+    expect(() => validateLexical(paragraphWith({ type: 'html', version: 1, html: '<script>alert(1)</script>' }))).toThrow('Неподдерживаемый формат узла текста')
+    expect(() => validateLexical(paragraphWith({ type: 'link', version: 4, url: 'https://nodejs.org', children: [] }))).toThrow('Неподдерживаемый формат узла текста')
+    expect(() => validateLexical(paragraphWith({ type: 'upload', version: '3', relationTo: 'media', value: 4 }))).toThrow('Неподдерживаемый формат узла текста')
+    expect(() => validateLexical(paragraphWith({ type: 'text', version: 2, text: 'Привет' }))).toThrow('Неподдерживаемый формат узла текста')
+  })
+
+  it('связь в тексте — только с курсом, уроком или роадмапом', () => {
+    expect(() => validateLexical(paragraphWith({ type: 'relationship', version: 2, relationTo: 'roadmaps', value: 3 }))).not.toThrow()
+    expect(() => validateLexical(paragraphWith({ type: 'relationship', version: 2, relationTo: 'users', value: 3 }))).toThrow('Неподдерживаемая связь в тексте')
+    expect(() => validateLexical(paragraphWith({ type: 'relationship', version: 2, relationTo: 'lessons', value: -1 }))).toThrow('Связь в тексте')
+  })
+})
+
+describe('slug и курсы-пререквизиты', () => {
+  const course = (data: Record<string, unknown>) => validateContentInput('courses', { title: 'Курс', roadmap: 1, ...data })
+
+  it('slug — только латиница, цифры и одиночные дефисы', () => {
+    expect(course({ slug: 'node-js-22' }).data.slug).toBe('node-js-22')
+    expect(() => course({ slug: 'Node JS' })).toThrow('Slug: латинские буквы, цифры и дефисы')
+    expect(() => course({ slug: 'node--js' })).toThrow('Slug')
+    expect(() => course({ slug: 'курс' })).toThrow('Slug')
+  })
+
+  it('пререквизиты — список целых ID не длиннее 100, null очищает список', () => {
+    expect(course({ prerequisites: [1, 2] }).data.prerequisites).toEqual([1, 2])
+    expect(course({ prerequisites: null }).data.prerequisites).toBeNull()
+    expect(() => course({ prerequisites: 3 })).toThrow('Не более 100 курсов-пререквизитов')
+    expect(() => course({ prerequisites: Array.from({ length: 101 }, (_, index) => index + 1) })).toThrow('Не более 100')
+    expect(() => course({ prerequisites: [1, '2'] })).toThrow('Пререквизит: требуется положительный целый ID')
+  })
+})

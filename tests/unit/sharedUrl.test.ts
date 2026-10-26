@@ -30,4 +30,21 @@ describe('общие ссылки на обучение', () => {
   it('ссылка на задачу сохраняет язык по реальному пути тема/задача', () => {
     expect(shareableURL('/trainer/functions/sum?lang=ts&code=private', origin)).toBe(`${origin}/trainer/functions/sum?lang=ts`)
   })
+  it('роадмап сохраняет поиск, вид и выбранную тему, но не чужие параметры', () => {
+    const url = new URL(shareableURL('/roadmaps/frontend?q=react&view=list&topic=node:hooks-1&sessionToken=secret#top', origin))
+    expect(url.pathname).toBe('/roadmaps/frontend')
+    expect(Object.fromEntries(url.searchParams)).toEqual({ q: 'react', view: 'list', topic: 'node:hooks-1' })
+    expect(url.hash).toBe('')
+  })
+  it('роадмап отбрасывает неизвестный вид и тему, похожую на ссылку', () => {
+    expect(shareableURL('/roadmaps/frontend?view=graph&topic=https://disk.yandex.ru/d/private', origin)).toBe(`${origin}/roadmaps/frontend`)
+  })
+  it('каталог задач тренажёра сохраняет фильтры и выбрасывает фильтр с токеном внутри', () => {
+    const href = '/trainer/tasks?q=массив&language=ts&difficulty=easy&tag=arrays&company=yandex&topic=sorting&status=solved&code=solution'
+    const url = new URL(shareableURL(href, origin))
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      q: 'массив', language: 'ts', difficulty: 'easy', tag: 'arrays', company: 'yandex', topic: 'sorting', status: 'solved',
+    })
+    expect(shareableURL('/trainer/tasks?q=token=abc&tag=/api/admin', origin)).toBe(`${origin}/trainer/tasks`)
+  })
 })
