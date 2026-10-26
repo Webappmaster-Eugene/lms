@@ -49,7 +49,7 @@ describe('редакторы внутри формы курса', () => {
     await waitFor(() => expect(screen.getByText('Есть несохранённые изменения')).toBeInTheDocument())
     await user.click(screen.getByRole('button', { name: 'Сохранить черновик' }))
 
-    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/manage/courses/5'))
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/manage/courses/5?saved=draft'))
     const patch = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === 'PATCH')
     const body = JSON.parse(String(patch?.[1]?.body)) as { coverImage: number; description: typeof description }
     expect(body.coverImage).toBe(41)

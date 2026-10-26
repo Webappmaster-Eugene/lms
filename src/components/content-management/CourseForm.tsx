@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { contentKey } from '@/lib/content-management/keys'
+import { savedNotice, savedNoticeHref } from '@/lib/content-management/saved-notice'
 
 import type { Course, Roadmap, RoadmapNode } from '@/payload-types'
 import { EditorActions } from '@/components/content-management/EditorActions'
@@ -67,8 +68,9 @@ export function CourseForm({ course, roadmaps, nodes, courses, defaultRoadmap, d
       const doc = await saveContent<Course>('courses', saved?.id, body, createKey)
       setSaved(doc)
       markSaved(courseDraft(doc))
-      setSuccess(doc.isPublished ? 'Курс опубликован.' : 'Черновик курса сохранён. Теперь добавьте разделы и уроки в программу.')
-      router.replace(`/manage/courses/${doc.id}`)
+      setSuccess(savedNotice('courses', doc.isPublished))
+      // Программа курса — другая страница без этой формы: подтверждение покажет она.
+      router.replace(savedNoticeHref(`/manage/courses/${doc.id}`, doc.isPublished))
       router.refresh()
     } catch (cause) {
       setError(saveError(cause))

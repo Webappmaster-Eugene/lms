@@ -64,7 +64,7 @@ describe('форма курса', () => {
     await user.type(screen.getByLabelText('Адрес курса'), ' node-js ')
     await user.click(screen.getByRole('button', { name: 'Сохранить и опубликовать' }))
 
-    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/manage/courses/5'))
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/manage/courses/5?saved=published'))
     expect(lastRequest()).toMatchObject({
       url: '/api/manage/content/courses/5',
       method: 'PATCH',

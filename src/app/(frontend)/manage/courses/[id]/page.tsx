@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { managedDocument, managedList, relationId, requireContentAdmin } from '@/lib/content-management/pages'
+import { savedNoticeFromQuery } from '@/lib/content-management/saved-notice'
 import { collectAllPages } from '@/lib/paginate'
 import { ManagementHeading, managementLink, managementPrimary, PublicationStatus } from '@/components/content-management/ManagementHeading'
+import { SavedNotice } from '@/components/content-management/SavedNotice'
 import { SectionForm } from '@/components/content-management/SectionForm'
 import type { Lesson } from '@/payload-types'
 
@@ -24,10 +26,10 @@ function LessonRows({ lessons }: { lessons: Pick<Lesson, 'id' | 'title' | 'descr
   ) : <p className="p-4 text-sm text-muted-foreground">Уроков пока нет. Добавьте первый урок в этот раздел.</p>
 }
 
-export default async function CourseProgramPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CourseProgramPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string | string[] }> }) {
   const course = await managedDocument('courses', (await params).id)
   const { payload, user } = await requireContentAdmin()
-  const [roadmap, sections, lessons] = await Promise.all([
+  const [roadmap, sections, lessons, query] = await Promise.all([
     managedDocument('roadmaps', String(relationId(course.roadmap))),
     managedList('sections', { course: { equals: course.id } }),
     // Контент каждого ролика не нужен для списка программы.
@@ -35,6 +37,7 @@ export default async function CourseProgramPage({ params }: { params: Promise<{ 
       ({ page, limit }) => payload.find({ collection: 'lessons', where: { course: { equals: course.id } }, select: { title: true, slug: true, section: true, order: true, isPublished: true, description: true }, depth: 0, user, overrideAccess: false, sort: ['order', 'id'], page, limit }),
       { label: `программа курса ${course.id}` },
     ),
+    searchParams,
   ])
   const sectionIds = new Set(sections.map((section) => section.id))
   const unsectioned = lessons.filter((lesson) => !sectionIds.has(relationId(lesson.section) ?? 0))
@@ -46,6 +49,7 @@ export default async function CourseProgramPage({ params }: { params: Promise<{ 
         <Link href={`/manage/courses/${course.id}/settings`} className={managementLink}>Настройки и публикация</Link>
         {course.isPublished && <Link href={`/courses/${course.slug}`} target="_blank" rel="noopener noreferrer" className={managementLink}>Посмотреть как ученик</Link>}
       </>} />
+      <SavedNotice text={savedNoticeFromQuery('courses', query.saved)} />
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         <PublicationStatus published={course.isPublished === true} />
         <span>Разделов: {sections.length}</span><span>Уроков: {lessons.length}</span>
