@@ -8,6 +8,7 @@ import { relationId } from '@/lib/relation-id'
 import { pluralize } from '@/lib/utils'
 import { redirect } from 'next/navigation'
 import { getLearningAccess } from '@/server/learning-access'
+import { notBootcamp } from '@/lib/course-path'
 
 export const metadata: Metadata = {
   title: 'Роадмапы',
@@ -44,7 +45,7 @@ export default async function RoadmapsPage() {
               collection: 'courses',
               overrideAccess: false,
               req,
-              where: { roadmap: { in: roadmapIds }, isPublished: { equals: true } },
+              where: { and: [{ roadmap: { in: roadmapIds }, isPublished: { equals: true } }, notBootcamp] },
               select: { roadmap: true },
               depth: 0,
               sort: 'id',

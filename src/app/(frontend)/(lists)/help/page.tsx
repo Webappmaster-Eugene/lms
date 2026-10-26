@@ -4,10 +4,11 @@ import { HelpCircle, Mail, MessageSquare, Users } from 'lucide-react'
 import { FaqAccordion } from '@/components/help/FaqAccordion'
 import { SupportForm } from './SupportForm'
 import { collectAllPages } from '@/lib/paginate'
-import { PLATFORM_SECTIONS } from '@/lib/platform-sections'
+import { PLATFORM_SECTIONS, visibleSections } from '@/lib/platform-sections'
 import { getLearningRequest } from '@/server/learning-request'
 import { getTrainerAccess } from '@/server/trainer-access'
 import { getGuideAccess } from '@/server/guide-access'
+import { getBootcamps } from '@/server/bootcamps'
 import { readSiteContacts } from '@/lib/site-settings'
 
 export const metadata: Metadata = {
@@ -43,7 +44,8 @@ export default async function HelpPage({ searchParams }: { searchParams: HelpSea
   // Справка перечисляет те же разделы, что и меню: тренажёр и гайды скрыты у тех, кому они не назначены.
   const trainerEnabled = user ? (await getTrainerAccess(payload, user, req)).hasAccess : false
   const guidesEnabled = user ? (await getGuideAccess(payload, user, req)).hasAccess : false
-  const sections = PLATFORM_SECTIONS.filter((section) => (trainerEnabled || section.href !== '/trainer') && (guidesEnabled || section.href !== '/guides'))
+  const bootcampEnabled = user ? (await getBootcamps(payload, user, req)).length > 0 : false
+  const sections = visibleSections(PLATFORM_SECTIONS, { trainerEnabled, guidesEnabled, bootcampEnabled })
 
   // Почта открывается на месте: в новой вкладке почтовый клиент оставил бы пустую страницу.
   const channels = [

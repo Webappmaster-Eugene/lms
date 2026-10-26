@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { GraduationCap, History, LayoutDashboard, Map, Menu } from 'lucide-react'
+import { GraduationCap, History, LayoutDashboard, Map, Menu, Tent } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useHydrated } from '@/hooks/use-hydrated'
 import { useSidebar } from './SidebarContext'
@@ -22,7 +22,10 @@ const TABS: readonly Tab[] = [
   { href: '/learning-history', label: 'История', icon: History },
 ]
 
-export function BottomNav() {
+/** Участнику буткемпа он важнее истории: та остаётся в «Ещё», а вкладок по-прежнему пять. */
+const BOOTCAMP_TABS: readonly Tab[] = [...TABS.slice(0, 3), { href: '/bootcamp', label: 'Буткемп', icon: Tent }]
+
+export function BottomNav({ bootcampEnabled = false }: { bootcampEnabled?: boolean } = {}) {
   const hydrated = useHydrated()
   const pathname = usePathname()
   const { mobileOpen, toggleMobile } = useSidebar()
@@ -32,8 +35,9 @@ export function BottomNav() {
       <div
         className="mx-auto flex h-16 max-w-lg items-stretch justify-around"
       >
-        {TABS.map(({ href, label, icon: Icon, exact }) => {
-          const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`) || (href === '/courses' && pathname.startsWith('/lessons/'))
+        {(bootcampEnabled ? BOOTCAMP_TABS : TABS).map(({ href, label, icon: Icon, exact }) => {
+          // Урок участника буткемпа скорее из буткемпа: подсветка «Курсов» на нём была бы ложной.
+          const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`) || (href === '/courses' && !bootcampEnabled && pathname.startsWith('/lessons/'))
           return (
             <Link
               key={href}

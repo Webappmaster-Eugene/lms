@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { getLearningRequest } from '@/server/learning-request'
 import Link from 'next/link'
-import { ArrowRight, Award, BookOpen, Clock, Flame, GraduationCap, Map as MapIcon, MessagesSquare, Star, Trophy } from 'lucide-react'
+import { ArrowRight, Award, BookOpen, Clock, Flame, GraduationCap, Map as MapIcon, MessagesSquare, Star, Tent, Trophy } from 'lucide-react'
 import { collectAllPages } from '@/lib/paginate'
 import { pluralize } from '@/lib/utils'
 import { streakView } from '@/lib/streak'
@@ -12,6 +12,7 @@ import { formatTime } from '@/lib/video-memory'
 import { nextLesson, recentCourseIds } from '@/lib/roadmap-next-step'
 import type { Where } from 'payload'
 import { getLearningAccess } from '@/server/learning-access'
+import { coursePath } from '@/lib/course-path'
 
 export const metadata: Metadata = {
   title: 'Дашборд',
@@ -52,7 +53,7 @@ export default async function DashboardPage() {
       sort: ['order', 'id'],
       limit: DASHBOARD_COURSES,
       depth: 0,
-      select: { title: true, slug: true, estimatedHours: true },
+      select: { title: true, slug: true, estimatedHours: true, isBootcamp: true },
     }),
     payload.find({
       collection: 'user-progress',
@@ -161,7 +162,7 @@ export default async function DashboardPage() {
             overrideAccess: false,
             req,
             where: { and: [{ id: { in: recentIds }, isPublished: { equals: true } }, assignedCourses] },
-            select: { title: true, slug: true, estimatedHours: true },
+            select: { title: true, slug: true, estimatedHours: true, isBootcamp: true },
             depth: 0,
             limit: recentIds.length,
           })
@@ -183,6 +184,9 @@ export default async function DashboardPage() {
       id: cId,
       title: course.title,
       slug: course.slug,
+      // Дашборд показывает всё, что ученик проходит, но буткемп открывается в своём разделе.
+      href: coursePath(course),
+      isBootcamp: course.isBootcamp === true,
       estimatedHours: policy.catalogVisibility === 'catalog' ? course.estimatedHours : null,
       totalLessons,
       completedCount,
@@ -293,12 +297,12 @@ export default async function DashboardPage() {
             {coursesWithProgress.map((course) => (
               <Link
                 key={course.id}
-                href={`/courses/${course.slug}`}
+                href={course.href}
                 className="group flex flex-col rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/50 sm:p-5"
               >
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
-                    <GraduationCap className="h-5 w-5 text-primary" />
+                    {course.isBootcamp ? <Tent className="h-5 w-5 text-primary" aria-hidden="true" /> : <GraduationCap className="h-5 w-5 text-primary" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors text-sm truncate">

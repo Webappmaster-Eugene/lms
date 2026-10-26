@@ -4,6 +4,7 @@
  */
 export const PLATFORM_SECTIONS = [
   { href: '/', label: 'Дашборд', hint: 'Главная страница: ваш прогресс, серия дней и урок, с которого стоит продолжить' },
+  { href: '/bootcamp', label: 'Буткемп', hint: 'Программа вашего буткемпа: методички по неделям и прогресс по ним' },
   { href: '/roadmaps', label: 'Роадмапы', hint: 'Карты направлений: какие темы изучать и в каком порядке, с курсами по каждой теме' },
   { href: '/courses', label: 'Курсы', hint: 'Все доступные вам курсы с описанием, программой и прогрессом' },
   { href: '/trainer', label: 'Тренажёр', hint: 'Практика: задачи с автоматической проверкой кода и режим собеседования' },
@@ -23,3 +24,11 @@ export const PLATFORM_SECTIONS = [
 ] as const
 
 export type PlatformSectionHref = typeof PLATFORM_SECTIONS[number]['href']
+
+/** Что открыто пользователю. Раздел без доступа не показывается ни в меню, ни в справке, ни в подвале. */
+export type SectionAccess = { trainerEnabled: boolean; guidesEnabled: boolean; bootcampEnabled: boolean }
+
+export function visibleSections<T extends { href: string }>(sections: readonly T[], access: SectionAccess): T[] {
+  return sections.filter(({ href }) =>
+    (access.trainerEnabled || href !== '/trainer') && (access.guidesEnabled || href !== '/guides') && (access.bootcampEnabled || href !== '/bootcamp'))
+}

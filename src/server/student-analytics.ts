@@ -13,6 +13,7 @@ import { trustedClientIp } from '@/server/client-ip'
 import { lookupGeoIp } from '@/server/geoip'
 import { getUserWebVitals } from '@/server/web-vitals'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
+import { coursePath } from '@/lib/course-path'
 
 const DAY = 86_400_000
 const PAGE_SIZE = 25
@@ -125,12 +126,12 @@ async function observedTarget(req: PayloadRequest, user: User, path: string): Pr
     if (!found.docs[0]) throw new StudentAnalyticsError('Материал недоступен', 404)
     return { course: null, lesson: null }
   }
-  const match = /^\/(lessons|courses|roadmaps)\/([a-zA-Z0-9_-]+)$/.exec(path)
+  const match = /^\/(lessons|courses|bootcamp|roadmaps)\/([a-zA-Z0-9_-]+)$/.exec(path)
   if (!match) {
-    if (!new Set(['/', '/admin', '/courses', '/roadmaps', '/trainer', '/trainer/interview', '/interviews', '/learning-history', '/profile', '/profile/edit', '/achievements', '/certificates', '/notifications', '/settings/notifications', '/settings/app', '/notes', '/saved', '/leaderboard', '/help', '/contacts', '/questions', '/guides']).has(path) && !/^\/trainer\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)?$/.test(path) && !/^\/certificates\/\d+$/.test(path)) throw new StudentAnalyticsError('Страница не отслеживается')
+    if (!new Set(['/', '/admin', '/courses', '/bootcamp', '/roadmaps', '/trainer', '/trainer/interview', '/interviews', '/learning-history', '/profile', '/profile/edit', '/achievements', '/certificates', '/notifications', '/settings/notifications', '/settings/app', '/notes', '/saved', '/leaderboard', '/help', '/contacts', '/questions', '/guides']).has(path) && !/^\/trainer\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)?$/.test(path) && !/^\/certificates\/\d+$/.test(path)) throw new StudentAnalyticsError('Страница не отслеживается')
     return { course: null, lesson: null }
   }
-  const collection = match[1] === 'lessons' ? 'lessons' : match[1] === 'courses' ? 'courses' : 'roadmaps'
+  const collection = match[1] === 'lessons' ? 'lessons' : match[1] === 'roadmaps' ? 'roadmaps' : 'courses'
   const found = await req.payload.find({ collection, where: { and: [{ slug: { equals: match[2] } }, { isPublished: { equals: true } }] }, select: collection === 'lessons' ? { course: true, section: true, isPublished: true } : { title: true, isPublished: true }, limit: 1, depth: 0, overrideAccess: false, req })
   const target = found.docs[0]
   if (!target) throw new StudentAnalyticsError('Материал недоступен', 404)
@@ -171,8 +172,8 @@ export async function recordStudentActivity(payload: Payload, user: User, header
 async function targetMaps(req: PayloadRequest, lessonIds: number[], courseIds: number[]) {
   const lessons = lessonIds.length ? (await req.payload.find({ collection: 'lessons', where: { id: { in: [...new Set(lessonIds)] } }, select: { title: true, slug: true, course: true }, limit: lessonIds.length, depth: 0, overrideAccess: true, req })).docs : []
   const allCourseIds = [...new Set([...courseIds, ...lessons.flatMap(lesson => id(lesson.course) ?? [])])]
-  const courses = allCourseIds.length ? (await req.payload.find({ collection: 'courses', where: { id: { in: allCourseIds } }, select: { title: true, slug: true }, limit: allCourseIds.length, depth: 0, overrideAccess: true, req })).docs : []
-  return { lessons: new Map(lessons.map(lesson => [lesson.id, { id: lesson.id, title: lesson.title, href: `/lessons/${lesson.slug}` } satisfies AnalyticsTarget])), courses: new Map(courses.map(course => [course.id, { id: course.id, title: course.title, href: `/courses/${course.slug}` } satisfies AnalyticsTarget])), lessonCourses: new Map(lessons.map(lesson => [lesson.id, id(lesson.course)])) }
+  const courses = allCourseIds.length ? (await req.payload.find({ collection: 'courses', where: { id: { in: allCourseIds } }, select: { title: true, slug: true, isBootcamp: true }, limit: allCourseIds.length, depth: 0, overrideAccess: true, req })).docs : []
+  return { lessons: new Map(lessons.map(lesson => [lesson.id, { id: lesson.id, title: lesson.title, href: `/lessons/${lesson.slug}` } satisfies AnalyticsTarget])), courses: new Map(courses.map(course => [course.id, { id: course.id, title: course.title, href: coursePath(course) } satisfies AnalyticsTarget])), lessonCourses: new Map(lessons.map(lesson => [lesson.id, id(lesson.course)])) }
 }
 
 export async function studentAnalyticsSnapshot(payload: Payload, admin: User, userId: number, sessionsPage = 1, eventsPage = 1): Promise<StudentAnalyticsSnapshot> {

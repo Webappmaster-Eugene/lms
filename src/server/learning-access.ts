@@ -8,7 +8,7 @@ import { recordLearningAccess, withLearningSpan } from '@/lib/learning-observabi
 import { clearAuthoritativeLearningMode, getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import {
   buildLearningAccess, learningRelationId,
-  type LearningAccessSnapshot, type LearningAccessUser, type LearningGrant, type LearningLessonMetadata,
+  type LearningAccessSnapshot, type LearningAccessUser, type LearningCourseMetadata, type LearningGrant, type LearningLessonMetadata,
 } from '@/lib/learning-access'
 
 const requestPolicies = new WeakMap<PayloadRequest, Map<number, Promise<LearningAccessSnapshot>>>()
@@ -71,6 +71,37 @@ async function loadLessonPolicy(payload: Payload, user: LearningAccessUser | nul
     collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmap-nodes', where: { or: [{ course: { equals: courseId } }, ...(nodeId === null ? [] : [{ id: { equals: nodeId } }])] }, select: { roadmap: true, course: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'темы конкретного курса' }),
   ])
   return buildLearningAccess(user, grants as LearningGrant[], { courses: [course], sections, roadmaps, nodes, lessons: [lesson] })
+}
+
+/**
+ * Какие из данных курсов пользователь видит — без полного каталога: меню спрашивает о буткемпах
+ * на каждой странице, и уроку не нужна полная политика ради одного пункта меню.
+ */
+export async function browsableCourseIds(payload: Payload, user: LearningAccessUser | null | undefined, courses: LearningCourseMetadata[], req?: Partial<PayloadRequest>): Promise<Set<number>> {
+  const fullPolicy = req && user ? requestPolicies.get(req as PayloadRequest)?.get(user.id) : undefined
+  if (fullPolicy) {
+    const policy = await fullPolicy
+    return new Set(courses.filter((course) => policy.canBrowseCourse(course.id)).map((course) => course.id))
+  }
+  const actual = await resolveAccessUser(payload, user, req)
+  if (!actual || courses.length === 0) return new Set()
+  if (actual.role === 'admin') return new Set(courses.map((course) => course.id))
+  const courseIds = courses.map((course) => course.id)
+  const roadmapIds = [...new Set(courses.flatMap((course) => learningRelationId(course.roadmap) ?? []))]
+  const nodeIds = [...new Set(courses.flatMap((course) => learningRelationId(course.roadmapNode) ?? []))]
+  const [grants, roadmaps, nodes] = await Promise.all([
+    collectAllPages(({ page, limit }) => payload.find({ collection: 'learning-access-grants', where: { user: { equals: actual.id } }, select: { target: true, effect: true, startsAt: true, expiresAt: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'назначения для видимости курсов' }) as Promise<LearningGrant[]>,
+    roadmapIds.length ? payload.find({ collection: 'roadmaps', where: { id: { in: roadmapIds } }, select: { isPublished: true }, depth: 0, limit: roadmapIds.length, overrideAccess: true, req }).then((result) => result.docs) : Promise.resolve([]),
+    collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmap-nodes', where: { or: [{ course: { in: courseIds } }, ...(nodeIds.length ? [{ id: { in: nodeIds } }] : [])] }, select: { roadmap: true, course: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'темы для видимости курсов' }),
+  ])
+  // Назначение раздела или урока тоже открывает курс: их метаданные — только по назначениям ученика.
+  const targetIds = (collection: LearningGrant['target']['relationTo']) => grants.filter((grant) => grant.target?.relationTo === collection).map((grant) => learningRelationId(grant.target?.value)).filter((id): id is number => id !== null)
+  const lessonIds = targetIds('lessons')
+  const lessons = lessonIds.length ? await collectAllPages(({ page, limit }) => payload.find({ collection: 'lessons', where: { and: [{ id: { in: lessonIds } }, { course: { in: courseIds } }] }, select: { course: true, section: true, isPublished: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'назначенные уроки для видимости курсов' }) : []
+  const sectionIds = [...new Set([...targetIds('sections'), ...lessons.flatMap((lesson) => learningRelationId(lesson.section) ?? [])])]
+  const sections = sectionIds.length ? await collectAllPages(({ page, limit }) => payload.find({ collection: 'sections', where: { and: [{ id: { in: sectionIds } }, { course: { in: courseIds } }] }, select: { course: true, isPublished: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'назначенные разделы для видимости курсов' }) : []
+  const policy = buildLearningAccess(actual, grants, { courses, sections, roadmaps, nodes, lessons })
+  return new Set(courseIds.filter((id) => policy.canBrowseCourse(id)))
 }
 
 /** A Range request loads only this lesson's ancestors and this user's indexed grants. */

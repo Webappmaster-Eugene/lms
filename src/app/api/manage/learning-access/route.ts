@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { sql } from '@payloadcms/db-postgres'
-import { commitTransaction, createLocalReq, getPayload, initTransaction, killTransaction, type Payload, type PayloadRequest, type Where } from 'payload'
+import { commitTransaction, createLocalReq, getPayload, initTransaction, killTransaction, ValidationError, type Payload, type PayloadRequest, type Where } from 'payload'
 import config from '@payload-config'
 
 import { AssignmentInputError, assignmentId, storedAssignmentTarget, validateAssignmentInput, type AssignmentInput, type AssignmentRule, type AssignmentSnapshot } from '@/components/learning-access/contracts'
@@ -154,7 +154,9 @@ async function preview(payload: Payload, input: AssignmentInput, req: PayloadReq
 function failure(error: unknown) {
   if (error instanceof AssignmentInputError) return response({ error: error.message, ...(error.code ? { code: error.code } : {}) }, error.status)
   const status = error instanceof Error && 'status' in error && typeof error.status === 'number' ? error.status : 500
-  return response({ error: status === 404 ? 'Ученик или материал не найден' : status < 500 ? 'Проверьте поля назначений и повторите сохранение' : 'Не удалось загрузить или сохранить назначения. Повторите попытку' }, status)
+  // Правило из хука назначения (например, «буткемп только целиком») администратору нужно дословно.
+  const rule = error instanceof ValidationError ? error.data.errors.find((item) => item.message)?.message : undefined
+  return response({ error: rule ?? (status === 404 ? 'Ученик или материал не найден' : status < 500 ? 'Проверьте поля назначений и повторите сохранение' : 'Не удалось загрузить или сохранить назначения. Повторите попытку') }, status)
 }
 
 export async function GET(request: Request) {

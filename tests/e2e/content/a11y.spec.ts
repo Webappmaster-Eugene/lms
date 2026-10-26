@@ -46,6 +46,7 @@ const INNER: [string, string][] = [
   ['дашборд', '/'],
   ['курсы', '/courses'],
   ['курс', `/courses/${CONTENT.course.slug}`],
+  ['буткемп без назначения', '/bootcamp'],
   ['урок', `/lessons/${CONTENT.lessons[0].slug}`],
   ['тренажёр', '/trainer'],
   ['задача', `/trainer/${CONTENT.topic.slug}/${CONTENT.task.slug}`],

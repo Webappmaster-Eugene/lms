@@ -5,6 +5,7 @@ import { BookOpen } from 'lucide-react'
 import { CourseCatalog } from '@/components/course/CourseCatalog'
 import { collectAllPages } from '@/lib/paginate'
 import { getLearningAccess } from '@/server/learning-access'
+import { notBootcamp } from '@/lib/course-path'
 
 export const metadata: Metadata = {
   title: 'Курсы',
@@ -19,7 +20,8 @@ export default async function CoursesListPage() {
     ({ page, limit }) =>
       payload.find({
         collection: 'courses',
-        where: { isPublished: { equals: true } },
+        // Буткемп — отдельный раздел меню, в каталоге курсов его нет.
+        where: { and: [{ isPublished: { equals: true } }, notBootcamp] },
         sort: ['order', 'id'],
         select: { title: true, slug: true, estimatedHours: true, roadmap: true },
         depth: 0,

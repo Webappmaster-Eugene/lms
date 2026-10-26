@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionBeforeValidateHook, CollectionConfig } from 'payload'
 
 import { isAdmin } from '@/payload/access/isAdmin'
 import { learningCourseRead } from '@/payload/access/learningCatalogRead'
@@ -6,6 +6,12 @@ import { generateSlug } from '@/payload/hooks/generateSlug'
 import { protectCourseSources } from '@/payload/hooks/protectCourseSources'
 import { cleanupLearningTargetGrants } from '@/payload/hooks/learningAccessCleanup'
 import { learningCourseDescriptionRead } from '@/payload/access/learningCourseDescription'
+
+/** Буткемп без назначения открыл бы режим «все опубликованные курсы» и доступ ко всей карте. */
+const bootcampAssignedOnly: CollectionBeforeValidateHook = ({ data, originalDoc }) => {
+  if (data && (data.isBootcamp ?? originalDoc?.isBootcamp) === true) data.assignedOnly = true
+  return data
+}
 
 export const Courses: CollectionConfig = {
   slug: 'courses',
@@ -23,7 +29,7 @@ export const Courses: CollectionConfig = {
   hooks: {
     beforeDelete: [cleanupLearningTargetGrants('courses')],
     afterRead: [protectCourseSources],
-    beforeValidate: [generateSlug],
+    beforeValidate: [generateSlug, bootcampAssignedOnly],
   },
   fields: [
     {
@@ -98,6 +104,16 @@ export const Courses: CollectionConfig = {
       admin: {
         position: 'sidebar',
         description: 'Открывается только назначением на курс, его тему, раздел или урок. Режим «все опубликованные курсы» и доступ ко всей карте его не открывают, каталог не показывает.',
+      },
+    },
+    {
+      name: 'isBootcamp',
+      type: 'checkbox',
+      defaultValue: false,
+      label: 'Буткемп',
+      admin: {
+        position: 'sidebar',
+        description: 'Показывается в разделе «Буткемп», а не в «Курсах» и роадмапах. Назначается только целиком, поэтому всегда «Только по назначению»; если снять флажок, «Только по назначению» останется — снимите его отдельно.',
       },
     },
     {

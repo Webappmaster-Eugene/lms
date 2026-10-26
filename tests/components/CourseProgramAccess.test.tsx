@@ -4,13 +4,14 @@ import { render, screen } from '@testing-library/react'
 const mocks = vi.hoisted(() => ({ find: vi.fn(), findByID: vi.fn(), auth: vi.fn(), policy: vi.fn(), req: { user: { id: 7, role: 'student' } } }))
 vi.mock('@/lib/payload', () => ({ getPayload: async () => mocks }))
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }))
-vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('not-found') }, redirect: () => { throw new Error('redirect') } }))
+vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('not-found') }, redirect: (to: string) => { throw new Error(`redirect ${to}`) } }))
 vi.mock('payload', () => ({ createLocalReq: async () => mocks.req }))
 vi.mock('next/link', async () => (await import('../helpers/component-mocks')).linkMock())
 vi.mock('@/server/learning-access', () => ({ getLearningAccess: (...args: unknown[]) => mocks.policy(...args) }))
 vi.mock('@payloadcms/richtext-lexical/react', () => ({ RichText: () => <p>Описание назначенного курса</p> }))
 
 const { default: CourseDetailPage } = await import('@/app/(frontend)/courses/[slug]/page')
+const { default: BootcampDetailPage } = await import('@/app/(frontend)/bootcamp/[slug]/page')
 
 const lessons = [
   { id: 1, title: 'Закрытая тема', slug: 'closed-topic', course: 10, section: null, isPublished: true, order: 0 },
@@ -55,7 +56,7 @@ describe('серверная программа курса', () => {
 
   it('проверяет настоящую сессию до чтения программы', async () => {
     mocks.auth.mockResolvedValue({ user: null })
-    await expect(CourseDetailPage({ params: Promise.resolve({ slug: 'node' }) })).rejects.toThrow('redirect')
+    await expect(CourseDetailPage({ params: Promise.resolve({ slug: 'node' }) })).rejects.toThrow('redirect /login')
     expect(mocks.find).not.toHaveBeenCalled()
     expect(mocks.policy).not.toHaveBeenCalled()
   })
@@ -103,5 +104,31 @@ describe('серверная программа курса', () => {
     expect(screen.getByText('2/2 (100%)')).toBeInTheDocument()
     expect(screen.queryByText(/Курс пройден/)).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Сертификаты' })).not.toBeInTheDocument()
+  })
+
+  it('буткемп из «Курсов» уводит в свой раздел, не загружая программу', async () => {
+    mocks.policy.mockResolvedValue({ canBrowseCourse: () => true })
+    mocks.find.mockImplementation(async ({ collection }: { collection: string }) => collection === 'courses' ? page([{ id: 10, title: 'Node.js', slug: 'node', roadmap: 3, isBootcamp: true }]) : page(lessons))
+    await expect(CourseDetailPage({ params: Promise.resolve({ slug: 'node' }) })).rejects.toThrow('redirect /bootcamp/node')
+    expect(mocks.find).toHaveBeenCalledTimes(1)
+  })
+
+  it('обычный курс по адресу буткемпа не открывается', async () => {
+    mocks.policy.mockResolvedValue({ canBrowseCourse: () => true })
+    await expect(BootcampDetailPage({ params: Promise.resolve({ slug: 'node' }) })).rejects.toThrow('not-found')
+    expect(mocks.find).toHaveBeenCalledTimes(1)
+  })
+
+  it('буткемп открывается в своём разделе без ссылки в роадмап', async () => {
+    mocks.policy.mockResolvedValue({ canBrowseCourse: () => true, canBrowseLessonMetadata: () => true, canBrowseSection: () => true, canAccessCourse: () => true, canReadCourseDescription: () => false, canAccessLessonMetadata: () => true })
+    mocks.find.mockImplementation(async ({ collection }: { collection: string }) => {
+      if (collection === 'courses') return page([{ id: 10, title: 'Буткемп Node.js', slug: 'node', roadmap: 3, isBootcamp: true }])
+      if (collection === 'lessons') return page(lessons)
+      return page([])
+    })
+    render(await BootcampDetailPage({ params: Promise.resolve({ slug: 'node' }) }))
+    expect(screen.getByRole('heading', { level: 1, name: 'Буткемп Node.js' })).toBeInTheDocument()
+    expect(screen.getByText('Начать буткемп')).toBeInTheDocument()
+    expect(mocks.find.mock.calls.some(([args]) => args.collection === 'roadmaps')).toBe(false)
   })
 })

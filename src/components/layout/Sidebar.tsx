@@ -24,6 +24,7 @@ import {
   Smartphone,
   History,
   Film,
+  Tent,
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { MobileSheet } from './MobileSheet'
@@ -32,10 +33,11 @@ import { SHORTCUTS_OPEN_EVENT } from './KeyboardShortcuts'
 import { cn } from '@/lib/utils'
 import { useSidebar } from './SidebarContext'
 import { disconnectDevicePush } from '@/lib/pwa-client'
-import { PLATFORM_SECTIONS, type PlatformSectionHref } from '@/lib/platform-sections'
+import { PLATFORM_SECTIONS, visibleSections, type PlatformSectionHref } from '@/lib/platform-sections'
 
 const NAV_ICONS: Record<PlatformSectionHref, typeof LayoutDashboard> = {
   '/': LayoutDashboard,
+  '/bootcamp': Tent,
   '/roadmaps': Map,
   '/courses': GraduationCap,
   '/trainer': Code2,
@@ -55,7 +57,7 @@ const NAV_ICONS: Record<PlatformSectionHref, typeof LayoutDashboard> = {
 }
 const NAV_ITEMS = PLATFORM_SECTIONS.map((section) => ({ ...section, icon: NAV_ICONS[section.href] }))
 
-export function Sidebar({ isAdmin = false, trainerEnabled = true, guidesEnabled = false }: { isAdmin?: boolean; trainerEnabled?: boolean; guidesEnabled?: boolean }) {
+export function Sidebar({ isAdmin = false, trainerEnabled = true, guidesEnabled = false, bootcampEnabled = false }: { isAdmin?: boolean; trainerEnabled?: boolean; guidesEnabled?: boolean; bootcampEnabled?: boolean }) {
   const pathname = usePathname()
   const { mobileOpen, setMobileOpen } = useSidebar()
 
@@ -82,7 +84,7 @@ export function Sidebar({ isAdmin = false, trainerEnabled = true, guidesEnabled 
 
       {/* Navigation */}
       <nav aria-label="Меню платформы" className={cn('flex-1 overflow-y-auto px-3 py-4', mobile ? 'grid grid-cols-1 gap-2 min-[360px]:grid-cols-2' : 'space-y-1')}>
-        {NAV_ITEMS.filter((item) => (trainerEnabled || item.href !== '/trainer') && (guidesEnabled || item.href !== '/guides')).map(({ href, label, hint, icon: Icon }) => {
+        {visibleSections(NAV_ITEMS, { trainerEnabled, guidesEnabled, bootcampEnabled }).map(({ href, label, hint, icon: Icon }) => {
           const isActive = href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)
           return (
             <Link

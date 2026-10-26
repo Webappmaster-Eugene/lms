@@ -50,6 +50,26 @@ describe('нижняя навигация', () => {
     expect(items[items.length - 1]).toHaveTextContent('Ещё')
   })
 
+  it('участнику буткемпа вкладка «Буткемп» заменяет историю, вкладок по-прежнему пять', () => {
+    pathname.current = '/bootcamp/nodejs-bootcamp-manuals'
+    render(<BottomNav bootcampEnabled />)
+
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Главная', 'Роадмапы', 'Курсы', 'Буткемп'])
+    expect(screen.getByRole('link', { name: /Буткемп/ })).toHaveAttribute('href', '/bootcamp')
+    expect(screen.getByRole('link', { name: /Буткемп/ })).toHaveAttribute('aria-current', 'page')
+    const items = screen.getByRole('navigation', { name: 'Основная навигация' }).querySelectorAll('a, button')
+    expect(items).toHaveLength(5)
+  })
+
+  it('урок у участника буткемпа не подсвечивает «Курсы»: он скорее из буткемпа', () => {
+    pathname.current = '/lessons/week-0-git'
+    const { unmount } = render(<BottomNav bootcampEnabled />)
+    expect(screen.getByRole('link', { name: /Курсы/ })).not.toHaveAttribute('aria-current')
+    unmount()
+    render(<BottomNav />)
+    expect(screen.getByRole('link', { name: /Курсы/ })).toHaveAttribute('aria-current', 'page')
+  })
+
   it('история обучения ведёт на свой раздел и подсвечивается на нём', () => {
     pathname.current = '/learning-history'
     render(<BottomNav />)
