@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 
 import { expect, test } from '@playwright/test'
 
-import { CONTENT, NOT_FOUND_HEADING } from '../fixtures/data'
+import { CONTENT, GUIDE_NOT_FOUND_HEADING } from '../fixtures/data'
 import { storageStateOf } from '../fixtures/env'
 
 /**
@@ -117,7 +117,8 @@ test.describe('ученик', () => {
   test('черновик гайда по прямой ссылке отвечает 404', async ({ page }) => {
     const response = await page.goto(`/guides/${CONTENT.draftGuide.slug}`)
     expect(response?.status()).toBe(404)
-    await expect(page.getByRole('heading', { name: NOT_FOUND_HEADING })).toBeVisible()
+    await expect(page.getByRole('heading', { name: GUIDE_NOT_FOUND_HEADING })).toBeVisible()
+    await expect(page.getByText(CONTENT.draftGuide.title)).toHaveCount(0)
   })
 })
 

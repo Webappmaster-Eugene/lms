@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test, type BrowserContext } from '@playwright/test'
 
-import { USERS } from '../fixtures/data'
+import { CONTENT, GUIDE_NOT_FOUND_HEADING, USERS } from '../fixtures/data'
 import { resetTokenOf } from '../fixtures/db'
 import { APP_URL, storageStateOf } from '../fixtures/env'
 
@@ -11,7 +11,7 @@ import { APP_URL, storageStateOf } from '../fixtures/env'
  * Вход, выход, защищённые страницы, восстановление пароля и «регистрация» —
  * в LMS аккаунты заводит админ, студент задаёт пароль по ссылке из письма.
  */
-const PROTECTED = ['/', '/courses', '/lessons/e2e-html', '/trainer', '/roadmaps', '/leaderboard', '/profile', '/help', '/certificates', '/guides', '/guides/e2e-linkedin']
+const PROTECTED = ['/', '/courses', '/lessons/e2e-html', '/trainer', '/roadmaps', '/leaderboard', '/profile', '/help', '/certificates']
 
 test.describe('аноним', () => {
   for (const path of PROTECTED) {
@@ -21,6 +21,14 @@ test.describe('аноним', () => {
       await expect(page.getByRole('heading', { name: 'MentorCareer LMS' })).toBeVisible()
     })
   }
+
+  test('гайды без входа: открытый каталог, закрытый гайд — 404 раздела без названия', async ({ page }) => {
+    expect((await page.goto('/guides'))?.status()).toBe(200)
+    await expect(page.getByRole('heading', { name: 'Гайды', level: 1 })).toBeVisible()
+    expect((await page.goto('/guides/e2e-linkedin'))?.status()).toBe(404)
+    await expect(page.getByRole('heading', { name: GUIDE_NOT_FOUND_HEADING })).toBeVisible()
+    await expect(page.getByText(CONTENT.guide.title)).toHaveCount(0)
+  })
 
   test('публичные страницы открываются без входа', async ({ page }) => {
     for (const path of ['/login', '/forgot-password', '/reset-password']) {

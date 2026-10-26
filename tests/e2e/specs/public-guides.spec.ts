@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { GUIDE_NOT_FOUND_HEADING } from '../fixtures/data'
 import { APP_URL, storageStateOf } from '../fixtures/env'
 
 test.use({ storageState: storageStateOf('admin') })
@@ -61,6 +62,10 @@ test('админ делает гайд публичным: гость читае
       expect((await guest.request.get(`/guides/${hidden.slug}`)).status()).toBe(404)
       expect((await guest.request.get(`/guides/${hidden.slug}/download`)).status()).toBe(404)
     }
+    expect((await reader.goto(`/guides/${closed.slug}`))?.status()).toBe(404)
+    await expect(reader.getByRole('heading', { name: GUIDE_NOT_FOUND_HEADING })).toBeVisible()
+    await expect(reader.getByText(closed.title)).toHaveCount(0)
+    await expect(reader.getByRole('main').getByRole('link', { name: 'Все гайды' })).toHaveAttribute('href', '/guides')
     expect((await guest.request.get('/courses', { maxRedirects: 0 })).status()).toBe(307)
     await reader.setViewportSize({ width: 375, height: 812 })
     await reader.goto(`/guides/${item.slug}`)
