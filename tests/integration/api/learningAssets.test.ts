@@ -59,6 +59,9 @@ beforeAll(async () => {
     { id: 'root-1', blockType: 'link', title: 'Вся папка', url: ROOT },
     { id: 'missing-1', blockType: 'link', title: 'Удалённый файл', url: `${ROOT}/missing.zip` },
     { id: 'forbidden-1', blockType: 'link', title: 'Закрытый файл', url: `${ROOT}/forbidden.zip` },
+    { id: 'rich-1', blockType: 'text', content: { root: { type: 'root', direction: 'ltr', format: '', indent: 0, version: 1, children: [
+      { type: 'paragraph', version: 1, children: [{ type: 'link', version: 3, fields: { linkType: 'custom', url: `${ROOT}/handout.pdf`, newTab: false }, children: [{ type: 'text', text: 'Раздаточный материал', version: 1 }] }] },
+    ] } } },
   ] } })
   image = await payload.create({ collection: 'media', data: { alt: 'Квота потоков' }, file: { data: PNG, mimetype: 'image/png', name: `${uid('quota')}.png`, size: PNG.length } })
   vi.stubGlobal('fetch', disk)
@@ -92,6 +95,24 @@ describe('GET /api/learning-assets — материалы урока', () => {
     expect(pdf.status).toBe(200)
     expect(pdf.headers.get('Content-Type')).toBe('application/pdf')
     expect(pdf.body).toBeNull()
+  })
+
+  it('ссылка внутри форматированного текста урока выдаётся как материал', async () => {
+    const { token } = await viewer()
+    const response = await asset('rich-1', token)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Content-Type')).toBe('application/pdf')
+    expect(response.headers.get('Content-Disposition')).toBe("attachment; filename*=UTF-8''handout.pdf")
+    await response.arrayBuffer()
+  })
+
+  it('несуществующий урок — 404 без обращения к Диску', async () => {
+    disk.mockClear()
+    const { token } = await viewer()
+    const response = await assetGET(new Request('http://lms.test/api/learning-assets?lesson=2000000000&block=zip-1', { headers: { Authorization: `JWT ${token}` } }))
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({ error: 'Видео не найдено' })
+    expect(disk).not.toHaveBeenCalled()
   })
 
   it('папка целиком, неизвестный блок и испорченный идентификатор материала не выдаются', async () => {
