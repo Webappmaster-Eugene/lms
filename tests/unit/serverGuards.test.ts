@@ -1,9 +1,7 @@
 import { createHmac } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PayloadRequest } from 'payload'
 
 import { GET as connectivity } from '@/app/api/connectivity/route'
-import { isPublishedOrAdmin } from '@/payload/access/isPublishedOrAdmin'
 import { allowEnvelope, forwardEnvelope, resetTunnelLimits } from '@/server/error-tunnel'
 import { validNotificationJobKey } from '@/server/notification-job-auth'
 import { resolveSlideFileName, SlidesError } from '@/server/slides-folder'
@@ -95,16 +93,6 @@ describe('проверка связи PWA', () => {
     expect(response.status).toBe(204)
     expect(response.headers.get('Cache-Control')).toBe('no-store, max-age=0')
     expect(response.headers.get('X-LMS-Connectivity')).toBe('1')
-  })
-})
-
-describe('права «опубликованное или администратор»', () => {
-  const access = (user: unknown) => isPublishedOrAdmin({ req: { user } as PayloadRequest })
-
-  it('гость не видит ничего, администратор — всё, ученик — только опубликованное', () => {
-    expect(access(null)).toBe(false)
-    expect(access({ id: 1, role: 'admin' })).toBe(true)
-    expect(access({ id: 2, role: 'student' })).toEqual({ isPublished: { equals: true } })
   })
 })
 

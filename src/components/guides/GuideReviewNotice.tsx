@@ -12,7 +12,7 @@ export async function GuideReviewNotice({ payload, user }: BeforeListServerProps
   if (user?.role !== 'admin') return null
   const soon = guideReviewHorizon()
   const guides = await collectAllPages(
-    ({ page, limit }) => payload.find({ collection: 'guides', where: { reviewBy: { less_than_equal: soon } }, select: { title: true, reviewBy: true, isPublished: true }, sort: 'reviewBy', depth: 0, page, limit, overrideAccess: true }),
+    ({ page, limit }) => payload.find({ collection: 'guides', where: { reviewBy: { less_than_equal: soon } }, select: { title: true, reviewBy: true, isPublished: true }, sort: ['reviewBy', 'id'], depth: 0, page, limit, overrideAccess: true }),
     { label: 'гайды к пересмотру' },
   )
   const unreviewed = await payload.count({ collection: 'guides', where: { reviewedAt: { exists: false } }, overrideAccess: true })

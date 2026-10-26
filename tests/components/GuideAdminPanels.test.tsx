@@ -49,7 +49,8 @@ describe('блок «Пора пересмотреть» над списком �
     expect(payload.find).toHaveBeenCalledWith(expect.objectContaining({
       collection: 'guides',
       where: { reviewBy: { less_than_equal: '2026-11-09T09:00:00.000Z' } },
-      sort: 'reviewBy',
+      // id вторым ключом: при равных сроках постраничная выборка иначе теряет или дублирует гайды на границе страниц.
+      sort: ['reviewBy', 'id'],
     }))
     expect(payload.count).toHaveBeenCalledWith(expect.objectContaining({ collection: 'guides', where: { reviewedAt: { exists: false } } }))
   })
