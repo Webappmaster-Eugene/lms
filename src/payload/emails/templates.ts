@@ -280,6 +280,30 @@ export function broadcastEmail({ firstName, subject, body, ctaLabel, ctaUrl, uns
   )
 }
 
+type BootcampLeadEmailInput = {
+  id: number | string
+  address: string
+  name: string | null
+  program: string
+  source: string
+}
+
+/** Команде: пришла новая предзапись. Ученику письмо не уходит — адрес не подтверждён. */
+export function bootcampLeadEmail({ id, address, name, program, source }: BootcampLeadEmailInput): EmailContent {
+  const url = `${BASE_URL}/admin/collections/bootcamp-leads/${encodeURIComponent(String(id))}`
+  const rows: [string, string][] = [['Email', address], ['Имя', name ?? 'не указано'], ['Программа', program], ['Откуда', source]]
+  return email(
+    `Новая заявка на буткемп: ${address}`,
+    `Заявка от ${address}: ответьте и пришлите входное задание.`,
+    'Новая заявка на буткемп',
+    `${paragraph('С лендинга пришла предзапись. Ответьте человеку и отметьте этап заявки в CMS.')}
+    ${notice(rows.map(([title, value]) => `<strong style="color:#27272a;">${escapeHtml(title)}</strong><br><span style="word-break:break-all;">${escapeHtml(value)}</span>`).join('<br><br>'))}
+    ${button('Открыть заявку', url)}
+    ${fallbackLink(url)}`,
+    `С лендинга пришла предзапись. Ответьте человеку и отметьте этап заявки в CMS.\n\n${rows.map(([title, value]) => `${title}: ${value}`).join('\n')}\n\nОткрыть заявку: ${url}`,
+  )
+}
+
 export function emailBaseUrl(): string {
   return BASE_URL
 }
