@@ -112,6 +112,9 @@ test.describe('администратор', () => {
       await expect(row).toContainText('Выбранные ученики: 1')
       await expect(row).toContainText('Черновик')
       await row.click()
+      // Без ожидания под нагрузкой клик «Удалить» успевал до конца перехода, и confirm терялся.
+      await expect(page).toHaveURL(new RegExp(`/manage/broadcasts/${broadcastId}$`))
+      await expect(page.getByRole('heading', { name: `${subject} (правка)`, level: 1 })).toBeVisible()
       page.once('dialog', (dialog) => dialog.dismiss())
       await page.getByRole('button', { name: 'Удалить', exact: true }).click()
       await expect(page).toHaveURL(new RegExp(`/manage/broadcasts/${broadcastId}$`))
