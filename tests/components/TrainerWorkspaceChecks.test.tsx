@@ -405,10 +405,8 @@ describe('ответ сервера на отправку', () => {
     expect(toast).toHaveBeenCalledWith('Не удалось отправить решение', 'error')
   })
 
-  // Дефект: TrainerWorkspace.tsx:351-354 — fetch отклоняется TypeError, это Error,
-  // поэтому заготовленный текст «Сеть недоступна» не используется и ученик видит
-  // сообщение браузера на английском («Failed to fetch», в Safari — «Load failed»).
-  it.fails('обрыв сети при отправке объяснён по-русски — дефект: показывается «Failed to fetch» из браузера', async () => {
+  // Браузер описывает обрыв сети по-английски: «Failed to fetch», в Safari — «Load failed».
+  it('обрыв сети при отправке объяснён по-русски', async () => {
     const user = userEvent.setup()
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
     render(<TrainerWorkspace task={task} progress={progress} />)
@@ -548,10 +546,7 @@ describe('скрытые тесты', () => {
     expect(screen.getByText('Ещё 1 скрытый тест прогонится при отправке')).toBeInTheDocument()
   })
 
-  // Дефект: TrainerWorkspace.tsx:368-371 склоняет только «1» и «остальные», без
-  // pluralize из @/lib/utils. В каталоге 30 задач с 5–7 скрытыми тестами — там
-  // написано «Ещё 5 скрытых теста прогонится при отправке».
-  it.fails('пять скрытых тестов согласованы с числом — дефект: «Ещё 5 скрытых теста»', () => {
+  it('пять скрытых тестов согласованы с числом', () => {
     render(<TrainerWorkspace task={{ ...task, hiddenCaseCount: 5 }} progress={progress} />)
 
     expect(screen.getByText(/^Ещё 5 скрытых тестов /)).toBeInTheDocument()
@@ -622,11 +617,8 @@ describe('Go и предпросмотр frontend', () => {
     expect(screen.getByRole('button', { name: 'Запустить' })).toBeEnabled()
   })
 
-  // Дефект: TrainerWorkspace.tsx:223 читает ответ /api/trainer/run через
-  // response.json() без защиты. Прокси на долгой сборке Go отвечает текстом
-  // «Gateway Timeout», и вместо «Не удалось запустить решение» ученик видит
-  // ошибку парсера JSON на английском.
-  it.fails('сбой прокси при запуске Go объяснён по-русски — дефект: показывается ошибка разбора JSON', async () => {
+  // Прокси перед приложением отвечает на 502/504 не JSON: фразу интерфейса не должна подменять ошибка парсера.
+  it('сбой прокси при запуске Go объяснён по-русски', async () => {
     const user = userEvent.setup()
     serve({ '/api/trainer/run': () => new Response('Gateway Timeout', { status: 504 }) })
     render(<TrainerWorkspace task={goTask} progress={progress} />)

@@ -6,7 +6,7 @@ import { BookOpen, FlaskConical, Lightbulb, Lock, Unlock } from 'lucide-react'
 import { HintsAccordion } from './HintsAccordion'
 import { MarkdownRenderer } from '@/components/lesson/MarkdownRenderer'
 import { LANGUAGE_LABELS } from '@/lib/trainer/constants'
-import { cn } from '@/lib/utils'
+import { cn, pluralize } from '@/lib/utils'
 import type { SolutionResponse } from '@/lib/trainer/api'
 import type { BrowserCheck, RuntimeCase } from '@/lib/trainer/runtime-spec'
 import type { TrainerCaseSpec, TrainerLanguage } from '@/lib/trainer/types'
@@ -135,6 +135,11 @@ export function TaskSidePanel({
   )
 }
 
+function hiddenCasesNote(count: number): string {
+  const single = count % 10 === 1 && count % 100 !== 11
+  return `Плюс ${pluralize(count, 'скрытый тест', 'скрытых теста', 'скрытых тестов')} — ${single ? 'он прогоняется' : 'они прогоняются'} на сервере при отправке.`
+}
+
 function TestsTab({
   publicCases,
   runtimeCases = [],
@@ -208,8 +213,8 @@ function TestsTab({
         )}
         {hiddenCaseCount > 0 && (
           <p className="text-xs text-muted-foreground">
-            Плюс {hiddenCaseCount} скрытых тестов — они прогоняются на сервере при отправке.
-            Их входные данные и ожидаемые результаты не показываются.
+            {hiddenCasesNote(hiddenCaseCount)}
+            {' '}Их входные данные и ожидаемые результаты не показываются.
           </p>
         )}
       </div>
@@ -254,7 +259,7 @@ function TestsTab({
 
       {hiddenCaseCount > 0 && (
         <p className="text-xs text-muted-foreground">
-          Плюс {hiddenCaseCount} скрытых тестов — они прогоняются на сервере при отправке.
+          {hiddenCasesNote(hiddenCaseCount)}
         </p>
       )}
     </div>

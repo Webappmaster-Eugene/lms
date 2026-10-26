@@ -15,7 +15,8 @@ import { useCodeRunner } from './useCodeRunner'
 import { CustomTestCases } from './CustomTestCases'
 import { LANGUAGE_LABELS, TRAINER_LIMITS } from '@/lib/trainer/constants'
 import { failureResult } from '@/lib/trainer/result'
-import { cn } from '@/lib/utils'
+import { cn, pluralize } from '@/lib/utils'
+import { apiFetch, readJson } from '@/lib/http-client'
 import { useToast } from '@/components/ui/Toast'
 import { useHydrated } from '@/hooks/use-hydrated'
 import { queryHref } from '@/lib/shared-url'
@@ -180,23 +181,20 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
     async (source: string): Promise<{ js: string; diagnostics: TrainerDiagnostic[] } | null> => {
       if (language === 'js') return { js: source, diagnostics: [] }
 
-      const response = await fetch('/api/trainer/compile', {
+      const response = await apiFetch('/api/trainer/compile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ taskId: task.id, code: source }),
       })
 
-      if (!response.ok) {
-        const message = await response
-          .json()
-          .then((data: { error?: string }) => data.error)
-          .catch(() => undefined)
-        showToast(message ?? 'Не удалось скомпилировать решение', 'error')
+      const data = await readJson<{ js: string; diagnostics: TrainerDiagnostic[]; error?: string }>(response)
+      if (!response.ok || !data) {
+        showToast(data?.error ?? 'Не удалось скомпилировать решение', 'error')
         return null
       }
 
-      return (await response.json()) as { js: string; diagnostics: TrainerDiagnostic[] }
+      return data
     },
     [language, showToast, task.id],
   )
@@ -212,16 +210,16 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
     try {
       if (isRuntimeLanguage(language)) {
         if (preview?.leaseToken) {
-          const released = await fetch(`/api/trainer/preview-release/${encodeURIComponent(preview.leaseToken)}`, { method: 'POST', credentials: 'omit' })
+          const released = await apiFetch(`/api/trainer/preview-release/${encodeURIComponent(preview.leaseToken)}`, { method: 'POST', credentials: 'omit' })
           if (!released.ok) throw new Error('Не удалось закрыть предыдущий предпросмотр. Повторите запуск.')
           setPreview(null)
         }
-        const response = await fetch('/api/trainer/run', {
+        const response = await apiFetch('/api/trainer/run', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
           body: JSON.stringify({ taskId: task.id, language, code, ...((language === 'go' || language === 'python') ? { customCases: programCases } : {}) }),
         })
-        const data = await response.json() as { result?: TrainerRunResult; preview?: { html?: string; previewPath?: string; leaseToken?: string }; error?: string }
-        if (!response.ok || !data.result) throw new Error(data.error ?? 'Не удалось запустить решение')
+        const data = await readJson<{ result?: TrainerRunResult; preview?: { html?: string; previewPath?: string; leaseToken?: string }; error?: string }>(response)
+        if (!response.ok || !data?.result) throw new Error(data?.error ?? 'Не удалось запустить решение')
         if (!mounted.current) {
           if (data.preview?.leaseToken) void fetch(`/api/trainer/preview-release/${encodeURIComponent(data.preview.leaseToken)}`, { method: 'POST', keepalive: true, credentials: 'omit' }).catch(() => undefined)
           return
@@ -306,28 +304,25 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
 
     try {
       if (preview?.leaseToken) {
-        const released = await fetch(`/api/trainer/preview-release/${encodeURIComponent(preview.leaseToken)}`, { method: 'POST', credentials: 'omit' })
+        const released = await apiFetch(`/api/trainer/preview-release/${encodeURIComponent(preview.leaseToken)}`, { method: 'POST', credentials: 'omit' })
         if (!released.ok) throw new Error('Не удалось закрыть предыдущий предпросмотр. Повторите отправку.')
         setPreview(null)
       }
-      const response = await fetch('/api/trainer/submit', {
+      const response = await apiFetch('/api/trainer/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ taskId: task.id, language, code }),
       })
 
-      if (!response.ok) {
-        const message = await response
-          .json()
-          .then((data: { error?: string }) => data.error)
-          .catch(() => undefined)
-        showToast(message ?? 'Не удалось отправить решение', 'error')
-        setResult(failureResult('error', message ?? 'Не удалось отправить решение'))
+      const data = await readJson<SubmitResponse & { error?: string }>(response)
+      if (!response.ok || !data?.result) {
+        const message = (response.ok ? undefined : data?.error) ?? 'Не удалось отправить решение'
+        showToast(message, 'error')
+        setResult(failureResult('error', message))
         return
       }
 
-      const data = (await response.json()) as SubmitResponse
       setResult(data.result)
       setDiagnostics(data.result.diagnostics ?? [])
       setAttempts(data.attempts)
@@ -367,7 +362,9 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
 
   const hiddenNote = useMemo(() => {
     if (task.hiddenCaseCount === 0) return null
-    return `Ещё ${task.hiddenCaseCount} скрыт${task.hiddenCaseCount === 1 ? 'ый тест' : 'ых теста'} прогонится при отправке`
+    const count = task.hiddenCaseCount
+    const verb = count % 10 === 1 && count % 100 !== 11 ? 'прогонится' : 'прогонятся'
+    return `Ещё ${pluralize(count, 'скрытый тест', 'скрытых теста', 'скрытых тестов')} ${verb} при отправке`
   }, [task.hiddenCaseCount])
 
   return (

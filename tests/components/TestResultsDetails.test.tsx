@@ -84,9 +84,7 @@ describe('упавший тест в отчёте', () => {
     expect(screen.queryByText('Ожидалось')).not.toBeInTheDocument()
   })
 
-  // Дефект: TestResultsPanel.tsx:49-57 — кнопка раскрытия теста не сообщает своё
-  // состояние (нет aria-expanded), скринридер не отличает раскрытый тест от свёрнутого.
-  it.fails('кнопка теста объявляет, раскрыт ли он — дефект: нет aria-expanded', async () => {
+  it('кнопка теста объявляет, раскрыт ли он', async () => {
     const user = userEvent.setup()
     render(<TestResultsPanel result={result({ tests: [failedTest] })} isRunning={false} origin="client" />)
 
@@ -147,9 +145,7 @@ describe('вкладки отчёта', () => {
     expect(screen.getByText(/складывает отрицательные/)).toBeInTheDocument()
   })
 
-  // Дефект: TestResultsPanel.tsx:257-280 — у вкладок «Тесты»/«Консоль» выбранная
-  // отмечена только цветом. В TaskSidePanel та же роль решена через aria-pressed.
-  it.fails('выбранная вкладка отчёта объявлена скринридеру — дефект: активность видна только цветом', async () => {
+  it('выбранная вкладка отчёта объявлена скринридеру', async () => {
     const user = userEvent.setup()
     // Роль кнопки или вкладки — на выбор исправления, проверяется только объявленное состояние.
     const tab = (label: string) => screen.getByText(label).closest('button') as HTMLButtonElement

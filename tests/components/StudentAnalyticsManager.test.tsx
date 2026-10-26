@@ -165,9 +165,8 @@ describe('аналитика ученика для администратора'
     expect(await screen.findByRole('heading', { name: 'Александр Студент' })).toBeInTheDocument()
   })
 
-  // Тот же разбор, что в назначениях: JSON читается до проверки статуса, и HTML-страница
-  // 502/504 от прокси превращается в сообщение парсера вместо фразы компонента.
-  it.fails('ответ не в JSON (502 от прокси) показывается понятной фразой — дефект: админ видит ошибку разбора JSON', async () => {
+  // Прокси перед приложением отвечает на 502/504 не JSON: фразу интерфейса не должна подменять ошибка парсера.
+  it('ответ не в JSON (502 от прокси) показывается понятной фразой', async () => {
     vi.stubGlobal('fetch', vi.fn(async (raw: string | URL | Request) => new URL(String(raw), 'http://localhost').searchParams.has('user')
       ? new Response('<html>502 Bad Gateway</html>', { status: 502 })
       : fetchMock(raw)))

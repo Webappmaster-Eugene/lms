@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from './InterviewButton'
+import { apiFetch, readJson } from '@/lib/http-client'
 
 export function InterviewStart({ taskId }: { taskId?: string }) {
   const router = useRouter()
@@ -12,11 +13,11 @@ export function InterviewStart({ taskId }: { taskId?: string }) {
     setBusy(true)
     setError('')
     try {
-      const response = await fetch('/api/trainer/interview', {
+      const response = await apiFetch('/api/trainer/interview', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskId ? { taskId } : {}),
       })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error ?? 'Не удалось создать комнату')
+      const data = await readJson<{ error?: string; room?: { token?: string } }>(response)
+      if (!response.ok || !data?.room?.token) throw new Error(data?.error ?? 'Не удалось создать комнату')
       router.push(`/trainer/interview/${data.room.token}`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Не удалось создать комнату')

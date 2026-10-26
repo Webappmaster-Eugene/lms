@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import type { LearningTargetCollection } from '@/lib/learning-access'
 import { maximumLearningRules, type AssignmentOption, type AssignmentOptions, type AssignmentPreview, type AssignmentRule, type AssignmentSnapshot } from './contracts'
+import { apiFetch, readJson } from '@/lib/http-client'
 import './learning-access.scss'
 
 const endpoint = '/api/manage/learning-access'
@@ -15,8 +16,8 @@ class AssignmentRequestError extends Error {
 }
 
 async function result<T>(response: Response): Promise<T> {
-  const data = await response.json()
-  if (!response.ok) throw new AssignmentRequestError(typeof data.error === 'string' ? data.error : 'Не удалось выполнить запрос. Повторите попытку', data.code === 'orphaned-assignment' ? data.code : undefined)
+  const data = await readJson<{ error?: unknown; code?: unknown }>(response)
+  if (!response.ok || !data) throw new AssignmentRequestError(typeof data?.error === 'string' ? data.error : 'Не удалось выполнить запрос. Повторите попытку', data?.code === 'orphaned-assignment' ? data.code : undefined)
   return data as T
 }
 
@@ -39,7 +40,7 @@ function useOptions(kind: 'students' | 'targets', type?: LearningTargetCollectio
       if (type) query.set('type', type)
       if (parentId) query.set('parent', String(parentId))
       try {
-        const data = await result<AssignmentOptions>(await fetch(`${endpoint}?${query}`, { signal: abort.signal, credentials: 'same-origin' }))
+        const data = await result<AssignmentOptions>(await apiFetch(`${endpoint}?${query}`, { signal: abort.signal, credentials: 'same-origin' }))
         if (!abort.signal.aborted) setLoaded({ key: requestKey, options: data })
       } catch (error) {
         if (!abort.signal.aborted) { setLoaded({ key: requestKey, options: emptyOptions }); setError(error instanceof Error ? error.message : 'Не удалось загрузить список') }
@@ -109,7 +110,7 @@ export function LearningAccessManager({ initialUserId = null }: { initialUserId?
     generation.current += 1
     const abort = new AbortController()
     if (!userId) return
-    fetch(`${endpoint}?user=${userId}`, { signal: abort.signal, credentials: 'same-origin' }).then(result<AssignmentSnapshot>).then((data) => {
+    apiFetch(`${endpoint}?user=${userId}`, { signal: abort.signal, credentials: 'same-origin' }).then(result<AssignmentSnapshot>).then((data) => {
       if (!abort.signal.aborted) { setSnapshot(data); setMode(data.mode); setCatalogVisibility(data.catalogVisibility); setTrainerMode(data.trainerMode); setGuidesMode(data.guidesMode); setRules(data.rules) }
     }).catch((error) => { if (!abort.signal.aborted) { setError(error instanceof Error ? error.message : 'Не удалось загрузить назначения'); setNeedsGrantCleanup(error instanceof AssignmentRequestError && error.code === 'orphaned-assignment') } })
     return () => abort.abort()
@@ -134,7 +135,7 @@ export function LearningAccessManager({ initialUserId = null }: { initialUserId?
     setError(''); setNeedsGrantCleanup(false); setNotice('')
     if (save) setSaving(true); else setPreviewLoading(true)
     try {
-      const response = await fetch(`${endpoint}?page=${page}&trainerPage=${trainerPage}`, { method: save ? 'PUT' : 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: snapshot.userId, revision: snapshot.revision, mode, catalogVisibility, trainerMode, guidesMode, rules }) })
+      const response = await apiFetch(`${endpoint}?page=${page}&trainerPage=${trainerPage}`, { method: save ? 'PUT' : 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: snapshot.userId, revision: snapshot.revision, mode, catalogVisibility, trainerMode, guidesMode, rules }) })
       if (save) {
         const next = await result<AssignmentSnapshot>(response)
         if (currentGeneration === generation.current) { setSnapshot(next); setMode(next.mode); setCatalogVisibility(next.catalogVisibility); setTrainerMode(next.trainerMode); setGuidesMode(next.guidesMode); setRules(next.rules); setNotice('Назначения сохранены. Новые запросы ученика используют этот доступ.') }

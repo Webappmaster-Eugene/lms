@@ -216,9 +216,8 @@ describe('назначения: выбор ученика, ошибки и пр�
     expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось выполнить запрос. Повторите попытку')
   })
 
-  // Прокси перед приложением отдаёт 502/504 страницей HTML. result() сначала парсит JSON,
-  // и админ видит сообщение парсера вместо собственной фразы компонента об ошибке запроса.
-  it.fails('ответ не в JSON (502 от прокси) показывается понятной фразой — дефект: админ видит ошибку разбора JSON', async () => {
+  // Прокси перед приложением отвечает на 502/504 не JSON: фразу интерфейса не должна подменять ошибка парсера.
+  it('ответ не в JSON (502 от прокси) показывается понятной фразой', async () => {
     api((address, init) => !init?.method && address.searchParams.has('user') ? new Response('<html>502 Bad Gateway</html>', { status: 502 }) : undefined)
     render(<LearningAccessManager initialUserId={34} />)
     expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось выполнить запрос. Повторите попытку')

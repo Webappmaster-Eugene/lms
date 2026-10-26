@@ -102,9 +102,7 @@ describe('вопросы и ответы в справке', () => {
     expect(screen.getByText('Пока нет часто задаваемых вопросов')).toBeInTheDocument()
   })
 
-  // Дефект: кнопка вопроса (FaqAccordion.tsx:32) не сообщает состояние через aria-expanded и не связана
-  // с ответом aria-controls. Экранный диктор не говорит, раскрыт ли ответ, — шаблон WAI-ARIA Accordion нарушен.
-  it.fails('кнопка вопроса сообщает, раскрыт ли ответ — дефект: нет aria-expanded', () => {
+  it('кнопка вопроса сообщает, раскрыт ли ответ', () => {
     render(<FaqAccordion items={items} />)
     const toggle = screen.getByRole('button', { name: 'Как получить доступ?' })
 

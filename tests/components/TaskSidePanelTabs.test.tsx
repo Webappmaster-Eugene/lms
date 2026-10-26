@@ -171,17 +171,14 @@ describe('вкладка «Тесты»', () => {
     expect(screen.getByText('Публичные примеры для этой задачи пока не добавлены.')).toBeInTheDocument()
   })
 
-  // Дефект: TaskSidePanel.tsx:257 (и :211 для Go/frontend) пишет «скрытых тестов»
-  // при любом числе, хотя в @/lib/utils есть pluralize. В каталоге 51 задача
-  // с 2–4 скрытыми тестами — там «Плюс 2 скрытых тестов».
-  it.fails('два скрытых теста согласованы с числом — дефект: «Плюс 2 скрытых тестов»', async () => {
+  it('два скрытых теста согласованы с числом', async () => {
     renderPanel({ hiddenCaseCount: 2 })
     await openTab('Тесты')
 
     expect(screen.getByText(/Плюс 2 скрытых теста —/)).toBeInTheDocument()
   })
 
-  it.fails('один скрытый тест программы согласован с числом — дефект: «Плюс 1 скрытых тестов»', async () => {
+  it('один скрытый тест программы согласован с числом', async () => {
     renderPanel({ checkMode: 'program', languages: ['python'], runtimeCases: [], hiddenCaseCount: 1 })
     await openTab('Тесты')
 

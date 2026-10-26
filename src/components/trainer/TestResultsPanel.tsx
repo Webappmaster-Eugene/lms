@@ -50,6 +50,7 @@ function TestRow({
         type="button"
         onClick={() => hasDetails && setOpen((value) => !value)}
         disabled={!hasDetails}
+        aria-expanded={hasDetails ? open : undefined}
         className={cn(
           'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
           hasDetails ? 'cursor-pointer hover:bg-accent/50' : 'cursor-default',
@@ -267,6 +268,7 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={cn(
         'rounded-t-md px-3 py-1.5 text-xs font-medium transition-colors',
         active

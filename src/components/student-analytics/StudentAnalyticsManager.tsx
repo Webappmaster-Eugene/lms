@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { AnalyticsTarget, StudentAnalyticsSnapshot, StudentEventDTO, StudentEventType, StudentSessionDTO } from '@/lib/student-analytics'
 import { UserPerformanceSummary } from './UserPerformanceSummary'
+import { apiFetch, readJson } from '@/lib/http-client'
 import './student-analytics.scss'
 
 type StudentOption = { id: number; title: string; email: string; isActive: boolean; role?: 'admin' | 'student' }
@@ -14,8 +15,8 @@ const eventLabels: Record<StudentEventType, string> = { login: 'Вход на п
 const statusLabels: Record<StudentSessionDTO['status'], string> = { online: 'Активность за последние 5 минут', active: 'Вход сохранён', expired: 'Срок входа истёк', revoked: 'Вход завершён' }
 
 async function responseData<T>(response: Response): Promise<T> {
-  const data = await response.json()
-  if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Не удалось загрузить данные. Повторите попытку')
+  const data = await readJson<{ error?: unknown }>(response)
+  if (!response.ok || !data) throw new Error(typeof data?.error === 'string' ? data.error : 'Не удалось загрузить данные. Повторите попытку')
   return data as T
 }
 
@@ -79,7 +80,7 @@ export function StudentAnalyticsManager({ initialUserId = null }: { initialUserI
     const timer = window.setTimeout(async () => {
       const query = new URLSearchParams({ kind: 'students', search, page: String(studentsPage) })
       try {
-        const data = await responseData<StudentsPage>(await fetch(`${endpoint}?${query}`, { signal: abort.signal, credentials: 'same-origin' }))
+        const data = await responseData<StudentsPage>(await apiFetch(`${endpoint}?${query}`, { signal: abort.signal, credentials: 'same-origin' }))
         if (!abort.signal.aborted) { setStudents({ key: searchKey, data }); setStudentsError('') }
       } catch (error) {
         if (!abort.signal.aborted) { setStudents({ key: searchKey, data: emptyStudents }); setStudentsError(error instanceof Error ? error.message : 'Не удалось найти пользователя') }
@@ -91,7 +92,7 @@ export function StudentAnalyticsManager({ initialUserId = null }: { initialUserI
     if (!userId) return
     const abort = new AbortController()
     const query = new URLSearchParams({ user: String(userId), eventsPage: String(eventsPage), sessionsPage: String(sessionsPage) })
-    fetch(`${endpoint}?${query}`, { signal: abort.signal, credentials: 'same-origin' }).then(responseData<StudentAnalyticsSnapshot>).then((data) => {
+    apiFetch(`${endpoint}?${query}`, { signal: abort.signal, credentials: 'same-origin' }).then(responseData<StudentAnalyticsSnapshot>).then((data) => {
       if (abort.signal.aborted) return
       if (data.student.id !== userId) throw new Error('Данные пользователя не совпали. Повторите загрузку')
       setReport({ key: reportKey, data, loadedAt: new Date().toISOString() })

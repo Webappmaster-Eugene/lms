@@ -14,6 +14,7 @@ import { LANGUAGE_OPTIONS } from '@/lib/trainer/constants'
 import { isFrontendLanguage, isRuntimeLanguage } from '@/lib/trainer/runtime-spec'
 import { interviewStarter, interviewLanguage } from '@/lib/trainer/interview'
 import type { RuntimePreview } from '@/server/trainer/runtime'
+import { apiFetch, readJson } from '@/lib/http-client'
 
 const FrontendEditor = dynamic(() => import('@/components/trainer/FrontendEditor').then((module) => module.FrontendEditor), { ssr: false, loading: () => <p className="p-4 text-sm">Загружаем редактор проекта…</p> })
 
@@ -96,12 +97,12 @@ export function InterviewWorkspace({ token }: { token: string }) {
       setPreview(null)
       let code = draft.code
       if (isRuntimeLanguage(draft.language)) {
-        const response = await fetch(`/api/trainer/interview/${token}/run`, {
+        const response = await apiFetch(`/api/trainer/interview/${token}/run`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code, language: draft.language }), signal: controller.signal,
         })
-        const output = await response.json()
-        if (!response.ok) throw new Error(output.error ?? 'Не удалось запустить код')
+        const output = await readJson<{ error?: string; result: TrainerRunResult; preview: RuntimePreview }>(response)
+        if (!response.ok || !output) throw new Error(output?.error ?? 'Не удалось запустить код')
         if (id !== runId.current) {
           if (output.preview?.leaseToken) void releasePreviewLease(output.preview.leaseToken, true)
           return
@@ -113,12 +114,12 @@ export function InterviewWorkspace({ token }: { token: string }) {
         return
       }
       if (draft.language === 'ts') {
-        const response = await fetch(`/api/trainer/interview/${token}/compile`, {
+        const response = await apiFetch(`/api/trainer/interview/${token}/compile`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code, language: draft.language }), signal: controller.signal,
         })
-        const compiled = await response.json()
-        if (!response.ok) throw new Error(compiled.error ?? 'Не удалось скомпилировать код')
+        const compiled = await readJson<{ error?: string; js: string; diagnostics: { line: number; message: string }[] }>(response)
+        if (!response.ok || !compiled) throw new Error(compiled?.error ?? 'Не удалось скомпилировать код')
         if (id !== runId.current) return
         if (compiled.diagnostics.length) {
           setRunError(compiled.diagnostics.map((item: { line: number; message: string }) => `Строка ${item.line}: ${item.message}`).join('\n'))

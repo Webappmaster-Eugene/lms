@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { InterviewRoom } from '@/lib/trainer/interview'
 import type { TrainerLanguage } from '@/lib/trainer/types'
+import { apiFetch, readJson } from '@/lib/http-client'
 
 type Snapshot = { room: InterviewRoom; userId: number }
 type Draft = { code: string; language: TrainerLanguage }
@@ -29,11 +30,14 @@ export function useInterviewRoom(token: string) {
     const controller = new AbortController()
     controllers.current.add(controller)
     try {
-      const response = await fetch(`/api/trainer/interview/${token}`, {
+      const response = await apiFetch(`/api/trainer/interview/${token}`, {
         method, signal: controller.signal, cache: 'no-store',
         ...(input ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) } : {}),
       })
-      return { status: response.status, data: await response.json() }
+      const data = await readJson<Snapshot & { error?: string }>(response)
+      // Не JSON отвечает только прокси (502/504): даже с кодом 200 это сбой, и каждый вызов покажет свою фразу.
+      if (!data) return { status: response.ok ? 502 : response.status, data: {} as Snapshot & { error?: string } }
+      return { status: response.status, data }
     } finally {
       controllers.current.delete(controller)
     }
