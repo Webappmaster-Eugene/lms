@@ -1,3 +1,23 @@
+// Project MCP servers start only inside a thread: without threadId the status
+// lists just the app-server's own servers. An ephemeral thread keeps no rollout
+// and starts no model turn.
+export async function mcpInventory(rpc, cwd) {
+  const { thread } = await rpc("thread/start", { cwd, ephemeral: true });
+  if (!thread?.id) throw new Error("Codex did not start an inspection thread");
+  const servers = [];
+  let cursor;
+  const seenCursors = new Set();
+  do {
+    const mcp = await rpc("mcpServerStatus/list", { threadId: thread.id, detail: "toolsAndAuthOnly", ...(cursor ? { cursor } : {}) });
+    if (!Array.isArray(mcp.data)) throw new Error("Missing MCP status inventory");
+    servers.push(...mcp.data.map(server => ({ name: server.name, authStatus: server.authStatus, tools: Object.keys(server.tools ?? {}).length })));
+    cursor = mcp.nextCursor;
+    if (cursor && seenCursors.has(cursor)) throw new Error("Repeated MCP inventory cursor");
+    seenCursors.add(cursor);
+  } while (cursor);
+  return { cwd, servers };
+}
+
 // Missing inventory is a failed check, never evidence of a working setup.
 export function validateNativeReport(report, { cwds, skills, servers }) {
   const failures = [];
@@ -25,9 +45,10 @@ export function validateNativeReport(report, { cwds, skills, servers }) {
         failures.push(`${cwd}: ${event} hook must be enabled, trusted and loaded once`);
       }
     }
-  }
-  for (const name of servers) {
-    if (!report.mcp?.some(server => server.name === name && server.tools > 0)) failures.push(`MCP handshake/tools missing: ${name}`);
+    const mcp = report.mcp?.find(item => item.cwd === cwd);
+    for (const name of servers) {
+      if (!mcp?.servers?.some(server => server.name === name && server.tools > 0)) failures.push(`${cwd}: MCP handshake/tools missing: ${name}`);
+    }
   }
   return failures;
 }

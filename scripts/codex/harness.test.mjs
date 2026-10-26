@@ -9,7 +9,7 @@ import { serverCommand } from "./mcp.mjs";
 import { handleEvent, deniedCommand, claudeDenyPatterns, claudeMemoryDir, claudeMemory, contextExcerpt } from "./hooks.mjs";
 import { hooksToTrust } from "./trust.mjs";
 import { configText, verificationPlan, configuredServers, repo } from "./harness.mjs";
-import { validateNativeReport } from "./native-report.mjs";
+import { mcpInventory, validateNativeReport } from "./native-report.mjs";
 import { stopChild } from "./process.mjs";
 import { startupFailure } from './app-server.mjs'
 
@@ -176,7 +176,7 @@ function nativeFixture() {
     configs: nativeExpected.cwds.map(cwd => ({ cwd, approval: "never", permissions: "lms", contextWindow: 600000, autoCompactLimit: 540000, mcp: ["context7"] })),
     skills: nativeExpected.cwds.map(cwd => ({ cwd, errors: [], skills: nativeExpected.skills.map(name => ({ name, enabled: true })) })),
     hooks: { data: nativeExpected.cwds.map(cwd => ({ cwd, errors: [], hooks: ["sessionStart", "preToolUse", "stop"].map(eventName => ({ eventName, enabled: true, trustStatus: "trusted" })) })) },
-    mcp: [{ name: "context7", tools: 2 }],
+    mcp: nativeExpected.cwds.map(cwd => ({ cwd, servers: [{ name: "context7", tools: 2 }] })),
   };
 }
 
@@ -204,13 +204,40 @@ test("native check rejects missing, disabled and untrusted capabilities", () => 
     report => { report.hooks.data[0].hooks[0].enabled = false; },
     report => { report.hooks.data[0].hooks[0].trustStatus = "untrusted"; },
     report => { report.hooks.data[0].hooks[1].eventName = "sessionStart"; },
-    report => { report.mcp[0].tools = 0; },
+    report => { report.mcp[0].servers[0].tools = 0; },
+    report => { report.mcp.pop(); },
+    // An inventory without a project root is the app-server's own list, not the project's.
+    report => { report.mcp = [{ name: "context7", tools: 2 }]; },
   ];
   for (const corrupt of corruptions) {
     const report = nativeFixture();
     corrupt(report);
     assert.ok(validateNativeReport(report, nativeExpected).length > 0, corrupt.toString());
   }
+});
+
+test("native check reads MCP status inside an ephemeral thread of the project root", async () => {
+  const calls = [];
+  const pages = { first: { data: [{ name: "context7", tools: { a: {}, b: {} } }], nextCursor: "next" }, next: { data: [{ name: "playwright", authStatus: "unsupported" }] } };
+  const rpc = async (method, params) => {
+    calls.push({ method, params });
+    return method === "thread/start" ? { thread: { id: "t1" } } : pages[params.cursor ?? "first"];
+  };
+  assert.deepEqual(await mcpInventory(rpc, "/project"), { cwd: "/project", servers: [
+    { name: "context7", authStatus: undefined, tools: 2 },
+    { name: "playwright", authStatus: "unsupported", tools: 0 },
+  ] });
+  assert.deepEqual(calls[0], { method: "thread/start", params: { cwd: "/project", ephemeral: true } });
+  assert.ok(calls.slice(1).every(call => call.method === "mcpServerStatus/list" && call.params.threadId === "t1"));
+  assert.equal(calls.length, 3);
+});
+
+test("native check fails instead of guessing when the MCP inventory is unusable", async () => {
+  await assert.rejects(mcpInventory(async () => ({}), "/project"), /inspection thread/);
+  const looping = async method => method === "thread/start" ? { thread: { id: "t1" } } : { data: [], nextCursor: "same" };
+  await assert.rejects(mcpInventory(looping, "/project"), /Repeated MCP inventory cursor/);
+  const empty = async method => method === "thread/start" ? { thread: { id: "t1" } } : {};
+  await assert.rejects(mcpInventory(empty, "/project"), /Missing MCP status inventory/);
 });
 
 test('sibling checkout sync preserves the shared workspace configuration and instructions', () => {
