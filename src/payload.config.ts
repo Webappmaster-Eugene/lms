@@ -48,6 +48,7 @@ import { Guides } from '@/payload/collections/Guides'
 import { GuideCategories } from '@/payload/collections/GuideCategories'
 import { GuideReads } from '@/payload/collections/GuideReads'
 import { YandexDiskImports } from '@/payload/collections/YandexDiskImports'
+import { BootcampLeads } from '@/payload/collections/BootcampLeads'
 import { withLessonSourceGuard } from '@/payload/hooks/denyLessonSourceQueries'
 import { SiteSettings } from '@/payload/globals/SiteSettings'
 
@@ -133,6 +134,7 @@ export default buildConfig({
     InterviewAnalysisUsage,
     FaqItems,
     YandexDiskImports,
+    BootcampLeads,
   ].map(withLessonSourceGuard),
 
   globals: [SiteSettings],

@@ -111,6 +111,7 @@ export interface Config {
     'interview-analysis-usage': InterviewAnalysisUsage;
     'faq-items': FaqItem;
     'yandex-disk-imports': YandexDiskImport;
+    'bootcamp-leads': BootcampLead;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -162,6 +163,7 @@ export interface Config {
     'interview-analysis-usage': InterviewAnalysisUsageSelect<false> | InterviewAnalysisUsageSelect<true>;
     'faq-items': FaqItemsSelect<false> | FaqItemsSelect<true>;
     'yandex-disk-imports': YandexDiskImportsSelect<false> | YandexDiskImportsSelect<true>;
+    'bootcamp-leads': BootcampLeadsSelect<false> | BootcampLeadsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -1721,6 +1723,43 @@ export interface YandexDiskImport {
   createdAt: string;
 }
 /**
+ * Предзапись с info.mentorcareer.ru/bootcamp/nodejs. Повторная отправка того же адреса не создаёт новую заявку, а увеличивает счётчик отправок.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-leads".
+ */
+export interface BootcampLead {
+  id: number;
+  email: string;
+  name?: string | null;
+  program: 'nodejs';
+  status: 'new' | 'contacted' | 'diagnostic' | 'admitted' | 'preparation' | 'rejected' | 'withdrawn';
+  assignee?: (number | null) | User;
+  nextActionAt?: string | null;
+  note?: string | null;
+  /**
+   * Метки рекламы из адреса страницы и сайт, с которого перешли. Полный адрес не хранится.
+   */
+  source?: {
+    utmSource?: string | null;
+    utmMedium?: string | null;
+    utmCampaign?: string | null;
+    utmContent?: string | null;
+    utmTerm?: string | null;
+    referrerHost?: string | null;
+  };
+  consentVersion: string;
+  consentAt: string;
+  submissionCount: number;
+  lastSubmittedAt?: string | null;
+  /**
+   * Пусто — письмо администраторам не ушло: заявка видна только в этом списке.
+   */
+  notifiedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -1855,6 +1894,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'yandex-disk-imports';
         value: number | YandexDiskImport;
+      } | null)
+    | ({
+        relationTo: 'bootcamp-leads';
+        value: number | BootcampLead;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -2813,6 +2856,36 @@ export interface YandexDiskImportsSelect<T extends boolean = true> {
   lessonsCreated?: T;
   errorLog?: T;
   importedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-leads_select".
+ */
+export interface BootcampLeadsSelect<T extends boolean = true> {
+  email?: T;
+  name?: T;
+  program?: T;
+  status?: T;
+  assignee?: T;
+  nextActionAt?: T;
+  note?: T;
+  source?:
+    | T
+    | {
+        utmSource?: T;
+        utmMedium?: T;
+        utmCampaign?: T;
+        utmContent?: T;
+        utmTerm?: T;
+        referrerHost?: T;
+      };
+  consentVersion?: T;
+  consentAt?: T;
+  submissionCount?: T;
+  lastSubmittedAt?: T;
+  notifiedAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

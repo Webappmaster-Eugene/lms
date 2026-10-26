@@ -100,4 +100,20 @@ test.describe('лендинг', () => {
     await page.goto('/no-such-page')
     expect(await audit(page, 'landing-404')).toEqual([])
   })
+
+  for (const width of [375, 1440]) {
+    test(`буткемп Node.js с ошибками формы, ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/bootcamp/nodejs/')
+      // Проверяется и состояние с ошибками: подсказки должны быть связаны с полями.
+      await page.getByRole('button', { name: 'Оставить заявку' }).click()
+      await page.locator('.bc-faq summary').first().click()
+      expect(await audit(page, `landing-bootcamp-${width}`)).toEqual([])
+    })
+  }
+
+  test('политика обработки персональных данных', async ({ page }) => {
+    await page.goto('/privacy/')
+    expect(await audit(page, 'landing-privacy')).toEqual([])
+  })
 })
