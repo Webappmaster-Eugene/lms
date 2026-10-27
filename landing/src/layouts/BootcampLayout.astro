@@ -13,7 +13,7 @@ interface Props {
 const { title, description, schema = [], noindex = false } = Astro.props
 const canonicalUrl = new URL(Astro.url.pathname, SITE_URL).href
 const ogImage = new URL('/bootcamp/og-nodejs.png', SITE_URL).href
-const ogImageAlt = 'Буткемп Node.js: backend сервиса проката — предзапись на поток'
+const ogImageAlt = 'Буткемп Node.js: backend сервиса проката, предзапись на поток'
 const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': [

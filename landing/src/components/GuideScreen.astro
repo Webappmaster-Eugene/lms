@@ -8,8 +8,13 @@ interface Props {
   alt: string
   steps: GuideStep[]
   mobile?: boolean
+  /** Папка снимков в public: у инструкции по платформе и у буткемпа свои. */
+  folder?: string
+  /** Уровень заголовков шагов: на странице буткемпа скриншоты стоят внутри главы с h3. */
+  level?: 3 | 4
 }
-const { id, screen, alt, steps, mobile = false } = Astro.props
+const { id, screen, alt, steps, mobile = false, folder = 'guide', level = 3 } = Astro.props
+const StepHeading = `h${level}` as 'h3' | 'h4'
 const size = Object.entries(screens).find(([name]) => name === screen)?.[1]
 if (!size) throw new Error(`Screenshot dimensions missing: ${screen}`)
 ---
@@ -24,7 +29,7 @@ if (!size) throw new Error(`Screenshot dimensions missing: ${screen}`)
   </div>
   <div class="screen-image">
     <div class="screen-canvas">
-      <img src={`/guide/${screen}.webp`} alt={alt} width={size.width} height={size.height} loading="lazy" decoding="async" />
+      <img src={`/${folder}/${screen}.webp`} alt={alt} width={size.width} height={size.height} loading="lazy" decoding="async" />
       {steps.map((step, i) => (
         <button type="button" class:list={['hotspot', { 'arrow-below': step.y < 10 }]} data-hotspot={i} data-x={step.x} data-y={step.y} data-active={i === 0 ? 'true' : 'false'} style={`--x:${step.x}%;--y:${step.y}%`} aria-label={`Шаг ${i + 1}: ${step.title}`} aria-pressed={i === 0 ? 'true' : 'false'} aria-describedby={`${id}-step-${i}`}>
           <span>{i + 1}</span>
@@ -36,7 +41,7 @@ if (!size) throw new Error(`Screenshot dimensions missing: ${screen}`)
   <ol class="screen-steps" aria-label="Пошаговое объяснение">
     {steps.map((step, i) => (
       <li data-step={i} data-title={step.title} data-active={i === 0 ? 'true' : 'false'}>
-        <h3><button type="button" data-select={i} aria-pressed={i === 0 ? 'true' : 'false'}><span class="step-number" aria-hidden="true">{i + 1}</span> {step.title}</button></h3>
+        <StepHeading><button type="button" data-select={i} aria-pressed={i === 0 ? 'true' : 'false'}><span class="step-number" aria-hidden="true">{i + 1}</span> {step.title}</button></StepHeading>
         <p id={`${id}-step-${i}`}>{step.text}</p>
       </li>
     ))}

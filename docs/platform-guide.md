@@ -12,9 +12,11 @@ JSON-LD, llms.txt и картинки Open Graph.
 - `landing/src/data/guide.ts`: десять разделов, инструкции и координаты меток.
 - `landing/src/data/faq.ts`: общий источник видимого FAQ и JSON-LD.
 - `landing/src/components/GuideScreen.astro`: скриншот, заголовки `h3` и кнопки шагов.
-- `landing/src/scripts/guide.ts`: выбор шагов, показ с приближением к метке, увеличение скриншотов,
-  оглавление с поиском и закреплённой мобильной навигацией, локальный
-  чек-лист. Чек-лист не меняет учебный прогресс LMS.
+- `landing/src/scripts/walkthrough.ts` и `landing/src/styles/walkthrough.css`: выбор шагов,
+  показ с приближением к метке, увеличение скриншотов. Общие с путём недели на странице
+  буткемпа (`docs/bootcamp-leads.md`).
+- `landing/src/scripts/guide.ts`: оглавление с поиском и закреплённой мобильной навигацией,
+  локальный чек-лист. Чек-лист не меняет учебный прогресс LMS.
 - `landing/public/guide/`: 13 WebP-скриншотов настоящего интерфейса.
 - `landing/src/data/screens.json`: размеры снимков для стабильной раскладки.
 

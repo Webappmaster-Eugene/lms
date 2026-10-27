@@ -1,0 +1,82 @@
+/* Скриншот с шагами и окно увеличения: общие для инструкции по платформе и страницы буткемпа.
+   Цвета берутся из переменных страницы: --ink, --muted, --accent, --pale, --line, --surface, --white. */
+.walkthrough { margin-top: 26px; border: 1px solid #ccdcd2; border-radius: 12px; overflow: hidden; background: var(--white); }
+.screen-toolbar { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+[data-tour-label] { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.touring [data-tour-label] { color: var(--ink); font-weight: 700; }
+.tour-progress { display: none; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; background: var(--accent); transform: scaleX(0); transform-origin: left; }
+.touring .tour-progress { display: block; }
+.screen-actions { display: none; align-items: center; gap: 8px; }
+.enhanced .screen-actions { display: flex; }
+.screen-actions button { border: 1px solid #bdcfc3; color: var(--ink); background: var(--white); min-height: 40px; font-size: 12px; padding: 6px 12px; border-radius: 6px; }
+.screen-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.screen-actions button[aria-pressed="true"] { background: var(--accent); color: var(--white); border-color: var(--accent); }
+.screen-image { overflow: hidden; }
+.screen-canvas { position: relative; transform-origin: 0 0; transition: transform .7s cubic-bezier(.2, .7, .2, 1); }
+.touring .screen-canvas { transform: translate(var(--shift-x, 0), var(--shift-y, 0)) scale(var(--zoom, 1)); }
+.screen-image img { width: 100%; }
+.hotspot { display: none; position: absolute; left: var(--x); top: var(--y); transform: translate(-50%, -50%); width: 32px; height: 32px; border: 2px solid var(--white); border-radius: 50%; background: var(--accent); color: var(--white); padding: 0; font-size: 13px; font-weight: 700; box-shadow: 0 0 0 5px #176b5626; z-index: 1; transition: transform .7s cubic-bezier(.2, .7, .2, 1), opacity .3s; }
+.enhanced .hotspot { display: block; }
+.hotspot[data-active="false"] { background: var(--white); border-color: var(--accent); color: var(--accent); box-shadow: none; }
+/* Метки не растут вместе с приближенным скриншотом. */
+.touring .hotspot { transform: translate(-50%, -50%) scale(calc(1 / var(--zoom, 1))); }
+.touring .hotspot[data-active="false"] { opacity: .5; }
+.touring .hotspot[data-active="true"] { animation: hotspot-pulse 1.4s ease-out infinite; }
+@keyframes hotspot-pulse { from { box-shadow: 0 0 0 0 #176b5680; } to { box-shadow: 0 0 0 16px #176b5600; } }
+.pointer-arrow { display: none; position: absolute; width: 50px; height: 52px; right: 7px; bottom: 36px; color: var(--accent); stroke-width: 3; filter: drop-shadow(0 1px 1px white); pointer-events: none; }
+.hotspot[data-active="true"] .pointer-arrow { display: block; }
+/* У верхнего края стрелка сверху обрезалась бы рамкой скриншота. */
+.arrow-below .pointer-arrow { bottom: auto; top: 36px; transform: scaleY(-1); }
+.screen-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.screen-steps li { padding: 20px; position: relative; }
+.screen-steps li+li { border-left: 1px solid var(--line); }
+.screen-steps li[data-active="true"] { background: var(--pale); }
+.screen-steps li[data-active="true"]::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent); }
+/* Заголовок шага нужен для структуры страницы, вид задаёт кнопка внутри. */
+.screen-steps h3, .screen-steps h4 { font-size: inherit; line-height: inherit; }
+.screen-steps button { display: flex; gap: 10px; align-items: flex-start; width: 100%; border: none; background: none; text-align: left; padding: 0; font-size: 14px; line-height: 1.5; color: var(--ink); font-weight: 700; }
+.step-number { display: inline-grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%; border: 1px solid #acc5b6; font-size: 11px; background: white; color: var(--accent); }
+.screen-steps p { font-size: 14px; color: var(--muted); line-height: 1.7; margin-top: 12px; }
+.walkthrough-mobile { display: grid; grid-template-columns: minmax(220px, 320px) minmax(0, 1fr); background: var(--surface); }
+.walkthrough-mobile .screen-toolbar { grid-column: 1/-1; }
+.walkthrough-mobile .screen-image { margin: 24px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.walkthrough-mobile .screen-steps { display: flex; flex-direction: column; border-top: none; padding: 24px 24px 24px 0; justify-content: center; gap: 12px; }
+.walkthrough-mobile .screen-steps li { border: 1px solid var(--line); border-radius: 8px; background: var(--white); }
+.walkthrough-mobile .screen-steps li[data-active="true"] { background: var(--pale); border-color: var(--accent); }
+.walkthrough-mobile .screen-steps li::before { display: none; }
+.image-dialog { width: min(96vw, 1600px); max-width: none; max-height: 92dvh; border: 1px solid var(--line); border-radius: 12px; padding: 0; color: var(--ink); }
+.image-dialog::backdrop { background: #14281ee0; }
+.dialog-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 20px; background: var(--surface); position: sticky; top: 0; z-index: 1; }
+.dialog-toolbar h2 { font-size: 16px; }
+.dialog-toolbar button { min-height: 44px; padding: 7px 13px; border: 1px solid #bdcfc3; border-radius: 6px; background: white; font-size: 13px; }
+.dialog-image-scroll { overflow: auto; }
+.dialog-image-scroll img { min-width: 900px; width: 100%; }
+.image-dialog>p { padding: 16px 20px; font-size: 14px; }
+@media (max-width: 1200px) {
+  .screen-steps { grid-template-columns: 1fr; }
+  .screen-steps li { padding: 16px 18px; }
+  .screen-steps li+li { border-left: none; border-top: 1px solid var(--line); }
+  .screen-steps p { margin-left: 34px; margin-top: 8px; }
+}
+@media (max-width: 800px) {
+  .walkthrough { margin-top: 22px; }
+  .screen-toolbar { padding: 10px 12px; flex-wrap: wrap; }
+  /* Отдельная строка, чтобы длинный заголовок шага не переносил кнопки и не сдвигал скриншот. */
+  [data-tour-label] { flex-basis: 100%; font-size: 12px; }
+  .screen-actions { gap: 6px; }
+  .screen-actions button { font-size: 12px; min-height: 40px; padding: 5px 9px; }
+  .hotspot { width: 26px; height: 26px; font-size: 11px; }
+  .pointer-arrow { width: 36px; height: 38px; bottom: 27px; }
+  .arrow-below .pointer-arrow { top: 27px; }
+  .walkthrough-mobile { display: block; }
+  .walkthrough-mobile .screen-image { max-width: 280px; margin: 20px auto; }
+  .walkthrough-mobile .screen-steps { padding: 0 16px 16px; }
+  .walkthrough-mobile .screen-steps p { margin-left: 0; }
+  .dialog-toolbar { padding: 12px; }
+  .dialog-toolbar h2 { font-size: 13px; }
+  .dialog-image-scroll img { min-width: 1000px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen-canvas, .hotspot { transition: none; }
+  .touring .hotspot[data-active="true"] { animation: none; }
+}

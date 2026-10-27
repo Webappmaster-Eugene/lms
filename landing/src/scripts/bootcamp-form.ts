@@ -31,13 +31,13 @@ function setup(form: HTMLFormElement) {
 
   function checkEmail() {
     const address = email.value.trim()
-    showError('email', !address ? 'Укажите email — на него придёт входное задание.' : EMAIL.test(address) ? '' : 'Проверьте email: в нём должны быть @ и домен, например name@mail.ru.')
+    showError('email', !address ? 'Укажите email: на него придёт входное задание.' : EMAIL.test(address) ? '' : 'Проверьте email: в нём должны быть @ и домен, например name@mail.ru.')
   }
 
   /** Фокус уводится только при отправке: при переходе Tab между полями он должен идти своим порядком. */
   function validate(): boolean {
     checkEmail()
-    showError('consent', consent.checked ? '' : 'Отметьте согласие — без него заявку не сохранить.')
+    showError('consent', consent.checked ? '' : 'Отметьте согласие, без него заявку не сохранить.')
     const firstInvalid = [email, consent].find((input) => input.getAttribute('aria-invalid') === 'true')
     firstInvalid?.focus()
     return !firstInvalid
@@ -75,8 +75,8 @@ function setup(form: HTMLFormElement) {
       status.textContent = result?.error ?? `Заявка не сохранилась: сервер ответил ${response.status}. Отправьте её ещё раз через минуту.`
     } catch {
       status.textContent = controller.signal.aborted
-        ? 'Сервер не ответил за 15 секунд. Заявка могла не сохраниться — отправьте её ещё раз, дубля не будет.'
-        : 'Нет связи с сервером. Проверьте интернет и отправьте заявку ещё раз — введённое осталось в форме.'
+        ? 'Сервер не ответил за 15 секунд. Заявка могла не сохраниться. Отправьте её ещё раз, дубля не будет.'
+        : 'Нет связи с сервером. Проверьте интернет и отправьте заявку ещё раз. Введённые данные остались в форме.'
     } finally {
       clearTimeout(timer)
       submit.disabled = false

@@ -5,7 +5,7 @@ import { OPERATOR, POLICY_DATE } from '../data/privacy'
 
 const operator = `${OPERATOR.name}, ${OPERATOR.status}, ИНН ${OPERATOR.inn}, адрес: ${OPERATOR.address}`
 ---
-<BootcampLayout title="Политика обработки персональных данных — MentorCareer" description="Какие данные собирает форма предзаписи на буткемп MentorCareer, зачем, где и сколько они хранятся и как отозвать согласие.">
+<BootcampLayout title="Политика обработки персональных данных - MentorCareer" description="Какие данные собирает форма предзаписи на буткемп MentorCareer, зачем, где и сколько они хранятся и как отозвать согласие.">
   <header class="bc-header">
     <a class="bc-brand" href={BOOTCAMP_PATH}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v14c-3-1-6-1-9 1-3-2-6-2-9-1zM12 6v14" /></svg><span>MentorCareer</span><span class="bc-brand-product">Буткемп Node.js</span></a>
   </header>
@@ -14,13 +14,13 @@ const operator = `${OPERATOR.name}, ${OPERATOR.status}, ИНН ${OPERATOR.inn}, 
     <p class="bc-note">Редакция от {POLICY_DATE} (версия {CONSENT_VERSION}). Действует для формы предзаписи на странице буткемпа info.mentorcareer.ru.</p>
 
     <h2>Кто обрабатывает данные</h2>
-    <p>Оператор персональных данных — {operator}. Вопросы, запросы и отзыв согласия — на {OPERATOR.email}.</p>
+    <p>Оператор персональных данных: {operator}. Вопросы, запросы и отзыв согласия присылайте на {OPERATOR.email}.</p>
 
     <h2>Какие данные мы получаем</h2>
     <ul class="bc-list">
-      <li>email — обязательно, на него приходит ответ на заявку;</li>
-      <li>имя — если вы его указали;</li>
-      <li>метки рекламы из адреса страницы (utm_source, utm_medium, utm_campaign, utm_content, utm_term) и домен сайта, с которого вы перешли, — без полного адреса страницы;</li>
+      <li>email (обязательно): на него приходит ответ на заявку;</li>
+      <li>имя, если вы его указали;</li>
+      <li>метки рекламы из адреса страницы (utm_source, utm_medium, utm_campaign, utm_content, utm_term) и домен сайта, с которого вы перешли, без полного адреса страницы;</li>
       <li>дата и время согласия, версия этой политики и число отправок формы.</li>
     </ul>
     <p>IP-адрес используется только чтобы ограничить частоту отправок формы и вместе с заявкой не сохраняется. Файлы cookie и сервисы веб-аналитики форма не использует.</p>

@@ -116,6 +116,27 @@ test('сбой сети и ошибка сервера: введённое ос�
   await expect(page.locator('[data-done]')).toBeVisible()
 })
 
+test('путь недели: скриншоты загружаются, шаг выбирается, увеличение возвращает фокус', async ({ page }) => {
+  await page.goto(PAGE)
+  await expect(page.locator('.bc-path-chapter')).toHaveCount(6)
+  for (const image of await page.locator('.bc-path img').all()) {
+    await image.scrollIntoViewIfNeeded()
+    await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete ? img.naturalWidth : 0)).toBeGreaterThan(0)
+  }
+  const review = page.locator('#path-review [data-walkthrough]')
+  await review.getByRole('button', { name: 'Ваш ответ', exact: true }).click()
+  await expect(review.getByRole('button', { name: 'Шаг 2: Ваш ответ' })).toHaveAttribute('aria-pressed', 'true')
+  const zoom = review.getByRole('button', { name: 'Увеличить' })
+  await zoom.click()
+  await expect(page.locator('.image-dialog')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.image-dialog')).toBeHidden()
+  await expect(zoom).toBeFocused()
+  // Правило владельца 27.10.2026: только короткий дефис, без длинного тире.
+  expect(await page.locator('body').innerText()).not.toMatch(/[—–]/)
+  expect(`${await page.title()} ${await page.locator('meta[name="description"]').getAttribute('content')}`).not.toMatch(/[—–]/)
+})
+
 test('на телефоне нет горизонтальной прокрутки, форма помещается', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 })
   await page.goto(PAGE)

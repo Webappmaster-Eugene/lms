@@ -1,4 +1,5 @@
 @import './fonts.css';
+@import './walkthrough.css';
 
 /* Страница буткемпа. Цвета бренда — как у инструкции; жёлтая «лента» — только у статуса
    набора и у отказа в журнале: это два места, где страница говорит «внимание». */
@@ -16,6 +17,10 @@
   --log-dim: #9fb3ab;
   --log-ok: #93dbbb;
   --error: #b42318;
+  /* Имена, под которыми общие стили скриншотов (walkthrough.css) ждут цвета страницы. */
+  --pale: #e9f4ee;
+  --surface: var(--panel);
+  --white: #fff;
   --measure: 68ch;
   font-family: 'Golos Text', sans-serif;
   color: var(--ink);
@@ -123,6 +128,21 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
 .bc-program thead th { font-size: 14px; font-weight: 400; color: var(--muted); padding-top: 0; }
 .bc-program tbody th { width: 7.5em; font-variant-numeric: tabular-nums; color: var(--accent); }
 
+/* Путь недели: главы идут по порядку, поэтому номер у заголовка. */
+.bc-sample { margin-top: 26px; font-size: 15px; color: var(--muted); }
+.bc-path { list-style: none; margin: 0; padding: 0; counter-reset: path; }
+.bc-path-chapter { margin-top: 56px; }
+.bc-path-chapter > h3 { display: flex; align-items: center; gap: 14px; font-size: clamp(21px, 2.2vw, 25px); }
+.bc-path-chapter > h3::before { counter-increment: path; content: counter(path); display: grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; font-size: 15px; color: var(--accent); border: 1.5px solid var(--accent); }
+.bc-path-chapter > p { margin-top: 12px; margin-left: 50px; color: var(--muted); }
+.bc-extra { margin-top: 18px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.bc-extra img { display: block; width: 100%; height: auto; }
+.bc-extra figcaption { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 16px; font-size: 15px; color: var(--muted); background: var(--panel); border-top: 1px solid var(--line); }
+.bc-zoom { flex-shrink: 0; min-height: 40px; padding: 6px 12px; font-size: 13px; color: var(--ink); background: #fff; border: 1px solid #bdcfc3; border-radius: 6px; cursor: pointer; }
+.bc-zoom:hover { color: var(--accent); border-color: var(--accent); }
+.walkthrough img { display: block; height: auto; }
+.screen-actions button, .screen-steps button, .hotspot, [data-close-dialog] { cursor: pointer; }
+
 .bc-mentor { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 32px 56px; }
 .bc-mentor-name { margin: 18px 0 8px; font-size: 22px; font-weight: 700; }
 .bc-mentor .bc-link { margin-top: 10px; }
@@ -185,4 +205,6 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
   .bc-flow li:not(:last-child)::after { width: 14px; }
   .bc-form, .bc-done { padding: 20px; }
   .bc-program tbody th { width: 4.5em; }
+  .bc-path-chapter { margin-top: 44px; }
+  .bc-path-chapter > p { margin-left: 0; }
 }

@@ -50,5 +50,37 @@
   "trainer": {
     "width": 1440,
     "height": 1000
+  },
+  "bc-gitlab-project": {
+    "width": 1440,
+    "height": 900
+  },
+  "bc-gitlab-mr": {
+    "width": 1440,
+    "height": 900
+  },
+  "bc-gitlab-checks": {
+    "width": 1440,
+    "height": 900
+  },
+  "bc-gitlab-review": {
+    "width": 1440,
+    "height": 900
+  },
+  "bc-gitlab-merged": {
+    "width": 1440,
+    "height": 900
+  },
+  "bc-gitlab-pipeline": {
+    "width": 1440,
+    "height": 640
+  },
+  "bc-lms-program": {
+    "width": 1440,
+    "height": 900
+  },
+  "bc-lms-manual": {
+    "width": 1440,
+    "height": 900
   }
 }

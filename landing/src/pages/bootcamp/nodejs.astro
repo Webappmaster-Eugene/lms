@@ -1,13 +1,14 @@
 ---
 import BootcampLayout from '../../layouts/BootcampLayout.astro'
+import GuideScreen from '../../components/GuideScreen.astro'
+import screens from '../../data/screens.json'
 import { AUTHOR_URL, LMS_URL, SITE_URL } from '../../config'
 import {
-  BOOTCAMP_PATH, COMPUTER, CONSENT_VERSION, FACTS, FAQ, HARD_PARTS, LOG, MENTOR_FACTS, NEED, OUTCOMES, PRIVACY_PATH,
-  PROGRAM, PROVIDED, RENTAL_FLOW, START, WEEK,
+  BOOTCAMP_PATH, CONSENT_VERSION, FACTS, FAQ, LOG, MENTOR_EXPERIENCE, PATH, PRIVACY_PATH, PROGRAM, RENTAL_FLOW, START,
 } from '../../data/bootcamp'
 
-const title = 'Буткемп Node.js: backend сервиса проката — MentorCareer'
-const description = 'Backend одного продукта за 20 недель: PostgreSQL, деньги без двойных списаний, события, Kafka и ClickHouse. Личный проект и ревью каждой работы.'
+const title = 'Буткемп Node.js: backend сервиса проката - MentorCareer'
+const description = 'Backend одного продукта за 20 недель: PostgreSQL, оплата без двойных списаний, Kafka и ClickHouse. Свой проект в GitLab, CI и ревью каждой работы.'
 const pageUrl = new URL(BOOTCAMP_PATH, SITE_URL).href
 const schema = [
   {
@@ -17,6 +18,11 @@ const schema = [
   },
   { '@type': 'FAQPage', '@id': `${pageUrl}#faq`, mainEntity: FAQ.map(({ question, answer }) => ({ '@type': 'Question', name: question, acceptedAnswer: { '@type': 'Answer', text: answer } })) },
 ]
+const extraSize = (screen: string) => {
+  const size = Object.entries(screens).find(([name]) => name === screen)?.[1]
+  if (!size) throw new Error(`Screenshot dimensions missing: ${screen}`)
+  return size
+}
 ---
 <BootcampLayout title={title} description={description} schema={schema}>
   <header class="bc-header">
@@ -29,11 +35,11 @@ const schema = [
       <div class="bc-hero-copy">
         <p class="bc-tape">Идёт предзапись на поток, старт планируется {START}</p>
         <h1 id="hero-title">Буткемп Node.js: backend сервиса проката</h1>
-        <p class="bc-lede">Соберите backend одного продукта — от первого HTTP-маршрута до надёжных платежей, событий и аналитики. Личный проект, задача каждую неделю и ревью каждой работы.</p>
+        <p class="bc-lede">За 20 недель вы соберёте backend одного продукта: от первого HTTP-маршрута до надёжной оплаты, событий и аналитики. Свой проект в GitLab, задача каждую неделю и ревью каждой работы.</p>
         <dl class="bc-facts">
           {FACTS.map(({ term, value }) => <div><dt>{term}</dt><dd>{value}</dd></div>)}
         </dl>
-        <div class="bc-actions"><a class="bc-button" href="#apply">Оставить заявку</a><a class="bc-link" href="#program">Программа по неделям</a></div>
+        <div class="bc-actions"><a class="bc-button" href="#apply">Оставить заявку</a><a class="bc-link" href="#week">Как проходит неделя</a></div>
       </div>
       <figure class="bc-log" aria-labelledby="log-caption">
         <div class="bc-log-bar"><span>журнал сервиса проката</span><span>сб, 13 марта</span></div>
@@ -46,46 +52,62 @@ const schema = [
             </li>
           ))}
         </ol>
-        <figcaption id="log-caption">Одна дрель, два клиента в одну миллисекунду и повтор оплаты после обрыва связи. Код, после которого журнал выглядит именно так, вы пишете в неделях 3–8.</figcaption>
+        <figcaption id="log-caption">Одна дрель, два клиента в одну миллисекунду и повтор оплаты после обрыва связи. Код, после которого журнал выглядит именно так, вы пишете в неделях 3-8.</figcaption>
       </figure>
     </section>
 
     <section class="bc-section bc-two" id="fit" aria-labelledby="fit-title">
       <div>
         <h2 id="fit-title">Подходит ли вам</h2>
-        <p>Буткемп рассчитан на разработчиков, которые уверенно пишут на JavaScript и хотят перейти в backend или закрыть в нём пробелы. Чаще всего это frontend-разработчики.</p>
+        <p>Буткемп для разработчиков, которые уверенно пишут на JavaScript и хотят перейти в backend или закрыть в нём пробелы. Чаще всего это frontend-разработчики.</p>
       </div>
       <div class="bc-columns">
         <div>
-          <h3>Нужно уметь</h3>
-          <ul class="bc-list">{NEED.map((item) => <li>{item}</li>)}</ul>
+          <h3>Что нужно уметь</h3>
+          <p>Писать на JavaScript: промисы, async/await, модули, классы. Читать типы TypeScript. Работать с Git: ветки, коммиты, merge request. И найти 15-20 часов в неделю на все 20 недель.</p>
         </div>
         <div>
-          <h3>Не нужно знать заранее</h3>
-          <p>NestJS, SQL, брокеры сообщений и Docker — им посвящена программа.</p>
-          <p>Перед допуском вы выполняете короткое входное задание. Если в JavaScript или Git есть пробелы, мы предложим маршрут подготовки и следующий поток, а не возьмём оплату.</p>
+          <h3>Что знать заранее не нужно</h3>
+          <p>NestJS, SQL, брокеры сообщений и Docker. Им посвящена программа.</p>
+          <p>Перед зачислением вы делаете короткое входное задание. Если в JavaScript или Git есть пробелы, мы подскажем, что подтянуть, и предложим следующий поток. Оплату в этом случае не берём.</p>
         </div>
       </div>
     </section>
 
     <section class="bc-section" id="product" aria-labelledby="product-title">
       <h2 id="product-title">Что вы построите</h2>
-      <p class="bc-intro">Сервис проката инструментов: клиент находит дрель, бронирует её на выходные, оплачивает, получает в пункте и возвращает.</p>
+      <p class="bc-intro">Сервис проката инструментов. Клиент находит дрель, бронирует её на выходные, оплачивает, забирает в пункте выдачи и возвращает.</p>
       <ol class="bc-flow" aria-label="Путь клиента в сервисе проката">
         {RENTAL_FLOW.map((step) => <li>{step}</li>)}
       </ol>
       <div class="bc-two bc-two-tight">
-        <p>За этим простым сценарием — задачи, которые встречаются в любом backend. Каждую неделю проект получает одно изменение, которое принимается по ревью и автоматическим проверкам.</p>
-        <ul class="bc-list">{HARD_PARTS.map((item) => <li>{item}</li>)}</ul>
+        <p>За простым сценарием стоят задачи, которые есть в любом backend. Каждую неделю проект получает одно изменение, и его принимают по ревью и автоматическим проверкам.</p>
+        <p>Каталог нужно перенести из старой системы и не потерять данные. Одну дрель нельзя отдать двум клиентам, даже если они нажали «Забронировать» в одну секунду. Оплата не должна списаться второй раз, если запрос повторился после обрыва связи. Сети пунктов проката нужны тарифы и подписки. События между сервисами не должны теряться при сбое. А по миллионам событий нужно строить отчёты и быстро искать по каталогу.</p>
       </div>
     </section>
 
     <section class="bc-section" id="week" aria-labelledby="week-title">
-      <h2 id="week-title">Как устроена неделя</h2>
-      <ol class="bc-steps">
-        {WEEK.map(({ title: step, text }) => <li><h3>{step}</h3><p>{text}</p></li>)}
+      <h2 id="week-title">Как проходит неделя</h2>
+      <div class="bc-two bc-two-tight">
+        <p>Неделя устроена как работа над задачей в команде. В субботу двухчасовое занятие: теория, постановка задачи и разбор примера. В воскресенье полтора часа: типовые ошибки, упражнение и ответы на вопросы.</p>
+        <p>Между занятиями вы читаете методичку и делаете задачу в своём проекте. Дальше решение проходит тот же путь, что код в рабочей команде: merge request, автоматические проверки, ревью и слияние. Ниже этот путь на настоящих экранах.</p>
+      </div>
+      <p class="bc-sample">На скриншотах демонстрационный ученик сдаёт первую неделю. Нажмите «Показать шаги», чтобы пройти по экрану с подсказками, или «Увеличить», чтобы рассмотреть его целиком.</p>
+      <ol class="bc-path">
+        {PATH.map((chapter) => (
+          <li class="bc-path-chapter" id={chapter.id}>
+            <h3>{chapter.title}</h3>
+            <p>{chapter.intro}</p>
+            <GuideScreen id={chapter.id} screen={chapter.screen} alt={chapter.alt} steps={chapter.steps} folder="bootcamp/path" level={4} />
+            {chapter.extra && (
+              <figure class="bc-extra">
+                <img src={`/bootcamp/path/${chapter.extra.screen}.webp`} alt={chapter.extra.alt} width={extraSize(chapter.extra.screen).width} height={extraSize(chapter.extra.screen).height} loading="lazy" decoding="async" />
+                <figcaption><span>{chapter.extra.caption}</span><button type="button" class="bc-zoom" data-zoom-static aria-haspopup="dialog">Увеличить</button></figcaption>
+              </figure>
+            )}
+          </li>
+        ))}
       </ol>
-      <p class="bc-note">Как в команде: GitLab с доской задач, ветками, merge request, ревью и CI. Ревью отвечает на вопрос «что сломается в продакшене и почему», а не «поменяйте отступы».</p>
     </section>
 
     <section class="bc-section" id="program" aria-labelledby="program-title">
@@ -95,21 +117,21 @@ const schema = [
         <thead><tr><th scope="col">Недели</th><th scope="col">Что изучаем на проекте</th></tr></thead>
         <tbody>{PROGRAM.map(({ weeks, topic }) => <tr><th scope="row">{weeks}</th><td>{topic}</td></tr>)}</tbody>
       </table>
-      <p class="bc-note">Kafka и ClickHouse — обязательная часть программы, а не бонус.</p>
+      <p class="bc-note">Kafka и ClickHouse входят в обязательную программу.</p>
     </section>
 
     <section class="bc-section bc-columns bc-columns-three" aria-label="Дополнительные треки и результат">
       <div>
         <h2>Если вы строите свой SaaS</h2>
-        <p>Неделя 12 посвящена тарифам, подпискам, пробному периоду и лимитам. Для тех, кто делает собственный продукт, есть необязательный трек основателя. Запуск бизнеса и доход мы не обещаем: трек помогает построить эту часть продукта правильно.</p>
+        <p>Неделя 12 посвящена тарифам, подпискам, пробному периоду и лимитам. Для тех, кто делает свой продукт, есть необязательный трек основателя. Запуск бизнеса и доход мы не обещаем: трек помогает правильно построить эту часть продукта.</p>
       </div>
       <div>
         <h2>Карьерный трек</h2>
-        <p>Резюме и профиль, разбор вопросов собеседований по каждой теме программы, пробное собеседование. Трудоустройство мы не гарантируем: трек помогает показать то, что вы действительно умеете.</p>
+        <p>Резюме и профиль, вопросы собеседований по каждой теме программы, пробное собеседование. Работу мы не гарантируем: трек помогает показать то, что вы на самом деле умеете.</p>
       </div>
       <div>
         <h2>После выпуска вы сможете</h2>
-        <ul class="bc-list">{OUTCOMES.map((item) => <li>{item}</li>)}</ul>
+        <p>Проектировать HTTP API и схему PostgreSQL под реальные сценарии. Находить и устранять гонки, когда одни данные меняют одновременно. Проводить оплату без двойных списаний. Строить обмен событиями, который переживает сбои. Собирать аналитику на ClickHouse. Искать причину проблемы по метрикам, логам и трассам.</p>
         <p>Всё это вы показываете на защите проекта, а не только в тестах.</p>
       </div>
     </section>
@@ -117,13 +139,13 @@ const schema = [
     <section class="bc-section bc-columns" id="setup" aria-label="Компьютер и среда">
       <div>
         <h2>Компьютер</h2>
-        <ul class="bc-list">{COMPUTER.map((item) => <li>{item}</li>)}</ul>
-        <p>До оплаты вы запускаете скрипт проверки окружения. Если компьютер не тянет весь стенд, вы узнаете об этом заранее.</p>
+        <p>Нужен компьютер с 4 ядрами или больше, 16 ГБ памяти (лучше 32) и 40 ГБ свободного места на SSD. Подойдут macOS на Apple Silicon или Intel, Windows 10 или 11 с WSL2 и Linux. Для контейнеров нужен Docker: Docker Desktop, Rancher Desktop или Colima.</p>
+        <p>До оплаты вы запускаете скрипт проверки компьютера. Если машина не потянет весь стенд, вы узнаете об этом заранее.</p>
       </div>
       <div>
         <h2>Среда</h2>
-        <p>Организатор даёт {PROVIDED.join(', ')}.</p>
-        <p>Сервисы курса работают локально в Docker на вашем компьютере. Если машина не тянет недели с Kafka и ClickHouse, предложим серверную среду.</p>
+        <p>Мы даём закрытый репозиторий в GitLab курса, CI и проверку каждой сдачи на закрытых тестах, учебный кабинет с методичками, чат участников и записи занятий.</p>
+        <p>PostgreSQL, Redis, RabbitMQ, Kafka и ClickHouse вы запускаете в Docker на своём компьютере, как локальный стенд разработчика. Описание стенда в compose.yaml вы ведёте сами, как в рабочем проекте.</p>
       </div>
     </section>
 
@@ -131,12 +153,12 @@ const schema = [
       <div>
         <h2 id="mentor-title">Наставник</h2>
         <p class="bc-mentor-name">Евгений Надточеев</p>
-        <p>Fullstack-разработчик с backend-фокусом. Лично ведёт занятия, проверяет работы и принимает защиты всех 20 участников.</p>
+        <p>Fullstack-разработчик с упором на backend. Сам ведёт занятия, проверяет работы и принимает защиты всех 20 участников.</p>
         <a class="bc-link" href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Подробнее на nadtocheev.ru</a>
       </div>
       <div>
-        <ul class="bc-list">{MENTOR_FACTS.map((item) => <li>{item}</li>)}</ul>
-        <p class="bc-note">Отзывов о буткемпе пока нет: это первый поток. Отзывы о консультациях и других курсах мы за отзывы буткемпа не выдаём.</p>
+        <p>{MENTOR_EXPERIENCE} в коммерческой разработке. Поддерживает микросервисы, которыми пользуются больше 40 тысяч человек в день, с нагрузкой до 2000 запросов в секунду. Перевёл сервисы с Express на Fastify: по замерам k6 задержка упала вдвое при той же памяти. Строил учёт денег на реальных платежах без двойных списаний, с доставкой событий через Outbox и Kafka. Подключал Робокассу с подписками в трёх проектах.</p>
+        <p>Два года преподаёт: больше 30 платных и 50 бесплатных консультаций, занятия в Школе 21, Purple School, Solvery, GetMentor и H.Careers.</p>
       </div>
     </section>
 
@@ -147,7 +169,7 @@ const schema = [
 
     <section class="bc-section bc-apply" id="apply" aria-labelledby="apply-title">
       <div class="bc-apply-copy">
-        <h2 id="apply-title">Оставьте заявку — пришлём входное задание и даты</h2>
+        <h2 id="apply-title">Оставьте заявку, и мы пришлём входное задание и даты</h2>
         <p>Стоимость, точные даты занятий и условия опубликуем, когда откроется набор. Сейчас идёт предзапись: заявка ни к чему не обязывает, оплаты на этой странице нет.</p>
       </div>
       <form class="bc-form" data-lead-form data-consent-version={CONSENT_VERSION} novalidate>
@@ -181,8 +203,14 @@ const schema = [
   </main>
 
   <footer class="bc-footer">
-    <p>MentorCareer — буткемп Node.js</p>
-    <nav aria-label="Ссылки в подвале"><a href={PRIVACY_PATH}>Политика обработки персональных данных</a><a href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Сайт наставника — nadtocheev.ru</a><a href={LMS_URL}>Вход для учеников</a></nav>
+    <p>MentorCareer, буткемп Node.js</p>
+    <nav aria-label="Ссылки в подвале"><a href={PRIVACY_PATH}>Политика обработки персональных данных</a><a href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Сайт наставника nadtocheev.ru</a><a href={LMS_URL}>Вход для учеников</a></nav>
   </footer>
+  <dialog class="image-dialog" aria-labelledby="image-dialog-title">
+    <div class="dialog-toolbar"><h2 id="image-dialog-title">Скриншот</h2><button type="button" data-close-dialog>Закрыть <span aria-hidden="true">×</span></button></div>
+    <div class="dialog-image-scroll"><img alt="" /></div>
+    <p data-dialog-description></p>
+  </dialog>
   <script src="../../scripts/bootcamp-form.ts"></script>
+  <script src="../../scripts/walkthrough.ts"></script>
 </BootcampLayout>
