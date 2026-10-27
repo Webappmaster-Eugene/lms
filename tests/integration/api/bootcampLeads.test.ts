@@ -1,22 +1,35 @@
 import type { Payload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
+import { GET as downloadEntryTask } from '@/app/(entry-task)/entry-task/[token]/download/route'
 import { POST } from '@/app/api/bootcamp/leads/route'
 import { logger } from '@/lib/telemetry'
+import { ENTRY_TASK_RESEND_AFTER_MS } from '@/server/bootcamp-entry-task'
 import { captureEmails, createAdmin, createStudent, getTestPayload, login, rest, uid, type TestUser } from '../helpers/payload'
+import { zipOf } from '../../fixtures/zip'
 
 let payload: Payload
 let admin: TestUser
 let adminToken: string
 let studentToken: string
 let ipSeq = 0
+let entryTaskFile = ''
 const previousTrustProxy = process.env.LMS_TRUST_PROXY
+
+const ENTRY_TASK_ZIP = zipOf('README.md', '# Входное задание')
 
 beforeAll(async () => {
   payload = await getTestPayload()
   admin = await createAdmin(payload)
   adminToken = await login(payload, admin)
   studentToken = await login(payload, await createStudent(payload))
+  const task = await payload.create({
+    collection: 'bootcamp-entry-tasks',
+    data: { program: 'nodejs', active: true, readme: '# Входное задание\n\nТри задачи на TypeScript.' },
+    file: { data: ENTRY_TASK_ZIP, mimetype: 'application/zip', name: `${uid('entry')}.zip`, size: ENTRY_TASK_ZIP.length },
+    overrideAccess: true,
+  })
+  entryTaskFile = task.filename ?? ''
   // Лимит считается по адресу клиента, который подставляет Traefik.
   process.env.LMS_TRUST_PROXY = 'true'
 })
@@ -141,6 +154,68 @@ describe('POST /api/bootcamp/leads: предзапись с лендинга', (
       failure.mockRestore()
       logged.mockRestore()
     }
+  })
+
+  it('сразу после заявки кандидату уходит письмо с личной ссылкой на задание', async () => {
+    const mail = captureEmails(payload)
+    try {
+      const email = `${uid('task')}@mail.test`
+      expect((await send(lead(email))).status).toBe(200)
+      await vi.waitFor(async () => expect((await stored(email))[0]?.entryTaskSentAt).toBeTruthy())
+      const [row] = await stored(email)
+      expect(row?.entryTaskToken).toMatch(/^[A-Za-z0-9_-]{32}$/)
+      expect(Date.parse(row?.entryTaskDueAt ?? '') - Date.now()).toBeGreaterThan(6 * 24 * 60 * 60_000)
+      const letter = mail.sent.find((message) => message.to === email)
+      expect(letter?.subject).toBe('Входное задание буткемпа Node.js')
+      expect(letter?.text).toContain(`/entry-task/${row?.entryTaskToken}`)
+      expect(letter?.text).toContain('в течение 5 дней')
+    } finally {
+      mail.restore()
+    }
+  })
+
+  it('по личной ссылке отдаётся архив задания, по чужой и кривой - 404', async () => {
+    const email = `${uid('download')}@mail.test`
+    expect((await send(lead(email))).status).toBe(200)
+    const [row] = await stored(email)
+    const download = (token: string) => downloadEntryTask(new Request(`http://lms.test/entry-task/${token}/download`), { params: Promise.resolve({ token }) })
+    const response = await download(row?.entryTaskToken ?? '')
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toBe('application/zip')
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
+    expect(Buffer.from(await response.arrayBuffer()).equals(ENTRY_TASK_ZIP)).toBe(true)
+    expect((await download('A'.repeat(32))).status).toBe(404)
+    expect((await download('../../etc/passwd')).status).toBe(404)
+  })
+
+  it('повтор заявки сразу после письма его не дублирует, а позже присылает ту же ссылку с прежним сроком', async () => {
+    const email = `${uid('resend')}@mail.test`
+    expect((await send(lead(email))).status).toBe(200)
+    await vi.waitFor(async () => expect((await stored(email))[0]?.entryTaskSentAt).toBeTruthy())
+    const mail = captureEmails(payload)
+    try {
+      expect((await send(lead(email))).status).toBe(200)
+      expect(mail.sent.filter((message) => message.to === email)).toHaveLength(0)
+      const [first] = await stored(email)
+      const earlier = new Date(Date.now() - ENTRY_TASK_RESEND_AFTER_MS - 60_000).toISOString()
+      await payload.update({ collection: 'bootcamp-leads', id: Number(first?.id), data: { entryTaskSentAt: earlier }, overrideAccess: true })
+      expect((await send(lead(email))).status).toBe(200)
+      await vi.waitFor(() => expect(mail.sent.filter((message) => message.to === email)).toHaveLength(1))
+      const [again] = await stored(email)
+      expect(again?.entryTaskToken).toBe(first?.entryTaskToken)
+      expect(again?.entryTaskDueAt).toBe(first?.entryTaskDueAt)
+      expect(mail.sent.find((message) => message.to === email)?.text).toContain(`/entry-task/${first?.entryTaskToken}`)
+    } finally {
+      mail.restore()
+    }
+  })
+
+  it('архив задания через REST Payload видит только администратор', async () => {
+    expect((await rest('GET', '/bootcamp-entry-tasks')).status).toBe(403)
+    expect((await rest('GET', '/bootcamp-entry-tasks', { token: studentToken })).status).toBe(403)
+    expect((await rest('GET', `/bootcamp-entry-tasks/file/${entryTaskFile}`)).status).toBe(403)
+    expect((await rest('GET', `/bootcamp-entry-tasks/file/${entryTaskFile}`, { token: studentToken })).status).toBe(403)
+    expect((await rest('GET', '/bootcamp-entry-tasks', { token: adminToken })).status).toBe(200)
   })
 
   it('заявки читает и меняет только администратор', async () => {

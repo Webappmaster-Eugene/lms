@@ -40,6 +40,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Входное задание кандидата: доступ даёт личная ссылка из письма, аккаунта у него ещё нет.
+  if (/^\/entry-task\/[^/]+(?:\/download)?\/?$/.test(pathname)) {
+    return NextResponse.next()
+  }
+
   // Проверяем наличие payload-token cookie
   const token = request.cookies.get('payload-token')
 

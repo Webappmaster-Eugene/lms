@@ -81,7 +81,7 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   'faq-items': () => ({ question: 'Вопрос?', answer: lexical('Ответ') }),
   'yandex-disk-imports': (ctx) => ({ publicUrl: 'https://disk.yandex.ru/d/test', course: ctx.courseId, importedBy: ctx.userId }),
   // Адрес уникален в программе: фабрика каждый раз даёт новый.
-  'bootcamp-leads': () => ({ email: `${uid('lead')}@mail.test`.toLowerCase(), program: 'nodejs', consentVersion: '2026-10-26', consentAt: new Date().toISOString() }),
+  'bootcamp-leads': () => ({ email: `${uid('lead')}@mail.test`.toLowerCase(), program: 'nodejs', consentVersion: '2026-10-26', consentAt: new Date().toISOString(), entryTaskToken: uid('entry-token') }),
 }
 
 /** Коллекции, где пользователь может владеть документом (поле user). */

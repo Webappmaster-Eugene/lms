@@ -2,6 +2,7 @@ import { expect, test, type APIRequestContext } from '@playwright/test'
 
 import { USERS } from '../fixtures/data'
 import { APP_URL, LANDING_URL, LANDING_USE } from '../fixtures/env'
+import { zipOf } from '../../fixtures/zip'
 
 /**
  * Страница буткемпа и форма предзаписи: заявка идёт через тот же путь, что в проде
@@ -12,12 +13,16 @@ const PAGE = '/bootcamp/nodejs/'
 
 test.use(LANDING_USE)
 
-async function adminLeads(request: APIRequestContext, email: string) {
+async function adminToken(request: APIRequestContext): Promise<string> {
   const login = await request.post(`${APP_URL}/api/users/login`, { headers: { Origin: APP_URL }, data: { email: USERS.admin.email, password: USERS.admin.password } })
-  const { token } = await login.json() as { token: string }
+  return (await login.json() as { token: string }).token
+}
+
+async function adminLeads(request: APIRequestContext, email: string) {
+  const token = await adminToken(request)
   const found = await request.get(`${APP_URL}/api/bootcamp-leads?where[email][equals]=${encodeURIComponent(email)}&depth=0`, { headers: { Authorization: `JWT ${token}` } })
   expect(found.status()).toBe(200)
-  return (await found.json() as { docs: { email: string; name: string | null; submissionCount: number; source: { utmSource: string | null } }[] }).docs
+  return (await found.json() as { docs: { email: string; name: string | null; submissionCount: number; source: { utmSource: string | null }; entryTaskToken: string | null }[] }).docs
 }
 
 test('страница: метаданные, CSP без нарушений, адрес без косой черты ведёт на канонический', async ({ page, request }) => {
@@ -78,6 +83,7 @@ test('форма с клавиатуры: ошибки рядом с полям�
   await expect(done).toBeVisible()
   await expect(done).toBeFocused()
   await expect(done).toContainText(`Заявка сохранена`)
+  await expect(done).toContainText('письмо с личной ссылкой на входное задание')
   await expect(done).toContainText(email.toUpperCase())
 
   const [lead] = await adminLeads(request, email)
@@ -163,6 +169,44 @@ test('оплата, качество, политика и согласие: св
   const llms = await (await request.get(`${origin}/llms.txt`)).text()
   expect(llms).toContain(`${SITE}/bootcamp/nodejs/payment/`)
   expect(llms).not.toMatch(/[—–]/)
+})
+
+test('входное задание: личная страница открывается без входа, отдаёт архив и не индексируется', async ({ page, request }) => {
+  const archive = zipOf('README.md', '# Задание')
+  const uploaded = await request.post(`${APP_URL}/api/bootcamp-entry-tasks`, {
+    headers: { Authorization: `JWT ${await adminToken(request)}`, Origin: APP_URL },
+    multipart: {
+      file: { name: `entry-${Date.now()}.zip`, mimeType: 'application/zip', buffer: archive },
+      _payload: JSON.stringify({ program: 'nodejs', active: true, readme: '# Входное задание\n\n## Условие задания\n\nЗадача 1. Заявка на бронь.' }),
+    },
+  })
+  expect(uploaded.status()).toBe(201)
+
+  const email = `entry-${Date.now()}@example.com`
+  const sent = await request.post(`${APP_URL}/api/bootcamp/leads`, {
+    headers: { Origin: APP_URL, 'Sec-Fetch-Site': 'same-origin' },
+    data: { program: 'nodejs', email, name: 'Иван', consent: true, consentVersion: '2026-10-27' },
+  })
+  expect(sent.status()).toBe(200)
+  const [lead] = await adminLeads(request, email)
+  const token = lead?.entryTaskToken ?? ''
+  expect(token).toMatch(/^[A-Za-z0-9_-]{32}$/)
+
+  const response = await page.goto(`${APP_URL}/entry-task/${token}`)
+  expect(response?.status()).toBe(200)
+  // Заголовок README не дублирует h1 страницы.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Входное задание буткемпа Node.js')
+  await expect(page.locator('main')).toContainText('Иван, задание показывает')
+  await expect(page.getByRole('heading', { level: 2, name: 'Условие задания' })).toBeVisible()
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/)
+  const download = await request.get(`${APP_URL}/entry-task/${token}/download`)
+  expect(download.status()).toBe(200)
+  expect(download.headers()['content-type']).toBe('application/zip')
+  expect(Buffer.from(await download.body()).equals(archive)).toBe(true)
+
+  const missing = await page.goto(`${APP_URL}/entry-task/${'A'.repeat(32)}`)
+  expect(missing?.status()).toBe(404)
+  await expect(page.locator('main')).toContainText('Ссылка на задание не найдена')
 })
 
 test('на телефоне нет горизонтальной прокрутки, форма помещается', async ({ page }) => {

@@ -6,7 +6,7 @@ import GuideScreen from '../../components/GuideScreen.astro'
 import screens from '../../data/screens.json'
 import { AUTHOR_URL, SITE_URL } from '../../config'
 import {
-  AUDIENCE, BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, FACTS, FAQ, LOG, MENTOR_EXPERIENCE, PATH, PAYMENT_PATH, PREP_START, PRICE, PRIVACY_PATH,
+  AUDIENCE, BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, ENTRY_TASK_DAYS, FACTS, FAQ, LOG, MENTOR_EXPERIENCE, PATH, PAYMENT_PATH, PREP_START, PRICE, PRIVACY_PATH,
   PROGRAM, QUALITY_PATH, RENTAL_FLOW, REVIEW_DAYS, START, START_ISO,
 } from '../../data/bootcamp'
 
@@ -87,7 +87,7 @@ const extraSize = (screen: string) => {
         <div>
           <h3>Что знать заранее не нужно</h3>
           <p>NestJS, SQL, брокеры сообщений и Docker. Им посвящена программа.</p>
-          <p>Перед зачислением вы делаете короткое входное задание. Если в JavaScript или Git есть пробелы, мы подскажем, что подтянуть, и предложим следующий поток. Оплату в этом случае не берём.</p>
+          <p>Перед зачислением вы делаете короткое входное задание. Оно приходит на email сразу после заявки: на него {ENTRY_TASK_DAYS}, ответ в течение {REVIEW_DAYS}. Если в JavaScript или Git есть пробелы, мы подскажем, что подтянуть, и предложим следующий поток. Оплату в этом случае не берём.</p>
         </div>
       </div>
       <div class="bc-actions"><a class="bc-button" href="#apply">Оставить заявку</a></div>
@@ -219,7 +219,7 @@ const extraSize = (screen: string) => {
 
     <section class="bc-section bc-apply" id="apply" aria-labelledby="apply-title">
       <div class="bc-apply-copy">
-        <h2 id="apply-title">Оставьте заявку, и мы пришлём входное задание и даты</h2>
+        <h2 id="apply-title">Оставьте заявку, и входное задание сразу придёт на email</h2>
         <p>Точное время занятий и договор-оферту пришлём, когда откроется набор в январе 2027 года. Сейчас идёт предзапись: заявка ни к чему не обязывает, оплаты на этой странице нет.</p>
       </div>
       <form class="bc-form" data-lead-form data-consent-version={CONSENT_VERSION} novalidate>
@@ -248,7 +248,7 @@ const extraSize = (screen: string) => {
       </form>
       <div class="bc-done" data-done tabindex="-1" hidden>
         <h3>Заявка сохранена</h3>
-        <p>Мы напишем на <strong data-done-email></strong>: пришлём входное задание и даты потока.</p>
+        <p>На <strong data-done-email></strong> ушло письмо с личной ссылкой на входное задание. Если письма нет, проверьте папку «Спам». Не нашли и через 15 минут, отправьте заявку ещё раз: письмо придёт повторно.</p>
       </div>
     </section>
   </main>

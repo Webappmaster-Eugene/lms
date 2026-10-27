@@ -112,6 +112,7 @@ export interface Config {
     'faq-items': FaqItem;
     'yandex-disk-imports': YandexDiskImport;
     'bootcamp-leads': BootcampLead;
+    'bootcamp-entry-tasks': BootcampEntryTask;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -164,6 +165,7 @@ export interface Config {
     'faq-items': FaqItemsSelect<false> | FaqItemsSelect<true>;
     'yandex-disk-imports': YandexDiskImportsSelect<false> | YandexDiskImportsSelect<true>;
     'bootcamp-leads': BootcampLeadsSelect<false> | BootcampLeadsSelect<true>;
+    'bootcamp-entry-tasks': BootcampEntryTasksSelect<false> | BootcampEntryTasksSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -1760,8 +1762,43 @@ export interface BootcampLead {
    * Пусто — письмо администраторам не ушло: заявка видна только в этом списке.
    */
   notifiedAt?: string | null;
+  /**
+   * Страница задания на платформе: /entry-task/<эта строка>. Кто знает ссылку, тот видит задание, поэтому её не пересылают.
+   */
+  entryTaskToken?: string | null;
+  /**
+   * Пусто — письмо кандидату не ушло. Повторная заявка с того же адреса отправит его снова.
+   */
+  entryTaskSentAt?: string | null;
+  entryTaskDueAt?: string | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * Кандидат видит последнее активное задание своей программы: описание на странице и архив для скачивания.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-entry-tasks".
+ */
+export interface BootcampEntryTask {
+  id: number;
+  program: 'nodejs';
+  active?: boolean | null;
+  /**
+   * README из архива: кандидат читает его на странице задания.
+   */
+  readme: string;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1902,6 +1939,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'bootcamp-leads';
         value: number | BootcampLead;
+      } | null)
+    | ({
+        relationTo: 'bootcamp-entry-tasks';
+        value: number | BootcampEntryTask;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -2891,8 +2932,31 @@ export interface BootcampLeadsSelect<T extends boolean = true> {
   submissionCount?: T;
   lastSubmittedAt?: T;
   notifiedAt?: T;
+  entryTaskToken?: T;
+  entryTaskSentAt?: T;
+  entryTaskDueAt?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-entry-tasks_select".
+ */
+export interface BootcampEntryTasksSelect<T extends boolean = true> {
+  program?: T;
+  active?: T;
+  readme?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  focalX?: T;
+  focalY?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

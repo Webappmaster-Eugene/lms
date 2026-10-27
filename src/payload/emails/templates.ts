@@ -304,6 +304,37 @@ export function bootcampLeadEmail({ id, address, name, program, source }: Bootca
   )
 }
 
+type BootcampEntryTaskEmailInput = {
+  name: string | null
+  program: string
+  url: string
+  dueDate: string
+  reviewDays: number
+  replyable: boolean
+}
+
+/** Кандидату сразу после заявки: личная ссылка на входное задание и сроки. */
+export function bootcampEntryTaskEmail({ name, program, url, dueDate, reviewDays, replyable }: BootcampEntryTaskEmailInput): EmailContent {
+  const hello = name?.trim() ? `Здравствуйте, ${name.trim()}!` : 'Здравствуйте!'
+  const intro = `Спасибо за заявку на буткемп ${program}. Входное задание ждёт вас на платформе MentorCareer по личной ссылке. Она открывает только ваше задание, поэтому не пересылайте её.`
+  const terms = `Срок: до ${dueDate} включительно. На задание обычно уходит 3-4 часа. Как сдать решение, написано на странице задания. Мы ответим в течение ${reviewDays} дней после сдачи.`
+  const reply = replyable ? 'Если появятся вопросы, просто ответьте на это письмо.' : ''
+  const reason = 'Вы получили это письмо, потому что оставили заявку на буткемп на info.mentorcareer.ru. Если заявку оставили не вы, просто удалите письмо.'
+  return email(
+    `Входное задание буткемпа ${program}`,
+    `Личная ссылка на входное задание, срок до ${dueDate}.`,
+    'Входное задание буткемпа',
+    `${paragraph(escapeHtml(hello))}
+    ${paragraph(escapeHtml(intro))}
+    ${button('Открыть входное задание', url)}
+    ${fallbackLink(url)}
+    ${notice(escapeHtml(terms))}
+    ${reply ? paragraph(escapeHtml(reply)) : ''}`,
+    `${hello}\n\n${intro}\n\nОткрыть входное задание: ${url}\n\n${terms}${reply ? `\n\n${reply}` : ''}`,
+    { html: `<p style="margin:0;">${escapeHtml(reason)}</p>`, text: reason },
+  )
+}
+
 export function emailBaseUrl(): string {
   return BASE_URL
 }

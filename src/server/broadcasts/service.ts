@@ -11,6 +11,7 @@ import { captureThrottled } from '@/lib/error-reporting/capture'
 import { broadcastEmail, emailBaseUrl } from '@/payload/emails/templates'
 import { broadcastErrorLabel, broadcastSendOutcome, MAX_BROADCAST_ATTEMPTS } from '@/server/broadcasts/delivery-outcome'
 import { createUnsubscribeToken } from '@/server/broadcasts/unsubscribe-token'
+import { contactReplyTo } from '@/server/contact-reply-to'
 
 export class BroadcastError extends Error {
   constructor(message: string, readonly status = 400) { super(message) }
@@ -204,17 +205,6 @@ export function emailTransportReady(payload: Payload): boolean {
   return Boolean(payload.email) && payload.email.name !== 'console'
 }
 
-async function replyToAddress(payload: Payload): Promise<string | undefined> {
-  try {
-    const settings = await payload.findGlobal({ slug: 'site-settings', depth: 0, overrideAccess: true })
-    const address = settings.contacts?.email?.trim()
-    return address && /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(address) ? address : undefined
-  } catch (error) {
-    logger.warn('Email broadcast reply-to is unavailable', { 'error.type': error instanceof Error ? error.name : 'unknown' })
-    return undefined
-  }
-}
-
 export function unsubscribePageUrl(userId: number): string {
   return `${emailBaseUrl()}/unsubscribe?token=${encodeURIComponent(createUnsubscribeToken(userId))}`
 }
@@ -246,14 +236,14 @@ export function broadcastMessage(broadcast: Pick<EmailBroadcast, 'subject' | 'bo
 
 /** То самое письмо, которое получит администратор при тестовой отправке. */
 export async function broadcastPreview(payload: Payload, broadcast: EmailBroadcast, admin: Pick<User, 'id' | 'email' | 'firstName'>) {
-  return broadcastMessage(broadcast, admin, await replyToAddress(payload))
+  return broadcastMessage(broadcast, admin, await contactReplyTo(payload))
 }
 
 export async function sendBroadcastTest(payload: Payload, id: number, admin: Pick<User, 'id' | 'email' | 'firstName'>): Promise<void> {
   if (!emailTransportReady(payload)) throw new BroadcastError('Почта на сервере не настроена: письмо не уйдёт', 503)
   const broadcast = await findBroadcast(payload, id)
   try {
-    await payload.sendEmail(broadcastMessage(broadcast, admin, await replyToAddress(payload), '[Тест] '))
+    await payload.sendEmail(broadcastMessage(broadcast, admin, await contactReplyTo(payload), '[Тест] '))
   } catch (error) {
     const outcome = broadcastSendOutcome(error, MAX_BROADCAST_ATTEMPTS)
     logger.warn('Email broadcast test failed', { 'broadcast.id': id, 'email.error': outcome.error ?? 'unknown' })
@@ -314,7 +304,7 @@ export async function runEmailBroadcastJobs(payload: Payload, { deadline = Date.
       return result
     }
     const due = await payload.find({ collection: 'email-broadcast-deliveries', where: { and: [{ status: { in: ['pending', 'processing'] } }, { nextAttemptAt: { less_than_equal: new Date().toISOString() } }, { attempts: { less_than: MAX_BROADCAST_ATTEMPTS } }] }, sort: 'nextAttemptAt', limit: SENDS_PER_RUN, depth: 0, overrideAccess: true })
-    const replyTo = due.docs.length ? await replyToAddress(payload) : undefined
+    const replyTo = due.docs.length ? await contactReplyTo(payload) : undefined
     for (const candidate of due.docs) {
       // Запас на таймаут SMTP-сокета: прогон обязан закончиться до таймаута планировщика.
       if (Date.now() >= deadline - 25_000) break

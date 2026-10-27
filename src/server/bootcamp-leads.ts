@@ -6,12 +6,13 @@ import { BOOTCAMP_PROGRAMS, describeLeadSource, type BootcampLeadInput } from '@
 import { collectAllPages } from '@/lib/paginate'
 import { logger } from '@/lib/telemetry'
 import { bootcampLeadEmail } from '@/payload/emails/templates'
+import { entryTaskResendDue, newEntryTaskToken, sendEntryTask } from '@/server/bootcamp-entry-task'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
 import type { BootcampLead } from '@/payload-types'
 
 export type SavedBootcampLead = {
   outcome: 'created' | 'repeat'
-  /** Письмо команде уходит после ответа форме; его сбой заявку не теряет. */
+  /** Письма команде и кандидату уходят после ответа форме; их сбой заявку не теряет. */
   notification: Promise<void>
 }
 
@@ -55,9 +56,12 @@ export async function saveBootcampLead(payload: Payload, input: BootcampLeadInpu
         data: {
           program: input.program, email: input.email, name: input.name, status: 'new', source: input.source,
           consentVersion: input.consentVersion, consentAt: now, submissionCount: 1, lastSubmittedAt: now,
+          entryTaskToken: newEntryTaskToken(),
         },
       })
-      return { outcome: 'created', notification: notifyTeam(payload, lead) }
+      const created = lead
+      // По очереди: Payload пишет документ целиком, и параллельные отметки об отправке затёрли бы друг друга.
+      return { outcome: 'created', notification: sendEntryTask(payload, created).then(() => notifyTeam(payload, created)) }
     } catch (error) {
       if (!isUniqueViolation(error)) throw error
       lead = await findLead(payload, input)
@@ -71,7 +75,8 @@ export async function saveBootcampLead(payload: Payload, input: BootcampLeadInpu
     depth: 0,
     data: { submissionCount: (lead.submissionCount ?? 1) + 1, lastSubmittedAt: now },
   })
-  return { outcome: 'repeat', notification: Promise.resolve() }
+  // Повтор — обычно «письмо не пришло»: присылаем ту же ссылку ещё раз, но не чаще раза в 15 минут.
+  return { outcome: 'repeat', notification: entryTaskResendDue(lead) ? sendEntryTask(payload, lead) : Promise.resolve() }
 }
 
 async function notifyTeam(payload: Payload, lead: BootcampLead): Promise<void> {

@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro'
 
 import { LMS_URL, SITE_URL, AUTHOR_URL } from '../config'
-import { BOOTCAMP_PATH, CONSENT_PATH, LAST_CLASS, PAYMENT_PATH, PREP_START, PRICE, PRIVACY_PATH, PROGRAM, QUALITY_PATH, REVIEW_DAYS, START } from '../data/bootcamp'
+import { BOOTCAMP_PATH, CONSENT_PATH, ENTRY_TASK_DAYS, LAST_CLASS, PAYMENT_PATH, PREP_START, PRICE, PRIVACY_PATH, PROGRAM, QUALITY_PATH, REVIEW_DAYS, START } from '../data/bootcamp'
 
 /** Для ИИ-поиска: собирается из тех же данных, что и страницы, поэтому факты не расходятся с сайтом. */
 const url = (path: string) => new URL(path, SITE_URL).href
@@ -32,7 +32,7 @@ const text = `# MentorCareer
 Программа по неделям:
 ${PROGRAM.map(({ weeks, topic }) => `- ${weeks}: ${topic}`).join('\n')}
 
-Стоимость ${PRICE.text} за весь поток, карьерный трек оплачивается отдельно. Доступ к методичкам и записям занятий после выпуска сохраняется без ограничения срока. Платить нужно только после входного задания и допуска: одним платежом или в рассрочку от банка-партнёра без переплаты. От обучения можно отказаться в любой момент с возвратом денег за оставшиеся недели. Трудоустройство не гарантируется, документ об образовании не выдаётся: по итогам защиты выдаётся паспорт проверенных навыков.
+Стоимость ${PRICE.text} за весь поток, карьерный трек оплачивается отдельно. Доступ к методичкам и записям занятий после выпуска сохраняется без ограничения срока. Входное задание приходит на email сразу после заявки по личной ссылке: ${ENTRY_TASK_DAYS} на выполнение, ответ в течение ${REVIEW_DAYS}. Платить нужно только после входного задания и допуска: одним платежом или в рассрочку от банка-партнёра без переплаты. От обучения можно отказаться в любой момент с возвратом денег за оставшиеся недели. Трудоустройство не гарантируется, документ об образовании не выдаётся: по итогам защиты выдаётся паспорт проверенных навыков.
 `
 
 export const GET: APIRoute = () => new Response(text, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })

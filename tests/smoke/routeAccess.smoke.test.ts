@@ -20,7 +20,7 @@ const ROUTE_GROUP = /^\(.+\)$/
 const CMS_GROUP = '(payload)'
 
 /** Должен совпадать с PUBLIC_PATHS в middleware. */
-const PUBLIC_PAGES = new Set(['/login', '/forgot-password', '/reset-password', '/unsubscribe', '/guides', '/guides/[slug]'])
+const PUBLIC_PAGES = new Set(['/login', '/forgot-password', '/reset-password', '/unsubscribe', '/guides', '/guides/[slug]', '/entry-task/[token]'])
 
 /**
  * Пропускаются по префиксу `/admin`, отданному админке Payload, поэтому
@@ -116,6 +116,13 @@ describe('доступ ко всем страницам приложения', (
 
   it.each([...PUBLIC_PAGES])('без токена открыта: %s', (route) => {
     expect(visit(route)).toBe('passed')
+  })
+
+  it('открыта только страница задания и её архив, а не всё под /entry-task', () => {
+    expect(visit('/entry-task/AbCdEfGhIjKlMnOpQrStUvWxYz012345')).toBe('passed')
+    expect(visit('/entry-task/AbCdEfGhIjKlMnOpQrStUvWxYz012345/download')).toBe('passed')
+    expect(visit('/entry-task/AbCdEfGhIjKlMnOpQrStUvWxYz012345/other')).toBe('redirected')
+    expect(visit('/entry-task')).toBe('redirected')
   })
 
   it.each(protectedRoutes)('с токеном открыта: %s', (route) => {

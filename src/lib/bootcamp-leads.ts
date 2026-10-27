@@ -4,7 +4,7 @@
  * обрезается здесь, до записи в базу.
  */
 
-export const BOOTCAMP_PROGRAMS = [{ value: 'nodejs', label: 'Node.js: backend сервиса проката' }] as const
+export const BOOTCAMP_PROGRAMS = [{ value: 'nodejs', label: 'Node.js: backend сервиса проката', short: 'Node.js' }] as const
 export type BootcampProgram = (typeof BOOTCAMP_PROGRAMS)[number]['value']
 
 export const BOOTCAMP_LEAD_STATUSES = [

@@ -100,7 +100,7 @@ describe('предпросмотр письма и адрес для ответ�
     vi.spyOn(payload, 'findGlobal').mockRejectedValueOnce(new TypeError('settings unavailable'))
     const preview = await broadcastPreview(payload, item, admin)
     expect(preview).not.toHaveProperty('replyTo')
-    expect(warn).toHaveBeenCalledWith('Email broadcast reply-to is unavailable', { 'error.type': 'TypeError' })
+    expect(warn).toHaveBeenCalledWith('Email reply-to is unavailable', { 'error.type': 'TypeError' })
   })
 })
 
