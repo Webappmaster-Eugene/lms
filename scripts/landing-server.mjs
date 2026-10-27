@@ -10,6 +10,9 @@ import { createServer, request as httpRequest } from 'node:http'
 import { extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { loadWorktreeEnv } from './worktree-env.mjs'
+
+loadWorktreeEnv()
 const LANDING = fileURLToPath(new URL('../landing/', import.meta.url))
 const PORT = process.env.E2E_LANDING_PORT ?? '3101'
 // LMS для формы предзаписи: в проде её проксирует nginx лендинга (location /api/bootcamp/leads).

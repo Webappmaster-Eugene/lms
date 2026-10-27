@@ -89,8 +89,24 @@ export async function up() {
   await waitReady()
 }
 
-export async function reset(db) {
+function checkName(db) {
   if (!/^[a-z0-9_]+$/.test(db)) throw new Error(`Недопустимое имя базы: ${db}`)
+}
+
+/** Удаляет базы, если они есть; контейнер не поднимает. */
+export async function drop(databases) {
+  databases.forEach(checkName)
+  const client = new pg.Client({ connectionString: databaseUrl('postgres') })
+  await client.connect()
+  try {
+    for (const db of databases) await client.query(`DROP DATABASE IF EXISTS ${db} WITH (FORCE)`)
+  } finally {
+    await client.end()
+  }
+}
+
+export async function reset(db) {
+  checkName(db)
   const client = new pg.Client({ connectionString: databaseUrl('postgres') })
   await client.connect()
   try {

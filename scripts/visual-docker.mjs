@@ -14,7 +14,9 @@ import { spawn, spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { browserServerUrl } from './test-db.mjs'
+import { loadWorktreeEnv } from './worktree-env.mjs'
 
+loadWorktreeEnv()
 const APP_DIR = fileURLToPath(new URL('../', import.meta.url))
 const APP_PORT = process.env.VISUAL_APP_PORT ?? '3102'
 const LANDING_PORT = process.env.VISUAL_LANDING_PORT ?? '3103'
@@ -53,7 +55,7 @@ async function waitFor(url, timeoutMs) {
 let code = 1
 try {
   start('scripts/e2e-server.mjs', { E2E_APP_PORT: APP_PORT, E2E_BASE_URL: `http://host.docker.internal:${APP_PORT}` })
-  start('scripts/landing-server.mjs', { E2E_LANDING_PORT: LANDING_PORT })
+  start('scripts/landing-server.mjs', { E2E_LANDING_PORT: LANDING_PORT, E2E_APP_PORT: APP_PORT })
   await waitFor(`http://localhost:${APP_PORT}/api/health`, 30 * 60_000)
   await waitFor(`http://localhost:${LANDING_PORT}/`, 5 * 60_000)
 

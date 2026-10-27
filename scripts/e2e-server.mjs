@@ -17,7 +17,9 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { databaseUrl, migrateFresh, up } from './test-db.mjs'
+import { loadWorktreeEnv } from './worktree-env.mjs'
 
+loadWorktreeEnv()
 const APP_DIR = fileURLToPath(new URL('../', import.meta.url))
 const PORT = process.env.E2E_APP_PORT ?? '3100'
 // База своя на каждый порт: e2e и скриншоты можно гонять параллельно.
@@ -61,6 +63,8 @@ function sourceHash() {
   }
   walk(`${APP_DIR}src`)
   for (const file of ['next.config.mjs', 'package.json', 'pnpm-lock.yaml']) hash.update(readFileSync(`${APP_DIR}${file}`))
+  // Адрес вшивается в клиентский код: сборка под e2e не годится для скриншотов на другом порту.
+  hash.update(env.NEXT_PUBLIC_SERVER_URL)
   return hash.digest('hex')
 }
 

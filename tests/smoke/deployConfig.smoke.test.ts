@@ -368,7 +368,15 @@ describe('скрипты проверки', () => {
     }
   })
 
-  it('lint вызывает eslint напрямую', () => {
-    expect(PACKAGE.scripts.lint).toBe('eslint .')
+  // `next lint` без конфигурации уходил в интерактивный визард вместо проверки.
+  it('lint вызывает eslint напрямую, через общую очередь проверок', () => {
+    expect(PACKAGE.scripts.lint).toBe('sh scripts/heavy.sh eslint .')
+  })
+
+  it('тяжёлые проверки идут через очередь heavy, сборка образа — мимо неё', () => {
+    for (const name of ['lint', 'typecheck', 'test', 'test:integration', 'test:e2e', 'test:e2e:all', 'test:visual', 'build']) {
+      expect(PACKAGE.scripts[name], name).toMatch(/^sh scripts\/heavy\.sh /)
+    }
+    expect(DOCKERFILE).not.toMatch(/pnpm (run )?build/)
   })
 })

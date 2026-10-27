@@ -3,6 +3,11 @@
  * логинов, слагов и заголовков. Пароли тестовые и живут только в одноразовой
  * базе lms_e2e.
  */
+import { loadWorktreeEnv } from '../../../scripts/worktree-env.mjs'
+
+// Порты отдельного worktree из .worktree.env: конфиг Playwright читает их через этот модуль.
+loadWorktreeEnv()
+
 export const E2E_DB_PREFIX = 'lms_e2e_'
 export const E2E_SECRET = 'e2e-test-secret-not-for-production-000000001'
 export const APP_PORT = Number(process.env.E2E_APP_PORT ?? 3100)
