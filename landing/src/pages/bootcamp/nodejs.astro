@@ -6,8 +6,8 @@ import GuideScreen from '../../components/GuideScreen.astro'
 import screens from '../../data/screens.json'
 import { AUTHOR_URL, SITE_URL } from '../../config'
 import {
-  AUDIENCE, BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, ENTRY_TASK_DAYS, FACTS, FAQ, LOG, MENTOR_EXPERIENCE, PATH, PAYMENT_PATH, PREP_START, PRICE, PRIVACY_PATH,
-  PROGRAM, QUALITY_PATH, RENTAL_FLOW, REVIEW_DAYS, START, START_ISO,
+  AUDIENCE, BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, ENTRY_TASK_DAYS, FACTS, FAQ, LOG, MENTOR_EXPERIENCE, PAINS, PATH, PAYMENT_PATH, PREP_START, PRICE,
+  PRIVACY_PATH, PROGRAM, QUALITY_PATH, RENTAL_FLOW, REVIEW_DAYS, SAMPLE_MANUAL, SAMPLE_QUESTIONS, START, START_ISO,
 } from '../../data/bootcamp'
 
 // В заголовке то, что ищут: «буткемп», «Node.js», «курс backend».
@@ -51,8 +51,8 @@ const extraSize = (screen: string) => {
     <section class="bc-hero" aria-labelledby="hero-title">
       <div class="bc-hero-copy">
         <p class="bc-tape">Идёт предзапись. Старт планируется {START}, неделя подготовки с {PREP_START}</p>
-        <h1 id="hero-title">Буткемп Node.js: backend сервиса проката</h1>
-        <p class="bc-lede">Для frontend- и fullstack-разработчиков, которые ищут работу, и для junior и middle, которые хотят вырасти как backend-разработчики. За 20 недель вы соберёте backend одного продукта, от первого HTTP-маршрута до надёжной оплаты, событий и аналитики, и каждую неделю будете получать ревью своего кода.</p>
+        <h1 id="hero-title">Буткемп Node.js: backend, о котором спрашивают на собеседованиях</h1>
+        <p class="bc-lede">Для frontend- и fullstack-разработчиков, которые ищут работу, и для junior и middle, которые хотят вырасти как backend-разработчики. За 20 недель вы соберёте backend сервиса проката, от первого HTTP-маршрута до оплаты без двойных списаний, очередей и аналитики. Каждую неделю наставник читает ваш код.</p>
         <dl class="bc-facts">
           {FACTS.map(({ term, value }) => <div><dt>{term}</dt><dd>{value}</dd></div>)}
         </dl>
@@ -73,6 +73,13 @@ const extraSize = (screen: string) => {
       </figure>
     </section>
 
+    <section class="bc-section" id="pains" aria-labelledby="pains-title">
+      <h2 id="pains-title">Что обычно мешает</h2>
+      <dl class="bc-pains">
+        {PAINS.map(({ pain, answer }) => <div><dt>{pain}</dt><dd>{answer}</dd></div>)}
+      </dl>
+    </section>
+
     <section class="bc-section" id="fit" aria-labelledby="fit-title">
       <h2 id="fit-title">Для кого этот буткемп</h2>
       <p class="bc-intro">Для разработчиков, которые уверенно пишут на JavaScript и хотят работать с backend всерьёз, а не на уровне примеров из статей.</p>
@@ -91,6 +98,19 @@ const extraSize = (screen: string) => {
         </div>
       </div>
       <div class="bc-actions"><a class="bc-button" href="#apply">Оставить заявку</a></div>
+    </section>
+
+    <section class="bc-section bc-mentor" id="mentor" aria-labelledby="mentor-title">
+      <div>
+        <h2 id="mentor-title">Наставник</h2>
+        <p class="bc-mentor-name">Евгений Надточеев</p>
+        <p>Fullstack-разработчик с упором на backend. Сам ведёт занятия, проверяет работы и принимает защиты всех участников.</p>
+        <a class="bc-link" href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Подробнее на nadtocheev.ru</a>
+      </div>
+      <div>
+        <p>{MENTOR_EXPERIENCE} в коммерческой разработке. Поддерживает микросервисы, которыми пользуются больше 40 тысяч человек в день, с нагрузкой до 2000 запросов в секунду. Перевёл сервисы с Express на Fastify: по замерам k6 задержка упала вдвое при той же памяти. Строил учёт денег на реальных платежах без двойных списаний, с доставкой событий через Outbox и Kafka.</p>
+        <p>Два года преподаёт: больше 30 платных и 50 бесплатных консультаций, лекции в Школе 21, наставничество в Purple School, менторство на Solvery, GetMentor и H.Careers.</p>
+      </div>
     </section>
 
     <section class="bc-section" id="product" aria-labelledby="product-title">
@@ -154,8 +174,22 @@ const extraSize = (screen: string) => {
           <p>После защиты вы получаете паспорт навыков: список умений, подтверждённых вашим кодом и защитой, со ссылками на тесты, merge request и отчёты в проекте. Это не диплом, а проверяемое описание того, что вы умеете, его можно показать вместе с репозиторием.</p>
         </div>
       </div>
-      <p class="bc-note">Отдельно, за дополнительную плату, можно пройти карьерный трек: резюме и профиль на hh.ru, разбор вопросов собеседований и пробное собеседование. Работу мы не гарантируем: трек помогает показать то, что вы на самом деле умеете.</p>
       <p class="bc-note">Если вы строите свой продукт: неделя 12 посвящена тарифам, подпискам, пробному периоду и лимитам, а для основателей есть необязательный трек. Запуск бизнеса и доход мы не обещаем, трек помогает правильно построить эту часть продукта.</p>
+    </section>
+
+    <section class="bc-section" id="career" aria-labelledby="career-title">
+      <h2 id="career-title">Если вы ищете работу</h2>
+      <div class="bc-columns bc-result">
+        <div>
+          <h3>Входит в стоимость</h3>
+          <p>164 вопроса собеседования в разделах методичек, по каждой теме программы. Защита проекта: вы показываете сервис, отвечаете на вопросы и меняете код при наставнике. Паспорт навыков, который можно показать вместе с репозиторием.</p>
+        </div>
+        <div>
+          <h3>Карьерный трек</h3>
+          <p>На 8-й неделе разбираем рынок вакансий Node.js и путь из frontend. На 14-й собираем резюме, профиль на hh.ru и README проекта. На 15-17-й наставник разбирает ваше резюме, на 18-й говорим об этапах собеседования, а на 19-20-й проводим личное пробное собеседование на 45 минут.</p>
+          <p>Трек не входит в стоимость, его условия обсуждаются отдельно. Работу мы не гарантируем: трек помогает показать то, что вы на самом деле умеете.</p>
+        </div>
+      </div>
     </section>
 
     <section class="bc-section bc-columns" id="setup" aria-label="Компьютер и среда">
@@ -168,19 +202,6 @@ const extraSize = (screen: string) => {
         <h2>Среда</h2>
         <p>Мы даём закрытый репозиторий в GitLab курса, CI и проверку каждой сдачи на закрытых тестах, учебный кабинет с методичками, чат участников и записи занятий. Доступ к методичкам и записям остаётся у вас и после выпуска, без ограничения срока.</p>
         <p>PostgreSQL, Redis, RabbitMQ, Kafka и ClickHouse вы запускаете в Docker на своём компьютере, как локальный стенд разработчика. Описание стенда в compose.yaml вы ведёте сами, как в рабочем проекте.</p>
-      </div>
-    </section>
-
-    <section class="bc-section bc-mentor" id="mentor" aria-labelledby="mentor-title">
-      <div>
-        <h2 id="mentor-title">Наставник</h2>
-        <p class="bc-mentor-name">Евгений Надточеев</p>
-        <p>Fullstack-разработчик с упором на backend. Сам ведёт занятия, проверяет работы и принимает защиты всех участников.</p>
-        <a class="bc-link" href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Подробнее на nadtocheev.ru</a>
-      </div>
-      <div>
-        <p>{MENTOR_EXPERIENCE} в коммерческой разработке. Поддерживает микросервисы, которыми пользуются больше 40 тысяч человек в день, с нагрузкой до 2000 запросов в секунду. Перевёл сервисы с Express на Fastify: по замерам k6 задержка упала вдвое при той же памяти. Строил учёт денег на реальных платежах без двойных списаний, с доставкой событий через Outbox и Kafka.</p>
-        <p>Два года преподаёт: больше 30 платных и 50 бесплатных консультаций, лекции в Школе 21, наставничество в Purple School, менторство на Solvery, GetMentor и H.Careers.</p>
       </div>
     </section>
 
@@ -203,11 +224,25 @@ const extraSize = (screen: string) => {
       <a class="bc-link" href={QUALITY_PATH}>Подробно о том, как устроены проверки и методички</a>
     </section>
 
+    <section class="bc-section" id="materials" aria-labelledby="materials-title">
+      <h2 id="materials-title">Посмотрите материалы до заявки</h2>
+      <div class="bc-two bc-two-tight">
+        <div>
+          <p>Методичка первой недели целиком: теория, разобранные примеры, задание и вопросы собеседования. Так устроена каждая из 21 методички программы.</p>
+          <a class="bc-link" href={SAMPLE_MANUAL.href} target="_blank" rel="noopener">Открыть методичку недели 1 (PDF, {SAMPLE_MANUAL.pages} страниц, {SAMPLE_MANUAL.size})</a>
+        </div>
+        <div>
+          <p>Три вопроса собеседования из недели про оплату:</p>
+          <ol class="bc-list">{SAMPLE_QUESTIONS.map((question) => <li>{question}</li>)}</ol>
+        </div>
+      </div>
+    </section>
+
     <section class="bc-section" id="payment" aria-labelledby="payment-title">
       <h2 id="payment-title">Как устроена оплата</h2>
       <div class="bc-two bc-two-tight">
         <p>Сейчас идёт предзапись, платить ничего не нужно. Стоимость буткемпа {PRICE.text} за весь поток. Деньги мы берём только после входного задания и решения о допуске. До оплаты вы получаете договор-оферту: программа, сроки, цена и порядок возврата.</p>
-        <p>Заплатить можно одним платежом картой или через СБП либо в рассрочку от банка-партнёра платёжного сервиса. Рассрочку предлагаем только без переплаты для вас, кредит с процентами не предлагаем. Отказаться от обучения можно в любой момент: вернём деньги за оставшиеся недели. Карьерный трек в стоимость не входит и оплачивается отдельно.</p>
+        <p>Заплатить можно одним платежом картой или через СБП либо в рассрочку от банка-партнёра платёжного сервиса. Рассрочку предлагаем только без переплаты для вас, кредит с процентами не предлагаем. Отказаться от обучения можно в любой момент: вернём деньги за оставшиеся недели. Карьерный трек в стоимость не входит, его условия обсуждаются отдельно.</p>
       </div>
       <a class="bc-link" href={PAYMENT_PATH}>Подробно об оплате, договоре и возврате</a>
     </section>

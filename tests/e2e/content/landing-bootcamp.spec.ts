@@ -34,7 +34,7 @@ test('страница: метаданные, CSP без нарушений, а�
   const response = await page.goto(PAGE)
   expect(response?.status()).toBe(200)
   expect(response?.headers()['content-security-policy']).toContain("script-src 'self'")
-  await expect(page.locator('h1')).toHaveText('Буткемп Node.js: backend сервиса проката')
+  await expect(page.locator('h1')).toHaveText('Буткемп Node.js: backend, о котором спрашивают на собеседованиях')
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', `${SITE}${PAGE}`)
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow')
   expect((await page.title()).length).toBeLessThanOrEqual(70)
@@ -168,6 +168,9 @@ test('оплата, качество, политика и согласие: св
   }
   const llms = await (await request.get(`${origin}/llms.txt`)).text()
   expect(llms).toContain(`${SITE}/bootcamp/nodejs/payment/`)
+  const sample = await request.get(`${origin}/bootcamp/samples/nodejs-week-01-node-runtime.pdf`)
+  expect(sample.status()).toBe(200)
+  expect(sample.headers()['content-type']).toBe('application/pdf')
   expect(llms).not.toMatch(/[—–]/)
 })
 
@@ -196,7 +199,8 @@ test('входное задание: личная страница открыв�
   expect(response?.status()).toBe(200)
   // Заголовок README не дублирует h1 страницы.
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Входное задание буткемпа Node.js')
-  await expect(page.locator('main')).toContainText('Иван, задание показывает')
+  await expect(page.locator('main')).toContainText('Иван, ниже условие задания')
+  expect(await page.title()).toBe('Входное задание буткемпа - MentorCareer')
   await expect(page.getByRole('heading', { level: 2, name: 'Условие задания' })).toBeVisible()
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/)
   const download = await request.get(`${APP_URL}/entry-task/${token}/download`)

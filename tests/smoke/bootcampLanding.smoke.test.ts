@@ -1,8 +1,8 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 import { parseBootcampLead } from '@/lib/bootcamp-leads'
-import { AUDIENCE, CONSENT_VERSION, FACTS, FAQ, LOG, PATH, PROGRAM } from '../../landing/src/data/bootcamp'
+import { AUDIENCE, CONSENT_VERSION, FACTS, FAQ, LOG, PAINS, PATH, PROGRAM, SAMPLE_MANUAL, SAMPLE_QUESTIONS } from '../../landing/src/data/bootcamp'
 import { OPERATOR } from '../../landing/src/data/privacy'
 import screens from '../../landing/src/data/screens.json'
 
@@ -54,7 +54,13 @@ describe('лендинг буткемпа: тексты и путь недели
     const frontmatter = ['src/pages/bootcamp/nodejs/payment.astro', 'src/pages/llms.txt.ts'].map((path) => (readFileSync(landing(path), 'utf8').match(/'[^'\n]*'|`[^`]*`/g) ?? []).join(''))
     markup.push(...frontmatter)
     const messages = readFileSync(landing('src/scripts/bootcamp-form.ts'), 'utf8').match(/'[^'\n]*'/g) ?? []
-    expect(`${JSON.stringify({ AUDIENCE, FACTS, FAQ, LOG, PATH, PROGRAM })}${markup.join('')}${messages.join('')}`).not.toMatch(/[—–]/)
+    expect(`${JSON.stringify({ AUDIENCE, FACTS, FAQ, LOG, PAINS, PATH, PROGRAM, SAMPLE_QUESTIONS })}${markup.join('')}${messages.join('')}`).not.toMatch(/[—–]/)
+  })
+
+  it('методичка-пример лежит в public, это PDF и лёгкий для телефона', () => {
+    const file = landing(`public${SAMPLE_MANUAL.href}`)
+    expect(readFileSync(file).subarray(0, 5).toString('latin1')).toBe('%PDF-')
+    expect(statSync(file).size).toBeLessThan(3 * 1024 * 1024)
   })
 
   it('у каждого скриншота пути есть файл с размерами из screens.json и нет лишних файлов', () => {

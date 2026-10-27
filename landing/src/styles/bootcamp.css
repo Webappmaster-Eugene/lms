@@ -58,7 +58,7 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
 /* Первый экран */
 .bc-hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 56px; align-items: center; padding: 64px 0 72px; }
 .bc-tape { display: inline-block; margin-bottom: 26px; padding: 5px 12px; font-size: 15px; font-weight: 700; background: var(--tape); border-radius: 3px; box-shadow: 0 1px 0 #c9a21a; }
-.bc-hero h1 { font-size: clamp(38px, 5.2vw, 62px); font-weight: 800; letter-spacing: -0.035em; line-height: 1.04; max-width: 13ch; }
+.bc-hero h1 { font-size: clamp(36px, 4.4vw, 54px); font-weight: 800; letter-spacing: -0.035em; line-height: 1.04; max-width: 16ch; }
 .bc-lede { margin-top: 24px; font-size: 19px; color: var(--muted); max-width: 46ch; }
 .bc-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 28px; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); }
 .bc-facts dt { font-size: 14px; color: var(--muted); }
@@ -117,6 +117,13 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
 .bc-flow li { display: flex; align-items: center; gap: 10px; font-weight: 700; }
 .bc-flow li::before { counter-increment: flow; content: counter(flow); display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; font-size: 14px; color: var(--accent); border: 1.5px solid var(--accent); }
 .bc-flow li:not(:last-child)::after { content: ''; width: 28px; height: 1.5px; margin-left: 4px; background: var(--line); }
+
+/* Ситуация читателя и ответ буткемпа — пары, поэтому список определений в две колонки. */
+.bc-pains { max-width: 1040px; margin: 28px 0 0; }
+.bc-pains > div { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 8px 48px; padding: 20px 0; border-bottom: 1px solid var(--line); }
+.bc-pains > div:first-child { border-top: 1px solid var(--line); }
+.bc-pains dt { font-weight: 700; }
+.bc-pains dd { margin: 0; color: var(--muted); }
 
 /* Три группы аудитории: у каждой своя проблема, поэтому отдельные колонки, а не общий список. */
 .bc-audience { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 36px; margin-top: 32px; }
@@ -200,7 +207,7 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
 .bc-form-note a { color: var(--accent); text-underline-offset: 3px; }
 
 @media (max-width: 960px) {
-  .bc-hero, .bc-two, .bc-mentor, .bc-apply, .bc-columns-three, .bc-audience { grid-template-columns: minmax(0, 1fr); }
+  .bc-hero, .bc-two, .bc-mentor, .bc-apply, .bc-columns-three, .bc-audience, .bc-pains > div { grid-template-columns: minmax(0, 1fr); }
   .bc-hero { gap: 40px; padding: 44px 0 56px; }
 }
 @media (max-width: 640px) {

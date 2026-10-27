@@ -10,7 +10,8 @@ import { currentEntryTask, findLeadByEntryTaskToken } from '@/server/bootcamp-en
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Входное задание буткемпа',
+  // Свой заголовок целиком: шаблон платформы добавил бы длинное тире, а кандидат видит текст буткемпа.
+  title: { absolute: 'Входное задание буткемпа - MentorCareer' },
   robots: { index: false, follow: false },
 }
 
@@ -27,8 +28,11 @@ export default async function EntryTaskPage({ params }: Props) {
   // Страница динамическая: срок сверяется с моментом запроса.
   const now = new Date()
   const overdue = lead.entryTaskDueAt ? Date.parse(lead.entryTaskDueAt) < now.getTime() : false
-  const purpose = 'задание показывает, хватает ли базы по JavaScript, TypeScript и Git, чтобы с первой недели работать над backend. На него обычно уходит 3-4 часа.'
-  const intro = lead.name?.trim() ? `${lead.name.trim()}, ${purpose}` : `${purpose.charAt(0).toUpperCase()}${purpose.slice(1)}`
+  // Зачем задание и сколько времени оно занимает, рассказывает сам README ниже.
+  const name = lead.name?.trim()
+  const intro = name
+    ? `${name}, ниже условие задания, а в архиве заготовка проекта с публичными тестами.`
+    : 'Ниже условие задания, а в архиве заготовка проекта с публичными тестами.'
 
   return (
     <article className="mx-auto max-w-3xl space-y-8">

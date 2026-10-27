@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { ErrorScreen, errorPrimaryAction } from '@/components/errors/ErrorScreen'
 
 export const metadata: Metadata = {
-  title: 'Ссылка не найдена',
+  title: { absolute: 'Ссылка не найдена - MentorCareer' },
   robots: { index: false, follow: false },
 }
 
