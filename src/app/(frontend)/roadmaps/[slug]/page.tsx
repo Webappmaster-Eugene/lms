@@ -3,6 +3,7 @@ import { getLearningRequest } from '@/server/learning-request'
 import { notFound, redirect } from 'next/navigation'
 import { getLearningAccess } from '@/server/learning-access'
 import { getRoadmapContent } from '@/server/learning-catalog'
+import { getRoadmapNodeExtras } from '@/server/roadmap-node-extras'
 import { lexicalPlainText } from '@/lib/lexical-text'
 import { routeSlug } from '@/lib/route-slug'
 import { orderRoadmapNodes } from '@/lib/roadmap-sequence'
@@ -21,7 +22,7 @@ import { protectProgramText } from '@/lib/lesson-video-source'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, PartyPopper, Pencil, Settings } from 'lucide-react'
 import { RoadmapExplorer } from '@/components/roadmap/RoadmapExplorer'
-import type { GraphEdge, AnyRoadmapNode, NodeCourse } from '@/components/roadmap/types'
+import type { GraphEdge, AnyRoadmapNode, NodeCourse, NodeExtra } from '@/components/roadmap/types'
 import type {
   RoadmapNode as PayloadRoadmapNode,
   RoadmapEdge as PayloadRoadmapEdge,
@@ -86,7 +87,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
     .sort((first, second) => rankCourse(first) - rankCourse(second) || (first.order ?? 0) - (second.order ?? 0) || first.id - second.id)
   const courseIds = visibleCourses.map((c) => String(c.id))
 
-  const [loadedLessonDocs, sectionDocs, progressDocs] = await Promise.all([
+  const [loadedLessonDocs, sectionDocs, progressDocs, extrasByNode] = await Promise.all([
     courseIds.length > 0
       ? collectAllPages(
           ({ page, limit }) =>
@@ -145,6 +146,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
           { label: `прогресс пользователя ${user.id}` },
         )
       : [],
+    getRoadmapNodeExtras(payload, user, access, nodeDocs, req),
   ])
 
   const lessonDocs = loadedLessonDocs.filter((lesson) => access.canBrowseLessonMetadata(lesson))
@@ -238,6 +240,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
     edgeDocs,
     coursesWithProgress,
     nextStep?.id ?? null,
+    extrasByNode,
     user?.role === 'admin',
   )
   const nextStepNodeId =
@@ -418,6 +421,7 @@ function buildGraphData(
   rawEdges: Pick<PayloadRoadmapEdge, 'id' | 'edgeId' | 'source' | 'target' | 'edgeType' | 'animated'>[],
   coursesWithProgress: CourseWithProgress[],
   nextStepCourseId: string | null,
+  extrasByNode: Map<number, NodeExtra[]>,
   canManage = false,
 ): { graphNodes: AnyRoadmapNode[]; graphEdges: GraphEdge[]; placedCourseIds: Set<string> } {
   const courseMap = new Map(coursesWithProgress.map((c) => [c.id, c]))
@@ -433,18 +437,24 @@ function buildGraphData(
     const linkedCourseId = resolveRelationId(n.course)
     const linkedCourse = linkedCourseId ? courseMap.get(linkedCourseId) ?? null : null
 
-    // Тема без опубликованного курса с уроками — не тупик, а «скоро»:
+    const extras = n.nodeType === 'category' ? [] : extrasByNode.get(n.id) ?? []
+    // Тема без опубликованного курса с уроками и без гайдов и буткемпов — не тупик, а «скоро»:
     // клик по ней никуда не ведёт, но каркас карты сохраняется.
     const summary = summarizeNode(
       linkedCourse,
       byNode.get(String(n.id)) ?? [],
       n.nodeType === 'category',
+      extras.length,
     )
     const { courses: nodeCourses, totalLessons, completedLessons, progressPercent, comingSoon } = summary
     const fullCourses = nodeCourses.flatMap((c) => courseMap.get(c.id) ?? [])
-    const status = comingSoon || (fullCourses.length > 0 && !fullCourses.some((course) => course.accessAllowed)) ? 'locked'
-      : totalLessons > 0 && completedLessons === totalLessons && fullCourses.every((course) => course.accessibleLessons === course.totalLessons) ? 'completed'
-        : completedLessons > 0 ? 'in-progress' : 'available'
+    // Прогресс и статус темы с уроками — только по курсам. Тема без уроков открыта, если открыт
+    // хоть один её гайд или буткемп.
+    const extrasOnly = n.nodeType !== 'category' && !comingSoon && totalLessons === 0
+    const status = extrasOnly ? (extras.some((extra) => extra.accessAllowed) ? 'available' : 'locked')
+      : comingSoon || (fullCourses.length > 0 && !fullCourses.some((course) => course.accessAllowed)) ? 'locked'
+        : totalLessons > 0 && completedLessons === totalLessons && fullCourses.every((course) => course.accessibleLessons === course.totalLessons) ? 'completed'
+          : completedLessons > 0 ? 'in-progress' : 'available'
     if (n.nodeType !== 'category') for (const c of fullCourses) placedCourseIds.add(c.id)
 
     const bullets = Array.isArray(n.bullets)
@@ -463,6 +473,7 @@ function buildGraphData(
         nodeType: n.nodeType,
         courseSlug: comingSoon ? null : (linkedCourse ?? nodeCourses[0])?.slug ?? null,
         courses: comingSoon ? [] : fullCourses.map(toNodeCourse),
+        extras,
         comingSoon,
         icon: n.icon ?? null,
         description: n.description ? (canManage ? n.description : protectProgramText(n.description)) : null,

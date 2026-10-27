@@ -1,6 +1,7 @@
 import { CheckCircle2, Circle, CircleDot, Lock, Play } from 'lucide-react'
 
 import { NodeCourseList } from './NodeCourseList'
+import { NodeExtraList } from './NodeExtraList'
 import { STAGE_ORDER, STAGE_TITLES } from './stage-colors'
 import type { GraphNode, NodeCourse, NodeStatus, RoadmapNodeData } from './types'
 import type { NodeStage } from './stage-colors'
@@ -87,8 +88,13 @@ function TopicRow({ data, nodeId, managementRoadmapId, selected, onSelect }: { d
         )}
         {data.courses.length > 0 ? (
           <NodeCourseList courses={data.courses} />
-        ) : (
+        ) : data.comingSoon ? (
           <p className="text-sm text-muted-foreground">Курсов по этой теме пока нет.</p>
+        ) : null}
+        {data.extras.length > 0 && (
+          <div className={data.courses.length > 0 ? 'mt-4' : undefined}>
+            <NodeExtraList extras={data.extras} />
+          </div>
         )}
       </div>
     </details>

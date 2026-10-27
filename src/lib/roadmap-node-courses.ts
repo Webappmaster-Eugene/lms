@@ -46,12 +46,14 @@ export function groupCoursesByNode(courses: NodeCourse[]): Map<string, NodeCours
 
 /**
  * Состояние узла по его курсам. Основной курс идёт первым — именно он
- * открывается по клику; остальные курсы темы следуют за ним.
+ * открывается по клику; остальные курсы темы следуют за ним. Гайды и буткемпы
+ * темы (`extrasCount`) в прогресс не входят, но тема с ними не «готовится».
  */
 export function summarizeNode(
   primary: NodeCourse | null,
   attached: NodeCourse[],
   isCategory = false,
+  extrasCount = 0,
 ): NodeSummary {
   const courses = [...(primary ? [primary] : []), ...attached.filter((c) => c.id !== primary?.id)]
 
@@ -66,7 +68,7 @@ export function summarizeNode(
     else if (completedLessons > 0) status = 'in-progress'
   }
 
-  const comingSoon = !isCategory && totalLessons === 0
+  const comingSoon = !isCategory && totalLessons === 0 && extrasCount === 0
   if (comingSoon) status = 'locked'
 
   return { courses, totalLessons, completedLessons, progressPercent, status, comingSoon }

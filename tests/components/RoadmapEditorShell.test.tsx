@@ -257,6 +257,8 @@ describe('канва редактора', () => {
           bullets: [],
           courseId: null,
           courseName: null,
+          guideIds: [],
+          bootcampIds: [],
           order: 0,
           payloadId: null,
           nodeId: 'n1',

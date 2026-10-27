@@ -352,6 +352,14 @@ export interface RoadmapNode {
    * Курс, который открывается по клику. Остальные курсы темы привязываются полем «Узел роадмапа» в самом курсе
    */
   course?: (number | null) | Course;
+  /**
+   * Видны в теме рядом с курсами. Название видно всем, кому видна тема, даже без доступа. В прогресс роадмапа не входят
+   */
+  guides?: (number | Guide)[] | null;
+  /**
+   * Только курсы с флажком «Буткемп». Название видно всем, кому видна тема, даже без доступа. В прогресс роадмапа не входят. Не привязывайте буткемп полем «Узел роадмапа» и не ставьте основным курсом темы
+   */
+  bootcamps?: (number | Course)[] | null;
   positionX: number;
   positionY: number;
   description?: string | null;
@@ -427,6 +435,66 @@ export interface Course {
    * Курсы, которые нужно завершить перед началом этого курса
    */
   prerequisites?: (number | Course)[] | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "guides".
+ */
+export interface Guide {
+  id: number;
+  title: string;
+  /**
+   * Подставляется из названия транслитом. Менять уже опубликованный адрес не стоит
+   */
+  slug: string;
+  /**
+   * Одна-две фразы о том, чему научит гайд. Видны в списке гайдов и в описании страницы
+   */
+  summary: string;
+  markdown?: string | null;
+  /**
+   * По ней ученик фильтрует список гайдов. Нет нужной — создайте кнопкой рядом
+   */
+  category?: (number | null) | GuideCategory;
+  /**
+   * Когда цифры и ссылки в гайде сверены с источниками. Видно ученику
+   */
+  reviewedAt?: string | null;
+  /**
+   * Пустое — через 3 месяца после проверки. Просроченные гайды видны над списком
+   */
+  reviewBy?: string | null;
+  /**
+   * Считается из текста при сохранении
+   */
+  readingMinutes?: number | null;
+  announcedAt?: string | null;
+  order?: number | null;
+  /**
+   * После публикации доступен всем без входа, по ссылке и в поисковиках. Текст и прикреплённые файлы становятся публичными
+   */
+  isPublic?: boolean | null;
+  isPublished?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "guide-categories".
+ */
+export interface GuideCategory {
+  id: number;
+  title: string;
+  /**
+   * Адрес фильтра: /guides?category=<slug>. Подставляется из названия
+   */
+  slug: string;
+  /**
+   * Чем меньше, тем левее в фильтре списка гайдов
+   */
+  order?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -632,66 +700,6 @@ export interface MarkdownBlock {
   id?: string | null;
   blockName?: string | null;
   blockType: 'markdown';
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "guides".
- */
-export interface Guide {
-  id: number;
-  title: string;
-  /**
-   * Подставляется из названия транслитом. Менять уже опубликованный адрес не стоит
-   */
-  slug: string;
-  /**
-   * Одна-две фразы о том, чему научит гайд. Видны в списке гайдов и в описании страницы
-   */
-  summary: string;
-  markdown?: string | null;
-  /**
-   * По ней ученик фильтрует список гайдов. Нет нужной — создайте кнопкой рядом
-   */
-  category?: (number | null) | GuideCategory;
-  /**
-   * Когда цифры и ссылки в гайде сверены с источниками. Видно ученику
-   */
-  reviewedAt?: string | null;
-  /**
-   * Пустое — через 3 месяца после проверки. Просроченные гайды видны над списком
-   */
-  reviewBy?: string | null;
-  /**
-   * Считается из текста при сохранении
-   */
-  readingMinutes?: number | null;
-  announcedAt?: string | null;
-  order?: number | null;
-  /**
-   * После публикации доступен всем без входа, по ссылке и в поисковиках. Текст и прикреплённые файлы становятся публичными
-   */
-  isPublic?: boolean | null;
-  isPublished?: boolean | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "guide-categories".
- */
-export interface GuideCategory {
-  id: number;
-  title: string;
-  /**
-   * Адрес фильтра: /guides?category=<slug>. Подставляется из названия
-   */
-  slug: string;
-  /**
-   * Чем меньше, тем левее в фильтре списка гайдов
-   */
-  order?: number | null;
-  updatedAt: string;
-  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2045,6 +2053,8 @@ export interface RoadmapNodesSelect<T extends boolean = true> {
   nodeType?: T;
   roadmap?: T;
   course?: T;
+  guides?: T;
+  bootcamps?: T;
   positionX?: T;
   positionY?: T;
   description?: T;

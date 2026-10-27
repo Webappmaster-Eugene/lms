@@ -38,6 +38,25 @@ describe('кеш каталога с настоящим Payload/PostgreSQL', () 
     expect((await getRoadmapContent(payload, roadmap.id)).nodes[0]?.bullets?.[0]?.text).toBe('После изменения')
   })
 
+  it('видит правку состава темы в roadmap_nodes_rels и снятие гайда с публикации', async () => {
+    const roadmap = await payload.create({ collection: 'roadmaps', data: { title: uid('cache-extras'), slug: uid('cache-extras'), isPublished: true } })
+    const guide = (title: string) => payload.create({ collection: 'guides', data: { title: uid(title), slug: uid('cache-guide'), summary: 'Кратко', markdown: 'Текст', isPublished: true }, context: { skipHooks: true } })
+    const [first, second] = [await guide('first'), await guide('second')]
+    const node = await payload.create({ collection: 'roadmap-nodes', data: { nodeId: uid('cache-extras-node'), label: 'Карьера', nodeType: 'topic', positionX: 0, positionY: 0, roadmap: roadmap.id, guides: [first.id] } })
+    const catalogNode = async () => (await getLearningCatalog(payload)).nodes.find((row) => row.id === node.id)
+    expect((await getRoadmapContent(payload, roadmap.id)).nodes[0]?.guides).toEqual([first.id])
+    expect(await catalogNode()).toMatchObject({ guides: [first.id] })
+
+    // Связь правится в дочерней таблице: строка самой темы и её xmin не меняются.
+    const adapter = payload.db as unknown as { drizzle: { execute: (query: ReturnType<typeof sql>) => Promise<unknown> } }
+    await adapter.drizzle.execute(sql`update roadmap_nodes_rels set guides_id = ${second.id} where parent_id = ${node.id} and path = 'guides'`)
+    expect((await getRoadmapContent(payload, roadmap.id)).nodes[0]?.guides).toEqual([second.id])
+    expect(await catalogNode()).toMatchObject({ guides: [second.id] })
+
+    await payload.update({ collection: 'guides', id: second.id, data: { isPublished: false }, context: { skipHooks: true } })
+    expect(await catalogNode()).toMatchObject({ guides: [] })
+  })
+
   it('не публикует незакоммиченный снимок в общий кеш', async () => {
     const roadmap = await payload.create({ collection: 'roadmaps', data: { title: uid('cache-tx'), slug: uid('cache-tx'), isPublished: true } })
     await getLearningCatalog(payload)

@@ -66,7 +66,7 @@ test.describe('администратор', () => {
       await expect(form.getByText('Курс остаётся в исходном роадмапе.')).toBeVisible()
       const node = form.getByRole('combobox', { name: 'Тема на карте', exact: true })
       // Категория «Старт» — не тема: привязать к ней курс нельзя.
-      await expect(node.locator('option')).toHaveText(['Без привязки к теме', 'Веб-основы'])
+      await expect(node.locator('option')).toHaveText(['Без привязки к теме', 'Веб-основы', CONTENT.extrasTopic.label])
       await expect(page.getByText('Изменений нет', { exact: true })).toBeVisible()
 
       await form.getByRole('textbox', { name: 'Название курса', exact: true }).fill(title)

@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import { isAdmin } from '@/payload/access/isAdmin'
+import { isAdmin, isAdminField } from '@/payload/access/isAdmin'
 import { learningNodeRead } from '@/payload/access/learningCatalogRead'
 import { cleanupLearningTargetGrants } from '@/payload/hooks/learningAccessCleanup'
 import { protectRoadmapNodeSources } from '@/payload/hooks/protectCourseSources'
@@ -67,6 +67,34 @@ export const RoadmapNodes: CollectionConfig = {
       admin: {
         description:
           'Курс, который открывается по клику. Остальные курсы темы привязываются полем «Узел роадмапа» в самом курсе',
+      },
+    },
+    // Состав темы нужен только серверу карты: REST и GraphQL ученика его не раскрывают и по нему не ищут.
+    {
+      name: 'guides',
+      type: 'relationship',
+      relationTo: 'guides',
+      hasMany: true,
+      maxRows: 20,
+      maxDepth: 0,
+      label: 'Гайды темы',
+      access: { read: isAdminField },
+      admin: {
+        description: 'Видны в теме рядом с курсами. Название видно всем, кому видна тема, даже без доступа. В прогресс роадмапа не входят',
+      },
+    },
+    {
+      name: 'bootcamps',
+      type: 'relationship',
+      relationTo: 'courses',
+      hasMany: true,
+      maxRows: 3,
+      maxDepth: 0,
+      filterOptions: { isBootcamp: { equals: true } },
+      label: 'Буткемпы темы',
+      access: { read: isAdminField },
+      admin: {
+        description: 'Только курсы с флажком «Буткемп». Название видно всем, кому видна тема, даже без доступа. В прогресс роадмапа не входят. Не привязывайте буткемп полем «Узел роадмапа» и не ставьте основным курсом темы',
       },
     },
     {

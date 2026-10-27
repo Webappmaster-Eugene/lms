@@ -1,6 +1,6 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { CheckCircle2, Lock, Play } from 'lucide-react'
-import type { RoadmapNodeData } from './types'
+import { CheckCircle2, Compass, Lock, Play, Tent } from 'lucide-react'
+import type { NodeExtra, RoadmapNodeData } from './types'
 import { RoadmapIcon } from './RoadmapIcon'
 import { getNodeClasses } from './stage-colors'
 import { cn } from '@/lib/utils'
@@ -18,6 +18,8 @@ export function RoadmapTopicNode({ data }: NodeProps) {
   const showCourses = nodeData.courses.length > 1
   const visibleCourses = nodeData.courses.slice(0, 3)
   const visibleBullets = nodeData.bullets.slice(0, 4)
+  const bootcamps = nodeData.extras.filter((extra) => extra.kind === 'bootcamp')
+  const guides = nodeData.extras.filter((extra) => extra.kind === 'guide')
 
   return (
     <div
@@ -89,6 +91,13 @@ export function RoadmapTopicNode({ data }: NodeProps) {
         </ul>
       )}
 
+      {nodeData.extras.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 px-4 pb-3">
+          {bootcamps.length > 0 && <ExtraBadge items={bootcamps} Icon={Tent} label={bootcamps.length > 1 ? `Буткемпы · ${bootcamps.length}` : 'Буткемп'} />}
+          {guides.length > 0 && <ExtraBadge items={guides} Icon={Compass} label={`Гайды · ${guides.length}`} />}
+        </div>
+      )}
+
       {hasProgress && !isLocked && (
         <div className={cn('mt-auto border-t px-4 py-3', classes.border)}>
           <div className="flex items-center justify-between gap-2 text-xs leading-4">
@@ -119,12 +128,29 @@ export function RoadmapTopicNode({ data }: NodeProps) {
             ? 'Материалы готовятся'
             : firstBlocker
               ? `Сначала: ${firstBlocker}`
-              : 'Пройдите предыдущие курсы'}
+              : !hasProgress
+                ? 'Доступ не назначен'
+                : 'Пройдите предыдущие курсы'}
         </div>
       )}
 
       <Handle type="source" position={Position.Bottom} className="!h-2 !w-2 !bg-border !border-0" />
       <Handle type="target" position={Position.Top} className="!h-2 !w-2 !bg-border !border-0" />
     </div>
+  )
+}
+
+/** Значок вида материалов темы; замок вместо иконки, если ни один из них не открыт. */
+function ExtraBadge({ items, Icon, label }: { items: NodeExtra[]; Icon: typeof Tent; label: string }) {
+  const locked = !items.some((item) => item.accessAllowed)
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-current/20 px-2 py-0.5 text-xs leading-4">
+      {locked ? (
+        <Lock className="h-3 w-3 shrink-0" role="img" aria-label="Доступ не назначен" />
+      ) : (
+        <Icon className="h-3 w-3 shrink-0" aria-hidden="true" />
+      )}
+      {label}
+    </span>
   )
 }

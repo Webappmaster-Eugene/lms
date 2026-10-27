@@ -265,6 +265,27 @@ describe('миграции на чистой базе', () => {
     await raw(`delete from guides where id = ${id}`)
   })
 
+  it('привязки тем к гайдам и буткемпам: миграция только добавляет таблицу, темы прежнего кода целы', async () => {
+    const req = await createLocalReq({}, payload)
+    await rollbackTo('_roadmap_node_extras', req)
+    expect(await publicTables()).not.toContain('roadmap_nodes_rels')
+    // Прежний код пишет темы без новой таблицы; после миграции они читаются с пустыми привязками.
+    const [roadmap] = await raw(`insert into roadmaps (title, slug, is_published, updated_at, created_at) values ('Карта до миграции', 'extras-before-migration', true, now(), now()) returning id`)
+    const [node] = await raw(`insert into roadmap_nodes (node_id, label, node_type, roadmap_id, position_x, position_y, updated_at, created_at) values ('extras-before-migration', 'Тема', 'topic', ${roadmap.id}, 0, 0, now(), now()) returning id`)
+    await db().migrate({ migrations })
+    expect(await publicTables()).toContain('roadmap_nodes_rels')
+    expect(await drift()).toEqual([])
+    const before = await payload.findByID({ collection: 'roadmap-nodes', id: Number(node.id), depth: 0 })
+    expect(before).toMatchObject({ label: 'Тема', guides: [], bootcamps: [] })
+    const guide = await payload.create({ collection: 'guides', data: { title: 'Гайд темы', slug: 'extras-migration-guide', summary: 'Кратко', markdown: 'Текст', isPublished: true }, context: { skipHooks: true } })
+    await payload.update({ collection: 'roadmap-nodes', id: Number(node.id), data: { guides: [guide.id] } })
+    expect(await raw(`select path, guides_id from roadmap_nodes_rels where parent_id = ${node.id}`)).toEqual([{ path: 'guides', guides_id: guide.id }])
+    await payload.delete({ collection: 'roadmap-nodes', id: Number(node.id) })
+    expect(await raw(`select id from roadmap_nodes_rels where parent_id = ${node.id}`)).toEqual([])
+    await payload.delete({ collection: 'guides', id: guide.id })
+    await payload.delete({ collection: 'roadmaps', id: Number(roadmap.id) })
+  })
+
   it('индекс сортировки истории откатывается и возвращается без потери мест остановки', async () => {
     const index = migrations.find((migration) => migration.name.endsWith('_learning_history_index'))
     if (!index) throw new Error('Миграция индекса истории не зарегистрирована')

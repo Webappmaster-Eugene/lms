@@ -24,4 +24,15 @@ describe('кеш метаданных каталога', () => {
     expect(validCatalog(catalog({ assignedOnly: null }))).toBe(false)
     expect(validCatalog(catalog({ assignedOnly: 'true' }))).toBe(false)
   })
+
+  // Тема, открытая только гайдами или буткемпами, пропала бы у ученика, прочитай новый код запись без них.
+  it('требует у тем массивы id гайдов и буткемпов', () => {
+    const withNodes = (node: Record<string, unknown>) => ({ ...catalog({ assignedOnly: false }), nodes: [{ id: 5, roadmap: 1, course: null, ...node }] })
+    expect(validCatalog(withNodes({ guides: [3], bootcamps: [] }))).toBe(true)
+    expect(validCatalog(withNodes({}))).toBe(false)
+    expect(validCatalog(withNodes({ guides: [3] }))).toBe(false)
+    expect(validCatalog(withNodes({ guides: null, bootcamps: [] }))).toBe(false)
+    expect(validCatalog(withNodes({ guides: [{ id: 3 }], bootcamps: [] }))).toBe(false)
+    expect(validCatalog(withNodes({ guides: [], bootcamps: ['9'] }))).toBe(false)
+  })
 })

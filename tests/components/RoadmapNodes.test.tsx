@@ -24,6 +24,7 @@ function nodeData(overrides: Partial<RoadmapNodeData> = {}): RoadmapNodeData {
     nodeType: 'topic',
     courseSlug: 'deep-react',
     courses: [],
+    extras: [],
     icon: 'rocket',
     description: null,
     status: 'available',
@@ -145,9 +146,15 @@ describe('мини-узел подтемы', () => {
   })
 
   it('закрытая подтема объясняет причину подписью к замку', () => {
-    renderNode(RoadmapSubtopicNode, { status: 'locked', comingSoon: false })
+    renderNode(RoadmapSubtopicNode, { status: 'locked', comingSoon: false, totalLessons: 4 })
 
-    expect(screen.getByLabelText('Пройдите предыдущие курсы')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Пройдите предыдущие курсы' })).toBeInTheDocument()
+  })
+
+  it('подтема только с закрытыми гайдами и буткемпами говорит, что доступ не назначен', () => {
+    renderNode(RoadmapSubtopicNode, { status: 'locked', comingSoon: false, totalLessons: 0 })
+
+    expect(screen.getByRole('img', { name: 'Доступ не назначен' })).toBeInTheDocument()
   })
 
   it('готовящаяся подтема объясняет это отдельно', () => {

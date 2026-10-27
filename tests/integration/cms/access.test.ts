@@ -3,7 +3,7 @@ import type { CollectionSlug, Payload } from 'payload'
 
 import type { User } from '@/payload-types'
 import { buildFixtureContext, makeValid, VALID, type FixtureContext } from '../helpers/fixtures'
-import { createAdmin, createStudent, createSumTask, getTestPayload, login, type TestUser } from '../helpers/payload'
+import { createAdmin, createStudent, createSumTask, getTestPayload, login, rest, uid, type TestUser } from '../helpers/payload'
 
 /**
  * Контроль доступа на настоящем Local API с `overrideAccess: false` — так же,
@@ -412,5 +412,46 @@ describe('попытки эскалации прав', () => {
     })
     const outcome = await attempt(() => payload.findByID({ collection: 'lessons', id: draft.id, user: owner, overrideAccess: false }))
     expect(outcome).toBe('denied')
+  })
+})
+
+describe('гайды и буткемпы темы роадмапа', () => {
+  async function extrasNode() {
+    const guide = await payload.create({ collection: 'guides', data: { title: uid('Гайд темы'), slug: uid('guide'), summary: 'Кратко', markdown: 'Текст', isPublished: true }, context: { skipHooks: true } })
+    const bootcamp = await payload.create({ collection: 'courses', data: { title: uid('Буткемп'), slug: uid('bootcamp'), roadmap: ctx.roadmapId, isPublished: true, isBootcamp: true } })
+    const node = await payload.create({ collection: 'roadmap-nodes', data: { nodeId: uid('extras'), label: 'Карьера', nodeType: 'topic', roadmap: ctx.roadmapId, guides: [guide.id], bootcamps: [bootcamp.id], positionX: 0, positionY: 0 } })
+    return { guide, bootcamp, node }
+  }
+
+  it('ученик по REST не получает состав темы даже с depth и не ищет по нему; админ получает', async () => {
+    const { guide, bootcamp, node } = await extrasNode()
+    const studentToken = await login(payload, owner)
+    const asStudent = await rest('GET', `/roadmap-nodes/${node.id}?depth=2`, { token: studentToken })
+    expect(asStudent.status).toBe(200)
+    expect(asStudent.json).toMatchObject({ id: node.id, label: 'Карьера' })
+    expect(asStudent.json).not.toHaveProperty('guides')
+    expect(asStudent.json).not.toHaveProperty('bootcamps')
+    for (const query of [`where[guides][in]=${guide.id}`, `where[bootcamps][equals]=${bootcamp.id}`, `where[guides.title][like]=${encodeURIComponent('Гайд')}`]) {
+      const found = await rest('GET', `/roadmap-nodes?${query}&depth=0`, { token: studentToken })
+      // Payload отвергает фильтр по закрытому полю, а не отвечает пустым списком.
+      expect(found.status, query).toBe(400)
+      expect(JSON.stringify(found.json), query).not.toContain(`"id":${node.id}`)
+    }
+    const local = await payload.findByID({ collection: 'roadmap-nodes', id: node.id, depth: 2, user: owner, overrideAccess: false })
+    expect(local).not.toHaveProperty('guides')
+    const asAdmin = await rest('GET', `/roadmap-nodes/${node.id}?depth=2`, { token: await login(payload, admin) })
+    expect(asAdmin.json).toMatchObject({ guides: [guide.id], bootcamps: [bootcamp.id] })
+  })
+
+  it('курс без флажка «Буткемп» в буткемпы темы не проходит валидацию', async () => {
+    const outcome = payload.update({ collection: 'roadmap-nodes', id: ctx.nodeId, data: { bootcamps: [ctx.courseId] }, user: admin, overrideAccess: false })
+    await expect(outcome).rejects.toMatchObject({ data: { errors: [expect.objectContaining({ path: 'bootcamps' })] } })
+  })
+
+  it('ученик не меняет состав темы', async () => {
+    const { node } = await extrasNode()
+    const outcome = await attempt(() => payload.update({ collection: 'roadmap-nodes', id: node.id, data: { guides: [] }, user: owner, overrideAccess: false }))
+    expect(outcome).toBe('denied')
+    expect((await payload.findByID({ collection: 'roadmap-nodes', id: node.id, depth: 0 })).guides).toHaveLength(1)
   })
 })

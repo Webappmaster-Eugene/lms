@@ -306,3 +306,106 @@ describe('описания родителей при скрытом катало
     expect(reads(buildLearningAccess(strict, [expired], metadata, 1000)).courses).toEqual([])
   })
 })
+
+describe('гайды и буткемпы темы', () => {
+  const strict = { ...student, learningCatalogVisibility: 'assigned' as const }
+  const extras: LearningPolicyMetadata = {
+    ...metadata,
+    roadmaps: [...metadata.roadmaps, { id: 3, isPublished: false }],
+    courses: [
+      ...metadata.courses,
+      // Закрытый курс темы 102 и закрытый курс, привязанный к теме 107 без своего курса.
+      { id: 50, roadmap: 1, roadmapNode: 102, isPublished: true, assignedOnly: true },
+      { id: 51, roadmap: 1, roadmapNode: 107, isPublished: true, assignedOnly: true },
+      // Буткемпы: опубликованный, черновик и опубликованный в неопубликованной карте.
+      { id: 60, roadmap: 2, isPublished: true, assignedOnly: true },
+      { id: 61, roadmap: 2, isPublished: false, assignedOnly: true },
+      { id: 62, roadmap: 3, isPublished: true, assignedOnly: true },
+    ],
+    nodes: [
+      ...metadata.nodes,
+      { id: 102, roadmap: 1, course: 50, guides: [7] },
+      { id: 103, roadmap: 1, course: 50 },
+      { id: 104, roadmap: 1, course: null, guides: [7] },
+      { id: 105, roadmap: 1, course: null, bootcamps: [60] },
+      { id: 106, roadmap: 1, course: null, bootcamps: [61, 62] },
+      { id: 107, roadmap: 1, course: null, guides: [8] },
+    ],
+  }
+  const plain: LearningPolicyMetadata = { ...extras, nodes: extras.nodes.map(({ id, roadmap, course }) => ({ id, roadmap, course })) }
+
+  it('каталог: тема со скрытыми курсами видна с гайдом и без описания, без гайда скрыта', () => {
+    const policy = resolve([], extras)
+    expect(policy.canBrowseNode(102)).toBe(true)
+    expect(policy.canBrowseNode(107)).toBe(true)
+    expect(policy.canBrowseNode(103)).toBe(false)
+    expect(resolve([], plain).canBrowseNode(102)).toBe(false)
+    expect(resolve([], plain).canBrowseNode(107)).toBe(false)
+    // Описание такой темы может перечислять её закрытые курсы.
+    expect([102, 107].filter(policy.canReadNodeDescription)).toEqual([])
+    expect(policy.canReadNodeDescription(101)).toBe(true)
+    expect(policy.canReadNodeDescription(104)).toBe(true)
+  })
+
+  it('скрытый каталог: без назначений тема не видна, при открытом роадмапе видна без описания', () => {
+    expect(buildLearningAccess(strict, [], extras).browseNodeIds).toEqual([])
+    const policy = buildLearningAccess(strict, [grant('courses', 10)], extras)
+    expect([102, 103, 104, 105, 106, 107].filter(policy.canBrowseNode)).toEqual([102, 104, 105, 107])
+    expect([102, 104, 105, 107].filter(policy.canReadNodeDescription)).toEqual([])
+    // Буткемп 60 живёт в карте 2: тема его не открывает ни карту, ни сам буткемп.
+    expect(policy.canBrowseRoadmap(2)).toBe(false)
+    expect(policy.canBrowseCourse(60)).toBe(false)
+  })
+
+  it('тема, видимая лишь из-за гайдов, не делает описание карты доступным', () => {
+    const map = { ...extras, courses: extras.courses.filter((course) => ![50, 51].includes(course.id)), nodes: [...metadata.nodes, { id: 104, roadmap: 1, course: null, guides: [7] }] }
+    expect(buildLearningAccess(strict, [grant('roadmaps', 1)], map).canReadRoadmapDescription(1)).toBe(true)
+    const partial = buildLearningAccess(strict, [grant('courses', 10), grant('courses', 11)], map)
+    expect(partial.canBrowseNode(104)).toBe(true)
+    expect(partial.canReadRoadmapDescription(1)).toBe(false)
+    expect(buildLearningAccess(strict, [grant('courses', 10), grant('courses', 11)], { ...map, nodes: metadata.nodes }).canReadRoadmapDescription(1)).toBe(true)
+  })
+
+  it('запрет темы сильнее гайдов и буткемпов', () => {
+    expect(resolve([grant('roadmap-nodes', 102, 'deny')], extras).canBrowseNode(102)).toBe(false)
+    const policy = buildLearningAccess(strict, [grant('courses', 10), grant('roadmap-nodes', 104, 'deny'), grant('roadmap-nodes', 105, 'deny')], extras)
+    expect(policy.canBrowseNode(104)).toBe(false)
+    expect(policy.canBrowseNode(105)).toBe(false)
+    expect(policy.canBrowseNode(107)).toBe(true)
+  })
+
+  it('назначение темы не открывает её буткемп; черновой и неопубликованный буткемп тему не показывают', () => {
+    for (const user of [student, strict, { ...student, learningAccessMode: 'all' as const }]) {
+      const policy = buildLearningAccess(user, [grant('roadmap-nodes', 105), grant('roadmap-nodes', 106)], extras)
+      expect(policy.canAccessCourse(60)).toBe(false)
+      expect(policy.canBrowseCourse(60)).toBe(false)
+      expect(policy.canBrowseNode(105)).toBe(true)
+    }
+    expect(buildLearningAccess(strict, [grant('courses', 10)], extras).canBrowseNode(106)).toBe(false)
+    // Скрытый буткемп привязан к теме не полем курса: тема не становится «темой только закрытых курсов».
+    expect(resolve([], extras).canBrowseNode(105)).toBe(true)
+  })
+
+  it('курсы, разделы, уроки и карты открываются как без гайдов и буткемпов', () => {
+    const users = [student, strict, { ...student, learningAccessMode: 'all' as const }, { ...strict, learningAccessMode: 'all' as const }]
+    const grantSets = [[], [grant('courses', 10)], [grant('roadmaps', 1)], [grant('roadmap-nodes', 102)], [grant('lessons', 40)], [grant('courses', 60)]]
+    for (const user of users) for (const grants of grantSets) {
+      const withExtras = buildLearningAccess(user, grants, extras)
+      const without = buildLearningAccess(user, grants, plain)
+      for (const key of ['browseCourseIds', 'accessibleCourseIds', 'browseSectionIds', 'browseRoadmapIds', 'lessonWhere', 'browseLessonWhere'] as const) {
+        expect(withExtras[key], `${JSON.stringify(user)} ${JSON.stringify(grants)} ${key}`).toEqual(without[key])
+      }
+      for (const id of [10, 11, 20, 50, 51, 60, 61, 62]) {
+        expect(withExtras.canAccessCourse(id)).toBe(without.canAccessCourse(id))
+        expect(withExtras.canReadCourseDescription(id)).toBe(without.canReadCourseDescription(id))
+      }
+      for (const id of [1, 2, 3]) expect(withExtras.canReadRoadmapDescription(id)).toBe(without.canReadRoadmapDescription(id))
+    }
+  })
+
+  it('администратор и аноним: как раньше', () => {
+    const admin = buildLearningAccess({ id: 1, role: 'admin' }, [], extras)
+    expect(admin.canBrowseNode(106) && admin.canReadNodeDescription(102)).toBe(true)
+    expect(buildLearningAccess(null, [], extras).browseNodeIds).toEqual([])
+  })
+})

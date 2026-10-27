@@ -34,6 +34,8 @@ function data(overrides: Partial<EditorNodeData> = {}): EditorNodeData {
     bullets: [],
     courseId: null,
     courseName: null,
+    guideIds: [],
+    bootcampIds: [],
     order: 0,
     payloadId: null,
     nodeId: 'n1',

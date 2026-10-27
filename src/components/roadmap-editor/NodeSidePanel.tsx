@@ -84,7 +84,31 @@ type Props = {
   onClose: () => void
 }
 
-type CourseOption = { id: number; title: string; slug: string }
+type CourseOption = { id: number; title: string; slug: string; isBootcamp?: boolean | null }
+type ExtraOption = { id: number; title: string; isPublished?: boolean | null }
+type ExtraOptions = { items: ExtraOption[]; failed: boolean }
+
+const NO_OPTIONS: ExtraOptions = { items: [], failed: false }
+
+/** Список для чекбоксов; сбой загрузки показывается в панели, а не выглядит пустым списком. */
+function extraOptionsLoader(url: string, what: string) {
+  return async (signal: AbortSignal): Promise<ExtraOptions> => {
+    try {
+      const res = await fetch(url, { credentials: 'include', signal })
+      if (!res.ok) throw new Error(`${what}: HTTP ${res.status}`)
+      const json = (await res.json()) as { docs?: ExtraOption[] }
+      if (!Array.isArray(json.docs)) throw new Error(`${what}: ответ без списка`)
+      return { items: json.docs, failed: false }
+    } catch (error) {
+      if (signal.aborted) throw error
+      console.error(`[roadmap-editor] Не удалось загрузить ${what}`, error)
+      return { items: [], failed: true }
+    }
+  }
+}
+
+const loadGuides = extraOptionsLoader('/api/guides?limit=500&sort=title&depth=0&select[title]=true&select[isPublished]=true', 'гайды')
+const loadBootcamps = extraOptionsLoader('/api/courses?where[isBootcamp][equals]=true&limit=100&depth=0&select[title]=true&select[isPublished]=true', 'буткемпы')
 
 export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: Props) {
   const data = node.data as EditorNodeData
@@ -101,6 +125,10 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
   )
 
   const { data: courses, loading: coursesLoading } = useAsyncData<CourseOption[]>(loadCourses, [])
+  const { data: guides, loading: guidesLoading } = useAsyncData<ExtraOptions>(loadGuides, NO_OPTIONS)
+  const { data: bootcamps, loading: bootcampsLoading } = useAsyncData<ExtraOptions>(loadBootcamps, NO_OPTIONS)
+  // Буткемп привязывается только своим списком; уже выбранный оставляем, чтобы его можно было снять.
+  const courseOptions = courses.filter((course) => !course.isBootcamp || course.id === data.courseId)
 
   const update = useCallback(
     (partial: Partial<EditorNodeData>) => { onUpdate(node.id, partial) },
@@ -169,7 +197,16 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
 
         <Field label="Тип узла">
           {(id) => (
-            <select id={id} value={data.nodeType} onChange={(e) => update({ nodeType: e.target.value as EditorNodeData['nodeType'] })} style={selectStyle}>
+            <select
+              id={id}
+              value={data.nodeType}
+              onChange={(e) => {
+                const nodeType = e.target.value as EditorNodeData['nodeType']
+                // Категория — заголовок этапа: гайды и буткемпы на ней не показываются, их снимаем сразу.
+                update(nodeType === 'category' ? { nodeType, guideIds: [], bootcampIds: [] } : { nodeType })
+              }}
+              style={selectStyle}
+            >
               {NODE_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           )}
@@ -234,10 +271,35 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
               style={selectStyle}
             >
               <option value="">Не привязан</option>
-              {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+              {courseOptions.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
             </select>
           )}
         </Field>
+
+        {data.nodeType !== 'category' && (
+          <>
+            <ExtraChecklist
+              label="Буткемпы темы"
+              hint="Видны в теме даже без доступа, с замком. В прогресс не входят."
+              unknownLabel="Буткемп"
+              options={bootcamps}
+              loading={bootcampsLoading}
+              selected={data.bootcampIds}
+              max={3}
+              onChange={(bootcampIds) => update({ bootcampIds })}
+            />
+            <ExtraChecklist
+              label="Гайды темы"
+              hint="Видны в теме даже без доступа, с замком. В прогресс не входят."
+              unknownLabel="Гайд"
+              options={guides}
+              loading={guidesLoading}
+              selected={data.guideIds}
+              max={20}
+              onChange={(guideIds) => update({ guideIds })}
+            />
+          </>
+        )}
 
         <FieldGroup label="Позиция">
           <div style={{ display: 'flex', gap: 8 }}>
@@ -309,6 +371,55 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
 }
 
 const fieldLabelStyle: React.CSSProperties = { display: 'block', marginBottom: 4, fontSize: 12, fontWeight: 500, color: '#888' }
+const hintStyle: React.CSSProperties = { display: 'block', margin: '0 0 6px', fontSize: 11, color: '#777' }
+
+/**
+ * Чекбоксы гайдов или буткемпов темы. Порядок показа — порядок отметки. Выбранный id, которого нет
+ * в загруженном списке (удалён или не влез), остаётся видимым, чтобы его можно было снять.
+ */
+function ExtraChecklist({ label, hint, unknownLabel, options, loading, selected, max, onChange }: {
+  label: string
+  hint: string
+  unknownLabel: string
+  options: ExtraOptions
+  loading: boolean
+  selected: number[]
+  max: number
+  onChange: (ids: number[]) => void
+}) {
+  const known = new Set(options.items.map((item) => item.id))
+  const items = [...options.items, ...selected.filter((id) => !known.has(id)).map((id) => ({ id, title: `${unknownLabel} #${id}`, isPublished: true }))]
+  const full = selected.length >= max
+  return (
+    <FieldGroup label={`${label} (${selected.length})`}>
+      <span style={hintStyle}>{hint}</span>
+      {loading ? (
+        <span style={hintStyle}>Загружаем список…</span>
+      ) : options.failed ? (
+        <span role="alert" style={{ ...hintStyle, color: '#fca5a5' }}>Список не загрузился. Привязки сохранятся как есть.</span>
+      ) : items.length === 0 ? (
+        <span style={hintStyle}>Пока нечего привязать</span>
+      ) : null}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
+        {items.map((item) => {
+          const checked = selected.includes(item.id)
+          return (
+            <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#e0e0e0' }}>
+              <input
+                type="checkbox"
+                checked={checked}
+                disabled={!checked && full}
+                onChange={() => onChange(checked ? selected.filter((id) => id !== item.id) : [...selected, item.id])}
+              />
+              <span>{item.title}{item.isPublished === false ? ' (черновик)' : ''}</span>
+            </label>
+          )
+        })}
+      </div>
+      {full && <span style={hintStyle}>Не больше {max}</span>}
+    </FieldGroup>
+  )
+}
 
 function Field({ label, children }: { label: string; children: (id: string) => React.ReactNode }) {
   const id = useId()

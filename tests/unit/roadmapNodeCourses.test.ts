@@ -91,4 +91,14 @@ describe('состояние узла по его курсам', () => {
 
     expect(summary.comingSoon).toBe(true)
   })
+
+  it('тема из одних гайдов и буткемпов не «готовится», но в прогресс они не входят', () => {
+    const extrasOnly = summarizeNode(null, [], false, 2)
+    expect(extrasOnly.comingSoon).toBe(false)
+    expect(extrasOnly).toMatchObject({ totalLessons: 0, completedLessons: 0, progressPercent: 0 })
+
+    const withCourse = summarizeNode(course({ id: '1', totalLessons: 4, completedCount: 1 }), [], false, 3)
+    expect(withCourse).toMatchObject({ totalLessons: 4, completedLessons: 1, progressPercent: 25, comingSoon: false })
+    expect(summarizeNode(null, [], true, 2).comingSoon).toBe(false)
+  })
 })

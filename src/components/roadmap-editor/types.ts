@@ -12,6 +12,9 @@ export type EditorNodeData = {
   bullets: string[]
   courseId: number | null
   courseName: string | null
+  /** Гайды и буткемпы темы в порядке показа. У категории всегда пустые. */
+  guideIds: number[]
+  bootcampIds: number[]
   order: number
   payloadId: number | null
   nodeId: string

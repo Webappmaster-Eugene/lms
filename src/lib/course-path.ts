@@ -7,3 +7,6 @@ export function coursePath(course: { slug: string; isBootcamp?: boolean | null }
 
 /** Курсы без буткемпов. `exists: false` — строка без значения не должна пропасть из каталога. */
 export const notBootcamp: Where = { or: [{ isBootcamp: { equals: false } }, { isBootcamp: { exists: false } }] }
+
+/** Закрытый буткемп на карте ведёт сюда: адрес самого буткемпа ученику без доступа не раскрывается. */
+export const BOOTCAMP_LOCKED_PATH = '/bootcamp?locked=1'

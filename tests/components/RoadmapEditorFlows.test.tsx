@@ -23,7 +23,7 @@ const ROADMAP_ID = 7
 function editorNode(id: string, data: Partial<EditorNodeData> = {}, position = { x: 120.4, y: 80.6 }): EditorNode {
   return {
     id, type: data.nodeType ?? 'topic', position,
-    data: { label: `Узел ${id}`, nodeType: 'topic', icon: null, description: null, stage: null, color: null, bullets: [], courseId: null, courseName: null, order: 1, payloadId: 10, nodeId: id, ...data },
+    data: { label: `Узел ${id}`, nodeType: 'topic', icon: null, description: null, stage: null, color: null, bullets: [], courseId: null, courseName: null, guideIds: [], bootcampIds: [], order: 1, payloadId: 10, nodeId: id, ...data },
   } as EditorNode
 }
 
@@ -40,6 +40,8 @@ function api({ nodes = [payloadNode('n1', 1, 'React'), payloadNode('n2', 2, 'Red
     if (url.includes('/api/roadmaps/')) return roadmapOk ? Response.json({ id: ROADMAP_ID, title: 'Frontend React', slug: 'frontend-react' }) : new Response('нет', { status: 404 })
     if (url.includes('/api/roadmap-nodes')) return Response.json({ docs: nodes })
     if (url.includes('/api/roadmap-edges')) return Response.json({ docs: edges })
+    if (url.includes('/api/guides')) return Response.json({ docs: [] })
+    if (url.includes('[isBootcamp]')) return Response.json({ docs: [] })
     if (url.includes('/api/courses')) return Response.json({ docs: [{ id: 51, title: 'Глубокий React', slug: 'deep-react' }, { id: 52, title: 'Redux Toolkit', slug: 'rtk' }] })
     return Response.json({})
   }

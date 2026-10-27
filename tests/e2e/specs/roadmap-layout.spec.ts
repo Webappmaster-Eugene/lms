@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test'
+import { CONTENT } from '../fixtures/data'
 import { storageStateOf } from '../fixtures/env'
 
 async function assertGeometry(canvas: Locator) {
@@ -84,5 +85,43 @@ test.describe('Аккуратная геометрия роадмапа', () => 
       for (const id of nodes.reverse()) await page.request.delete(`/api/roadmap-nodes/${id}`)
       if (roadmapId) await page.request.delete(`/api/roadmaps/${roadmapId}`)
     }
+  })
+})
+
+test.describe('гайды и буткемпы в теме карты', () => {
+  test.use({ storageState: storageStateOf('student') })
+
+  test('закрытый буткемп виден с замком и ведёт на экран без доступа, гайды — с отметкой, в прогресс не входят', async ({ page }) => {
+    const { label, nodeId } = CONTENT.extrasTopic
+    await page.goto(`/roadmaps/${CONTENT.roadmap.slug}?view=list`)
+    // Прогресс и счётчики считают только курс темы «Веб-основы».
+    await expect(page.getByText(`1 курс`, { exact: true })).toBeVisible()
+    const summary = page.locator('summary').filter({ hasText: label })
+    await summary.click()
+    const topic = summary.locator('..')
+    const bootcamp = topic.getByRole('link', { name: CONTENT.bootcamp.title, exact: true })
+    await expect(bootcamp).toHaveAttribute('href', '/bootcamp?locked=1')
+    await expect(topic.getByText('Доступ не назначен', { exact: true })).toHaveCount(1)
+    await expect(topic.getByRole('link', { name: CONTENT.guide.title, exact: true })).toHaveAttribute('href', `/guides/${CONTENT.guide.slug}`)
+    await expect(topic.getByRole('link', { name: CONTENT.aiGuide.title, exact: true })).toBeVisible()
+    await expect(topic.getByText('Прочитан', { exact: true })).toHaveCount(1)
+    await expect(topic.getByText(CONTENT.draftGuide.title)).toHaveCount(0)
+    await expect(topic.getByText('В прогресс роадмапа не входят')).toBeVisible()
+    await expect(topic.getByText('Курсов по этой теме пока нет.')).toHaveCount(0)
+    // Адрес закрытого буткемпа в страницу не попадает.
+    expect(await page.content()).not.toContain(CONTENT.bootcamp.slug)
+
+    await page.goto(`/roadmaps/${CONTENT.roadmap.slug}?view=map`)
+    const canvas = page.locator('[data-roadmap-canvas]')
+    await assertGeometry(canvas)
+    const card = canvas.locator(`.react-flow__node[data-id="${nodeId}"]`)
+    await expect(card.getByText('Буткемп', { exact: true })).toBeVisible()
+    await expect(card.getByText('Гайды · 2', { exact: true })).toBeVisible()
+    await expect(card.locator('svg[role="img"][aria-label="Доступ не назначен"]')).toHaveCount(1)
+    await canvas.getByRole('button', { name: `Открыть тему «${label}»`, exact: true }).click()
+    const panel = canvas.getByRole('complementary', { name: `Тема «${label}»` })
+    await expect(panel.getByText('Материалы готовятся')).toHaveCount(0)
+    await panel.getByRole('link', { name: CONTENT.bootcamp.title, exact: true }).click()
+    await expect(page).toHaveURL((url) => url.pathname === '/bootcamp' && url.searchParams.get('locked') === '1')
   })
 })

@@ -13,7 +13,11 @@ export type LearningGrant = {
 export type LearningCourseMetadata = { id: number; roadmap: unknown; roadmapNode?: unknown; isPublished?: boolean | null; assignedOnly?: boolean | null }
 export type LearningSectionMetadata = { id: number; course: unknown; isPublished?: boolean | null }
 export type LearningLessonMetadata = { id: number; course: unknown; section?: unknown; isPublished?: boolean | null }
-export type LearningNodeMetadata = { id: number; roadmap: unknown; course?: unknown }
+/**
+ * `guides` — только опубликованные гайды темы, `bootcamps` — буткемпы, привязанные к ней полем узла.
+ * Гайды и буткемпы показывают тему без курса, но не открывают ни её курсы, ни саму карту.
+ */
+export type LearningNodeMetadata = { id: number; roadmap: unknown; course?: unknown; guides?: number[]; bootcamps?: number[] }
 export type LearningPolicyMetadata = {
   courses: LearningCourseMetadata[]
   sections: LearningSectionMetadata[]
@@ -223,6 +227,18 @@ export function buildLearningAccess(
       browseRoadmaps.add(roadmapId)
     }
   }
+  // Гайды и буткемпы темы видны в ней и без курса, закрытые — с замком. Карту они не открывают:
+  // тема появляется, только если её роадмап уже открыт (в каталоге открыты все опубликованные).
+  const extrasAdmitted = new Set<number>()
+  for (const node of nodes.values()) {
+    const roadmapId = learningRelationId(node.roadmap)
+    if (!user || roadmapId === null || !browseRoadmaps.has(roadmapId) || browseNodes.has(node.id)) continue
+    const hasExtras = (node.guides?.length ?? 0) > 0 || (node.bootcamps ?? []).some((id) => courses.has(id))
+    if (hasExtras && effect('roadmap-nodes', node.id) !== 'deny') {
+      browseNodes.add(node.id)
+      extrasAdmitted.add(node.id)
+    }
+  }
   // Описание родителя может перечислять всё его содержимое, включая неназначенное. Поэтому при
   // скрытом каталоге оно положено лишь тому, кому открыт весь родитель. Назначение отдельных
   // уроков этого не даёт: полный список уроков политика не загружает и полноту доказать не может.
@@ -258,7 +274,8 @@ export function buildLearningAccess(
   }
   for (const node of nodes.values()) {
     const roadmapId = learningRelationId(node.roadmap)
-    if (roadmapId !== null && !browseNodes.has(node.id)) partialRoadmaps.add(roadmapId)
+    // Тема, видимая лишь из-за гайдов и буткемпов, открыта не целиком: описание карты остаётся как было.
+    if (roadmapId !== null && (!browseNodes.has(node.id) || extrasAdmitted.has(node.id))) partialRoadmaps.add(roadmapId)
   }
   const wholeRoadmaps = new Set([...browseRoadmaps].filter((id) => !partialRoadmaps.has(id)))
   const wholeNodes = new Set([...browseNodes].filter((id) => {
@@ -282,7 +299,9 @@ export function buildLearningAccess(
     canBrowseNode: id => admin || browseNodes.has(id),
     canBrowseLessonMetadata: lesson => isPublishedLesson(lesson) && (inCatalog(learningRelationId(lesson.course)) || canAccessLessonMetadata(lesson)),
     canAccessCourse: id => admin || accessible.has(id), canAccessLessonMetadata,
-    canReadRoadmapDescription: describes(wholeRoadmaps), canReadNodeDescription: describes(wholeNodes),
+    canReadRoadmapDescription: describes(wholeRoadmaps),
+    // Описание темы, открытой только гайдами и буткемпами, может перечислять её закрытые курсы.
+    canReadNodeDescription: (id) => admin || wholeNodes.has(id) || (catalogVisibility === 'catalog' && !extrasAdmitted.has(id)),
     canReadCourseDescription: describes(wholeCourses), canReadSectionDescription: describes(wholeSections) }
 
 }

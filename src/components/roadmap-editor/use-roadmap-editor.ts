@@ -100,6 +100,11 @@ function resolveRelationId(ref: unknown): number | null {
   return null
 }
 
+/** hasMany-связь приходит числами или объектами в зависимости от depth. */
+function resolveRelationIds(refs: unknown): number[] {
+  return Array.isArray(refs) ? refs.flatMap((ref) => resolveRelationId(ref) ?? []) : []
+}
+
 function transformNodes(raw: PayloadRoadmapNode[]): {
   nodes: EditorNode[]
   nodeIdToPayloadId: Map<string, number>
@@ -133,6 +138,8 @@ function transformNodes(raw: PayloadRoadmapNode[]): {
         bullets,
         courseId,
         courseName,
+        guideIds: n.nodeType === 'category' ? [] : resolveRelationIds(n.guides),
+        bootcampIds: n.nodeType === 'category' ? [] : resolveRelationIds(n.bootcamps),
         order: n.order ?? 0,
         payloadId: n.id,
         nodeId: n.nodeId,
@@ -488,6 +495,8 @@ export function useRoadmapEditor(roadmapId: number): EditorState {
           bullets: [],
           courseId: null,
           courseName: null,
+          guideIds: [],
+          bootcampIds: [],
           order: 0,
           payloadId: null,
           nodeId: id,

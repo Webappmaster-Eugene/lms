@@ -34,7 +34,8 @@ export function RoadmapSubtopicNode({ data }: NodeProps) {
       {isLocked && (
         <Lock
           className={cn('h-4 w-4 shrink-0', classes.accent)}
-          aria-label={nodeData.comingSoon ? 'Материалы готовятся' : 'Пройдите предыдущие курсы'}
+          role="img"
+          aria-label={nodeData.comingSoon ? 'Материалы готовятся' : nodeData.totalLessons === 0 ? 'Доступ не назначен' : 'Пройдите предыдущие курсы'}
         />
       )}
       {isCompleted && <CheckCircle2 className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />}

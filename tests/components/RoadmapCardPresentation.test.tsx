@@ -13,6 +13,7 @@ const baseData: RoadmapNodeData = {
   nodeType: 'topic',
   courseSlug: null,
   courses: [],
+  extras: [],
   icon: null,
   description: null,
   status: 'available',

@@ -159,7 +159,8 @@ function RoadmapCanvas({ nodes, edges, nextStepNodeId = null, managementRoadmapI
     const match =
       topics.find((n) => n.data.label.toLowerCase() === needle) ??
       topics.find((n) => n.data.label.toLowerCase().includes(needle)) ??
-      topics.find((n) => n.data.courses.some((c) => c.title.toLowerCase().includes(needle)))
+      topics.find((n) => n.data.courses.some((c) => c.title.toLowerCase().includes(needle))) ??
+      topics.find((n) => n.data.extras.some((extra) => extra.title.toLowerCase().includes(needle)))
     setNotFound(!match)
     if (match) focusNode(match.id)
   }

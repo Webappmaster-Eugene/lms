@@ -249,10 +249,28 @@ for (const guide of [e2eGuide, aiGuide]) {
 }
 // Первый гайд студент уже открывал: «Прочитан» в списке не зависит от порядка тестов.
 await payload.create({ collection: 'guide-reads', data: { user: created.student, guide: e2eGuide.id } })
-await payload.create({
+const draftGuide = await payload.create({
   collection: 'guides',
   context: quiet,
   data: { title: CONTENT.draftGuide.title, slug: CONTENT.draftGuide.slug, summary: 'Ученики его не видят', markdown: 'Черновик.', order: 2, isPublished: false },
+})
+
+// Тема карты из гайдов и буткемпа: закрытое видно с замком, в прогресс роадмапа не входит.
+const bootcamp = await payload.create({
+  collection: 'courses',
+  data: { title: CONTENT.bootcamp.title, slug: CONTENT.bootcamp.slug, roadmap: roadmap.id, order: 2, isPublished: true, isBootcamp: true },
+})
+const extrasNode = await payload.create({
+  collection: 'roadmap-nodes',
+  data: {
+    nodeId: CONTENT.extrasTopic.nodeId, label: CONTENT.extrasTopic.label, nodeType: 'topic', roadmap: roadmap.id,
+    positionX: 0, positionY: 400, order: 2, stage: 'stage1', color: 'white', icon: 'rocket',
+    guides: [e2eGuide.id, aiGuide.id, draftGuide.id], bootcamps: [bootcamp.id],
+  },
+})
+await payload.create({
+  collection: 'roadmap-edges',
+  data: { edgeId: 'e2e-edge-2', roadmap: roadmap.id, source: htmlNode.id, target: extrasNode.id },
 })
 
 for (const [index, item] of CONTENT.faq.entries()) {

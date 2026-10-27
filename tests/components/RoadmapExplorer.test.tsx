@@ -41,6 +41,7 @@ function data(overrides: Partial<RoadmapNodeData> = {}): RoadmapNodeData {
     nodeType: 'topic',
     courseSlug: 'react-basics',
     courses: [course()],
+    extras: [],
     icon: null,
     description: null,
     status: 'in-progress',

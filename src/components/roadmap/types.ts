@@ -1,6 +1,9 @@
 import type { Node, Edge, BuiltInNode } from '@xyflow/react'
 import type { NodeColor, NodeStage } from './stage-colors'
 import type { LessonLink } from '@/lib/roadmap-next-step'
+import type { NodeExtra } from '@/lib/roadmap-node-extras'
+
+export type { NodeExtra }
 
 export type NodeStatus = 'locked' | 'available' | 'in-progress' | 'completed'
 
@@ -32,10 +35,12 @@ export type RoadmapNodeData = {
   courseSlug: string | null
   /** Все курсы темы — по одной теме их может быть несколько. */
   courses: NodeCourse[]
+  /** Буткемпы и гайды темы, в том числе закрытые. В прогресс и следующий шаг не входят. */
+  extras: NodeExtra[]
   icon: string | null
   description: string | null
   status: NodeStatus
-  /** Тема есть на карте, но материалов по ней пока нет. */
+  /** Тема есть на карте, но материалов по ней пока нет: ни уроков, ни гайдов, ни буткемпов. */
   comingSoon: boolean
   progressPercent: number
   totalLessons: number

@@ -238,6 +238,23 @@ describe('редактор роадмапа', () => {
       expect(node.data.bullets).toEqual(['пункт'])
     })
 
+    it('гайды и буткемпы темы читаются и числами, и объектами, у категории отбрасываются', async () => {
+      const { result } = await openEditor({
+        nodes: [
+          payloadNode('n1', 1, { guides: [3, { id: 1, title: 'Гайд' }], bootcamps: [{ id: 9 }] }),
+          payloadNode('n2', 2),
+          payloadNode('c1', 3, { nodeType: 'category', guides: [5], bootcamps: [6] }),
+        ],
+        edges: [],
+      })
+      const data = (id: string) => result.current.nodes.find((node) => node.id === id)?.data
+
+      expect(data('n1')).toMatchObject({ guideIds: [3, 1], bootcampIds: [9] })
+      // Ученику поля не отдаются вовсе; у админа пустая связь может прийти null.
+      expect(data('n2')).toMatchObject({ guideIds: [], bootcampIds: [] })
+      expect(data('c1')).toMatchObject({ guideIds: [], bootcampIds: [] })
+    })
+
     it('пустые пункты списка отбрасываются', async () => {
       const { result } = await openEditor({
         nodes: [payloadNode('n1', 1, { bullets: [{ text: 'есть' }, { text: '' }, {}] })],
@@ -448,6 +465,14 @@ describe('редактор роадмапа', () => {
 
       expect(result.current.nodes[0].data.label).toBe(label)
       expect(result.current.nodes[0].type).toBe(type)
+    })
+
+    it('новая тема начинается без гайдов и буткемпов', async () => {
+      const { result } = await openEditor({ nodes: [], edges: [] })
+
+      act(() => result.current.addNode('topic', { x: 0, y: 0 }))
+
+      expect(result.current.nodes[0].data).toMatchObject({ guideIds: [], bootcampIds: [] })
     })
 
     it('у двух новых узлов разные идентификаторы', async () => {

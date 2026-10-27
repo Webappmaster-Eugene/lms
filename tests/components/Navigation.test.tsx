@@ -288,6 +288,7 @@ describe('карта навыков', () => {
           nodeType: 'topic',
           courseSlug: 'deep-react',
           courses: [],
+          extras: [],
           icon: null,
           description: null,
           status: 'available',

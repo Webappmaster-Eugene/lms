@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import Link from 'next/link'
 
 import { NodeCourseList } from './NodeCourseList'
+import { NodeExtraList } from './NodeExtraList'
 import { STAGE_TITLES } from './stage-colors'
 import type { RoadmapNodeData } from './types'
 
@@ -87,6 +88,12 @@ export function RoadmapNodePanel({ data, onClose, managementRoadmapId, nodeId }:
           Курсов по этой теме пока нет — тема останется на карте, чтобы было видно, что изучать дальше.
         </p>
       ) : null}
+
+      {data.extras.length > 0 && (
+        <div className="mt-4">
+          <NodeExtraList extras={data.extras} />
+        </div>
+      )}
 
       {data.bullets.length > 0 && (
         <section className="mt-4">
