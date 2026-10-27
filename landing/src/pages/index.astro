@@ -56,7 +56,7 @@ import { AUTHOR_URL, LMS_URL } from '../config'
             <li><a href="#trainer"><span>4</span><strong>Закрепите на практике</strong><small>Проверьте код и отправьте решение</small></a></li>
           </ol>
         </div>
-        <div class="reading-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 3 14 9-7 1-3 7z" /></svg><p><strong>Скриншоты можно смотреть по шагам.</strong> Нажмите «Показать шаги» — инструкция приблизит нужное место на экране и по очереди объяснит, что делать.</p></div>
+        <div class="reading-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 3 14 9-7 1-3 7z" /></svg><p><strong>Скриншоты можно смотреть по шагам.</strong> <span class="note-wide">Нажмите «Показать шаги» — инструкция приблизит нужное место на экране и по очереди объяснит, что делать.</span><span class="note-narrow">Снимок сразу приближен к первому шагу. Чтобы перейти к следующему, нажмите стрелку над снимком или проведите по нему пальцем. Кнопка «Весь экран» откроет снимок крупно, его можно прокручивать в любую сторону.</span></p></div>
         <p class="sample-note">На скриншотах — демонстрационный аккаунт и учебные примеры. Названия ваших курсов и количество материалов могут отличаться.</p>
       </section>
       {CHAPTERS.map((chapter, i) => (
@@ -89,7 +89,7 @@ import { AUTHOR_URL, LMS_URL } from '../config'
     </main>
   </div>
   <dialog class="image-dialog" aria-labelledby="image-dialog-title">
-    <div class="dialog-toolbar"><h2 id="image-dialog-title">Скриншот платформы</h2><button type="button" data-close-dialog>Закрыть <span aria-hidden="true">×</span></button></div>
+    <div class="dialog-toolbar"><h2 id="image-dialog-title">Скриншот платформы</h2><div class="dialog-actions"><button type="button" class="dialog-fit" data-dialog-fit>Целиком</button><button type="button" data-close-dialog>Закрыть <span aria-hidden="true">×</span></button></div></div>
     <div class="dialog-image-scroll"><img alt="" /></div>
     <p data-dialog-description></p>
   </dialog>

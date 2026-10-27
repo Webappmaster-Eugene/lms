@@ -144,6 +144,53 @@ test('путь недели: скриншоты загружаются, шаг �
   expect(`${await page.title()} ${await page.locator('meta[name="description"]').getAttribute('content')}`).not.toMatch(/[—–]/)
 })
 
+test('путь недели на телефоне: снимок крупно у шага, листание, весь экран и касание статичного снимка', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${PAGE}#path-review`)
+  const review = page.locator('#path-review [data-walkthrough]')
+  const count = review.locator('[data-focus-count]')
+  await expect(review).toHaveClass(/focus-mode/)
+  await expect(count).toHaveText('Шаг 1 из 3')
+  await expect(review.locator('.screen-canvas')).not.toHaveCSS('transform', 'none')
+  await expect(review.getByRole('button', { name: 'Показать шаги' })).toBeHidden()
+  // Кадр во всю ширину экрана.
+  expect((await review.boundingBox())?.width).toBe(390)
+
+  await review.getByRole('button', { name: 'Дальше' }).click()
+  await expect(count).toHaveText('Шаг 2 из 3')
+  await expect(review.getByRole('button', { name: 'Шаг 2: Ваш ответ' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(review.locator('[data-step="1"] p')).toBeVisible()
+  await expect(review.locator('[data-step="0"] p')).toBeHidden()
+  await review.getByRole('button', { name: 'Назад' }).click()
+  await expect(count).toHaveText('Шаг 1 из 3')
+  await expect(review.getByRole('button', { name: 'Назад' })).toHaveAttribute('aria-disabled', 'true')
+  // Метка третьего шага в середине снимка: окно должно открыться прокрученным к ней.
+  await review.getByRole('button', { name: 'Дальше' }).click()
+  await review.getByRole('button', { name: 'Дальше' }).click()
+  await expect(count).toHaveText('Шаг 3 из 3')
+
+  const full = review.getByRole('button', { name: 'Весь экран' })
+  await full.click()
+  const dialog = page.locator('.image-dialog')
+  await expect(dialog).toBeVisible()
+  await expect.poll(() => dialog.locator('.dialog-image-scroll').evaluate((element) => element.scrollLeft + element.scrollTop)).toBeGreaterThan(0)
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect(full).toBeFocused()
+
+  const extra = page.locator('#path-checks .bc-extra')
+  await extra.locator('img').click()
+  await expect(dialog).toBeVisible()
+  await expect(dialog.locator('img')).toHaveAttribute('src', /bc-gitlab-pipeline\.webp$/)
+  await page.keyboard.press('Escape')
+  await expect(extra.getByRole('button', { name: 'Увеличить' })).toBeFocused()
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0)
+  // Подсказка про листание видна только на телефоне, длинного тире нет и в ней.
+  await expect(page.locator('.bc-sample')).toContainText('проведите по нему пальцем')
+  expect(await page.locator('body').innerText()).not.toMatch(/[—–]/)
+})
+
 test('оплата, качество, политика и согласие: свои адреса в карте сайта, ссылки со страницы буткемпа, реквизиты', async ({ page, request }) => {
   await page.goto(PAGE)
   await expect(page.locator('#lead-consent + label a')).toHaveAttribute('href', '/consent/')

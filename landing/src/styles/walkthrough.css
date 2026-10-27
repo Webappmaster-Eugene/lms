@@ -49,9 +49,12 @@
 .dialog-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 20px; background: var(--surface); position: sticky; top: 0; z-index: 1; }
 .dialog-toolbar h2 { font-size: 16px; }
 .dialog-toolbar button { min-height: 44px; padding: 7px 13px; border: 1px solid #bdcfc3; border-radius: 6px; background: white; font-size: 13px; }
+.dialog-actions { display: flex; align-items: center; gap: 8px; }
 .dialog-image-scroll { overflow: auto; }
-.dialog-image-scroll img { min-width: 900px; width: 100%; }
+.dialog-image-scroll img { min-width: 900px; width: 100%; height: auto; }
 .image-dialog>p { padding: 16px 20px; font-size: 14px; }
+/* Режим «фрагмент у шага» на телефоне: элементы для него видны только внутри .focus-mode. */
+.focus-count, .focus-step, .zoom-narrow, .focus-dots, .dialog-fit { display: none; }
 @media (max-width: 1200px) {
   .screen-steps { grid-template-columns: 1fr; }
   .screen-steps li { padding: 16px 18px; }
@@ -69,14 +72,52 @@
   .pointer-arrow { width: 36px; height: 38px; bottom: 27px; }
   .arrow-below .pointer-arrow { top: 27px; }
   .walkthrough-mobile { display: block; }
-  .walkthrough-mobile .screen-image { max-width: 280px; margin: 20px auto; }
+  .walkthrough-mobile .screen-image { max-width: 320px; margin: 20px auto; }
   .walkthrough-mobile .screen-steps { padding: 0 16px 16px; }
   .walkthrough-mobile .screen-steps p { margin-left: 0; }
-  .dialog-toolbar { padding: 12px; }
+  /* Класс ставит walkthrough.ts: без JS остаются целый скриншот и все шаги. */
+  .focus-mode { overflow: clip; }
+  .focus-mode .screen-toolbar { flex-wrap: nowrap; padding: 8px 16px; }
+  .focus-mode [data-tour-label], .focus-mode .play-guide, .focus-mode .zoom-wide { display: none; }
+  .focus-mode .focus-count { display: block; color: var(--ink); font-size: 14px; font-weight: 700; white-space: nowrap; }
+  .focus-mode .zoom-narrow { display: inline; }
+  .focus-mode .screen-actions button { min-height: 44px; font-size: 13px; padding: 6px 12px; }
+  .focus-mode .screen-actions .focus-step { display: inline-grid; place-items: center; width: 44px; padding: 0; }
+  .focus-step svg { width: 20px; height: 20px; stroke-width: 2.2; }
+  .focus-mode .focus-step[aria-disabled="true"], .focus-mode .focus-step[aria-disabled="true"]:hover { color: #8fa39a; border-color: var(--line); cursor: default; }
+  /* Кадр 4:3 вмещает и фрагмент, и текст шага на одном экране телефона. clip, а не hidden:
+     скрытый кадр браузер прокрутил бы к сфокусированной метке. Предел высоты для телефона боком,
+     где 4:3 выше экрана; svh не меняется, когда прячется адресная строка. Ширина задана явно,
+     иначе aspect-ratio перенёс бы предел высоты на ширину и сузил кадр. */
+  .focus-mode .screen-image { width: 100%; aspect-ratio: 4 / 3; max-height: 70vh; max-height: 70svh; overflow: clip; touch-action: pan-y pinch-zoom; background: var(--surface); }
+  .focus-mode .screen-canvas { transform: translate(var(--shift-x, 0), var(--shift-y, 0)) scale(var(--zoom, 1)); }
+  .focus-mode .hotspot { transform: translate(-50%, -50%) scale(calc(1 / var(--zoom, 1))); }
+  .focus-mode .hotspot[data-active="false"] { opacity: .7; }
+  .focus-mode .focus-dots { display: flex; justify-content: center; gap: 8px; padding: 14px 0 6px; border-top: 1px solid var(--line); }
+  .focus-dots span { width: 8px; height: 8px; border-radius: 4px; background: #c3d4ca; transition: width .3s, background-color .3s; }
+  .focus-dots span[data-active="true"] { width: 22px; background: var(--accent); }
+  /* Шаги в одной ячейке сетки: высота по самому длинному, и текст под кадром не прыгает при листании. */
+  .focus-mode .screen-steps { display: grid; border-top: none; }
+  .focus-mode .screen-steps li, .focus-mode .screen-steps li[data-active] { grid-area: 1 / 1; padding: 10px 16px 18px; border: none; background: none; }
+  .focus-mode .screen-steps li[data-active="false"] { visibility: hidden; }
+  .focus-mode .screen-steps li::before { display: none; }
+  /* На странице буткемпа у h4 остаются отступы браузера: на узком экране они разрывают заголовок и текст шага. */
+  .screen-steps h3, .screen-steps h4 { margin: 0; }
+  figure:has([data-zoom-static]) img { cursor: zoom-in; }
+  .image-dialog { width: 100vw; height: 100vh; width: 100dvw; height: 100dvh; max-width: none; max-height: none; margin: 0; border: none; border-radius: 0; overflow: hidden; }
+  .image-dialog[open] { display: flex; flex-direction: column; }
+  .dialog-toolbar { padding: 8px 12px; gap: 12px; }
   .dialog-toolbar h2 { font-size: 13px; }
-  .dialog-image-scroll img { min-width: 1000px; }
+  .dialog-toolbar .dialog-fit { display: block; }
+  .dialog-image-scroll { flex: 1; min-height: 0; overscroll-behavior: contain; }
+  .dialog-image-scroll img { width: max(var(--dialog-width, 100%), 100%); min-width: 0; max-width: none; }
+  .image-dialog.fit .dialog-image-scroll img { width: 100%; }
+  .image-dialog>p { flex-shrink: 0; max-height: 30dvh; overflow-y: auto; padding: 10px 16px 14px; border-top: 1px solid var(--line); }
+}
+@media (max-width: 560px) {
+  .screen-steps p, .screen-steps button { font-size: 15px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .screen-canvas, .hotspot { transition: none; }
+  .screen-canvas, .hotspot, .focus-dots span { transition: none; }
   .touring .hotspot[data-active="true"] { animation: none; }
 }

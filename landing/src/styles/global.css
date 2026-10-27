@@ -98,6 +98,7 @@ main { min-width: 0; padding: 0 clamp(28px, 4vw, 64px); background: var(--white)
 .reading-note svg { width: 22px; height: 22px; flex-shrink: 0; color: var(--accent); margin-top: 3px; }
 .reading-note p { font-size: 14px; color: var(--muted); }
 .reading-note strong { color: var(--ink); }
+.note-narrow { display: none; }
 .sample-note { font-size: 12px; color: var(--muted); margin: 12px 0 0 34px; }
 .chapter { border-top: 1px solid var(--line); padding: 42px 0; }
 .chapter-heading { display: flex; gap: 16px; align-items: flex-start; }
@@ -207,6 +208,9 @@ figcaption:has(.static-zoom) { display: flex; gap: 12px; align-items: center; ju
   .quick-start { margin-top: 26px; padding: 20px; }
   .quick-start ol { gap: 20px; }
   .reading-note p { font-size: 14px; }
+  /* На телефоне вместо «Показать шаги» листание: подсказка говорит о нём. */
+  .note-wide { display: none; }
+  .note-narrow { display: inline; }
   .sample-note { margin-left: 0; }
   .chapter { padding: 32px 0; }
   .chapter-heading { gap: 12px; }
@@ -223,9 +227,17 @@ figcaption:has(.static-zoom) { display: flex; gap: 12px; align-items: center; ju
   .site-footer { flex-direction: column; gap: 18px; }
 }
 @media (max-width: 560px) {
+  /* Под липкими шапкой (60) и строкой оглавления (48 и рамка) заголовок раздела виден целиком. */
+  html { scroll-padding-top: 124px; }
   .not-found { margin: 32px auto; padding: 24px 20px; }
   .not-found h1 { font-size: 30px; }
-  .site-header { padding: 0 18px; }
+  .site-header { height: 60px; padding: 0 16px; }
+  .contents { top: 60px; max-height: calc(100dvh - 60px); }
+  .contents summary { min-height: 48px; padding: 10px 16px; }
+  .contents-panel { padding: 0 16px 16px; }
+  main { padding: 0 16px; }
+  /* Скриншот во всю ширину экрана: на телефоне каждый пиксель кадра работает на читаемость. */
+  main .walkthrough { margin-left: -16px; margin-right: -16px; border-left: none; border-right: none; border-radius: 0; }
   .header-links .author-link { display: none; }
   .mobile-author { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-size: 13px; margin-top: 8px; text-decoration: underline; text-underline-offset: 4px; }
   .contents nav { grid-template-columns: 1fr; }
@@ -234,8 +246,6 @@ figcaption:has(.static-zoom) { display: flex; gap: 12px; align-items: center; ju
   .site-header { padding: 0 14px; }
   .platform-text { display: none; }
   .platform-text-small { display: inline; }
-  main { padding: 0 18px; }
-  .contents summary, .contents-panel { padding-left: 18px; padding-right: 18px; }
   .chapter-heading h2 { font-size: 24px; }
   .quick-start { padding: 18px 16px; }
 }

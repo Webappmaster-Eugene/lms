@@ -131,7 +131,7 @@ const extraSize = (screen: string) => {
         <p>Неделя устроена как работа над задачей в команде. В субботу двухчасовое занятие: теория, постановка задачи и разбор примера. В воскресенье полтора часа: типовые ошибки, упражнение и ответы на вопросы.</p>
         <p>Между занятиями вы читаете методичку и делаете задачу в своём проекте. Дальше решение проходит тот же путь, что код в рабочей команде: merge request, автоматические проверки, ревью и слияние. Ниже этот путь на настоящих экранах.</p>
       </div>
-      <p class="bc-sample">На скриншотах демонстрационный ученик сдаёт первую неделю. Нажмите «Показать шаги», чтобы пройти по экрану с подсказками, или «Увеличить», чтобы рассмотреть его целиком.</p>
+      <p class="bc-sample">На скриншотах демонстрационный ученик сдаёт первую неделю. <span class="note-wide">Нажмите «Показать шаги», чтобы пройти по экрану с подсказками, или «Увеличить», чтобы рассмотреть его целиком.</span><span class="note-narrow">Снимок сразу приближен к первому шагу. Чтобы перейти к следующему, нажмите стрелку над снимком или проведите по нему пальцем. Кнопка «Весь экран» откроет снимок крупно.</span></p>
       <ol class="bc-path">
         {PATH.map((chapter) => (
           <li class="bc-path-chapter" id={chapter.id}>
@@ -290,7 +290,7 @@ const extraSize = (screen: string) => {
 
   <BootcampFooter />
   <dialog class="image-dialog" aria-labelledby="image-dialog-title">
-    <div class="dialog-toolbar"><h2 id="image-dialog-title">Скриншот</h2><button type="button" data-close-dialog>Закрыть <span aria-hidden="true">×</span></button></div>
+    <div class="dialog-toolbar"><h2 id="image-dialog-title">Скриншот</h2><div class="dialog-actions"><button type="button" class="dialog-fit" data-dialog-fit>Целиком</button><button type="button" data-close-dialog>Закрыть <span aria-hidden="true">×</span></button></div></div>
     <div class="dialog-image-scroll"><img alt="" /></div>
     <p data-dialog-description></p>
   </dialog>

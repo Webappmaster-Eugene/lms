@@ -140,6 +140,7 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
 
 /* Путь недели: главы идут по порядку, поэтому номер у заголовка. */
 .bc-sample { margin-top: 26px; font-size: 15px; color: var(--muted); }
+.note-narrow { display: none; }
 .bc-path { list-style: none; margin: 0; padding: 0; counter-reset: path; }
 .bc-path-chapter { margin-top: 56px; }
 .bc-path-chapter > h3 { display: flex; align-items: center; gap: 14px; font-size: clamp(21px, 2.2vw, 25px); }
@@ -210,8 +211,18 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
   .bc-hero, .bc-two, .bc-mentor, .bc-apply, .bc-columns-three, .bc-audience, .bc-pains > div { grid-template-columns: minmax(0, 1fr); }
   .bc-hero { gap: 40px; padding: 44px 0 56px; }
 }
+@media (max-width: 800px) {
+  /* На телефоне вместо «Показать шаги» листание: подсказка говорит о нём. */
+  .note-wide { display: none; }
+  .note-narrow { display: inline; }
+}
 @media (max-width: 640px) {
   body { font-size: 16px; }
+  .bc-header { padding: 0 16px; }
+  main { padding: 0 16px; }
+  .bc-footer { padding-left: 16px; padding-right: 16px; }
+  /* Скриншот пути во всю ширину экрана: на телефоне каждый пиксель кадра работает на читаемость. */
+  .bc-path .walkthrough { margin-left: -16px; margin-right: -16px; border-left: none; border-right: none; border-radius: 0; }
   .bc-brand-product { display: none; }
   .bc-section { padding: 52px 0; }
   .bc-facts, .bc-columns { grid-template-columns: minmax(0, 1fr); }

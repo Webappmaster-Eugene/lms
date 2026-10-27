@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 
 import { LANDING_URL, LANDING_USE } from '../fixtures/env'
 
@@ -40,7 +40,8 @@ test('шаги выбираются с экрана, показ можно ос�
 test('показ шагов сразу приближает первый шаг, сам переходит дальше и в конце возвращает общий вид', async ({ page }) => {
   await page.clock.install()
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  await page.setViewportSize({ width: 390, height: 844 })
+  // На телефоне показа шагов нет, его заменяет листание: см. тест ниже.
+  await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/#trainer')
   const guide = page.locator('#trainer [data-walkthrough]')
   const label = guide.locator('[data-tour-label]')
@@ -57,6 +58,93 @@ test('показ шагов сразу приближает первый шаг,
   await expect(guide.locator('[data-step="2"]')).toHaveAttribute('data-active', 'true')
   await expect(label).toHaveText('Показываем на экране')
   await expect(canvas).toHaveCSS('transform', 'none')
+})
+
+/** Проводит мышью по кадру по горизонтали: те же pointer-события, что и от пальца. */
+async function swipe(page: Page, frame: Locator, dx: number, dy = 0) {
+  const box = await frame.boundingBox()
+  if (!box) throw new Error('кадр скриншота не на экране')
+  // Не из центра: там метка активного шага.
+  const x = box.x + box.width / 2 - dx / 2
+  const y = box.y + box.height * 0.25
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + dx, y + dy, { steps: 6 })
+  await page.mouse.up()
+}
+
+test('на телефоне снимок сразу крупно у первого шага, шаги листаются кнопками и пальцем', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/#trainer')
+  const guide = page.locator('#trainer [data-walkthrough]')
+  const canvas = guide.locator('.screen-canvas')
+  const frame = guide.locator('.screen-image')
+  const count = guide.locator('[data-focus-count]')
+  await expect(guide).toHaveClass(/focus-mode/)
+  await expect(count).toHaveText('Шаг 1 из 3')
+  await expect(canvas).not.toHaveCSS('transform', 'none')
+  await expect(guide.getByRole('button', { name: 'Шаг 1: Прочитайте условие и тесты' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(guide.getByRole('button', { name: 'Показать шаги' })).toBeHidden()
+  await expect(guide.getByRole('button', { name: 'Назад' })).toHaveAttribute('aria-disabled', 'true')
+  // Под кадром только текст активного шага.
+  await expect(guide.locator('[data-step="0"] p')).toBeVisible()
+  await expect(guide.locator('[data-step="1"] p')).toBeHidden()
+  // Снимок в 3/4 исходного размера, а не сжат целиком до ширины экрана.
+  const scale = await canvas.evaluate((element) => new DOMMatrix(getComputedStyle(element).transform).a * element.clientWidth / 1440)
+  expect(scale).toBeCloseTo(0.75, 2)
+  // Метка активного шага по центру кадра.
+  const [spot, box] = await Promise.all([guide.locator('[data-hotspot="0"]').boundingBox(), frame.boundingBox()])
+  expect(Math.abs((spot?.x ?? 0) + (spot?.width ?? 0) / 2 - ((box?.x ?? 0) + (box?.width ?? 0) / 2))).toBeLessThan(2)
+
+  await guide.getByRole('button', { name: 'Дальше' }).click()
+  await expect(count).toHaveText('Шаг 2 из 3')
+  await expect(guide.getByRole('button', { name: 'Шаг 2: Проверьте код: «Запустить»' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(guide.locator('.guide-status')).toHaveText('Шаг 2 из 3: Проверьте код: «Запустить»')
+  await expect(guide.locator('[data-step="1"] p')).toBeVisible()
+
+  await swipe(page, frame, -120)
+  await expect(count).toHaveText('Шаг 3 из 3')
+  await expect(guide.getByRole('button', { name: 'Дальше' })).toHaveAttribute('aria-disabled', 'true')
+  await swipe(page, frame, 120)
+  await expect(count).toHaveText('Шаг 2 из 3')
+  // Короткое и вертикальное движение - не листание.
+  await swipe(page, frame, -20)
+  await swipe(page, frame, -50, 120)
+  await expect(count).toHaveText('Шаг 2 из 3')
+
+  const full = guide.getByRole('button', { name: 'Весь экран' })
+  await full.click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  const scroller = dialog.locator('.dialog-image-scroll')
+  // Окно открыто крупно у метки шага, а не в левом верхнем углу снимка.
+  await expect.poll(() => scroller.evaluate((element) => element.scrollLeft + element.scrollTop)).toBeGreaterThan(0)
+  expect(await scroller.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
+  await dialog.getByRole('button', { name: 'Целиком' }).click()
+  await expect(dialog.getByRole('button', { name: 'Крупно' })).toBeVisible()
+  expect(await scroller.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect(full).toBeFocused()
+
+  // Поворот в широкий экран возвращает обычный вид.
+  await page.setViewportSize({ width: 1024, height: 768 })
+  await expect(guide).not.toHaveClass(/focus-mode/)
+  await expect(canvas).toHaveCSS('transform', 'none')
+  await expect(guide.getByRole('button', { name: 'Показать шаги' })).toBeVisible()
+})
+
+test('на телефоне статичный скриншот открывается касанием, горизонтальной прокрутки нет', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.goto('/#courses')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  const figure = page.locator('#courses figure.extra-screen')
+  await figure.locator('img').click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('dialog').locator('img')).toHaveAttribute('src', /course\.webp$/)
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toBeHidden()
+  await expect(figure.getByRole('button', { name: 'Увеличить' })).toBeFocused()
 })
 
 test('чек-лист сохраняется после перезагрузки и не отправляет результат в LMS', async ({ page }) => {
