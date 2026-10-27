@@ -34,8 +34,8 @@ test('буткемп появляется в меню только после н
     const menu = page.getByRole('navigation', { name: 'Меню платформы' }).last()
 
     await page.goto('/bootcamp')
-    await expect(page.getByText('Буткемп вам не назначен')).toBeVisible()
-    await expect(menu.getByRole('link', { name: 'Буткемп' })).toHaveCount(0)
+    await expect(page.getByText('Вам не назначен ни один буткемп')).toBeVisible()
+    await expect(menu.getByRole('link', { name: 'Буткемпы' })).toHaveCount(0)
 
     expect((await admin.request.post(`${APP_URL}/api/learning-access-grants`, { data: { user: created.users, target: { relationTo: 'courses', value: created.courses }, effect: 'allow' } })).status()).toBe(201)
 
@@ -45,11 +45,11 @@ test('буткемп появляется в меню только после н
     expect(direct.headers()['location']).toBe(`/bootcamp/bootcamp-e2e-${key}`)
 
     await page.goto('/')
-    await menu.getByRole('link', { name: 'Буткемп' }).click()
+    await menu.getByRole('link', { name: 'Буткемпы' }).click()
     // Единственный буткемп открывается сразу, без промежуточного списка.
     await expect(page).toHaveURL(`/bootcamp/bootcamp-e2e-${key}`)
     await expect(page.getByRole('heading', { level: 1, name: `Буткемп E2E ${key}` })).toBeVisible()
-    await expect(menu.getByRole('link', { name: 'Буткемп' })).toHaveAttribute('aria-current', 'page')
+    await expect(menu.getByRole('link', { name: 'Буткемпы' })).toHaveAttribute('aria-current', 'page')
     await expect(page.getByText('Начать буткемп')).toBeVisible()
 
     await page.goto('/courses')
@@ -62,10 +62,10 @@ test('буткемп появляется в меню только после н
     await expect(page.locator(`a[href="/bootcamp/bootcamp-e2e-${key}"]`).first()).toBeAttached()
     await expect(page.locator(`a[href="/courses/bootcamp-e2e-${key}"]`)).toHaveCount(0)
 
-    // На телефоне вкладка «Буткемп» в нижней панели.
+    // На телефоне вкладка «Буткемпы» в нижней панели.
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
-    await expect(page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Буткемп' })).toHaveAttribute('href', '/bootcamp')
+    await expect(page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Буткемпы' })).toHaveAttribute('href', '/bootcamp')
   } finally {
     for (const [collection, id] of Object.entries(created).reverse()) {
       if (id) expect((await admin.request.delete(`${APP_URL}/api/${collection}/${id}`)).status()).toBe(200)

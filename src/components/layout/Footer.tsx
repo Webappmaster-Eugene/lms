@@ -4,7 +4,7 @@ import { AUTHOR_NAME, AUTHOR_URL, GUIDE_URL } from '@/lib/site-links'
 import { visibleSections } from '@/lib/platform-sections'
 
 const SECTIONS = [
-  { href: '/bootcamp', label: 'Буткемп' },
+  { href: '/bootcamp', label: 'Буткемпы' },
   { href: '/courses', label: 'Курсы' },
   { href: '/roadmaps', label: 'Роадмапы' },
   { href: '/trainer', label: 'Тренажёр' },

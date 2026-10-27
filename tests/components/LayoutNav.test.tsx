@@ -50,11 +50,11 @@ describe('нижняя навигация', () => {
     expect(items[items.length - 1]).toHaveTextContent('Ещё')
   })
 
-  it('участнику буткемпа вкладка «Буткемп» заменяет историю, вкладок по-прежнему пять', () => {
+  it('участнику буткемпа вкладка «Буткемпы» заменяет историю, вкладок по-прежнему пять', () => {
     pathname.current = '/bootcamp/nodejs-bootcamp-manuals'
     render(<BottomNav bootcampEnabled />)
 
-    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Главная', 'Роадмапы', 'Курсы', 'Буткемп'])
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Главная', 'Роадмапы', 'Курсы', 'Буткемпы'])
     expect(screen.getByRole('link', { name: /Буткемп/ })).toHaveAttribute('href', '/bootcamp')
     expect(screen.getByRole('link', { name: /Буткемп/ })).toHaveAttribute('aria-current', 'page')
     const items = screen.getByRole('navigation', { name: 'Основная навигация' }).querySelectorAll('a, button')

@@ -66,8 +66,8 @@ describe('боковое меню', () => {
     pathname.current = '/bootcamp/nodejs-bootcamp-manuals'
     render(<Sidebar bootcampEnabled />)
     const links = within(desktop()).getAllByRole('link').map((link) => link.textContent)
-    expect(links.slice(0, 4)).toEqual(['Дашборд', 'Буткемп', 'Роадмапы', 'Курсы'])
-    const bootcamp = within(desktop()).getByRole('link', { name: 'Буткемп' })
+    expect(links.slice(0, 4)).toEqual(['Дашборд', 'Буткемпы', 'Роадмапы', 'Курсы'])
+    const bootcamp = within(desktop()).getByRole('link', { name: 'Буткемпы' })
     expect(bootcamp).toHaveAttribute('href', '/bootcamp')
     expect(bootcamp).toHaveAttribute('aria-current', 'page')
     expect(within(desktop()).getByRole('link', { name: 'Курсы' })).not.toHaveAttribute('aria-current')

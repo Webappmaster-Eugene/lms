@@ -15,7 +15,7 @@ export const BootcampLeads: CollectionConfig = {
   slug: 'bootcamp-leads',
   labels: { singular: 'Заявка на буткемп', plural: 'Заявки на буткемп' },
   admin: {
-    group: 'Буткемп',
+    group: 'Буткемпы',
     useAsTitle: 'email',
     defaultColumns: ['email', 'name', 'status', 'nextActionAt', 'createdAt', 'notifiedAt'],
     description: 'Предзапись с info.mentorcareer.ru/bootcamp/nodejs. Повторная отправка того же адреса не создаёт новую заявку, а увеличивает счётчик отправок.',

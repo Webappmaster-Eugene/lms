@@ -51,10 +51,10 @@ describe('подвал платформы', () => {
 
   it('буткемп в подвале только у того, кому он назначен', async () => {
     const { unmount } = render(await Footer())
-    expect(screen.queryByRole('link', { name: 'Буткемп' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Буткемпы' })).not.toBeInTheDocument()
     unmount()
     render(await Footer({ bootcampEnabled: true }))
-    expect(screen.getByRole('link', { name: 'Буткемп' })).toHaveAttribute('href', '/bootcamp')
+    expect(screen.getByRole('link', { name: 'Буткемпы' })).toHaveAttribute('href', '/bootcamp')
   })
 
   it('берёт контакты из CMS, а не из вёрстки', async () => {

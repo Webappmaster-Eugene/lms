@@ -23,7 +23,7 @@ const TABS: readonly Tab[] = [
 ]
 
 /** Участнику буткемпа он важнее истории: та остаётся в «Ещё», а вкладок по-прежнему пять. */
-const BOOTCAMP_TABS: readonly Tab[] = [...TABS.slice(0, 3), { href: '/bootcamp', label: 'Буткемп', icon: Tent }]
+const BOOTCAMP_TABS: readonly Tab[] = [...TABS.slice(0, 3), { href: '/bootcamp', label: 'Буткемпы', icon: Tent }]
 
 export function BottomNav({ bootcampEnabled = false }: { bootcampEnabled?: boolean } = {}) {
   const hydrated = useHydrated()

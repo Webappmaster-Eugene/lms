@@ -88,9 +88,9 @@ export function parseBootcampLead(body: unknown): BootcampLeadInput {
   const rawName = text(data.name)
   if (data.name !== undefined && data.name !== null && rawName === null) throw new BootcampLeadError('Имя должно быть текстом.')
   const name = rawName?.replace(/\s+/g, ' ').trim() || null
-  if (name && (name.length > 100 || hasControl(name))) throw new BootcampLeadError('Имя — до 100 знаков, без служебных символов.')
+  if (name && (name.length > 100 || hasControl(name))) throw new BootcampLeadError('Имя: до 100 знаков, без служебных символов.')
 
-  if (data.consent !== true) throw new BootcampLeadError('Отметьте согласие на обработку персональных данных — без него заявку не сохранить.')
+  if (data.consent !== true) throw new BootcampLeadError('Отметьте согласие на обработку персональных данных, без него заявку не сохранить.')
   const consentVersion = text(data.consentVersion) ?? ''
   if (!/^[\w.-]{1,40}$/.test(consentVersion)) throw new BootcampLeadError('Обновите страницу и отправьте заявку ещё раз: не удалось определить версию согласия.')
 

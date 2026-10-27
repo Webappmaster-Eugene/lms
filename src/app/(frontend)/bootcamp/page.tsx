@@ -6,7 +6,7 @@ import { getLearningRequest } from '@/server/learning-request'
 import { getBootcamps } from '@/server/bootcamps'
 
 export const metadata: Metadata = {
-  title: 'Буткемп',
+  title: 'Буткемпы',
 }
 
 export default async function BootcampPage() {
@@ -22,7 +22,7 @@ export default async function BootcampPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex items-center gap-3">
         <Tent className="h-7 w-7 text-primary" aria-hidden="true" />
-        <h1 className="text-xl font-bold text-foreground sm:text-2xl">Буткемп</h1>
+        <h1 className="text-xl font-bold text-foreground sm:text-2xl">Буткемпы</h1>
       </div>
       {bootcamps.length === 0 && user.role === 'admin' ? (
         <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
@@ -30,7 +30,7 @@ export default async function BootcampPage() {
         </p>
       ) : bootcamps.length === 0 ? (
         <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Буткемп вам не назначен. Если вы записались на поток и ждёте доступа, напишите в <Link href="/contacts" className="font-medium text-foreground underline underline-offset-2">поддержку</Link>.
+          Вам не назначен ни один буткемп. Если вы записались на поток и ждёте доступа, напишите в <Link href="/contacts" className="font-medium text-foreground underline underline-offset-2">поддержку</Link>.
         </p>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
