@@ -180,9 +180,11 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
 .bc-done:focus { outline: none; }
 .bc-done p { margin-top: 10px; }
 
-.bc-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 32px; padding: 28px max(20px, calc((100vw - 1160px) / 2)); font-size: 15px; color: var(--muted); border-top: 1px solid var(--line); }
-.bc-footer nav { display: flex; flex-wrap: wrap; gap: 4px 24px; }
-.bc-footer a { display: inline-flex; align-items: center; min-height: 44px; text-underline-offset: 4px; }
+.bc-footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 20px 48px; padding: 28px max(20px, calc((100vw - 1160px) / 2)); font-size: 15px; color: var(--muted); border-top: 1px solid var(--line); }
+.bc-footer-about p + p { margin-top: 6px; }
+.bc-footer-about a { text-underline-offset: 4px; }
+.bc-footer nav { display: grid; grid-template-columns: repeat(2, max-content); gap: 0 28px; }
+.bc-footer nav a { display: inline-flex; align-items: center; min-height: 44px; text-underline-offset: 4px; }
 
 /* Политика */
 .bc-doc { max-width: 760px; padding: 56px 0 80px; }
@@ -190,6 +192,12 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
 .bc-doc h2 { margin-top: 40px; font-size: 24px; }
 .bc-doc p, .bc-doc ul { margin-top: 14px; }
 .bc-doc .bc-note { margin-top: 18px; }
+.bc-lede-doc { margin-top: 18px; font-size: 19px; color: var(--muted); }
+.bc-doc .bc-faq { margin-top: 18px; }
+.bc-doc-links { display: flex; flex-wrap: wrap; gap: 4px 28px; margin-top: 40px; }
+.bc-section > .bc-link { margin-top: 22px; }
+.bc-form-note { margin-top: 14px; font-size: 14px; color: var(--muted); }
+.bc-form-note a { color: var(--accent); text-underline-offset: 3px; }
 
 @media (max-width: 960px) {
   .bc-hero, .bc-two, .bc-mentor, .bc-apply, .bc-columns-three, .bc-audience { grid-template-columns: minmax(0, 1fr); }
@@ -207,6 +215,9 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
   .bc-flow li:not(:last-child)::after { width: 14px; }
   .bc-form, .bc-done { padding: 20px; }
   .bc-program tbody th { width: 4.5em; }
+  .bc-footer { grid-template-columns: minmax(0, 1fr); }
+  .bc-footer nav { grid-template-columns: minmax(0, 1fr); }
+  .bc-lede-doc { font-size: 17px; }
   .bc-path-chapter { margin-top: 44px; }
   .bc-path-chapter > p { margin-left: 0; }
 }

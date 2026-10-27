@@ -1,13 +1,17 @@
 ---
 import BootcampLayout from '../../layouts/BootcampLayout.astro'
+import BootcampFooter from '../../components/BootcampFooter.astro'
+import BootcampHeader from '../../components/BootcampHeader.astro'
 import GuideScreen from '../../components/GuideScreen.astro'
 import screens from '../../data/screens.json'
-import { AUTHOR_URL, LMS_URL, SITE_URL } from '../../config'
+import { AUTHOR_URL, SITE_URL } from '../../config'
 import {
-  AUDIENCE, BOOTCAMP_PATH, CONSENT_VERSION, FACTS, FAQ, LOG, MENTOR_EXPERIENCE, PATH, PRIVACY_PATH, PROGRAM, RENTAL_FLOW, START,
+  AUDIENCE, BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, FACTS, FAQ, LOG, MENTOR_EXPERIENCE, PATH, PAYMENT_PATH, PRIVACY_PATH, PROGRAM,
+  QUALITY_PATH, RENTAL_FLOW, START, START_ISO,
 } from '../../data/bootcamp'
 
-const title = 'Буткемп Node.js: backend сервиса проката - MentorCareer'
+// В заголовке то, что ищут: «буткемп», «Node.js», «курс backend».
+const title = 'Буткемп Node.js: курс backend с ревью наставника - MentorCareer'
 const description = 'Backend на Node.js для frontend- и fullstack-разработчиков, junior и middle: 20 недель, свой проект в GitLab, CI и ревью каждой работы.'
 const pageUrl = new URL(BOOTCAMP_PATH, SITE_URL).href
 const schema = [
@@ -15,7 +19,21 @@ const schema = [
     '@type': 'Course', '@id': `${pageUrl}#course`, name: 'Буткемп Node.js: backend сервиса проката', description, inLanguage: 'ru',
     audience: { '@type': 'EducationalAudience', audienceType: 'frontend- и fullstack-разработчики, junior и middle backend-разработчики' },
     provider: { '@id': `${SITE_URL}/#organization` },
-    hasCourseInstance: { '@type': 'CourseInstance', courseMode: 'online', courseWorkload: 'PT20H', instructor: { '@type': 'Person', name: 'Евгений Надточеев', url: AUTHOR_URL } },
+    educationalLevel: 'Средний',
+    coursePrerequisites: 'Уверенный JavaScript, чтение типов TypeScript, работа с Git',
+    teaches: ['Node.js', 'TypeScript', 'HTTP API на Fastify', 'NestJS', 'PostgreSQL', 'Redis', 'RabbitMQ', 'Kafka', 'ClickHouse', 'Docker', 'OpenTelemetry', 'GitLab CI', 'оплата без двойных списаний', 'восстановление после сбоев'],
+    syllabusSections: PROGRAM.map(({ weeks, topic }) => ({ '@type': 'Syllabus', name: `Недели ${weeks}`, description: topic })),
+    hasCourseInstance: {
+      '@type': 'CourseInstance', courseMode: 'online', inLanguage: 'ru', startDate: START_ISO,
+      // 20 недель по 15-20 часов: в разметке нижняя граница.
+      courseWorkload: 'PT300H',
+      courseSchedule: { '@type': 'Schedule', repeatFrequency: 'P1W', repeatCount: 20, byDay: ['https://schema.org/Saturday', 'https://schema.org/Sunday'], startDate: START_ISO },
+      instructor: { '@id': `${pageUrl}#mentor` },
+    },
+  },
+  {
+    '@type': 'Person', '@id': `${pageUrl}#mentor`, name: 'Евгений Надточеев', url: AUTHOR_URL, sameAs: [AUTHOR_URL], jobTitle: 'Fullstack-разработчик, наставник',
+    knowsAbout: ['Node.js', 'Fastify', 'NestJS', 'PostgreSQL', 'Kafka', 'платёжные системы', 'наблюдаемость'],
   },
   { '@type': 'FAQPage', '@id': `${pageUrl}#faq`, mainEntity: FAQ.map(({ question, answer }) => ({ '@type': 'Question', name: question, acceptedAnswer: { '@type': 'Answer', text: answer } })) },
 ]
@@ -26,10 +44,7 @@ const extraSize = (screen: string) => {
 }
 ---
 <BootcampLayout title={title} description={description} schema={schema}>
-  <header class="bc-header">
-    <a class="bc-brand" href={BOOTCAMP_PATH}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v14c-3-1-6-1-9 1-3-2-6-2-9-1zM12 6v14" /></svg><span>MentorCareer</span><span class="bc-brand-product">Буткемп Node.js</span></a>
-    <a class="bc-header-cta" href="#apply">Оставить заявку</a>
-  </header>
+  <BootcampHeader cta="#apply" />
 
   <main id="main">
     <section class="bc-hero" aria-labelledby="hero-title">
@@ -167,6 +182,34 @@ const extraSize = (screen: string) => {
       </div>
     </section>
 
+    <section class="bc-section" id="quality" aria-labelledby="quality-title">
+      <h2 id="quality-title">Как мы отвечаем за качество</h2>
+      <div class="bc-columns bc-columns-three bc-result">
+        <div>
+          <h3>Программу прошли сами</h3>
+          <p>Для каждой из 20 недель есть наше эталонное решение. Перед стартом все недели сданы через GitLab курса тем же путём, что пройдёте вы: merge request, CI, закрытые тесты.</p>
+        </div>
+        <div>
+          <h3>Тесты ловят типовые ошибки</h3>
+          <p>Мы вносим в эталон больше 400 типовых ошибок учеников, например дробную сумму денег или текст внутренней ошибки в ответе API. Каждая должна проваливать проверку. Тест, который ошибку пропустил, чиним до старта.</p>
+        </div>
+        <div>
+          <h3>Каждую работу читает человек</h3>
+          <p>Автоматические проверки не заменяют ревью. Все работы всех участников наставник проверяет сам, поэтому в группе не больше 20 человек.</p>
+        </div>
+      </div>
+      <a class="bc-link" href={QUALITY_PATH}>Подробно о том, как устроены проверки и методички</a>
+    </section>
+
+    <section class="bc-section" id="payment" aria-labelledby="payment-title">
+      <h2 id="payment-title">Как устроена оплата</h2>
+      <div class="bc-two bc-two-tight">
+        <p>Сейчас идёт предзапись, платить ничего не нужно. Деньги мы берём только после входного задания и решения о допуске. До оплаты вы получаете договор-оферту: программа, сроки, цена и порядок возврата. Цену объявим вместе с ним, когда откроется набор в январе 2027 года.</p>
+        <p>Заплатить можно одним платежом картой или через СБП либо в рассрочку от банка-партнёра платёжного сервиса. Рассрочку предлагаем только без переплаты для вас, кредит с процентами не предлагаем. Отказаться от обучения можно в любой момент: вернём деньги за оставшиеся недели.</p>
+      </div>
+      <a class="bc-link" href={PAYMENT_PATH}>Подробно об оплате, договоре и возврате</a>
+    </section>
+
     <section class="bc-section" id="faq" aria-labelledby="faq-title">
       <h2 id="faq-title">Частые вопросы</h2>
       <div class="bc-faq">{FAQ.map(({ question, answer }) => <details><summary>{question}</summary><p>{answer}</p></details>)}</div>
@@ -193,12 +236,13 @@ const extraSize = (screen: string) => {
         </div>
         <div class="bc-consent">
           <input id="lead-consent" name="consent" type="checkbox" required aria-describedby="lead-consent-error" />
-          <label for="lead-consent">Соглашаюсь на обработку email и имени для ответа на заявку по <a href={PRIVACY_PATH} target="_blank">политике обработки персональных данных</a></label>
+          <label for="lead-consent">Даю <a href={CONSENT_PATH} target="_blank">согласие на обработку персональных данных</a>: email и имени, чтобы получить ответ на заявку. Мне есть 18 лет</label>
           <p class="bc-error" id="lead-consent-error" data-error-for="consent" hidden></p>
         </div>
         <button class="bc-button" type="submit" data-submit>Оставить заявку</button>
         <p class="bc-form-status" data-status role="status" aria-live="polite"></p>
         <noscript><p class="bc-form-status">Чтобы отправить заявку, включите JavaScript.</p></noscript>
+        <p class="bc-form-note">Как мы храним и удаляем данные, написано в <a href={PRIVACY_PATH} target="_blank">политике обработки персональных данных</a>.</p>
       </form>
       <div class="bc-done" data-done tabindex="-1" hidden>
         <h3>Заявка сохранена</h3>
@@ -207,10 +251,7 @@ const extraSize = (screen: string) => {
     </section>
   </main>
 
-  <footer class="bc-footer">
-    <p>MentorCareer, буткемп Node.js</p>
-    <nav aria-label="Ссылки в подвале"><a href={PRIVACY_PATH}>Политика обработки персональных данных</a><a href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Сайт наставника nadtocheev.ru</a><a href={LMS_URL}>Вход для учеников</a></nav>
-  </footer>
+  <BootcampFooter />
   <dialog class="image-dialog" aria-labelledby="image-dialog-title">
     <div class="dialog-toolbar"><h2 id="image-dialog-title">Скриншот</h2><button type="button" data-close-dialog>Закрыть <span aria-hidden="true">×</span></button></div>
     <div class="dialog-image-scroll"><img alt="" /></div>

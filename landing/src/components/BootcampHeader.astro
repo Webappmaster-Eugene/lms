@@ -1,0 +1,13 @@
+---
+import { BOOTCAMP_PATH } from '../data/bootcamp'
+
+interface Props {
+  /** На странице буткемпа кнопка ведёт к форме, на остальных — к форме на странице буткемпа. */
+  cta?: string
+}
+const { cta = `${BOOTCAMP_PATH}#apply` } = Astro.props
+---
+<header class="bc-header">
+  <a class="bc-brand" href={BOOTCAMP_PATH}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v14c-3-1-6-1-9 1-3-2-6-2-9-1zM12 6v14" /></svg><span>MentorCareer</span><span class="bc-brand-product">Буткемп Node.js</span></a>
+  <a class="bc-header-cta" href={cta}>Оставить заявку</a>
+</header>

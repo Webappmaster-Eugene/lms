@@ -1,0 +1,21 @@
+---
+import { AUTHOR_URL, LMS_URL } from '../config'
+import { BOOTCAMP_PATH, CONSENT_PATH, PAGE_UPDATED, PAYMENT_PATH, PRIVACY_PATH, QUALITY_PATH } from '../data/bootcamp'
+import { OPERATOR } from '../data/privacy'
+---
+<footer class="bc-footer">
+  <div class="bc-footer-about">
+    <p><a href={BOOTCAMP_PATH}>MentorCareer, буткемп Node.js</a></p>
+    <!-- Исполнитель и оператор данных: закон о защите прав потребителей требует, чтобы покупатель видел, с кем имеет дело. -->
+    <p>Исполнитель: {OPERATOR.name}, {OPERATOR.status}, ИНН {OPERATOR.inn}. Почта: <a href={`mailto:${OPERATOR.email}`}>{OPERATOR.email}</a></p>
+    <p>Страница обновлена {PAGE_UPDATED.text}</p>
+  </div>
+  <nav aria-label="Ссылки в подвале">
+    <a href={PAYMENT_PATH}>Оплата и возврат</a>
+    <a href={QUALITY_PATH}>Как мы отвечаем за качество</a>
+    <a href={PRIVACY_PATH}>Политика обработки персональных данных</a>
+    <a href={CONSENT_PATH}>Согласие на обработку данных</a>
+    <a href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Сайт наставника nadtocheev.ru</a>
+    <a href={LMS_URL}>Вход для учеников</a>
+  </nav>
+</footer>

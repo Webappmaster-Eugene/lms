@@ -137,6 +137,33 @@ test('путь недели: скриншоты загружаются, шаг �
   expect(`${await page.title()} ${await page.locator('meta[name="description"]').getAttribute('content')}`).not.toMatch(/[—–]/)
 })
 
+test('оплата, качество, политика и согласие: свои адреса в карте сайта, ссылки со страницы буткемпа, реквизиты', async ({ page, request }) => {
+  await page.goto(PAGE)
+  await expect(page.locator('#lead-consent + label a')).toHaveAttribute('href', '/consent/')
+  for (const path of ['/bootcamp/nodejs/payment/', '/bootcamp/nodejs/quality/']) await expect(page.locator(`main a[href="${path}"]`)).toHaveCount(1)
+  const origin = new URL(LANDING_URL).origin
+  const sitemap = await (await request.get(`${origin}/sitemap.xml`)).text()
+  for (const path of ['/bootcamp/nodejs/payment/', '/bootcamp/nodejs/quality/', '/privacy/', '/consent/']) {
+    const response = await page.goto(path)
+    expect(response?.status(), path).toBe(200)
+    await expect(page.locator('h1')).toHaveCount(1)
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', `${SITE}${path}`)
+    expect((await page.title()).length, path).toBeLessThanOrEqual(70)
+    const description = await page.locator('meta[name="description"]').getAttribute('content') ?? ''
+    expect(description.length, path).toBeGreaterThan(70)
+    expect(description.length, path).toBeLessThanOrEqual(160)
+    // Исполнитель виден на каждой странице: закон о защите прав потребителей.
+    await expect(page.locator('footer')).toContainText('ИНН')
+    expect(`${await page.locator('body').innerText()} ${await page.title()} ${description}`, path).not.toMatch(/[—–]/)
+    expect(sitemap).toContain(`<loc>${SITE}${path}</loc>`)
+    const bare = await request.get(`${origin}${path.slice(0, -1)}`, { maxRedirects: 0 })
+    expect(bare.status(), path).toBe(301)
+  }
+  const llms = await (await request.get(`${origin}/llms.txt`)).text()
+  expect(llms).toContain(`${SITE}/bootcamp/nodejs/payment/`)
+  expect(llms).not.toMatch(/[—–]/)
+})
+
 test('на телефоне нет горизонтальной прокрутки, форма помещается', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 })
   await page.goto(PAGE)
