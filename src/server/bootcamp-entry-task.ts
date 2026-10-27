@@ -9,6 +9,7 @@ import { entryTaskDueAt, entryTaskPath, ENTRY_TASK_REVIEW_DAYS, formatEntryTaskD
 import { BOOTCAMP_PROGRAMS } from '@/lib/bootcamp-leads'
 import { logger } from '@/lib/telemetry'
 import { bootcampEntryTaskEmail, emailBaseUrl } from '@/payload/emails/templates'
+import { ensureLeadEntryTaskToken, markLeadEntryTaskSent } from '@/server/bootcamp-lead-marks'
 import { contactReplyTo } from '@/server/contact-reply-to'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
 import type { BootcampEntryTask, BootcampLead } from '@/payload-types'
@@ -88,8 +89,7 @@ export async function sendEntryTask(payload: Payload, lead: BootcampLead): Promi
       return
     }
     // Новая заявка создаётся с токеном. Старой, без него, токен пишем до письма: ссылка должна открыться сразу.
-    const token = lead.entryTaskToken ?? newEntryTaskToken()
-    if (!lead.entryTaskToken) await payload.update({ collection: 'bootcamp-leads', id: lead.id, overrideAccess: true, depth: 0, data: { entryTaskToken: token } })
+    const token = lead.entryTaskToken ?? await ensureLeadEntryTaskToken(payload, lead.id, newEntryTaskToken())
     const dueAt = lead.entryTaskSentAt && lead.entryTaskDueAt ? lead.entryTaskDueAt : entryTaskDueAt(new Date()).toISOString()
     const program = BOOTCAMP_PROGRAMS.find((item) => item.value === lead.program)?.short ?? lead.program
     const replyTo = await contactReplyTo(payload)
@@ -102,7 +102,7 @@ export async function sendEntryTask(payload: Payload, lead: BootcampLead): Promi
       replyable: Boolean(replyTo),
     })
     await payload.sendEmail({ to: lead.email, ...content, ...(replyTo ? { replyTo } : {}) })
-    await payload.update({ collection: 'bootcamp-leads', id: lead.id, overrideAccess: true, depth: 0, data: { entryTaskSentAt: new Date().toISOString(), entryTaskDueAt: dueAt } })
+    await markLeadEntryTaskSent(payload, lead.id, dueAt)
   } catch (error) {
     logger.error('Bootcamp entry task email failed', error, { 'lead.id': lead.id })
   } finally {

@@ -34,13 +34,13 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
 }
 
 export async function down({ db, payload, req }: MigrateDownArgs): Promise<void> {
+  // Сначала связь из payload_locked_documents_rels: DROP TABLE ... CASCADE удалил бы её сам,
+  // и следующий DROP CONSTRAINT упал бы.
   await db.execute(sql`
-   ALTER TABLE "bootcamp_entry_tasks" DISABLE ROW LEVEL SECURITY;
-  DROP TABLE "bootcamp_entry_tasks" CASCADE;
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_bootcamp_entry_tasks_fk";
-  
-  DROP INDEX "bootcamp_leads_entry_task_token_idx";
+   ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_bootcamp_entry_tasks_fk";
   DROP INDEX "payload_locked_documents_rels_bootcamp_entry_tasks_id_idx";
+  DROP TABLE "bootcamp_entry_tasks";
+  DROP INDEX "bootcamp_leads_entry_task_token_idx";
   ALTER TABLE "bootcamp_leads" DROP COLUMN "entry_task_token";
   ALTER TABLE "bootcamp_leads" DROP COLUMN "entry_task_sent_at";
   ALTER TABLE "bootcamp_leads" DROP COLUMN "entry_task_due_at";

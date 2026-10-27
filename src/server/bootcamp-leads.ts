@@ -7,6 +7,7 @@ import { collectAllPages } from '@/lib/paginate'
 import { logger } from '@/lib/telemetry'
 import { bootcampLeadEmail } from '@/payload/emails/templates'
 import { entryTaskResendDue, newEntryTaskToken, sendEntryTask } from '@/server/bootcamp-entry-task'
+import { markLeadResubmitted, markLeadTeamNotified } from '@/server/bootcamp-lead-marks'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
 import type { BootcampLead } from '@/payload-types'
 
@@ -59,22 +60,14 @@ export async function saveBootcampLead(payload: Payload, input: BootcampLeadInpu
           entryTaskToken: newEntryTaskToken(),
         },
       })
-      const created = lead
-      // По очереди: Payload пишет документ целиком, и параллельные отметки об отправке затёрли бы друг друга.
-      return { outcome: 'created', notification: sendEntryTask(payload, created).then(() => notifyTeam(payload, created)) }
+      return { outcome: 'created', notification: Promise.all([sendEntryTask(payload, lead), notifyTeam(payload, lead)]).then(() => undefined) }
     } catch (error) {
       if (!isUniqueViolation(error)) throw error
       lead = await findLead(payload, input)
       if (!lead) throw error
     }
   }
-  await payload.update({
-    collection: 'bootcamp-leads',
-    id: lead.id,
-    overrideAccess: true,
-    depth: 0,
-    data: { submissionCount: (lead.submissionCount ?? 1) + 1, lastSubmittedAt: now },
-  })
+  await markLeadResubmitted(payload, lead.id, now)
   // Повтор — обычно «письмо не пришло»: присылаем ту же ссылку ещё раз, но не чаще раза в 15 минут.
   return { outcome: 'repeat', notification: entryTaskResendDue(lead) ? sendEntryTask(payload, lead) : Promise.resolve() }
 }
@@ -112,7 +105,7 @@ async function notifyTeam(payload: Payload, lead: BootcampLead): Promise<void> {
       source: describeLeadSource(lead.source),
     })
     for (const to of recipients) await payload.sendEmail({ to, ...content })
-    await payload.update({ collection: 'bootcamp-leads', id: lead.id, overrideAccess: true, depth: 0, data: { notifiedAt: new Date().toISOString() } })
+    await markLeadTeamNotified(payload, lead.id)
   } catch (error) {
     logger.error('Bootcamp lead notification failed', error, { 'lead.id': lead.id })
   }
