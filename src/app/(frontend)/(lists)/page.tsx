@@ -13,6 +13,7 @@ import { nextLesson, recentCourseIds } from '@/lib/roadmap-next-step'
 import type { Where } from 'payload'
 import { getLearningAccess } from '@/server/learning-access'
 import { coursePath } from '@/lib/course-path'
+import { HELP_LINK } from '@/components/access/LockedSection'
 
 export const metadata: Metadata = {
   title: 'Дашборд',
@@ -283,7 +284,7 @@ export default async function DashboardPage() {
 
       {/* Мои курсы */}
       {coursesWithProgress.length === 0 && (
-        <p className="rounded-xl border border-border bg-card p-5 text-muted-foreground">Администратор ещё не назначил обучение</p>
+        <p className="rounded-xl border border-border bg-card p-5 text-muted-foreground">Обучение вам пока не назначено. Доступ выдаёт ментор: если вы его ждёте, напишите в разделе {HELP_LINK}.</p>
       )}
       {coursesWithProgress.length > 0 && (
         <div>

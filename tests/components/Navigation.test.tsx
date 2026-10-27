@@ -46,7 +46,7 @@ describe('боковое меню', () => {
     render(<Sidebar isAdmin guidesEnabled />)
     const links = within(desktop()).getAllByRole('link')
     expect(links.map((link) => link.textContent)).toEqual([
-      'Дашборд', 'Роадмапы', 'Курсы', 'Тренажёр', 'Собеседования', 'Гайды', 'История обучения', 'Сертификаты', 'Заметки', 'Вопросы',
+      'Дашборд', 'Буткемпы', 'Роадмапы', 'Курсы', 'Тренажёр', 'Собеседования', 'Гайды', 'История обучения', 'Сертификаты', 'Заметки', 'Вопросы',
       'Сохранённое', 'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь',
     ])
     expect(within(desktop()).getByRole('link', { name: 'Приложение' })).toHaveAttribute('href', '/settings/app')
@@ -54,15 +54,21 @@ describe('боковое меню', () => {
     expect(within(desktop()).queryByRole('link', { name: 'Админка' })).not.toBeInTheDocument()
   })
 
-  it('при выключенном тренажёре и без доступа к гайдам сохраняет порядок остальных пунктов', () => {
+  it('закрытые разделы остаются на своих местах с пометкой «нет доступа» и ведут в раздел', () => {
     render(<Sidebar trainerEnabled={false} />)
-    expect(within(desktop()).getAllByRole('link').map((link) => link.textContent)).toEqual([
-      'Дашборд', 'Роадмапы', 'Курсы', 'Собеседования', 'История обучения', 'Сертификаты', 'Заметки', 'Вопросы', 'Сохранённое',
-      'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь',
+    expect(within(desktop()).getAllByRole('link').map((link) => link.getAttribute('aria-label') ?? link.textContent)).toEqual([
+      'Дашборд', 'Буткемпы, нет доступа', 'Роадмапы', 'Курсы', 'Тренажёр, нет доступа', 'Собеседования', 'Гайды, нет доступа',
+      'История обучения', 'Сертификаты', 'Заметки', 'Вопросы', 'Сохранённое', 'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь',
     ])
+    for (const [name, href] of [['Буткемпы, нет доступа', '/bootcamp'], ['Тренажёр, нет доступа', '/trainer'], ['Гайды, нет доступа', '/guides']]) {
+      const link = within(desktop()).getByRole('link', { name })
+      expect(link).toHaveAttribute('href', href)
+      expect(link.getAttribute('title')).toMatch(/^Нет доступа\. /)
+    }
+    expect(within(desktop()).getByRole('link', { name: 'Курсы' }).getAttribute('title')).not.toMatch(/Нет доступа/)
   })
 
-  it('буткемп — отдельный пункт сразу после дашборда и только у того, кому он назначен', () => {
+  it('буткемп — отдельный пункт сразу после дашборда, у назначенного без пометки', () => {
     pathname.current = '/bootcamp/nodejs-bootcamp-manuals'
     render(<Sidebar bootcampEnabled />)
     const links = within(desktop()).getAllByRole('link').map((link) => link.textContent)
@@ -85,7 +91,7 @@ describe('боковое меню', () => {
     render(<Sidebar trainerEnabled={false} />)
     expect(within(desktop()).getByRole('link', { name: 'Собеседования' })).toHaveAttribute('href', '/interviews')
     expect(within(desktop()).getByRole('link', { name: 'Собеседования' })).toHaveAttribute('aria-current', 'page')
-    expect(within(desktop()).queryByRole('link', { name: 'Тренажёр' })).not.toBeInTheDocument()
+    expect(within(desktop()).getByRole('link', { name: 'Тренажёр, нет доступа' })).toHaveAttribute('href', '/trainer')
   })
 
   it('дашборд подсвечивается только на главной', () => {

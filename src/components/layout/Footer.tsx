@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { readSiteContacts } from '@/lib/site-settings'
 import { AUTHOR_NAME, AUTHOR_URL, GUIDE_URL } from '@/lib/site-links'
-import { visibleSections } from '@/lib/platform-sections'
+import { Lock } from 'lucide-react'
+import { withSectionAccess } from '@/lib/platform-sections'
 
 const SECTIONS = [
   { href: '/bootcamp', label: 'Буткемпы' },
@@ -44,10 +45,11 @@ export async function Footer({ trainerEnabled = true, bootcampEnabled = false }:
         <nav aria-label="Разделы платформы" className="space-y-2">
           <p className="font-semibold text-foreground">Разделы</p>
           <ul className="space-y-1.5">
-            {visibleSections(SECTIONS, { trainerEnabled, guidesEnabled: false, bootcampEnabled }).map(({ href, label }) => (
+            {withSectionAccess(SECTIONS, { trainerEnabled, guidesEnabled: false, bootcampEnabled }).map(({ href, label, locked }) => (
               <li key={href}>
-                <Link href={href} className={linkClass}>
+                <Link href={href} aria-label={locked ? `${label}, нет доступа` : undefined} className={`${linkClass} inline-flex items-center gap-1.5`}>
                   {label}
+                  {locked && <Lock aria-hidden="true" className="h-3 w-3" />}
                 </Link>
               </li>
             ))}

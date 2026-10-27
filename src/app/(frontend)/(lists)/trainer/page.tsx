@@ -5,6 +5,7 @@ import { headers } from 'next/headers'
 import { Code2, ArrowRight, ListFilter } from 'lucide-react'
 import { getTrainerAccess } from '@/server/trainer-access'
 import { collectAllPages } from '@/lib/paginate'
+import { LockedSection } from '@/components/access/LockedSection'
 
 export const metadata: Metadata = {
   title: 'Тренажёр кода',
@@ -120,10 +121,10 @@ export default async function TrainerPage() {
         </Link>
       </section>}
 
+      {!scope.hasAccess && <LockedSection title="Тренажёр вам пока не открыт" description="Решать задачи и создавать комнаты для собеседования можно будет, когда тренажёр откроют." />}
+
       {topicsWithStats.length === 0 ? (
-        <p className="text-center text-muted-foreground py-12">
-          {scope.mode === 'disabled' || !scope.hasAccess ? 'Доступ к тренажёру не назначен. Обратитесь к наставнику.' : 'Задачи скоро появятся'}
-        </p>
+        scope.hasAccess && <p className="text-center text-muted-foreground py-12">Задачи скоро появятся</p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {topicsWithStats.map((topic) => {

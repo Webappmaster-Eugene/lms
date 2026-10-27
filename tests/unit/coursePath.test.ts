@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { coursePath, notBootcamp } from '@/lib/course-path'
-import { PLATFORM_SECTIONS, visibleSections } from '@/lib/platform-sections'
+import { PLATFORM_SECTIONS, withSectionAccess } from '@/lib/platform-sections'
 
 describe('буткемп отдельно от курсов', () => {
   it('ссылка на буткемп ведёт в его раздел, на курс — в каталог', () => {
@@ -15,11 +15,11 @@ describe('буткемп отдельно от курсов', () => {
     expect(notBootcamp).toEqual({ or: [{ isBootcamp: { equals: false } }, { isBootcamp: { exists: false } }] })
   })
 
-  it('раздел «Буткемп» виден только с доступом, остальные разделы не задевает', () => {
+  it('раздел без доступа не пропадает, а помечается закрытым; остальные разделы не задевает', () => {
     const all = { trainerEnabled: true, guidesEnabled: true, bootcampEnabled: true }
-    expect(visibleSections(PLATFORM_SECTIONS, all)).toHaveLength(PLATFORM_SECTIONS.length)
-    const without = visibleSections(PLATFORM_SECTIONS, { ...all, bootcampEnabled: false }).map(({ href }) => href)
-    expect(without).not.toContain('/bootcamp')
-    expect(without).toHaveLength(PLATFORM_SECTIONS.length - 1)
+    expect(withSectionAccess(PLATFORM_SECTIONS, all).filter(({ locked }) => locked)).toEqual([])
+    const without = withSectionAccess(PLATFORM_SECTIONS, { trainerEnabled: false, guidesEnabled: false, bootcampEnabled: false })
+    expect(without.map(({ href }) => href)).toEqual(PLATFORM_SECTIONS.map(({ href }) => href))
+    expect(without.filter(({ locked }) => locked).map(({ href }) => href)).toEqual(['/bootcamp', '/trainer', '/guides'])
   })
 })

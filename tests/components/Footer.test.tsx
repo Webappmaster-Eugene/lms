@@ -42,16 +42,16 @@ describe('подвал платформы', () => {
     )
   })
 
-  it('закрытый тренажёр не остаётся ссылкой в настольном подвале', async () => {
+  it('закрытый тренажёр остаётся в настольном подвале с пометкой', async () => {
     render(await Footer({ trainerEnabled: false }))
-    expect(screen.queryByRole('link', { name: 'Тренажёр' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Тренажёр, нет доступа' })).toHaveAttribute('href', '/trainer')
     expect(screen.getByRole('link', { name: 'Курсы' })).toHaveAttribute('href', '/courses')
     expect(screen.getByText(/персональные курсы, роадмапы и сертификаты/)).toBeInTheDocument()
   })
 
-  it('буткемп в подвале только у того, кому он назначен', async () => {
+  it('буткемп без назначения в подвале с пометкой, у участника без неё', async () => {
     const { unmount } = render(await Footer())
-    expect(screen.queryByRole('link', { name: 'Буткемпы' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Буткемпы, нет доступа' })).toHaveAttribute('href', '/bootcamp')
     unmount()
     render(await Footer({ bootcampEnabled: true }))
     expect(screen.getByRole('link', { name: 'Буткемпы' })).toHaveAttribute('href', '/bootcamp')

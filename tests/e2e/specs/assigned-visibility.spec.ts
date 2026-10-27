@@ -16,7 +16,7 @@ test('одно назначение урока раскрывает только
     const page = await learner.newPage()
     for (const path of ['/', '/courses', '/roadmaps']) {
       await page.goto(path)
-      await expect(page.getByText('Администратор ещё не назначил обучение')).toBeVisible()
+      await expect(page.getByText(/вам пока не назначен/)).toBeVisible()
       for (const title of [CONTENT.course.title, CONTENT.roadmap.title, CONTENT.lessons[0].title]) await expect(page.getByText(title, { exact: true })).toHaveCount(0)
       await expect(page.getByRole('link', { name: /Тренажёр/ })).toHaveCount(0)
     }

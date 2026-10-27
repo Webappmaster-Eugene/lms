@@ -34,8 +34,10 @@ test('буткемп появляется в меню только после н
     const menu = page.getByRole('navigation', { name: 'Меню платформы' }).last()
 
     await page.goto('/bootcamp')
-    await expect(page.getByText('Вам не назначен ни один буткемп')).toBeVisible()
-    await expect(menu.getByRole('link', { name: 'Буткемпы' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { level: 2, name: 'Буткемп вам пока не открыт' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Узнать о буткемпе и записаться' })).toHaveAttribute('href', 'https://info.mentorcareer.ru/bootcamp/nodejs/')
+    // Раздел без доступа не пропадает из меню: ученик видит его с пометкой.
+    await expect(menu.getByRole('link', { name: 'Буткемпы, нет доступа' })).toHaveAttribute('href', '/bootcamp')
 
     expect((await admin.request.post(`${APP_URL}/api/learning-access-grants`, { data: { user: created.users, target: { relationTo: 'courses', value: created.courses }, effect: 'allow' } })).status()).toBe(201)
 
@@ -51,6 +53,11 @@ test('буткемп появляется в меню только после н
     await expect(page.getByRole('heading', { level: 1, name: `Буткемп E2E ${key}` })).toBeVisible()
     await expect(menu.getByRole('link', { name: 'Буткемпы' })).toHaveAttribute('aria-current', 'page')
     await expect(page.getByText('Начать буткемп')).toBeVisible()
+
+    // Ссылка на закрытый буткемп с карты роадмапа объясняет, а не уводит в свой буткемп.
+    await page.goto('/bootcamp?locked=1')
+    await expect(page.getByRole('heading', { level: 2, name: 'Этот буткемп вам пока не открыт' })).toBeVisible()
+    await expect(page.getByRole('link', { name: `Буткемп E2E ${key}` })).toHaveAttribute('href', `/bootcamp/bootcamp-e2e-${key}`)
 
     await page.goto('/courses')
     await expect(page.getByText(`Буткемп E2E ${key}`)).toHaveCount(0)

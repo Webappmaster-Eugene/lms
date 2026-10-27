@@ -33,11 +33,11 @@ describe('мобильные панели', () => {
     document.body.style.overflow = ''
   })
 
-  it('закрытый тренажёр скрыт и в боковом меню, и в нижних вкладках', async () => {
+  it('закрытый тренажёр есть в «Ещё» с пометкой, но не занимает нижнюю вкладку', async () => {
     render(<SidebarProvider><Sidebar trainerEnabled={false} /><BottomNav /></SidebarProvider>)
-    expect(screen.queryByRole('link', { name: /Тренажёр/ })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('navigation', { name: 'Основная навигация' })).queryByRole('link', { name: /Тренажёр/ })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Ещё' }))
-    expect(within(screen.getByRole('dialog')).queryByRole('link', { name: /Тренажёр/ })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('dialog')).getByRole('link', { name: 'Тренажёр, нет доступа' })).toHaveAttribute('href', '/trainer')
     expect(within(screen.getByRole('dialog')).getByRole('link', { name: /Курсы/ })).toBeInTheDocument()
   })
 
@@ -185,7 +185,7 @@ describe('мобильные панели', () => {
     expect(more).toHaveAttribute('aria-expanded', 'true')
     expect(within(dialog).getByRole('link', { name: 'Приложение' })).toHaveAttribute('href', '/settings/app')
     expect(within(dialog).getAllByRole('link').map((link) => link.textContent)).toEqual([
-      'Дашборд', 'Роадмапы', 'Курсы', 'Тренажёр', 'Собеседования', 'Гайды', 'История обучения', 'Сертификаты', 'Заметки', 'Вопросы',
+      'Дашборд', 'Буткемпы', 'Роадмапы', 'Курсы', 'Тренажёр', 'Собеседования', 'Гайды', 'История обучения', 'Сертификаты', 'Заметки', 'Вопросы',
       'Сохранённое', 'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь',
     ])
     expect(within(dialog).getByRole('link', { name: 'Собеседования' })).toHaveAttribute('href', '/interviews')

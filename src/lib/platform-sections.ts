@@ -25,10 +25,13 @@ export const PLATFORM_SECTIONS = [
 
 export type PlatformSectionHref = typeof PLATFORM_SECTIONS[number]['href']
 
-/** Что открыто пользователю. Раздел без доступа не показывается ни в меню, ни в справке, ни в подвале. */
+/** Что открыто пользователю. Раздел без доступа не прячется: ученик видит его с замком и узнаёт, как его получить. */
 export type SectionAccess = { trainerEnabled: boolean; guidesEnabled: boolean; bootcampEnabled: boolean }
 
-export function visibleSections<T extends { href: string }>(sections: readonly T[], access: SectionAccess): T[] {
-  return sections.filter(({ href }) =>
-    (access.trainerEnabled || href !== '/trainer') && (access.guidesEnabled || href !== '/guides') && (access.bootcampEnabled || href !== '/bootcamp'))
+export function isSectionLocked(href: string, access: SectionAccess): boolean {
+  return (href === '/trainer' && !access.trainerEnabled) || (href === '/guides' && !access.guidesEnabled) || (href === '/bootcamp' && !access.bootcampEnabled)
+}
+
+export function withSectionAccess<T extends { href: string }>(sections: readonly T[], access: SectionAccess): (T & { locked: boolean })[] {
+  return sections.map((section) => ({ ...section, locked: isSectionLocked(section.href, access) }))
 }

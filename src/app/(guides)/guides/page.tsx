@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { CheckCircle2, Clock, Compass, Globe } from 'lucide-react'
+import { HELP_LINK, LockedSection } from '@/components/access/LockedSection'
 import { collectAllPages } from '@/lib/paginate'
 import { guideIsNew } from '@/lib/guides'
 import { learningRelationId } from '@/lib/learning-access'
@@ -97,16 +98,16 @@ export default async function GuidesPage({ searchParams }: Props) {
         </nav>
       )}
 
-      {shown.length === 0 ? (
+      {shown.length === 0 && !activeCategory && user && user.role !== 'admin' ? (
+        <LockedSection title="Гайды вам пока не открыты" description="Гайды открывает ментор: по одному под вашу задачу или сразу все." help={<>Если нужен гайд по конкретной теме, напишите в разделе {HELP_LINK}.</>} />
+      ) : shown.length === 0 ? (
         <div className="rounded-xl border border-border bg-card px-5 py-12 text-center text-muted-foreground">
           {activeCategory ? (
             <p>В этой категории гайдов пока нет. <Link href="/guides" className="font-medium text-primary underline-offset-2 hover:underline">Показать все</Link></p>
           ) : !user ? (
             <p>Открытых гайдов пока нет. <Link href="/login?redirect=%2Fguides" className="font-medium text-primary underline-offset-2 hover:underline">Войти в LMS</Link></p>
-          ) : user.role === 'admin' ? (
-            <p>Гайдов пока нет. Создайте первый в CMS — раздел «Гайды»</p>
           ) : (
-            <p>Вам пока не открыт ни один гайд. Гайды выдаёт ментор — если нужен конкретный, напишите в разделе <Link href="/help#support" className="font-medium text-primary underline-offset-2 hover:underline">«Помощь»</Link></p>
+            <p>Гайдов пока нет. Создайте первый в CMS — раздел «Гайды»</p>
           )}
         </div>
       ) : (

@@ -125,13 +125,14 @@ test.describe('ученик', () => {
 test.describe('ученик без назначенных гайдов', () => {
   test.use({ storageState: storageStateOf('leader') })
 
-  test('не видит раздела в меню, список объясняет, где взять доступ, прямая ссылка — что гайд закрыт', async ({ page }) => {
+  test('видит раздел в меню с пометкой, раздел объясняет, где взять доступ, прямая ссылка — что гайд закрыт', async ({ page }) => {
     await page.goto('/courses')
     await expect(page.locator('aside').last().getByRole('link', { name: 'Курсы', exact: true })).toBeVisible()
-    await expect(page.locator('aside').last().getByRole('link', { name: 'Гайды', exact: true })).toHaveCount(0)
+    await expect(page.locator('aside').last().getByRole('link', { name: 'Гайды, нет доступа', exact: true })).toHaveAttribute('href', '/guides')
 
     await page.goto('/guides')
-    await expect(page.getByText('Вам пока не открыт ни один гайд')).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: 'Гайды вам пока не открыты' })).toBeVisible()
+    await expect(page.getByRole('link', { name: '«Помощь»' })).toHaveAttribute('href', '/help#support')
     await expect(page.getByRole('link', { name: new RegExp(CONTENT.guide.title) })).toHaveCount(0)
 
     await page.goto(`/guides/${CONTENT.guide.slug}`)

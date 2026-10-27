@@ -10,7 +10,7 @@ import { APP_URL } from '../fixtures/env'
 const screenshotDirectory = resolve('.codex/state/account-ux')
 const password = 'Account-Test-Password-123'
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64')
-const menuLabels = ['Дашборд', 'Роадмапы', 'Курсы', 'Тренажёр', 'Собеседования', 'История обучения', 'Сертификаты', 'Заметки', 'Вопросы', 'Сохранённое', 'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь']
+const menuLabels = ['Дашборд', 'Буткемпы', 'Роадмапы', 'Курсы', 'Тренажёр', 'Собеседования', 'Гайды', 'История обучения', 'Сертификаты', 'Заметки', 'Вопросы', 'Сохранённое', 'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь']
 
 type Account = { id: number; email: string; admin: APIRequestContext; commentIds: number[] }
 const test = base.extend<{ account: Account }>({
@@ -198,6 +198,8 @@ test('меню имеет заданный порядок, профиль кли
   await page.goto('/')
   const desktopMenu = page.locator('aside').getByRole('navigation', { name: 'Меню платформы', exact: true })
   await expect(desktopMenu.getByRole('link')).toHaveText(menuLabels)
+  // Закрытые разделы остаются на своих местах, но называются с пометкой.
+  await expect(desktopMenu.getByRole('link', { name: 'Гайды, нет доступа', exact: true })).toHaveAttribute('href', '/guides')
   const profile = page.locator('header').getByRole('link', { name: 'Настроить профиль: Личный Аккаунт' })
   const box = await profile.boundingBox()
   expect(box?.height).toBeGreaterThanOrEqual(44)

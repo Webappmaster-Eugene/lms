@@ -1,10 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { HelpCircle, Mail, MessageSquare, Users } from 'lucide-react'
+import { HelpCircle, Lock, Mail, MessageSquare, Users } from 'lucide-react'
 import { FaqAccordion } from '@/components/help/FaqAccordion'
 import { SupportForm } from './SupportForm'
 import { collectAllPages } from '@/lib/paginate'
-import { PLATFORM_SECTIONS, visibleSections } from '@/lib/platform-sections'
+import { PLATFORM_SECTIONS, withSectionAccess } from '@/lib/platform-sections'
 import { getLearningRequest } from '@/server/learning-request'
 import { getTrainerAccess } from '@/server/trainer-access'
 import { getGuideAccess } from '@/server/guide-access'
@@ -41,11 +41,11 @@ export default async function HelpPage({ searchParams }: { searchParams: HelpSea
   const draft = errorReportDraft(await searchParams)
   const contacts = await readSiteContacts()
   const { payload, user, req } = await getLearningRequest()
-  // Справка перечисляет те же разделы, что и меню: тренажёр и гайды скрыты у тех, кому они не назначены.
+  // Справка перечисляет те же разделы, что и меню, и так же отмечает закрытые.
   const trainerEnabled = user ? (await getTrainerAccess(payload, user, req)).hasAccess : false
   const guidesEnabled = user ? (await getGuideAccess(payload, user, req)).hasAccess : false
   const bootcampEnabled = user ? (await getBootcamps(payload, user, req)).length > 0 : false
-  const sections = visibleSections(PLATFORM_SECTIONS, { trainerEnabled, guidesEnabled, bootcampEnabled })
+  const sections = withSectionAccess(PLATFORM_SECTIONS, { trainerEnabled, guidesEnabled, bootcampEnabled })
 
   // Почта открывается на месте: в новой вкладке почтовый клиент оставил бы пустую страницу.
   const channels = [
@@ -136,11 +136,12 @@ export default async function HelpPage({ searchParams }: { searchParams: HelpSea
           {sections.map((section) => (
             <div key={section.href} className="grid gap-1 px-5 py-3 sm:grid-cols-[11rem_1fr] sm:gap-4">
               <dt>
-                <Link href={section.href} className="font-medium text-foreground underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-ring">
+                <Link href={section.href} className="inline-flex items-center gap-1.5 font-medium text-foreground underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-ring">
                   {section.label}
+                  {section.locked && <Lock aria-hidden="true" className="h-3.5 w-3.5 text-muted-foreground" />}
                 </Link>
               </dt>
-              <dd className="text-sm leading-relaxed text-muted-foreground">{section.hint}</dd>
+              <dd className="text-sm leading-relaxed text-muted-foreground">{section.hint}{section.locked && '. Пока не открыт: доступ выдаёт ментор'}</dd>
             </div>
           ))}
         </dl>

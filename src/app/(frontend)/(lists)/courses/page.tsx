@@ -3,6 +3,7 @@ import { getLearningRequest } from '@/server/learning-request'
 import { redirect } from 'next/navigation'
 import { BookOpen } from 'lucide-react'
 import { CourseCatalog } from '@/components/course/CourseCatalog'
+import { LockedSection } from '@/components/access/LockedSection'
 import { collectAllPages } from '@/lib/paginate'
 import { getLearningAccess } from '@/server/learning-access'
 import { notBootcamp } from '@/lib/course-path'
@@ -130,7 +131,7 @@ export default async function CoursesListPage() {
       </p>
 
       {coursesWithProgress.length === 0 ? (
-        <p className="text-center text-muted-foreground py-12">Администратор ещё не назначил обучение</p>
+        <LockedSection title="Курсы вам пока не назначены" description="Здесь появятся курсы, которые откроет ментор, с программой и вашим прогрессом." />
       ) : (
         <CourseCatalog courses={coursesWithProgress} />
       )}

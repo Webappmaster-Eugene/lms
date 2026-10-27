@@ -25,6 +25,7 @@ import {
   History,
   Film,
   Tent,
+  Lock,
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { MobileSheet } from './MobileSheet'
@@ -33,7 +34,7 @@ import { SHORTCUTS_OPEN_EVENT } from './KeyboardShortcuts'
 import { cn } from '@/lib/utils'
 import { useSidebar } from './SidebarContext'
 import { disconnectDevicePush } from '@/lib/pwa-client'
-import { PLATFORM_SECTIONS, visibleSections, type PlatformSectionHref } from '@/lib/platform-sections'
+import { PLATFORM_SECTIONS, withSectionAccess, type PlatformSectionHref } from '@/lib/platform-sections'
 
 const NAV_ICONS: Record<PlatformSectionHref, typeof LayoutDashboard> = {
   '/': LayoutDashboard,
@@ -84,14 +85,16 @@ export function Sidebar({ isAdmin = false, trainerEnabled = true, guidesEnabled 
 
       {/* Navigation */}
       <nav aria-label="Меню платформы" className={cn('flex-1 overflow-y-auto px-3 py-4', mobile ? 'grid grid-cols-1 gap-2 min-[360px]:grid-cols-2' : 'space-y-1')}>
-        {visibleSections(NAV_ITEMS, { trainerEnabled, guidesEnabled, bootcampEnabled }).map(({ href, label, hint, icon: Icon }) => {
+        {withSectionAccess(NAV_ITEMS, { trainerEnabled, guidesEnabled, bootcampEnabled }).map(({ href, label, hint, icon: Icon, locked }) => {
           const isActive = href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)
           return (
             <Link
               key={href}
               href={href}
               aria-current={isActive ? 'page' : undefined}
-              title={hint}
+              // Пометка в имени ссылки, а не скрытым span: Chrome отделяет такой span пробелом.
+              aria-label={locked ? `${label}, нет доступа` : undefined}
+              title={locked ? `Нет доступа. ${hint}` : hint}
               onClick={() => setMobileOpen(false)}
               className={cn(
                 'flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring',
@@ -102,7 +105,8 @@ export function Sidebar({ isAdmin = false, trainerEnabled = true, guidesEnabled 
               )}
             >
               <Icon aria-hidden="true" className="h-5 w-5 flex-shrink-0" />
-              <span className="min-w-0 whitespace-normal">{label}</span>
+              <span className="min-w-0 flex-1 whitespace-normal">{label}</span>
+              {locked && <Lock aria-hidden="true" className="h-3.5 w-3.5 flex-shrink-0" />}
             </Link>
           )
         })}

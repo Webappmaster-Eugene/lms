@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { getLearningRequest } from '@/server/learning-request'
 import Link from 'next/link'
 import { Map as MapIcon } from 'lucide-react'
+import { LockedSection } from '@/components/access/LockedSection'
 import { lexicalPlainText } from '@/lib/lexical-text'
 import { collectAllPages } from '@/lib/paginate'
 import { relationId } from '@/lib/relation-id'
@@ -164,9 +165,9 @@ export default async function RoadmapsPage() {
         })}
 
         {roadmapDocs.length === 0 && (
-          <p className="col-span-full text-center text-muted-foreground py-12">
-            Администратор ещё не назначил обучение
-          </p>
+          <div className="col-span-full">
+            <LockedSection title="Роадмапы вам пока не назначены" description="Здесь появятся карты направлений: какие темы изучать и в каком порядке, с курсами по каждой теме." />
+          </div>
         )}
       </div>
     </div>
