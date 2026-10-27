@@ -118,10 +118,13 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
 .bc-flow li::before { counter-increment: flow; content: counter(flow); display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; font-size: 14px; color: var(--accent); border: 1.5px solid var(--accent); }
 .bc-flow li:not(:last-child)::after { content: ''; width: 28px; height: 1.5px; margin-left: 4px; background: var(--line); }
 
-.bc-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 26px 32px; list-style: none; margin: 28px 0 0; padding: 0; counter-reset: step; }
-.bc-steps li { padding-top: 16px; border-top: 3px solid var(--panel); }
-.bc-steps h3::before { counter-increment: step; content: counter(step) '. '; color: var(--accent); }
-.bc-steps p { margin-top: 8px; color: var(--muted); }
+/* Три группы аудитории: у каждой своя проблема, поэтому отдельные колонки, а не общий список. */
+.bc-audience { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 36px; margin-top: 32px; }
+.bc-audience > div { padding-top: 18px; border-top: 3px solid var(--accent); }
+.bc-audience p { margin-top: 10px; color: var(--muted); }
+.bc-needs { margin-top: 48px; padding-top: 32px; border-top: 1px solid var(--line); }
+.bc-section .bc-actions { margin-top: 32px; }
+.bc-result { margin-top: 28px; }
 
 .bc-program { width: 100%; max-width: 860px; border-collapse: collapse; margin-top: 24px; }
 .bc-program th, .bc-program td { text-align: left; vertical-align: top; padding: 13px 0; border-bottom: 1px solid var(--line); }
@@ -189,15 +192,14 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
 .bc-doc .bc-note { margin-top: 18px; }
 
 @media (max-width: 960px) {
-  .bc-hero, .bc-two, .bc-mentor, .bc-apply, .bc-columns-three { grid-template-columns: minmax(0, 1fr); }
+  .bc-hero, .bc-two, .bc-mentor, .bc-apply, .bc-columns-three, .bc-audience { grid-template-columns: minmax(0, 1fr); }
   .bc-hero { gap: 40px; padding: 44px 0 56px; }
-  .bc-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 640px) {
   body { font-size: 16px; }
   .bc-brand-product { display: none; }
   .bc-section { padding: 52px 0; }
-  .bc-facts, .bc-columns, .bc-steps { grid-template-columns: minmax(0, 1fr); }
+  .bc-facts, .bc-columns { grid-template-columns: minmax(0, 1fr); }
   .bc-lede, .bc-intro { font-size: 17px; }
   .bc-log { font-size: 12.5px; }
   .bc-log-line { grid-template-columns: minmax(0, 1fr); padding: 9px 14px; }

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 import { parseBootcampLead } from '@/lib/bootcamp-leads'
-import { CONSENT_VERSION, FACTS, FAQ, LOG, PATH, PROGRAM } from '../../landing/src/data/bootcamp'
+import { AUDIENCE, CONSENT_VERSION, FACTS, FAQ, LOG, PATH, PROGRAM } from '../../landing/src/data/bootcamp'
 import { OPERATOR } from '../../landing/src/data/privacy'
 import screens from '../../landing/src/data/screens.json'
 
@@ -50,7 +50,7 @@ describe('лендинг буткемпа: тексты и путь недели
   it('в текстах страницы, политики и формы нет длинного тире', () => {
     const markup = ['src/pages/bootcamp/nodejs.astro', 'src/pages/privacy.astro'].map((path) => readFileSync(landing(path), 'utf8').split('---').slice(2).join('---'))
     const messages = readFileSync(landing('src/scripts/bootcamp-form.ts'), 'utf8').match(/'[^'\n]*'/g) ?? []
-    expect(`${JSON.stringify({ FACTS, FAQ, LOG, PATH, PROGRAM })}${markup.join('')}${messages.join('')}`).not.toMatch(/[—–]/)
+    expect(`${JSON.stringify({ AUDIENCE, FACTS, FAQ, LOG, PATH, PROGRAM })}${markup.join('')}${messages.join('')}`).not.toMatch(/[—–]/)
   })
 
   it('у каждого скриншота пути есть файл с размерами из screens.json и нет лишних файлов', () => {
