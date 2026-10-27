@@ -36,8 +36,9 @@ test('страница: метаданные, CSP без нарушений, а�
   const description = await page.locator('meta[name="description"]').getAttribute('content')
   expect(description?.length ?? 0).toBeGreaterThan(70)
   expect(description?.length ?? 0).toBeLessThanOrEqual(160)
-  // Предзапись: ни цены, ни оплаты на странице нет.
-  await expect(page.locator('main')).not.toContainText(/₽\s*за|оплатить|купить/i)
+  // Предзапись: цена видна, но оплаты на странице нет.
+  await expect(page.locator('main')).toContainText('45 000 ₽ за весь поток')
+  await expect(page.locator('main')).not.toContainText(/оплатить|купить/i)
   expect(problems).toEqual([])
 
   const origin = new URL(LANDING_URL).origin
