@@ -17,7 +17,7 @@ export const BootcampLeads: CollectionConfig = {
   admin: {
     group: 'Буткемпы',
     useAsTitle: 'email',
-    defaultColumns: ['email', 'name', 'status', 'nextActionAt', 'createdAt', 'entryTaskSentAt'],
+    defaultColumns: ['email', 'name', 'status', 'nextActionAt', 'createdAt', 'entryTaskSentAt', 'entrySubmittedAt', 'entryPassed'],
     description: 'Предзапись с info.mentorcareer.ru/bootcamp/nodejs. Повторная отправка того же адреса не создаёт новую заявку, а увеличивает счётчик отправок.',
   },
   access: {
@@ -64,5 +64,20 @@ export const BootcampLeads: CollectionConfig = {
     },
     { name: 'entryTaskSentAt', type: 'date', label: 'Письмо с заданием', admin: { ...readOnly, description: 'Пусто — письмо кандидату не ушло. Повторная заявка с того же адреса отправит его снова.' } },
     { name: 'entryTaskDueAt', type: 'date', label: 'Срок входного задания', admin: readOnly },
+    {
+      type: 'collapsible',
+      label: 'Решение входного задания',
+      admin: { description: 'Кандидат решает задачи на странице задания и нажимает «Отправить решение». Тесты прогоняет сервер, здесь последняя отправка.' },
+      fields: [
+        { name: 'entrySubmittedAt', type: 'date', label: 'Решение отправлено', admin: { ...readOnly, date: { pickerAppearance: 'dayAndTime' } } },
+        { name: 'entrySubmissionCount', type: 'number', label: 'Отправок решения', admin: readOnly },
+        { name: 'entryPassed', type: 'number', label: 'Тестов пройдено', admin: readOnly },
+        { name: 'entryTotal', type: 'number', label: 'Тестов всего', admin: readOnly },
+        { name: 'entryResult', type: 'textarea', label: 'Итог по задачам', admin: readOnly },
+        { name: 'entrySolution', type: 'code', label: 'Код кандидата', admin: { readOnly: true, language: 'javascript' } },
+        // Тот же код по задачам: страница задания подставляет его в редакторы при повторном визите.
+        { name: 'entrySolutions', type: 'json', admin: { hidden: true } },
+      ],
+    },
   ],
 }

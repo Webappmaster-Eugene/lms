@@ -6,7 +6,7 @@ import GuideScreen from '../../components/GuideScreen.astro'
 import screens from '../../data/screens.json'
 import { AUTHOR_URL, SITE_URL } from '../../config'
 import {
-  AUDIENCE, BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, ENTRY_TASK_DAYS, FACTS, FAQ, LOG, MENTOR_EXPERIENCE, PAINS, PATH, PAYMENT_PATH, PREP_START, PRICE,
+  AUDIENCE, BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, ENTRY_TASK_DAYS, ENTRY_TASK_MINUTES, FACTS, FAQ, LOG, MENTOR_EXPERIENCE, PAINS, PATH, PAYMENT_PATH, PREP_START, PRICE,
   PRIVACY_PATH, PROGRAM, QUALITY_PATH, RENTAL_FLOW, REVIEW_DAYS, SAMPLE_MANUAL, SAMPLE_QUESTIONS, START, START_ISO,
 } from '../../data/bootcamp'
 
@@ -82,7 +82,7 @@ const extraSize = (screen: string) => {
 
     <section class="bc-section" id="fit" aria-labelledby="fit-title">
       <h2 id="fit-title">Для кого этот буткемп</h2>
-      <p class="bc-intro">Для разработчиков, которые уверенно пишут на JavaScript и хотят работать с backend всерьёз, а не на уровне примеров из статей.</p>
+      <p class="bc-intro">Для разработчиков, которые уверенно пишут на JavaScript и хотят глубже освоить backend на большом учебном проекте.</p>
       <div class="bc-audience">
         {AUDIENCE.map(({ title: who, text }) => <div><h3>{who}</h3><p>{text}</p></div>)}
       </div>
@@ -94,7 +94,7 @@ const extraSize = (screen: string) => {
         <div>
           <h3>Что знать заранее не нужно</h3>
           <p>NestJS, SQL, брокеры сообщений и Docker. Им посвящена программа.</p>
-          <p>Перед зачислением вы делаете короткое входное задание. Оно приходит на email сразу после заявки: на него {ENTRY_TASK_DAYS}, ответ в течение {REVIEW_DAYS}. Если в JavaScript или Git есть пробелы, мы подскажем, что подтянуть, и предложим следующий поток. Оплату в этом случае не берём.</p>
+          <p>Перед зачислением вы делаете короткое входное задание: три функции на JavaScript прямо в браузере, на {ENTRY_TASK_MINUTES} минут. Оно приходит на email сразу после заявки: на него {ENTRY_TASK_DAYS}, ответ в течение {REVIEW_DAYS}. Если в основах JavaScript есть пробелы, мы подскажем, что подтянуть, и предложим следующий поток. Оплату в этом случае не берём.</p>
         </div>
       </div>
       <div class="bc-actions"><a class="bc-button" href="#apply">Оставить заявку</a></div>
@@ -187,7 +187,7 @@ const extraSize = (screen: string) => {
         <div>
           <h3>Карьерный трек</h3>
           <p>На 8-й неделе разбираем рынок вакансий Node.js и путь из frontend. На 14-й собираем резюме, профиль на hh.ru и README проекта. На 15-17-й наставник разбирает ваше резюме, на 18-й говорим об этапах собеседования, а на 19-20-й проводим личное пробное собеседование на 45 минут.</p>
-          <p>Трек не входит в стоимость, его условия обсуждаются отдельно. Работу мы не гарантируем: трек помогает показать то, что вы на самом деле умеете.</p>
+          <p>Трек не входит в стоимость, его условия обсуждаются отдельно. Трудоустройство мы не гарантируем: трек помогает показать ваши реальные навыки.</p>
         </div>
       </div>
     </section>

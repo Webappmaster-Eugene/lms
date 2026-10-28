@@ -35,3 +35,16 @@ export async function ensureLeadEntryTaskToken(payload: Payload, id: number, can
 export async function markLeadEntryTaskSent(payload: Payload, id: number, dueAt: string): Promise<void> {
   await db(payload).execute(sql`update bootcamp_leads set entry_task_sent_at = now(), entry_task_due_at = ${dueAt}, updated_at = now() where id = ${id}`)
 }
+
+export type LeadEntrySubmission = {
+  passed: number
+  total: number
+  result: string
+  solution: string
+  solutions: Record<string, string>
+}
+
+/** Последняя отправка решения входного задания: счётчик растёт, прежний код заменяется. */
+export async function markLeadEntrySubmitted(payload: Payload, id: number, input: LeadEntrySubmission): Promise<void> {
+  await db(payload).execute(sql`update bootcamp_leads set entry_submitted_at = now(), entry_submission_count = coalesce(entry_submission_count, 0) + 1, entry_passed = ${input.passed}, entry_total = ${input.total}, entry_result = ${input.result}, entry_solution = ${input.solution}, entry_solutions = ${JSON.stringify(input.solutions)}::jsonb, updated_at = now() where id = ${id}`)
+}

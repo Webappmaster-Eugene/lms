@@ -4,6 +4,8 @@ import { logger } from '@/lib/telemetry'
 import { saveBootcampLead } from '@/server/bootcamp-leads'
 import { readRequestJson, RequestBodyError } from '@/server/read-json-body'
 import { trustedClientIp } from '@/server/client-ip'
+// Форма живёт на лендинге, а nginx лендинга проксирует сюда тот же путь: запрос приходит с того же origin.
+import { foreignPage } from '@/server/foreign-page'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
 
 export const dynamic = 'force-dynamic'
@@ -15,22 +17,6 @@ const overall = createRateLimiter('bootcamp-leads-all', 200, WINDOW_MS)
 
 const response = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   Response.json(body, { status, headers: { 'Cache-Control': 'no-store', ...headers } })
-
-/**
- * Форма живёт на лендинге, а nginx лендинга проксирует сюда тот же путь: запрос
- * приходит с того же origin. Чужие страницы не отправляют заявки руками посетителей.
- */
-function foreignPage(headers: Headers): boolean {
-  if (['cross-site', 'same-site'].includes(headers.get('sec-fetch-site') ?? '')) return true
-  const origin = headers.get('origin')
-  if (!origin) return false
-  const host = headers.get('x-forwarded-host') ?? headers.get('host')
-  try {
-    return new URL(origin).host !== host
-  } catch {
-    return true
-  }
-}
 
 /** POST /api/bootcamp/leads — предзапись с лендинга без входа в LMS. */
 export async function POST(request: Request) {

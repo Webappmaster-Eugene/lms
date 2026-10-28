@@ -37,7 +37,7 @@ function setup(form: HTMLFormElement) {
   /** Фокус уводится только при отправке: при переходе Tab между полями он должен идти своим порядком. */
   function validate(): boolean {
     checkEmail()
-    showError('consent', consent.checked ? '' : 'Отметьте согласие, без него заявку не сохранить.')
+    showError('consent', consent.checked ? '' : 'Отметьте согласие, чтобы мы могли принять заявку.')
     const firstInvalid = [email, consent].find((input) => input.getAttribute('aria-invalid') === 'true')
     firstInvalid?.focus()
     return !firstInvalid

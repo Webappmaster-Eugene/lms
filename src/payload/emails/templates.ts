@@ -294,7 +294,7 @@ export function bootcampLeadEmail({ id, address, name, program, source }: Bootca
   const rows: [string, string][] = [['Email', address], ['Имя', name ?? 'не указано'], ['Программа', program], ['Откуда', source]]
   return email(
     `Новая заявка на буткемп: ${address}`,
-    `Заявка от ${address}: ответьте и пришлите входное задание.`,
+    `Заявка от ${address}: входное задание ушло кандидату автоматически.`,
     'Новая заявка на буткемп',
     `${paragraph('С лендинга пришла предзапись. Ответьте человеку и отметьте этап заявки в CMS.')}
     ${notice(rows.map(([title, value]) => `<strong style="color:#27272a;">${escapeHtml(title)}</strong><br><span style="word-break:break-all;">${escapeHtml(value)}</span>`).join('<br><br>'))}
@@ -310,16 +310,17 @@ type BootcampEntryTaskEmailInput = {
   url: string
   dueDate: string
   reviewDays: number
+  minutes: string
   replyable: boolean
 }
 
 /** Кандидату сразу после заявки: личная ссылка на входное задание и сроки. */
-export function bootcampEntryTaskEmail({ name, program, url, dueDate, reviewDays, replyable }: BootcampEntryTaskEmailInput): EmailContent {
+export function bootcampEntryTaskEmail({ name, program, url, dueDate, reviewDays, minutes, replyable }: BootcampEntryTaskEmailInput): EmailContent {
   const hello = name?.trim() ? `Здравствуйте, ${name.trim()}!` : 'Здравствуйте!'
   const intro = `Спасибо за заявку на буткемп ${program}. Входное задание ждёт вас на платформе MentorCareer по личной ссылке. Она открывает только ваше задание, поэтому не пересылайте её.`
-  const terms = `Срок: до ${dueDate} включительно. На задание обычно уходит 3-4 часа. Как сдать решение, написано на странице задания. Мы ответим в течение ${reviewDays} дней после сдачи.`
-  const reply = replyable ? 'Если появятся вопросы, просто ответьте на это письмо.' : ''
-  const reason = 'Вы получили это письмо, потому что оставили заявку на буткемп на info.mentorcareer.ru. Если заявку оставили не вы, просто удалите письмо.'
+  const terms = `Задание решается прямо на странице, ничего устанавливать не нужно: три небольшие функции на JavaScript, обычно на них уходит ${minutes} минут. Решение отправляется кнопкой на той же странице, срок до ${dueDate} включительно. Мы ответим в течение ${reviewDays} дней после отправки.`
+  const reply = replyable ? 'Если появятся вопросы, ответьте на это письмо.' : ''
+  const reason = 'Вы получили это письмо, потому что оставили заявку на буткемп на info.mentorcareer.ru. Если заявку оставили не вы, письмо можно удалить.'
   return email(
     `Входное задание буткемпа ${program}`,
     `Личная ссылка на входное задание, срок до ${dueDate}.`,
@@ -332,6 +333,34 @@ export function bootcampEntryTaskEmail({ name, program, url, dueDate, reviewDays
     ${reply ? paragraph(escapeHtml(reply)) : ''}`,
     `${hello}\n\n${intro}\n\nОткрыть входное задание: ${url}\n\n${terms}${reply ? `\n\n${reply}` : ''}`,
     { html: `<p style="margin:0;">${escapeHtml(reason)}</p>`, text: reason },
+  )
+}
+
+type BootcampEntrySubmissionEmailInput = {
+  id: number | string
+  address: string
+  name: string | null
+  passed: number
+  total: number
+  tasks: { title: string, passed: number, total: number, attempted: boolean }[]
+  reviewDays: number
+}
+
+/** Команде: кандидат отправил решение входного задания, тесты уже прогнал сервер. */
+export function bootcampEntrySubmissionEmail({ id, address, name, passed, total, tasks, reviewDays }: BootcampEntrySubmissionEmailInput): EmailContent {
+  const url = `${BASE_URL}/admin/collections/bootcamp-leads/${encodeURIComponent(String(id))}`
+  const who = name?.trim() ? `${name.trim()} (${address})` : address
+  const intro = `Пришло решение входного задания от ${who}. Тесты прогнал сервер: пройдено ${passed} из ${total}. Код и итог по задачам открыты в заявке. Кандидату обещан ответ в течение ${reviewDays} дней.`
+  const rows = tasks.map((task) => `${task.title}: ${task.attempted ? `${task.passed} из ${task.total}` : 'не решалась'}`)
+  return email(
+    `Решение входного задания: ${address}, ${passed} из ${total}`,
+    `Пройдено ${passed} из ${total} тестов, код в заявке.`,
+    'Решение входного задания',
+    `${paragraph(escapeHtml(intro))}
+    ${notice(rows.map(escapeHtml).join('<br>'))}
+    ${button('Открыть заявку', url)}
+    ${fallbackLink(url)}`,
+    `${intro}\n\n${rows.join('\n')}\n\nОткрыть заявку: ${url}`,
   )
 }
 

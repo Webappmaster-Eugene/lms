@@ -72,27 +72,32 @@ export async function saveBootcampLead(payload: Payload, input: BootcampLeadInpu
   return { outcome: 'repeat', notification: entryTaskResendDue(lead) ? sendEntryTask(payload, lead) : Promise.resolve() }
 }
 
+/** Адреса действующих администраторов: им уходят письма о заявках и решениях входного задания. */
+export async function adminEmails(payload: Payload): Promise<string[]> {
+  const admins = await collectAllPages(
+    ({ page, limit }) => payload.find({
+      collection: 'users',
+      where: { role: { equals: 'admin' } },
+      select: { email: true, isActive: true },
+      depth: 0,
+      sort: 'id',
+      page,
+      limit,
+      overrideAccess: true,
+    }),
+    { label: 'администраторы' },
+  )
+  // .invalid по RFC 2606 не доставляется: временные учётки проверок дали бы отказы почты.
+  return admins.filter((admin) => admin.isActive !== false && admin.email && !admin.email.endsWith('.invalid')).map((admin) => admin.email)
+}
+
 async function notifyTeam(payload: Payload, lead: BootcampLead): Promise<void> {
   if (!teamMail.take('all')) {
     logger.warn('Bootcamp lead saved without team email: hourly mail limit reached', { 'lead.id': lead.id })
     return
   }
   try {
-    const admins = await collectAllPages(
-      ({ page, limit }) => payload.find({
-        collection: 'users',
-        where: { role: { equals: 'admin' } },
-        select: { email: true, isActive: true },
-        depth: 0,
-        sort: 'id',
-        page,
-        limit,
-        overrideAccess: true,
-      }),
-      { label: 'администраторы' },
-    )
-    // .invalid по RFC 2606 не доставляется: временные учётки проверок дали бы отказы почты.
-    const recipients = admins.filter((admin) => admin.isActive !== false && admin.email && !admin.email.endsWith('.invalid')).map((admin) => admin.email)
+    const recipients = await adminEmails(payload)
     if (recipients.length === 0) {
       logger.warn('Bootcamp lead saved, but no admin address to notify', { 'lead.id': lead.id })
       return

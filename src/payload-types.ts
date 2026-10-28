@@ -1779,6 +1779,21 @@ export interface BootcampLead {
    */
   entryTaskSentAt?: string | null;
   entryTaskDueAt?: string | null;
+  entrySubmittedAt?: string | null;
+  entrySubmissionCount?: number | null;
+  entryPassed?: number | null;
+  entryTotal?: number | null;
+  entryResult?: string | null;
+  entrySolution?: string | null;
+  entrySolutions?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -2945,6 +2960,13 @@ export interface BootcampLeadsSelect<T extends boolean = true> {
   entryTaskToken?: T;
   entryTaskSentAt?: T;
   entryTaskDueAt?: T;
+  entrySubmittedAt?: T;
+  entrySubmissionCount?: T;
+  entryPassed?: T;
+  entryTotal?: T;
+  entryResult?: T;
+  entrySolution?: T;
+  entrySolutions?: T;
   updatedAt?: T;
   createdAt?: T;
 }

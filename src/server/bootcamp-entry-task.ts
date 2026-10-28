@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Payload } from 'payload'
 
+import { ENTRY_TASK_MINUTES } from '@/data/bootcamp-entry/tasks'
 import { entryTaskDueAt, entryTaskPath, ENTRY_TASK_REVIEW_DAYS, formatEntryTaskDate, isEntryTaskToken } from '@/lib/bootcamp-entry-task'
 import { BOOTCAMP_PROGRAMS } from '@/lib/bootcamp-leads'
 import { logger } from '@/lib/telemetry'
@@ -80,10 +81,6 @@ export async function sendEntryTask(payload: Payload, lead: BootcampLead): Promi
   if (sending.has(lead.id)) return
   sending.add(lead.id)
   try {
-    if (!(await currentEntryTask(payload, lead.program))) {
-      logger.warn('Bootcamp entry task was not emailed: no active task for the program', { 'lead.id': lead.id, 'lead.program': lead.program })
-      return
-    }
     if (!candidateMail.take('all')) {
       logger.warn('Bootcamp entry task was not emailed: hourly mail limit reached', { 'lead.id': lead.id })
       return
@@ -99,6 +96,7 @@ export async function sendEntryTask(payload: Payload, lead: BootcampLead): Promi
       url: `${emailBaseUrl()}${entryTaskPath(token)}`,
       dueDate: formatEntryTaskDate(dueAt),
       reviewDays: ENTRY_TASK_REVIEW_DAYS,
+      minutes: ENTRY_TASK_MINUTES,
       replyable: Boolean(replyTo),
     })
     await payload.sendEmail({ to: lead.email, ...content, ...(replyTo ? { replyTo } : {}) })

@@ -3,6 +3,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { GET as downloadEntryTask } from '@/app/(entry-task)/entry-task/[token]/download/route'
 import { POST } from '@/app/api/bootcamp/leads/route'
+import { POST as checkEntry } from '@/app/api/entry-task/[token]/check/route'
+import { POST as submitEntry } from '@/app/api/entry-task/[token]/submit/route'
+import { ENTRY_TASKS } from '@/data/bootcamp-entry/tasks'
 import { logger } from '@/lib/telemetry'
 import { ENTRY_TASK_RESEND_AFTER_MS } from '@/server/bootcamp-entry-task'
 import { captureEmails, createAdmin, createStudent, getTestPayload, login, rest, uid, type TestUser } from '../helpers/payload'
@@ -51,6 +54,16 @@ function send(body: unknown, { ip = nextIp(), headers = {} as Record<string, str
 }
 
 const lead = (email: string, extra: Record<string, unknown> = {}) => ({ program: 'nodejs', email, name: 'Иван', consent: true, consentVersion: '2026-10-26', ...extra })
+
+type EntryRoute = (request: Request, context: { params: Promise<{ token: string }> }) => Promise<Response>
+
+function entryRequest(route: EntryRoute, token: string, body: unknown, headers: Record<string, string> = {}) {
+  return route(new Request(`http://lms.test/api/entry-task/${token}/x`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Host: 'lms.test', Origin: 'http://lms.test', 'Sec-Fetch-Site': 'same-origin', ...headers },
+    body: JSON.stringify(body),
+  }), { params: Promise.resolve({ token }) })
+}
 
 async function stored(email: string) {
   return (await payload.find({ collection: 'bootcamp-leads', where: { email: { equals: email } }, depth: 0, overrideAccess: true })).docs
@@ -205,6 +218,66 @@ describe('POST /api/bootcamp/leads: предзапись с лендинга', (
       expect(again?.entryTaskToken).toBe(first?.entryTaskToken)
       expect(again?.entryTaskDueAt).toBe(first?.entryTaskDueAt)
       expect(mail.sent.find((message) => message.to === email)?.text).toContain(`/entry-task/${first?.entryTaskToken}`)
+    } finally {
+      mail.restore()
+    }
+  })
+
+  it('«Проверить» прогоняет тесты задачи на сервере и ничего не пишет в заявку', async () => {
+    const email = `${uid('check')}@mail.test`
+    expect((await send(lead(email))).status).toBe(200)
+    const [row] = await stored(email)
+    const token = row?.entryTaskToken ?? ''
+    const [price] = ENTRY_TASKS
+    const solved = await entryRequest(checkEntry, token, { task: price?.slug, code: price?.solutionCode })
+    expect(solved.status).toBe(200)
+    const body = await solved.json() as { result: { status: string, passedCount: number } }
+    expect(body.result.status).toBe('passed')
+    expect(body.result.passedCount).toBe(price?.cases.length)
+    const wrong = await (await entryRequest(checkEntry, token, { task: price?.slug, code: 'function rentalPrice(p, d) { return p * d }' })).json() as { result: { status: string } }
+    expect(wrong.result.status).toBe('failed')
+    expect((await entryRequest(checkEntry, token, { task: 'nope', code: 'x' })).status).toBe(400)
+    expect((await entryRequest(checkEntry, token, { task: price?.slug, code: '   ' })).status).toBe(400)
+    expect((await entryRequest(checkEntry, 'A'.repeat(32), { task: price?.slug, code: price?.solutionCode })).status).toBe(404)
+    expect((await entryRequest(checkEntry, token, { task: price?.slug, code: price?.solutionCode }, { 'Sec-Fetch-Site': 'cross-site' })).status).toBe(403)
+    expect((await stored(email))[0]?.entrySubmittedAt).toBeFalsy()
+  })
+
+  it('«Отправить решение» пишет в заявку код и итог, команде уходит письмо, повтор заменяет прежний код', async () => {
+    const email = `${uid('submit')}@mail.test`
+    expect((await send(lead(email))).status).toBe(200)
+    await vi.waitFor(async () => expect((await stored(email))[0]?.entryTaskSentAt).toBeTruthy())
+    const [row] = await stored(email)
+    const token = row?.entryTaskToken ?? ''
+    const [price, overlap, summary] = ENTRY_TASKS
+    expect((await entryRequest(submitEntry, token, { solutions: {} })).status).toBe(400)
+    const mail = captureEmails(payload)
+    try {
+      const first = await entryRequest(submitEntry, token, { solutions: { [price?.slug ?? '']: price?.solutionCode, [overlap?.slug ?? '']: 'function overlaps(a, b) { return false }' } })
+      expect(first.status).toBe(200)
+      const result = await first.json() as { passed: number, total: number, tasks: { slug: string, attempted: boolean, passed: number }[] }
+      const total = ENTRY_TASKS.reduce((sum, task) => sum + task.cases.length, 0)
+      expect(result.total).toBe(total)
+      expect(result.tasks.find((task) => task.slug === price?.slug)?.passed).toBe(price?.cases.length)
+      expect(result.tasks.find((task) => task.slug === summary?.slug)?.attempted).toBe(false)
+      const [saved] = await stored(email)
+      expect(saved?.entrySubmissionCount).toBe(1)
+      expect(saved?.entryPassed).toBe(result.passed)
+      expect(saved?.entryTotal).toBe(total)
+      expect(saved?.entrySolution).toContain('return false')
+      expect(saved?.entryResult).toContain('Сводка по каталогу: не решалась')
+      expect((saved?.entrySolutions as Record<string, string>)[overlap?.slug ?? '']).toContain('return false')
+      // Заявка не потеряла поля, которые пишут другие процессы.
+      expect(saved?.entryTaskToken).toBe(token)
+      expect(saved?.entryTaskSentAt).toBe(row?.entryTaskSentAt)
+      await vi.waitFor(() => expect(mail.sent.find((message) => message.to === admin.email)?.subject).toBe(`Решение входного задания: ${email}, ${result.passed} из ${total}`))
+
+      const again = await entryRequest(submitEntry, token, { solutions: { [overlap?.slug ?? '']: overlap?.solutionCode } })
+      expect(again.status).toBe(200)
+      const [replaced] = await stored(email)
+      expect(replaced?.entrySubmissionCount).toBe(2)
+      expect(replaced?.entrySolution).not.toContain('return false')
+      expect(replaced?.entrySolution).toContain('// 1. Стоимость аренды: не решалась')
     } finally {
       mail.restore()
     }

@@ -3,6 +3,7 @@ import { expect, test, type APIRequestContext } from '@playwright/test'
 import { USERS } from '../fixtures/data'
 import { APP_URL, LANDING_URL, LANDING_USE } from '../fixtures/env'
 import { zipOf } from '../../fixtures/zip'
+import { ENTRY_TASKS } from '../../../src/data/bootcamp-entry/tasks'
 
 /**
  * Страница буткемпа и форма предзаписи: заявка идёт через тот же путь, что в проде
@@ -22,7 +23,7 @@ async function adminLeads(request: APIRequestContext, email: string) {
   const token = await adminToken(request)
   const found = await request.get(`${APP_URL}/api/bootcamp-leads?where[email][equals]=${encodeURIComponent(email)}&depth=0`, { headers: { Authorization: `JWT ${token}` } })
   expect(found.status()).toBe(200)
-  return (await found.json() as { docs: { email: string; name: string | null; submissionCount: number; source: { utmSource: string | null }; entryTaskToken: string | null }[] }).docs
+  return (await found.json() as { docs: { email: string; name: string | null; submissionCount: number; source: { utmSource: string | null }; entryTaskToken: string | null; entrySubmissionCount: number | null }[] }).docs
 }
 
 test('страница: метаданные, CSP без нарушений, адрес без косой черты ведёт на канонический', async ({ page, request }) => {
@@ -221,7 +222,7 @@ test('оплата, качество, политика и согласие: св
   expect(llms).not.toMatch(/[—–]/)
 })
 
-test('входное задание: личная страница открывается без входа, отдаёт архив и не индексируется', async ({ page, request }) => {
+test('входное задание: личная страница без входа, проверка в браузере, отправка решения и прежний архив', async ({ page, request }) => {
   const archive = zipOf('README.md', '# Задание')
   const uploaded = await request.post(`${APP_URL}/api/bootcamp-entry-tasks`, {
     headers: { Authorization: `JWT ${await adminToken(request)}`, Origin: APP_URL },
@@ -244,12 +245,34 @@ test('входное задание: личная страница открыв�
 
   const response = await page.goto(`${APP_URL}/entry-task/${token}`)
   expect(response?.status()).toBe(200)
-  // Заголовок README не дублирует h1 страницы.
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Входное задание буткемпа Node.js')
-  await expect(page.locator('main')).toContainText('Иван, ниже условие задания')
+  await expect(page.locator('main')).toContainText('Иван, спасибо за заявку')
   expect(await page.title()).toBe('Входное задание буткемпа - MentorCareer')
-  await expect(page.getByRole('heading', { level: 2, name: 'Условие задания' })).toBeVisible()
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/)
+  for (const task of ENTRY_TASKS) await expect(page.getByRole('heading', { level: 2, name: new RegExp(task.title) })).toBeVisible()
+  expect(await page.locator('main').innerText()).not.toMatch(/[—–]/)
+
+  // Заготовка проверяется на сервере и не проходит: кандидат сразу видит, что тесты работают.
+  await page.getByRole('button', { name: 'Проверить' }).first().click()
+  await expect(page.getByText('Часть тестов не пройдена').first()).toBeVisible()
+  await page.getByRole('button', { name: 'Отправить решение' }).click()
+  await expect(page.getByRole('alert').filter({ hasText: 'Решите хотя бы одну задачу' })).toBeVisible()
+
+  const [price] = ENTRY_TASKS
+  const submitted = await request.post(`${APP_URL}/api/entry-task/${token}/submit`, {
+    headers: { Origin: APP_URL, 'Sec-Fetch-Site': 'same-origin' },
+    data: { solutions: { [price?.slug ?? '']: price?.solutionCode } },
+  })
+  expect(submitted.status()).toBe(200)
+  await page.reload()
+  await expect(page.locator('main')).toContainText(`пройдено ${price?.cases.length} из`)
+  const [saved] = await adminLeads(request, email)
+  expect(saved?.entrySubmissionCount).toBe(1)
+
+  await page.setViewportSize({ width: 375, height: 812 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0)
+
+  // Прежнее задание с архивом осталось и отдаётся по той же ссылке, если наставник пришлёт её отдельно.
   const download = await request.get(`${APP_URL}/entry-task/${token}/download`)
   expect(download.status()).toBe(200)
   expect(download.headers()['content-type']).toBe('application/zip')
