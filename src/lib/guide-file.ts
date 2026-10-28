@@ -53,7 +53,7 @@ function readFrontmatter(block: string): { fields: GuideFileFields; problems: st
     else if (key === 'category') fields.category = value
     else if (key === 'reviewed' || key === 'reviewby') {
       const date = headerDate(value)
-      if (!date) problems.push(`${pair[1]}: «${value}» — нужна дата вида 2026-10-22`)
+      if (!date) problems.push(`${pair[1]}: «${value}» - нужна дата вида 2026-10-22`)
       else if (key === 'reviewed') fields.reviewedAt = date
       else fields.reviewBy = date
     }

@@ -44,7 +44,7 @@ import { AUTHOR_URL, LMS_URL } from '../config'
           <figure class="intro-preview">
             <div class="preview-toolbar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v14c-3-1-6-1-9 1-3-2-6-2-9-1zM12 6v14" /></svg><span>Ваш учебный кабинет</span></div>
             <div class="preview-image">{/* На узком экране превью скрыто: пустой источник не даёт зря скачивать картинку. */}<picture><source media="(max-width: 1200px)" srcset="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" /><img src="/guide/dashboard.webp" alt="Учебный кабинет с кнопкой продолжения урока и вашим прогрессом" width="1440" height="1000" fetchpriority="high" /></picture></div>
-            <figcaption><span class="preview-check" aria-hidden="true">✓</span><span>Один следующий шаг — и вы снова в обучении.</span><a href="#navigation" aria-label="Узнать, как устроен учебный кабинет"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></a></figcaption>
+            <figcaption><span class="preview-check" aria-hidden="true">✓</span><span>Один следующий шаг - и вы снова в обучении.</span><a href="#navigation" aria-label="Узнать, как устроен учебный кабинет"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></a></figcaption>
           </figure>
         </div>
         <div class="quick-start">
@@ -56,8 +56,8 @@ import { AUTHOR_URL, LMS_URL } from '../config'
             <li><a href="#trainer"><span>4</span><strong>Закрепите на практике</strong><small>Проверьте код и отправьте решение</small></a></li>
           </ol>
         </div>
-        <div class="reading-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 3 14 9-7 1-3 7z" /></svg><p><strong>Скриншоты можно смотреть по шагам.</strong> <span class="note-wide">Нажмите «Показать шаги» — инструкция приблизит нужное место на экране и по очереди объяснит, что делать.</span><span class="note-narrow">Снимок сразу приближен к первому шагу. Чтобы перейти к следующему, нажмите стрелку над снимком или проведите по нему пальцем. Кнопка «Весь экран» откроет снимок крупно, его можно прокручивать в любую сторону.</span></p></div>
-        <p class="sample-note">На скриншотах — демонстрационный аккаунт и учебные примеры. Названия ваших курсов и количество материалов могут отличаться.</p>
+        <div class="reading-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 3 14 9-7 1-3 7z" /></svg><p><strong>Скриншоты можно смотреть по шагам.</strong> <span class="note-wide">Нажмите «Показать шаги» - инструкция приблизит нужное место на экране и по очереди объяснит, что делать.</span><span class="note-narrow">Снимок сразу приближен к первому шагу. Чтобы перейти к следующему, нажмите стрелку над снимком или проведите по нему пальцем. Кнопка «Весь экран» откроет снимок крупно, его можно прокручивать в любую сторону.</span></p></div>
+        <p class="sample-note">На скриншотах - демонстрационный аккаунт и учебные примеры. Названия ваших курсов и количество материалов могут отличаться.</p>
       </section>
       {CHAPTERS.map((chapter, i) => (
         <section class="chapter" id={chapter.id} data-chapter>
@@ -78,14 +78,14 @@ import { AUTHOR_URL, LMS_URL } from '../config'
       </section>
       <section class="chapter final-chapter" id="checklist" data-chapter>
         <h2>Готовы к первому занятию?</h2>
-        <p class="section-intro">Отметьте действия, которые уже сделали. Этот список — ваша памятка в текущем браузере.</p>
+        <p class="section-intro">Отметьте действия, которые уже сделали. Этот список - ваша памятка в текущем браузере.</p>
         <fieldset class="checklist"><legend class="sr-only">Чек-лист первого занятия</legend>
           {['Войти в свой аккаунт', 'Открыть роадмап и найти следующий шаг', 'Изучить первый урок', 'Сохранить заметку с главными выводами', 'Нажать «Отметить пройденным»', 'Решить подходящую задачу и нажать «Отправить»'].map((label, i) => <label><input type="checkbox" data-check={i} /><span>{label}</span></label>)}
         </fieldset>
         <p class="checklist-progress" role="status">Выполнено <span data-check-count>0</span> из 6</p>
         <a href={LMS_URL} class="button">Открыть платформу и начать</a>
       </section>
-      <footer class="site-footer"><div><a class="footer-brand" href="#top">MentorCareer</a><p>Инструкция по учебной платформе</p></div><nav aria-label="Ссылки в подвале"><a href={LMS_URL}>Открыть платформу</a><a href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Сайт автора — nadtocheev.ru</a><a href="#top">К началу страницы</a></nav></footer>
+      <footer class="site-footer"><div><a class="footer-brand" href="#top">MentorCareer</a><p>Инструкция по учебной платформе</p></div><nav aria-label="Ссылки в подвале"><a href={LMS_URL}>Открыть платформу</a><a href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Сайт автора - nadtocheev.ru</a><a href="#top">К началу страницы</a></nav></footer>
     </main>
   </div>
   <dialog class="image-dialog" aria-labelledby="image-dialog-title">

@@ -39,11 +39,11 @@ export function BookmarkButton({ target, initialId, className }: Props) {
         if (!res.ok) throw new Error(`POST /api/bookmarks → ${res.status}`)
         const data = (await res.json()) as { doc?: { id: number } }
         setId(data.doc?.id ?? null)
-        toast('Сохранено — ищите в «Сохранённом»', 'success')
+        toast('Сохранено - ищите в «Сохранённом»', 'success')
       }
     } catch (error) {
       console.error('Не удалось изменить закладку', error)
-      toast('Не удалось сохранить — попробуйте ещё раз', 'error')
+      toast('Не удалось сохранить - попробуйте ещё раз', 'error')
     } finally {
       setBusy(false)
     }

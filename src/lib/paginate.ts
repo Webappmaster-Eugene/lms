@@ -56,6 +56,6 @@ export async function collectAllPages<T>(
 
   throw new Error(
     `${label}: превышен предохранитель в ${maxPages} страниц по ${pageSize} документов ` +
-      `(собрано ${docs.length}). Это не повод поднимать предел — сузьте запрос.`,
+      `(собрано ${docs.length}). Это не повод поднимать предел - сузьте запрос.`,
   )
 }

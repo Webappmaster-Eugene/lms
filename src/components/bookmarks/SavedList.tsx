@@ -31,7 +31,7 @@ export function SavedList({ items: initial }: { items: SavedItem[] }) {
       toast('Убрано из сохранённого', 'info')
     } catch (error) {
       console.error('Не удалось убрать закладку', error)
-      toast('Не удалось убрать — попробуйте ещё раз', 'error')
+      toast('Не удалось убрать - попробуйте ещё раз', 'error')
     } finally {
       setRemoving(null)
     }

@@ -73,7 +73,7 @@ export default async function NotesPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="space-y-1">
         <h1 className="text-xl font-bold text-foreground sm:text-2xl">Мои заметки</h1>
-        <p className="text-sm text-muted-foreground">Всё, что вы записали по урокам, — в одном месте</p>
+        <p className="text-sm text-muted-foreground">Всё, что вы записали по урокам, - в одном месте</p>
       </div>
       <NotesList notes={entries} />
     </div>

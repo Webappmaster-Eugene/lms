@@ -43,7 +43,7 @@ export function AppSettings() {
       {notice && <p role="status" className="rounded-xl border border-border bg-accent p-4 text-sm">{notice}</p>}
       <section className="rounded-2xl border border-border bg-card p-5 sm:p-6" aria-labelledby="install-heading">
         <h2 id="install-heading" className="flex items-center gap-3 text-lg font-semibold"><Smartphone className="h-5 w-5 shrink-0" aria-hidden="true" />Приложение на телефоне</h2>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">Те же курсы, уроки и заметки — с иконкой на домашнем экране и без панели браузера.</p>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">Те же курсы, уроки и заметки - с иконкой на домашнем экране и без панели браузера.</p>
         {installed ? (
           <p className="mt-4 flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4" aria-hidden="true" />Вы уже открыли установленное приложение</p>
         ) : canInstall ? (

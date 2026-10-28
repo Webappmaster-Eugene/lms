@@ -39,7 +39,7 @@ export function MyQuestions({ threads }: { threads: QuestionThread[] }) {
           <MessageSquare className="h-8 w-8 text-muted-foreground" />
         </div>
         <p className="max-w-sm text-muted-foreground">
-          Вопросов пока нет. Задать вопрос ментору можно под любым уроком — ответ придёт уведомлением
+          Вопросов пока нет. Задать вопрос ментору можно под любым уроком - ответ придёт уведомлением
         </p>
         <Link href="/courses" className="text-sm font-medium text-primary underline-offset-2 hover:underline">
           К курсам

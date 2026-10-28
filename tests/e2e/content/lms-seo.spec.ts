@@ -77,7 +77,7 @@ test.describe('внутренние страницы', () => {
     ]
     for (const [path, title] of expected) {
       await page.goto(path)
-      await expect(page, path).toHaveTitle(`${title} — MentorCareer LMS`)
+      await expect(page, path).toHaveTitle(`${title} - MentorCareer LMS`)
     }
   })
 

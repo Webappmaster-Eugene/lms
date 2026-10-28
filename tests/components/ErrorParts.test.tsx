@@ -63,7 +63,7 @@ describe('код ошибки для поддержки', () => {
     vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn().mockRejectedValue(new Error('denied')) } })
     render(<ErrorReference value="abc" />)
     await press()
-    expect(screen.getByRole('button', { name: 'Не удалось скопировать — выделите код вручную' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Не удалось скопировать - выделите код вручную' })).toBeInTheDocument()
     expect(screen.getByText('abc')).toBeInTheDocument()
   })
 })

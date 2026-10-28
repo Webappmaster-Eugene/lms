@@ -97,7 +97,7 @@ export function runtimeCases(task: { runtimeCases?: unknown }, publicOnly = fals
       if (!record(row.viewport) || !Number.isSafeInteger(row.viewport.width) || !Number.isSafeInteger(row.viewport.height)
         || typeof row.viewport.width !== 'number' || typeof row.viewport.height !== 'number'
         || row.viewport.width < 320 || row.viewport.width > 1920 || row.viewport.height < 240 || row.viewport.height > 1200) {
-        throw new TrainerSpecError('Размер окна должен быть в пределах 320–1920 × 240–1200')
+        throw new TrainerSpecError('Размер окна должен быть в пределах 320-1920 × 240-1200')
       }
       viewport = { width: row.viewport.width, height: row.viewport.height }
     }

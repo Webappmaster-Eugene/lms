@@ -19,7 +19,7 @@ export function CustomProgramCases({ cases, onChange, disabled, exampleCase, lan
           Нажмите здесь, чтобы открыть пример.
         </span>
       </summary>
-      <p className="my-3 text-muted-foreground">В «Ввод» напишите текст, который программа прочитает из stdin. В «Ожидаемый вывод» — то, что она должна напечатать в stdout. Формат берите из условия: JSON-массив вводится целиком, например [2,3]. Нажмите «Запустить»: эти проверки дополнят публичные тесты и не повлияют на баллы.</p>
+      <p className="my-3 text-muted-foreground">В «Ввод» напишите текст, который программа прочитает из stdin. В «Ожидаемый вывод» - то, что она должна напечатать в stdout. Формат берите из условия: JSON-массив вводится целиком, например [2,3]. Нажмите «Запустить»: эти проверки дополнят публичные тесты и не повлияют на баллы.</p>
       {exampleCase && !exampleCase.hidden && <div className="mb-3 space-y-1 text-xs">
         <p className="font-medium">Пример текущей задачи</p>
         <p>Ввод:</p><pre className="overflow-auto rounded bg-muted p-2">{exampleCase.input ?? '(пусто)'}</pre>

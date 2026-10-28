@@ -52,7 +52,7 @@ function ClosedGuide() {
       <Lock className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden="true" />
       <h1 className="text-xl font-bold text-foreground">Этот гайд вам пока не открыт</h1>
       <p className="text-sm leading-relaxed text-muted-foreground">
-        Гайды выдаёт ментор. Если он вам нужен, напишите в разделе <Link href="/help#support" className="font-medium text-primary underline-offset-2 hover:underline">«Помощь»</Link> — откроем.
+        Гайды выдаёт ментор. Если он вам нужен, напишите в разделе <Link href="/help#support" className="font-medium text-primary underline-offset-2 hover:underline">«Помощь»</Link> - откроем.
       </p>
       <Link href="/guides" className="inline-flex min-h-[44px] items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
@@ -101,11 +101,11 @@ export default async function GuidePage({ params }: Props) {
         <header className="space-y-3">
           {(!guide.isPublished || showPublic) && (
             <div className="flex flex-wrap items-center gap-2">
-              {!guide.isPublished && <p className="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-muted-foreground">Черновик — ученики его пока не видят</p>}
+              {!guide.isPublished && <p className="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-muted-foreground">Черновик - ученики его пока не видят</p>}
               {showPublic && (
                 <p className={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium', guide.isPublished ? 'bg-success/10 text-success' : 'bg-secondary text-muted-foreground')}>
                   <Globe className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  {guide.isPublished ? 'Публичный — открывается без входа, ссылкой можно поделиться' : 'Публичный после публикации'}
+                  {guide.isPublished ? 'Публичный - открывается без входа, ссылкой можно поделиться' : 'Публичный после публикации'}
                 </p>
               )}
             </div>
@@ -151,12 +151,12 @@ export default async function GuidePage({ params }: Props) {
         {guide.isPublished && user && !isAdmin && <GuideFeedback guideId={guide.id} initial={readState} maxComment={GUIDE_FEEDBACK_MAX} />}
         {isAdmin && (
           <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-            Ученики видят здесь вопрос «Гайд помог?». Ответы — в CMS: <Link href={`/admin/collections/guide-reads?where[guide][equals]=${guide.id}`} className="font-medium text-primary underline-offset-2 hover:underline">прочтения и отзывы</Link>.
+            Ученики видят здесь вопрос «Гайд помог?». Ответы - в CMS: <Link href={`/admin/collections/guide-reads?where[guide][equals]=${guide.id}`} className="font-medium text-primary underline-offset-2 hover:underline">прочтения и отзывы</Link>.
           </p>
         )}
 
         <footer className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-          Что-то не получилось или остались вопросы? Напишите в разделе <Link href="/help#support" className="font-medium text-primary underline-offset-2 hover:underline">«Помощь»</Link> — подскажем.
+          Что-то не получилось или остались вопросы? Напишите в разделе <Link href="/help#support" className="font-medium text-primary underline-offset-2 hover:underline">«Помощь»</Link> - подскажем.
         </footer>
       </article>
 

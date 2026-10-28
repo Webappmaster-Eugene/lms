@@ -26,7 +26,7 @@ export function InstallInstructions({ guide }: { guide: InstallGuide }) {
 function InAppInstructions() {
   return (
     <div className="space-y-3">
-      <p>Сайт открыт внутри другого приложения — отсюда установка недоступна. Откройте его в Safari (iPhone) или Chrome (Android): в меню приложения, обычно «⋯», выберите «Открыть в браузере».</p>
+      <p>Сайт открыт внутри другого приложения - отсюда установка недоступна. Откройте его в Safari (iPhone) или Chrome (Android): в меню приложения, обычно «⋯», выберите «Открыть в браузере».</p>
       <CopyLink />
     </div>
   )
@@ -62,7 +62,7 @@ function CopyLink() {
         <Copy className="h-4 w-4" aria-hidden="true" />Скопировать ссылку
       </button>
       <p role="status" className="text-xs">
-        {state === 'copied' && 'Ссылка скопирована — вставьте её в адресную строку браузера.'}
+        {state === 'copied' && 'Ссылка скопирована - вставьте её в адресную строку браузера.'}
         {state === 'failed' && <>Скопируйте ссылку вручную: <span className="select-all break-all font-medium">{window.location.href}</span></>}
       </p>
     </>

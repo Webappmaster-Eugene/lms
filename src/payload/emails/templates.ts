@@ -82,7 +82,7 @@ function layout(preview: string, title: string, content: string, footer = DEFAUL
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
-  <title>${escapeHtml(title)} — MentorCareer</title>
+  <title>${escapeHtml(title)} - MentorCareer</title>
   <style>
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
@@ -156,23 +156,23 @@ export function inviteEmail(firstName: string, address: string, token: string, c
     'Ваш аккаунт готов. Задайте пароль и начните обучение. Ссылка действует 7 дней.',
     'Ваше обучение начинается здесь',
     `${paragraph(escapeHtml(greeting(firstName)))}
-    ${paragraph('Администратор создал для вас аккаунт MentorCareer. Осталось задать пароль — после этого вы сможете открыть назначенные вам учебные материалы.')}
+    ${paragraph('Администратор создал для вас аккаунт MentorCareer. Осталось задать пароль - после этого вы сможете открыть назначенные вам учебные материалы.')}
     ${notice(`<strong style="color:#27272a;">Ваш логин</strong><br><span style="word-break:break-all;">${escapeHtml(address)}</span>`)}
     <ol style="margin:0 0 18px;padding-left:22px;font-size:15px;line-height:1.7;color:#3f3f46;">${steps.map(step => `<li style="padding:0 0 8px 4px;">${escapeHtml(step)}</li>`).join('')}</ol>
     ${button('Задать пароль', url)}
     ${paragraph('<strong>Ссылка действует 7 дней и используется один раз.</strong> Выберите пароль, который не используете в других сервисах.')}
     ${fallbackLink(url)}
     ${paragraph(`Ссылка устарела? ${link('Запросите новую', `${BASE_URL}/forgot-password`)}. Уже задали пароль? ${link('Войдите в аккаунт', `${BASE_URL}/login`)}.`)}
-    ${community ? paragraph(`Вопросы по задачам, разборы и общение с другими учениками — в нашем чате. ${link('Вступить в чат учеников в Telegram', community)}.`) : ''}
+    ${community ? paragraph(`Вопросы по задачам, разборы и общение с другими учениками - в нашем чате. ${link('Вступить в чат учеников в Telegram', community)}.`) : ''}
     ${notice('Если вы не ожидали приглашения, уточните его у администратора, который выдал доступ. Не пересылайте это письмо: ссылка позволяет задать пароль к вашему аккаунту.')}`,
-    `${greeting(firstName)}\n\nАдминистратор создал для вас аккаунт MentorCareer.\nВаш логин: ${address}\n\n${steps.map((step, index) => `${index + 1}. ${step}`).join('\n')}\n\nЗадать пароль по ссылке:\n${url}\n\nСсылка действует 7 дней и используется один раз. Выберите пароль, который не используете в других сервисах.\n\nСсылка устарела? Запросите новую: ${BASE_URL}/forgot-password\nУже задали пароль? Войти: ${BASE_URL}/login\n\n${community ? `Чат учеников в Telegram — вопросы по задачам, разборы и общение:\n${community}\n\n` : ''}Если вы не ожидали приглашения, уточните его у администратора, который выдал доступ. Не пересылайте это письмо: ссылка позволяет задать пароль к вашему аккаунту.`,
+    `${greeting(firstName)}\n\nАдминистратор создал для вас аккаунт MentorCareer.\nВаш логин: ${address}\n\n${steps.map((step, index) => `${index + 1}. ${step}`).join('\n')}\n\nЗадать пароль по ссылке:\n${url}\n\nСсылка действует 7 дней и используется один раз. Выберите пароль, который не используете в других сервисах.\n\nСсылка устарела? Запросите новую: ${BASE_URL}/forgot-password\nУже задали пароль? Войти: ${BASE_URL}/login\n\n${community ? `Чат учеников в Telegram - вопросы по задачам, разборы и общение:\n${community}\n\n` : ''}Если вы не ожидали приглашения, уточните его у администратора, который выдал доступ. Не пересылайте это письмо: ссылка позволяет задать пароль к вашему аккаунту.`,
   )
 }
 
 export function resetPasswordEmail(firstName: string, token: string): EmailContent {
   const url = passwordSetupUrl(token)
   return email(
-    `Восстановление пароля — ${BRAND_NAME}`,
+    `Восстановление пароля - ${BRAND_NAME}`,
     'Ссылка для нового пароля действует 1 час. Если запрос не ваш, ничего делать не нужно.',
     'Задайте новый пароль',
     `${paragraph(escapeHtml(greeting(firstName)))}

@@ -6,7 +6,7 @@ export const SITE_DESCRIPTION =
   'Платформа обучения разработке MentorCareer: курсы Frontend и Backend, роадмапы, тренажёр кода с проверкой решений и сертификаты.'
 
 /** Лежит в /images: этот префикс middleware пропускает без входа, иначе краулер получит редирект на /login. */
-export const OG_IMAGE = { url: '/images/og.png', width: 1200, height: 630, alt: 'MentorCareer LMS — платформа обучения разработке' }
+export const OG_IMAGE = { url: '/images/og.png', width: 1200, height: 630, alt: 'MentorCareer LMS - платформа обучения разработке' }
 
 const PRODUCTION_URL = 'https://learn.mentorcareer.ru'
 
@@ -38,7 +38,7 @@ export function titleWithContext(title: string, context: string | null | undefin
 
 export const ROOT_METADATA: Metadata = {
   metadataBase: siteUrl(),
-  title: { template: `%s — ${SITE_NAME}`, default: SITE_NAME },
+  title: { template: `%s - ${SITE_NAME}`, default: SITE_NAME },
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
   robots: { index: false, follow: false, googleBot: { index: false, follow: false } },

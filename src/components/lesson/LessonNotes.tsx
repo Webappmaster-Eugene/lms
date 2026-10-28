@@ -165,7 +165,7 @@ export function LessonNotes({ lessonId }: Props) {
             <>
               {loadFailed && (
                 <p role="alert" className="text-sm text-destructive">
-                  Не удалось загрузить сохранённую заметку — обновите страницу, прежде чем писать новую
+                  Не удалось загрузить сохранённую заметку - обновите страницу, прежде чем писать новую
                 </p>
               )}
               <textarea
@@ -214,7 +214,7 @@ export function LessonNotes({ lessonId }: Props) {
               )}
               <div className="flex items-center justify-between">
                 <span id="lesson-note-hint" className="text-xs text-muted-foreground">
-                  <span>{note.length}/5000</span> · Ctrl/⌘+Enter — сохранить ·{' '}
+                  <span>{note.length}/5000</span> · Ctrl/⌘+Enter - сохранить ·{' '}
                   <Link href="/notes" className="underline-offset-2 hover:text-foreground hover:underline">
                     все заметки
                   </Link>

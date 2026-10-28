@@ -57,7 +57,7 @@ describe('читаемая краткая программа на карте', (
     expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(5)
     expect(screen.getByText('Контракты')).toBeInTheDocument()
     expect(screen.queryByText('Транзакции')).not.toBeInTheDocument()
-    expect(screen.getByText('Ещё 2 — в описании темы')).toBeInTheDocument()
+    expect(screen.getByText('Ещё 2 - в описании темы')).toBeInTheDocument()
   })
 
   it('показывает три курса и количество остальных вместо перегруженной карты', () => {
@@ -68,7 +68,7 @@ describe('читаемая краткая программа на карте', (
 
     expect(screen.getByText('Курс архитектуры 3')).toBeInTheDocument()
     expect(screen.queryByText('Курс архитектуры 4')).not.toBeInTheDocument()
-    expect(screen.getByText('Ещё 2 — в программе темы')).toBeInTheDocument()
+    expect(screen.getByText('Ещё 2 - в программе темы')).toBeInTheDocument()
     expect(screen.queryByText('Служебное описание не дублируется')).not.toBeInTheDocument()
   })
 

@@ -20,7 +20,7 @@ export const jsInterviewTopic: TrainerTopicSeed = {
         'binary-search',
         'livecoding',
       ],
-      descriptionMd: 'Реализуйте equalRange(numbers, target): вернуть [first, last] — индексы первого и последнего вхождения target в отсортированном по возрастанию массиве. Если значения нет, верните [-1, -1]. Массив не изменяйте. До100000 чисел, все значения — безопасные целые; повторы разрешены. Требуемая сложность O(log n), дополнительная память O(1). Пример: equalRange([1,2,2,2,5],2) → [1,3]. На интервью объясните две границы поиска и проверьте пустой массив. Это авторская задача для подготовки, а не подтверждённый вопрос компании.',
+      descriptionMd: 'Реализуйте equalRange(numbers, target): вернуть [first, last] - индексы первого и последнего вхождения target в отсортированном по возрастанию массиве. Если значения нет, верните [-1, -1]. Массив не изменяйте. До100000 чисел, все значения - безопасные целые; повторы разрешены. Требуемая сложность O(log n), дополнительная память O(1). Пример: equalRange([1,2,2,2,5],2) → [1,3]. На интервью объясните две границы поиска и проверьте пустой массив. Это авторская задача для подготовки, а не подтверждённый вопрос компании.',
       starterCodeTs: `function equalRange(numbers: readonly number[], target: number): number[] {
   return [-1, -1]
 }`,
@@ -38,7 +38,7 @@ export const jsInterviewTopic: TrainerTopicSeed = {
   const first = bound(false)
   return first < numbers.length && numbers[first] === target ? [first, bound(true) - 1] : [-1, -1]
 }`,
-      solutionNotes: 'Первый поиск находит нижнюю границу, второй — первую позицию строго большего элемента. Не обходите весь диапазон повторений.',
+      solutionNotes: 'Первый поиск находит нижнюю границу, второй - первую позицию строго большего элемента. Не обходите весь диапазон повторений.',
       hints: [
         'Работайте с полуинтервалом [left,right).',
         'Для последней позиции найдите upper bound и вычтите1.',
@@ -229,7 +229,7 @@ export const jsInterviewTopic: TrainerTopicSeed = {
         'sliding-window',
         'two-pointers',
       ],
-      descriptionMd: 'Реализуйте minimumWindow(values, target): длина самого короткого непрерывного фрагмента массива, сумма которого не меньше target. Если такого фрагмента нет, верните0. values содержит неотрицательные целые, target — положительное целое. Массив до100000 элементов; все промежуточные суммы безопасные целые JS. Требуются O(n) времени и O(1) памяти, вход менять нельзя. Пример: minimumWindow([2,3,1,2,4,3],7) →2. Объясните, почему два указателя корректны именно для неотрицательных значений.',
+      descriptionMd: 'Реализуйте minimumWindow(values, target): длина самого короткого непрерывного фрагмента массива, сумма которого не меньше target. Если такого фрагмента нет, верните0. values содержит неотрицательные целые, target - положительное целое. Массив до100000 элементов; все промежуточные суммы безопасные целые JS. Требуются O(n) времени и O(1) памяти, вход менять нельзя. Пример: minimumWindow([2,3,1,2,4,3],7) →2. Объясните, почему два указателя корректны именно для неотрицательных значений.',
       starterCodeTs: `function minimumWindow(values: readonly number[], target: number): number {
   return 0
 }`,
@@ -812,7 +812,7 @@ export const jsInterviewTopic: TrainerTopicSeed = {
         'hash-table',
         'arrays',
       ],
-      descriptionMd: 'Реализуйте firstUniqueRequest(keys): верните первый ключ массива, который встречается ровно один раз, или null, если такого ключа нет. Порядок — порядок исходного массива. Ключи — произвольные строки, включая пустую строку и __proto__, регистр важен. До100000 ключей. Не меняйте вход, используйте O(n) времени. Пример: ["a","b","a","c"] → "b".',
+      descriptionMd: 'Реализуйте firstUniqueRequest(keys): верните первый ключ массива, который встречается ровно один раз, или null, если такого ключа нет. Порядок - порядок исходного массива. Ключи - произвольные строки, включая пустую строку и __proto__, регистр важен. До100000 ключей. Не меняйте вход, используйте O(n) времени. Пример: ["a","b","a","c"] → "b".',
       starterCodeTs: `function firstUniqueRequest(keys: readonly string[]): string | null {
   return null
 }`,
@@ -975,7 +975,7 @@ export const jsInterviewTopic: TrainerTopicSeed = {
         'arrays',
         'objects',
       ],
-      descriptionMd: 'Реализуйте userOrderSummary(users, orders). users — массив {id:string,name:string} с уникальными id. orders — массив {userId:string,amount:number}; amount — целые копейки, может быть отрицательным (возврат). Верните новый массив {id,name,count,total} в порядке users. Заказы неизвестных пользователей игнорируйте; пользователь без заказов получает count:0,total:0. Все суммы безопасные целые, до10000 пользователей и100000 заказов. Вход не меняйте; O(users+orders). Пример users=[{id:"u",name:"Ира"}], orders=[{userId:"u",amount:70},{userId:"u",amount:-20}] → [{id:"u",name:"Ира",count:2,total:50}].',
+      descriptionMd: 'Реализуйте userOrderSummary(users, orders). users - массив {id:string,name:string} с уникальными id. orders - массив {userId:string,amount:number}; amount - целые копейки, может быть отрицательным (возврат). Верните новый массив {id,name,count,total} в порядке users. Заказы неизвестных пользователей игнорируйте; пользователь без заказов получает count:0,total:0. Все суммы безопасные целые, до10000 пользователей и100000 заказов. Вход не меняйте; O(users+orders). Пример users=[{id:"u",name:"Ира"}], orders=[{userId:"u",amount:70},{userId:"u",amount:-20}] → [{id:"u",name:"Ира",count:2,total:50}].',
       starterCodeTs: `type SummaryUser = { id: string; name: string }
 type SummaryOrder = { userId: string; amount: number }
 function userOrderSummary(users: readonly SummaryUser[], orders: readonly SummaryOrder[]): Array<SummaryUser & {count:number;total:number}> {
@@ -1451,7 +1451,7 @@ function userOrderSummary(users: readonly SummaryUser[], orders: readonly Summar
         'concurrency',
         'cancelation',
       ],
-      descriptionMd: 'Реализуйте settledPool(tasks, limit, signal). tasks — массив функций, возвращающих значение или Promise<number>. Одновременно начаты не больше limit задач; освободившийся слот сразу берёт следующую. Возвращается Promise массива в исходном порядке: {status:"fulfilled",value:number}, {status:"rejected",reason:string} или {status:"skipped"}. Ошибка одной задачи не останавливает другие; reason — error.message для Error, иначе String(error). После signal.aborted=true не начинайте новые задачи, но дождитесь уже начатых. signal — объект с readonly aborted:boolean (подходит AbortController.signal). До1000 задач. limit обязан быть положительным целым; иначе Promise отклоняется RangeError до первого запуска. Пустой вход даёт[]. Таймеры тестов виртуальные: await __clock.runAll() или tick(ms), реальный sleep не нужен. Автотесты проверяют порядок, лимит, синхронные исключения, отклонения и пропуск очереди при отмене.',
+      descriptionMd: 'Реализуйте settledPool(tasks, limit, signal). tasks - массив функций, возвращающих значение или Promise<number>. Одновременно начаты не больше limit задач; освободившийся слот сразу берёт следующую. Возвращается Promise массива в исходном порядке: {status:"fulfilled",value:number}, {status:"rejected",reason:string} или {status:"skipped"}. Ошибка одной задачи не останавливает другие; reason - error.message для Error, иначе String(error). После signal.aborted=true не начинайте новые задачи, но дождитесь уже начатых. signal - объект с readonly aborted:boolean (подходит AbortController.signal). До1000 задач. limit обязан быть положительным целым; иначе Promise отклоняется RangeError до первого запуска. Пустой вход даёт[]. Таймеры тестов виртуальные: await __clock.runAll() или tick(ms), реальный sleep не нужен. Автотесты проверяют порядок, лимит, синхронные исключения, отклонения и пропуск очереди при отмене.',
       starterCodeTs: `type PoolOutcome = {status:'fulfilled';value:number} | {status:'rejected';reason:string} | {status:'skipped'}
 async function settledPool(tasks: Array<() => number | Promise<number>>, limit: number, signal: {readonly aborted:boolean}): Promise<PoolOutcome[]> {
   return []
@@ -1590,7 +1590,7 @@ __tr.register({name:'невалидный лимит не запускает р�
           checkedAt: '2026-10-10',
         },
       ],
-      descriptionMd: 'Соберите categoryTree(categories): записи {id,name,parent?} превратите в корень {id,name,next:[...]}. Корень id0 без parent; остальные ссылаются на существующего родителя. Вход гарантированно описывает связное дерево с уникальными неотрицательными id; порядок записей произвольный. В next сохраняйте порядок появления детей во входе, для листа next:[]. До10000 категорий; вход не изменяйте. JS/TS-контракт — учебная адаптация опубликованного отбора Route 256, не frontend-интервью.',
+      descriptionMd: 'Соберите categoryTree(categories): записи {id,name,parent?} превратите в корень {id,name,next:[...]}. Корень id0 без parent; остальные ссылаются на существующего родителя. Вход гарантированно описывает связное дерево с уникальными неотрицательными id; порядок записей произвольный. В next сохраняйте порядок появления детей во входе, для листа next:[]. До10000 категорий; вход не изменяйте. JS/TS-контракт - учебная адаптация опубликованного отбора Route 256, не frontend-интервью.',
       starterCodeTs: `type InputCategory = {id:number;name:string;parent?:number}
 type CategoryNode = {id:number;name:string;next:CategoryNode[]}
 function categoryTree(categories: readonly InputCategory[]): CategoryNode {
@@ -2129,7 +2129,7 @@ __tr.register({name:'исходные аргументы не меняются',
           checkedAt: '2026-10-10',
         },
       ],
-      descriptionMd: 'Реализуйте encodeRuns(text): замените каждую серию одинаковых соседних Unicode code points парой [character,count] и верните массив пар. Пустая строка даёт[]. Цифры и пробелы — обычные символы. Считайте code points, как for...of, а не UTF-16 единицы или пользовательские графемы; нормализацию не выполняйте. До100000 code points. Например "яя😀😀3" → [["я",2],["😀",2],["3",1]]. Это адаптация официального Amazon coding demo с нашим однозначным JSON-форматом, не обещание вопроса на будущем интервью.',
+      descriptionMd: 'Реализуйте encodeRuns(text): замените каждую серию одинаковых соседних Unicode code points парой [character,count] и верните массив пар. Пустая строка даёт[]. Цифры и пробелы - обычные символы. Считайте code points, как for...of, а не UTF-16 единицы или пользовательские графемы; нормализацию не выполняйте. До100000 code points. Например "яя😀😀3" → [["я",2],["😀",2],["3",1]]. Это адаптация официального Amazon coding demo с нашим однозначным JSON-форматом, не обещание вопроса на будущем интервью.',
       starterCodeTs: `function encodeRuns(text: string): Array<[string,number]> {
   return []
 }`,

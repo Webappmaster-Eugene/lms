@@ -66,7 +66,7 @@ export function ErrorScreen({ status, eyebrow, title, description, terminal, act
           <span className="h-2.5 w-2.5 rounded-full bg-destructive/70" />
           <span className="h-2.5 w-2.5 rounded-full bg-warning/70" />
           <span className="h-2.5 w-2.5 rounded-full bg-success/70" />
-          <span className="ml-2 truncate font-mono text-xs text-muted-foreground">mentorcareer — zsh</span>
+          <span className="ml-2 truncate font-mono text-xs text-muted-foreground">mentorcareer - zsh</span>
         </div>
         <pre className="overflow-x-auto px-4 py-3 font-mono text-[13px] leading-6">
           {terminal.map((line, index) => (

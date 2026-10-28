@@ -34,7 +34,7 @@ export function CodeBlock({ code, language, children }: { code: string; language
       <div className="flex flex-wrap items-center gap-x-3 border-b border-border bg-muted/60 py-0.5 pl-4 pr-1 text-xs text-muted-foreground">
         {label && <span className="font-mono">{label}</span>}
         <span role="status" className={state === 'failed' ? 'py-1 text-destructive' : 'sr-only'}>
-          {state === 'failed' ? 'Не удалось скопировать — выделите код вручную' : state === 'copied' ? 'Код скопирован' : ''}
+          {state === 'failed' ? 'Не удалось скопировать - выделите код вручную' : state === 'copied' ? 'Код скопирован' : ''}
         </span>
         <button
           type="button"

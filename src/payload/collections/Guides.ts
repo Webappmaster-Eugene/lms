@@ -98,7 +98,7 @@ export const Guides: CollectionConfig = {
       label: 'Категория',
       admin: {
         position: 'sidebar',
-        description: 'По ней ученик фильтрует список гайдов. Нет нужной — создайте кнопкой рядом',
+        description: 'По ней ученик фильтрует список гайдов. Нет нужной - создайте кнопкой рядом',
       },
     },
     {
@@ -118,7 +118,7 @@ export const Guides: CollectionConfig = {
       admin: {
         position: 'sidebar',
         date: { pickerAppearance: 'dayOnly', displayFormat: 'd MMMM yyyy' },
-        description: 'Пустое — через 3 месяца после проверки. Просроченные гайды видны над списком',
+        description: 'Пустое - через 3 месяца после проверки. Просроченные гайды видны над списком',
       },
     },
     {

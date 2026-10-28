@@ -91,7 +91,7 @@ describe('загрузка и поля презентации', () => {
 
     fireEvent.change(screen.getByLabelText('Загрузить картинки или PDF с компьютера'), { target: { files: [png('slide.png')] } })
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Загружено файлов: 0. Не загрузилось: 1 (slide.png) — проверьте формат (картинка или PDF), размер и соединение.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Загружено файлов: 0. Не загрузилось: 1 (slide.png) - проверьте формат (картинка или PDF), размер и соединение.')
     expect(screen.getByRole('alert')).not.toHaveTextContent('Сохраните урок')
     expect(names()).toEqual(['manual-0.png'])
   })

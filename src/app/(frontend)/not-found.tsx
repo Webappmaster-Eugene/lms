@@ -18,7 +18,7 @@ export default function FrontendNotFound() {
       terminal={[
         { kind: 'command', text: <>cd <CurrentPath /></> },
         { kind: 'error', text: 'no such file or directory' },
-        { kind: 'comment', text: 'урок мог переехать — загляните в каталог' },
+        { kind: 'comment', text: 'урок мог переехать - загляните в каталог' },
         { kind: 'hint', text: 'cd ~/courses' },
       ]}
       actions={

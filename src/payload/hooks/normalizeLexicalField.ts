@@ -35,7 +35,7 @@ function normalize(
   return normalizeLexicalValue(value, (bad) => {
     logger.warn(
       { value: bad, phase },
-      'richText field received a non-Lexical value — coercing to empty document',
+      'richText field received a non-Lexical value - coercing to empty document',
     )
   })
 }

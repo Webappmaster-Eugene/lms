@@ -125,7 +125,7 @@ export async function runSolution(
   if (code.length > TRAINER_LIMITS.maxCodeLength) {
     return failureResult(
       'error',
-      `Решение длиннее ${TRAINER_LIMITS.maxCodeLength} символов — сократите его`,
+      `Решение длиннее ${TRAINER_LIMITS.maxCodeLength} символов - сократите его`,
     )
   }
 

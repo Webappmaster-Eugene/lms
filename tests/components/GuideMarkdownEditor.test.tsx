@@ -94,7 +94,7 @@ describe('редактор гайда', () => {
     state.initial = 'Раздел'
     localStorage.setItem('guide-editor-mode', 'preview')
     editor()
-    await userEvent.click(screen.getByRole('button', { name: 'Раздел — пункт оглавления' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Раздел - пункт оглавления' }))
     expect(screen.getByRole('textbox')).toHaveValue('## Раздел')
     expect(within(screen.getByLabelText('Предпросмотр гайда')).getByRole('heading', { name: 'Раздел', level: 2 })).toBeVisible()
   })
@@ -412,7 +412,7 @@ describe('только чтение', () => {
     editor({ readOnly: true })
     const input = textbox()
     expect(input).toHaveAttribute('readonly')
-    for (const name of ['Раздел — пункт оглавления', 'Жирный', 'Список', 'Ссылка', 'Картинка — загрузить в медиатеку', 'Таблица', 'Блок кода']) {
+    for (const name of ['Раздел - пункт оглавления', 'Жирный', 'Список', 'Ссылка', 'Картинка - загрузить в медиатеку', 'Таблица', 'Блок кода']) {
       expect(screen.getByRole('button', { name })).toBeDisabled()
     }
     expect(screen.getByLabelText('Врезка')).toBeDisabled()
@@ -435,7 +435,7 @@ describe('только чтение', () => {
 describe('подсказка под полем', () => {
   it('по умолчанию объясняет разделы, врезки и сочетания клавиш', () => {
     editor()
-    expect(screen.getByTestId('field-description')).toHaveTextContent('Ctrl+B — жирный, Ctrl+I — курсив, Ctrl+K — ссылка')
+    expect(screen.getByTestId('field-description')).toHaveTextContent('Ctrl+B - жирный, Ctrl+I - курсив, Ctrl+K - ссылка')
   })
 
   it('описание из настроек поля заменяет стандартное', () => {
@@ -465,7 +465,7 @@ describe('картинка в гайде', () => {
     const input = fileInput(container)
     const opened = vi.fn()
     input.addEventListener('click', opened)
-    await userEvent.click(screen.getByRole('button', { name: 'Картинка — загрузить в медиатеку' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Картинка - загрузить в медиатеку' }))
     expect(opened).toHaveBeenCalledOnce()
     expect(input).toHaveAttribute('accept', 'image/png,image/jpeg,image/webp,image/gif')
   })
@@ -492,11 +492,11 @@ describe('картинка в гайде', () => {
     const { container } = editor()
     await userEvent.upload(fileInput(container), image('схема.png'))
     expect(await screen.findByRole('status')).toHaveTextContent('Загружаем «схема.png»…')
-    expect(screen.getByRole('button', { name: 'Картинка — загрузить в медиатеку' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Картинка — загрузить в медиатеку' })).toHaveTextContent('Загрузка…')
+    expect(screen.getByRole('button', { name: 'Картинка - загрузить в медиатеку' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Картинка - загрузить в медиатеку' })).toHaveTextContent('Загрузка…')
 
     finish(Response.json({ doc: { url: '/api/media/file/shema.png' } }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Картинка — загрузить в медиатеку' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Картинка - загрузить в медиатеку' })).toBeEnabled())
     expect(textbox()).toHaveValue('![схема](/api/media/file/shema.png)\n\n')
   })
 
@@ -521,7 +521,7 @@ describe('картинка в гайде', () => {
     const big = image('огромная.png')
     Object.defineProperty(big, 'size', { value: 10 * 1024 * 1024 + 1 })
     await userEvent.upload(fileInput(container), big)
-    expect(screen.getByRole('status')).toHaveTextContent('«огромная.png» больше 10 МБ — уменьшите картинку')
+    expect(screen.getByRole('status')).toHaveTextContent('«огромная.png» больше 10 МБ - уменьшите картинку')
     expect(uploads).toHaveLength(0)
   })
 
@@ -533,7 +533,7 @@ describe('картинка в гайде', () => {
     await userEvent.upload(fileInput(container), image('shot.png'))
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Не удалось загрузить «shot.png»: POST /api/media → 413'))
     expect(textbox()).toHaveValue('Текст')
-    expect(screen.getByRole('button', { name: 'Картинка — загрузить в медиатеку' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Картинка - загрузить в медиатеку' })).toBeEnabled()
     expect(console.error).toHaveBeenCalledWith('Не удалось загрузить картинку гайда', expect.any(Error))
   })
 

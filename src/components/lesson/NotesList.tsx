@@ -71,7 +71,7 @@ export function NotesList({ notes }: { notes: NoteEntry[] }) {
       </p>
 
       {shown === 0 ? (
-        <p className="py-12 text-center text-muted-foreground">В заметках такого нет — попробуйте другое слово</p>
+        <p className="py-12 text-center text-muted-foreground">В заметках такого нет - попробуйте другое слово</p>
       ) : (
         groups.map((group) => (
           <section key={group.key} className="space-y-3">

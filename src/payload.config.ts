@@ -67,7 +67,7 @@ export default buildConfig({
       baseDir: path.resolve(dirname),
     },
     meta: {
-      titleSuffix: ' — MentorCareer LMS',
+      titleSuffix: ' - MentorCareer LMS',
       icons: [{ url: '/icon.svg', type: 'image/svg+xml' }],
     },
     components: {
@@ -202,7 +202,7 @@ export default buildConfig({
     const { totalDocs: nodesCount } = await payload.count({ collection: 'roadmap-nodes' })
 
     if (nodesCount === 0) {
-      payload.logger.info('roadmap-nodes is empty — running auto-seed…')
+      payload.logger.info('roadmap-nodes is empty - running auto-seed…')
       try {
         const { seedRoadmapNodes } = await import('./lib/seed-roadmap-runner')
         await seedRoadmapNodes(payload)

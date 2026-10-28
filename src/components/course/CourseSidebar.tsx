@@ -79,7 +79,7 @@ export function CourseSidebar({ courseTitle, sections, completedLessonIds, curre
                       >
                         {done ? <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-success" /> : <Circle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />}
                         <span className="min-w-0 break-words leading-5">{lesson.title}</span>
-                        {done && <span className="sr-only"> — пройден</span>}
+                        {done && <span className="sr-only"> - пройден</span>}
                       </Link>
                     )
                   })}

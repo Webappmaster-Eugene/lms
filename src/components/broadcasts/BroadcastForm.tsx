@@ -163,7 +163,7 @@ export function BroadcastForm({ initial, allStudents }: Props) {
           <label htmlFor="broadcast-body" className="block font-medium text-foreground">Текст письма</label>
           <textarea id="broadcast-body" required value={draft.body} maxLength={BROADCAST_LIMITS.body} rows={12} onChange={(event) => change('body', event.target.value)} className={`${inputClass} min-h-48 leading-relaxed`} placeholder="Приветствие с именем ученика добавится автоматически." aria-describedby="broadcast-body-hint" />
           <p id="broadcast-body-hint" className="text-xs leading-relaxed text-muted-foreground">
-            Пустая строка — новый абзац. <code className="rounded bg-muted px-1">**жирный**</code>, <code className="rounded bg-muted px-1">[текст](https://…)</code> и адреса https://… превращаются в ссылки. Остальная разметка выводится как текст. {draft.body.length}/{BROADCAST_LIMITS.body}
+            Пустая строка - новый абзац. <code className="rounded bg-muted px-1">**жирный**</code>, <code className="rounded bg-muted px-1">[текст](https://…)</code> и адреса https://… превращаются в ссылки. Остальная разметка выводится как текст. {draft.body.length}/{BROADCAST_LIMITS.body}
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">

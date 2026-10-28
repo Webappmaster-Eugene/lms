@@ -319,7 +319,7 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
         <div role="alert" className="space-y-3 rounded-xl border border-border bg-card p-6">
           <p className="font-medium text-foreground">Не удалось воспроизвести запись</p>
           <p className="text-sm text-muted-foreground">
-            Начало файла доступно, но воспроизведение не запустилось. Повторите загрузку. Если ошибка сохраняется, сообщите название {recording ? 'записи' : 'урока'} в поддержку — нужно проверить запись и её загрузку.
+            Начало файла доступно, но воспроизведение не запустилось. Повторите загрузку. Если ошибка сохраняется, сообщите название {recording ? 'записи' : 'урока'} в поддержку - нужно проверить запись и её загрузку.
           </p>
           {actions}
         </div>

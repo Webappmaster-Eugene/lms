@@ -119,7 +119,7 @@ describe('загрузка .md-файла гайда в CMS', () => {
   it('неизвестная категория — ошибка с подсказкой, поле категории не меняется', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const status = await upload('---\ncategory: Финансы \n---\nТекст', 'money.md')
-    expect(status).toHaveTextContent('Не удалось прочитать «money.md»: категории «Финансы» нет — создайте её и выберите вручную')
+    expect(status).toHaveTextContent('Не удалось прочитать «money.md»: категории «Финансы» нет - создайте её и выберите вручную')
     expect(form.values.category).toBeUndefined()
   })
 
@@ -149,7 +149,7 @@ describe('загрузка .md-файла гайда в CMS', () => {
   it('неверная дата в шапке останавливает загрузку: ни одно поле не меняется', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     const status = await upload('---\ntitle: Гайд\nreviewed: 22.10.2026\n---\nТекст')
-    expect(status).toHaveTextContent('Не удалось прочитать «guide.md»: в шапке reviewed: «22.10.2026» — нужна дата вида 2026-10-22')
+    expect(status).toHaveTextContent('Не удалось прочитать «guide.md»: в шапке reviewed: «22.10.2026» - нужна дата вида 2026-10-22')
     expect(form.values).toEqual({})
     expect(log).toHaveBeenCalledWith('Не удалось прочитать .md-файл гайда', expect.any(Error))
   })

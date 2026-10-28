@@ -256,7 +256,7 @@ export const seed = async (payload: Payload) => {
   // ── Роадмап-контейнер ───────────────────────────────────────────
   const { docs: roadmaps } = await payload.find({ collection: 'roadmaps', limit: 1 })
   const roadmap = roadmaps[0]
-  if (!roadmap) throw new Error('Нет ни одного роадмапа — демо-курсы некуда привязать')
+  if (!roadmap) throw new Error('Нет ни одного роадмапа - демо-курсы некуда привязать')
 
   // ── Достижения ──────────────────────────────────────────────────
   const { totalDocs: achCount } = await payload.count({ collection: 'achievements' })

@@ -77,7 +77,7 @@ export const Lessons: CollectionConfig = {
       relationTo: 'sections',
       label: 'Секция',
       admin: {
-        description: 'Секция внутри курса. Если не указана — урок отображается без группировки.',
+        description: 'Секция внутри курса. Если не указана - урок отображается без группировки.',
       },
     },
     {

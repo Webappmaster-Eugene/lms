@@ -21,7 +21,7 @@ export type ActivityCell = {
 /** Первый показываемый день: понедельник недели, начавшейся ACTIVITY_WEEKS недель назад. */
 export function activityStart(now: Date, weeks = ACTIVITY_WEEKS): Date {
   const today = new Date(`${utcDay(now)}T00:00:00Z`)
-  const weekday = (today.getUTCDay() + 6) % 7 // понедельник — 0
+  const weekday = (today.getUTCDay() + 6) % 7 // понедельник - 0
   return new Date(today.getTime() - (weekday + (weeks - 1) * 7) * DAY_MS)
 }
 

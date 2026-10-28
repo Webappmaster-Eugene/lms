@@ -117,11 +117,11 @@ export const STAGE_ANNOTATIONS: StageAnnotation[] = [
   { stage: 'base', leftLabel: '1 неделя\nповторяем базу' },
   {
     stage: 'stage1',
-    leftLabel: '2–4 недели\nразработка основы',
+    leftLabel: '2-4 недели\nразработка основы',
     rightLabel: 'Ожидается\nбазовое\nпонимание!',
   },
   { stage: 'stage2', leftLabel: '1 неделя\nосвоение инструментов' },
-  { stage: 'practice', leftLabel: '1–2 месяца\nпрактика и\nподготовка к собесу' },
+  { stage: 'practice', leftLabel: '1-2 месяца\nпрактика и\nподготовка к собесу' },
   {
     stage: 'growth',
     leftLabel: 'Рост',

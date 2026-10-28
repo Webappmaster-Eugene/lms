@@ -75,7 +75,7 @@ export function validateBroadcastInput(raw: unknown): BroadcastDraftInput {
   const body = text(input.body, 'Текст письма', BROADCAST_LIMITS.body, true) as string
   const ctaLabel = text(input.ctaLabel, 'Текст кнопки', BROADCAST_LIMITS.ctaLabel, false)
   const ctaUrl = text(input.ctaUrl, 'Ссылка кнопки', BROADCAST_LIMITS.ctaUrl, false)
-  if (Boolean(ctaLabel) !== Boolean(ctaUrl)) throw new BroadcastError('Для кнопки укажите и текст, и ссылку — или оставьте оба поля пустыми')
+  if (Boolean(ctaLabel) !== Boolean(ctaUrl)) throw new BroadcastError('Для кнопки укажите и текст, и ссылку - или оставьте оба поля пустыми')
   const urlError = broadcastCtaUrlError(ctaUrl)
   if (urlError) throw new BroadcastError(urlError)
   if (input.audience !== 'all' && input.audience !== 'selected') throw new BroadcastError('Выберите получателей')

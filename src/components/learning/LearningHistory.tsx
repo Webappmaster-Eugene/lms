@@ -23,7 +23,7 @@ export function RecentLearningCourses({ entries, showHistoryLink = true }: { ent
         <h2 id="recent-learning-title" className="text-lg font-semibold">Ваше обучение</h2>
         {showHistoryLink && <Link href="/learning-history" prefetch={false} className="inline-flex min-h-11 items-center gap-2 text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring"><History aria-hidden="true" className="h-4 w-4" />История обучения</Link>}
       </div>
-      <p className="text-sm text-muted-foreground">Место остановки в каждом курсе — удобно, если учитесь параллельно.</p>
+      <p className="text-sm text-muted-foreground">Место остановки в каждом курсе - удобно, если учитесь параллельно.</p>
       <ul className="divide-y divide-border rounded-xl border border-border bg-card px-4 sm:px-5">
         {entries.map(entry => <li key={entry.courseId} className="py-4">
           <Link href={entry.href} prefetch={false} className="group flex min-h-11 items-start gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-ring">

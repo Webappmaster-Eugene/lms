@@ -17,7 +17,7 @@ export default function FrontendError({ error, reset }: { error: Error & { diges
       tone="danger"
       eyebrow="Сбой на нашей стороне"
       title="Страница не загрузилась"
-      description="Отчёт об ошибке уже у разработчиков. Попробуйте открыть страницу ещё раз — чаще всего это помогает. Ваш прогресс сохранён."
+      description="Отчёт об ошибке уже у разработчиков. Попробуйте открыть страницу ещё раз - чаще всего это помогает. Ваш прогресс сохранён."
       terminal={[
         { kind: 'command', text: `open ${pathname ?? '/'}` },
         { kind: 'error', text: 'Error: страница упала при загрузке' },

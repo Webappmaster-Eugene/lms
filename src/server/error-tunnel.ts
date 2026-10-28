@@ -58,7 +58,7 @@ function ownOrigins(request: Request): Set<string> {
   const origins = new Set([new URL(request.url).origin])
   const configured = process.env.NEXT_PUBLIC_SERVER_URL
   if (configured) {
-    try { origins.add(new URL(configured).origin) } catch { /* неверный адрес в окружении — проверяем по адресу запроса */ }
+    try { origins.add(new URL(configured).origin) } catch { /* неверный адрес в окружении - проверяем по адресу запроса */ }
   }
   return origins
 }

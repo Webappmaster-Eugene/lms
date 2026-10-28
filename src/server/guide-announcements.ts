@@ -88,7 +88,7 @@ export const notifyGuideGrant: CollectionAfterChangeHook = async ({ doc, previou
     if (!user) return doc
     const grants = await guideGrants(req.payload, req, guideId, userId)
     if (!canRead(user, grants, guideId, now) || canRead(user, grants.filter((grant) => grant.id !== doc.id), guideId, now)) return doc
-    await notify(req.payload, req, [userId], { title: 'Вам открыт гайд', message: `«${guide.title}» — откройте в разделе «Гайды».`, link: `/guides/${guide.slug}` })
+    await notify(req.payload, req, [userId], { title: 'Вам открыт гайд', message: `«${guide.title}» - откройте в разделе «Гайды».`, link: `/guides/${guide.slug}` })
   } catch (error) {
     logger.error('Не удалось отправить уведомление о назначенном гайде', error, { 'guide.id': guideId, 'user.id': userId })
     throw error
@@ -104,7 +104,7 @@ export const notifyGuidesModeOpened: CollectionAfterChangeHook = async ({ doc, p
   try {
     const published = await req.payload.count({ collection: 'guides', where: { isPublished: { equals: true } }, overrideAccess: true, req })
     if (!published.totalDocs) return doc
-    await notify(req.payload, req, [userId], { title: 'Вам открыты все гайды', message: 'Пошаговые инструкции по карьере, работе с ИИ и своему делу — в разделе «Гайды».', link: '/guides' })
+    await notify(req.payload, req, [userId], { title: 'Вам открыты все гайды', message: 'Пошаговые инструкции по карьере, работе с ИИ и своему делу - в разделе «Гайды».', link: '/guides' })
   } catch (error) {
     logger.error('Не удалось отправить уведомление об открытых гайдах', error, { 'user.id': userId })
     throw error

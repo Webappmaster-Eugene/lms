@@ -98,7 +98,7 @@ export const Roadmaps: CollectionConfig = {
       label: 'Ссылка для встраивания Miro-доски',
       admin: {
         description:
-          'Допустимые форматы: https://miro.com/app/live-embed/<boardId>/ или https://miro.com/app/embed/<boardId>/. Доска должна быть публичной (Share → Anyone with the link). View-URL вида https://miro.com/app/board/... не подойдёт — iframe покажет экран логина Miro.',
+          'Допустимые форматы: https://miro.com/app/live-embed/<boardId>/ или https://miro.com/app/embed/<boardId>/. Доска должна быть публичной (Share → Anyone with the link). View-URL вида https://miro.com/app/board/... не подойдёт - iframe покажет экран логина Miro.',
       },
       validate: (value: string | null | undefined) => {
         if (value == null || value === '') return true

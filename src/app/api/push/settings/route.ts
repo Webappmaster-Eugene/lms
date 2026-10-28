@@ -23,7 +23,7 @@ export async function PATCH(request: Request) {
       changes.timezone = body.timezone
     }
     if (body.reminderHour !== undefined) {
-      if (typeof body.reminderHour !== 'number' || !Number.isInteger(body.reminderHour) || body.reminderHour < 8 || body.reminderHour > 21) throw new NotificationError('Время напоминания — с 08:00 до 21:00')
+      if (typeof body.reminderHour !== 'number' || !Number.isInteger(body.reminderHour) || body.reminderHour < 8 || body.reminderHour > 21) throw new NotificationError('Время напоминания - с 08:00 до 21:00')
       changes.reminderHour = body.reminderHour
     }
     await changeNotificationPreferences(payload, user, changes)

@@ -210,11 +210,11 @@ export default async function DashboardPage() {
         {streak.status === 'at-risk' ? (
           <p className="mt-1 flex items-center gap-1.5 text-foreground">
             <Flame className="h-4 w-4 shrink-0 text-[hsl(var(--streak))]" aria-hidden="true" />
-            Серия {pluralize(streak.days, 'день', 'дня', 'дней')} подряд — пройдите урок сегодня, чтобы её не прервать
+            Серия {pluralize(streak.days, 'день', 'дня', 'дней')} подряд - пройдите урок сегодня, чтобы её не прервать
           </p>
         ) : streak.status === 'today' ? (
           <p className="mt-1 text-muted-foreground">
-            Сегодня урок уже пройден — серия {pluralize(streak.days, 'день', 'дня', 'дней')} подряд
+            Сегодня урок уже пройден - серия {pluralize(streak.days, 'день', 'дня', 'дней')} подряд
           </p>
         ) : (
           <p className="mt-1 text-muted-foreground">Продолжай обучение</p>

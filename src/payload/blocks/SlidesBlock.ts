@@ -36,7 +36,7 @@ export const SlidesBlock: Block = {
       labels: { singular: 'Файл', plural: 'Файлы' },
       maxRows: SLIDES_LIMIT,
       admin: {
-        description: 'Картинки листаются как слайды, PDF — постранично, остальные файлы ученик скачивает.',
+        description: 'Картинки листаются как слайды, PDF - постранично, остальные файлы ученик скачивает.',
       },
       fields: [
         {

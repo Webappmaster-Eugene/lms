@@ -135,11 +135,11 @@ export function LessonComments({ lessonId, userId }: Props) {
         </div>
       ) : failed ? (
         <p role="alert" className="py-6 text-center text-sm text-destructive">
-          Не удалось загрузить вопросы — обновите страницу
+          Не удалось загрузить вопросы - обновите страницу
         </p>
       ) : threads.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
-          Вопросов пока нет. Если что-то непонятно — спросите, ментор ответит здесь же.
+          Вопросов пока нет. Если что-то непонятно - спросите, ментор ответит здесь же.
         </p>
       ) : (
         <ul className="space-y-3">
@@ -261,7 +261,7 @@ function CommentBody({ comment, userId, onChanged, children }: { comment: Commen
       onChanged()
     } catch (err) {
       console.error('Не удалось изменить комментарий', err)
-      setError(remove ? 'Не удалось удалить комментарий. Попробуйте ещё раз.' : 'Не удалось сохранить изменения. Ваш текст остался в поле — попробуйте ещё раз.')
+      setError(remove ? 'Не удалось удалить комментарий. Попробуйте ещё раз.' : 'Не удалось сохранить изменения. Ваш текст остался в поле - попробуйте ещё раз.')
     } finally {
       setPending(false)
     }

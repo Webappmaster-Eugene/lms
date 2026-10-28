@@ -22,5 +22,5 @@ export function audienceLabel(broadcast: Pick<EmailBroadcast, 'audience' | 'reci
 const dateFormat = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' })
 
 export function broadcastDate(value: string | null | undefined): string {
-  return value ? `${dateFormat.format(new Date(value))} мск` : '—'
+  return value ? `${dateFormat.format(new Date(value))} мск` : '-'
 }

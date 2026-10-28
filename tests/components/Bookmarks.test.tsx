@@ -60,7 +60,7 @@ describe('кнопка «В сохранённое»', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'В сохранённое' }))
 
-    await waitFor(() => expect(toast).toHaveBeenCalledWith('Не удалось сохранить — попробуйте ещё раз', 'error'))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('Не удалось сохранить - попробуйте ещё раз', 'error'))
     expect(screen.getByRole('button', { name: 'В сохранённое' })).toHaveAttribute('aria-pressed', 'false')
   })
 })
@@ -115,7 +115,7 @@ describe('«Сохранённое»', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Убрать «Хуки» из сохранённого' }))
 
-    await waitFor(() => expect(toast).toHaveBeenCalledWith('Не удалось убрать — попробуйте ещё раз', 'error'))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('Не удалось убрать - попробуйте ещё раз', 'error'))
     expect(toast).not.toHaveBeenCalledWith('Убрано из сохранённого', 'info')
     expect(screen.getByRole('link', { name: 'Хуки' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Убрать «Хуки» из сохранённого' })).toBeEnabled()

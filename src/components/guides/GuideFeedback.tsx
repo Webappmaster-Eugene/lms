@@ -52,7 +52,7 @@ export function GuideFeedback({ guideId, initial, maxComment }: Props) {
       return true
     } catch (error) {
       console.error('Не удалось сохранить отзыв о гайде', error)
-      toast('Не удалось сохранить отзыв — попробуйте ещё раз', 'error')
+      toast('Не удалось сохранить отзыв - попробуйте ещё раз', 'error')
       return false
     } finally {
       setBusy(false)

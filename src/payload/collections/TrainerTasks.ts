@@ -104,7 +104,7 @@ export const TrainerTasks: CollectionConfig = {
       admin: {
         position: 'sidebar',
         description:
-          'stdout — сравнение вывода; unit — JS/TS; types — типы TS; program — Go/Python; dom — frontend',
+          'stdout - сравнение вывода; unit - JS/TS; types - типы TS; program - Go/Python; dom - frontend',
       },
     },
     {
@@ -201,7 +201,7 @@ export const TrainerTasks: CollectionConfig = {
       label: 'Преамбула',
       admin: {
         description:
-          'Код, который выполняется ПЕРЕД решением: фикстуры, моки, вспомогательные классы. Доступен и решению, и тестам. Только JavaScript — преамбула одна на оба языка и в песочницу попадает без транспиляции.',
+          'Код, который выполняется ПЕРЕД решением: фикстуры, моки, вспомогательные классы. Доступен и решению, и тестам. Только JavaScript - преамбула одна на оба языка и в песочницу попадает без транспиляции.',
       },
     },
     {
@@ -210,7 +210,7 @@ export const TrainerTasks: CollectionConfig = {
       label: 'Типы преамбулы',
       admin: {
         description:
-          'Объявления для компилятора: declare const helper: (x: number) => number. Нужны, когда задача решается на TypeScript, а преамбула написана на JavaScript — иначе strict-режим ругается на неявный any. Если пусто, tsc получит саму преамбулу.',
+          'Объявления для компилятора: declare const helper: (x: number) => number. Нужны, когда задача решается на TypeScript, а преамбула написана на JavaScript - иначе strict-режим ругается на неявный any. Если пусто, tsc получит саму преамбулу.',
       },
     },
     {
@@ -223,7 +223,7 @@ export const TrainerTasks: CollectionConfig = {
         read: ({ req }) => req.user?.role === 'admin',
       },
       admin: {
-        description: 'Только для режима stdout. Каждая строка — один вызов console.log.',
+        description: 'Только для режима stdout. Каждая строка - один вызов console.log.',
         condition: showForModes('stdout'),
       },
     },
@@ -251,7 +251,7 @@ export const TrainerTasks: CollectionConfig = {
           label: 'Аргументы (код)',
           admin: {
             description:
-              'Список аргументов как в вызове, без скобок: 1, "a", [2]. Допустимы NaN, undefined, new Map([...]). Пусто — вызов без аргументов.',
+              'Список аргументов как в вызове, без скобок: 1, "a", [2]. Допустимы NaN, undefined, new Map([...]). Пусто - вызов без аргументов.',
           },
         },
         {
@@ -370,7 +370,7 @@ export const TrainerTasks: CollectionConfig = {
     },
     { name: 'interviewFormat', type: 'select', label: 'Формат собеседования', options: [...INTERVIEW_FORMAT_OPTIONS] },
     { name: 'recommendedMinutes', type: 'number', label: 'Время на тренировку (минуты)', min: 5, max: 180, admin: { description: 'Рекомендация платформы, не фактическая длительность интервью компании.' } },
-    { name: 'companyEvidence', type: 'json', label: 'Источники меток компаний', validate: validateCompanyEvidence, admin: { description: 'Компания, kind, url, note, checkedAt. official — опубликованный пример; candidate-report — рассказ кандидата; preparation — адаптация для подготовки; unverified — историческая метка без подтверждения.' } },
+    { name: 'companyEvidence', type: 'json', label: 'Источники меток компаний', validate: validateCompanyEvidence, admin: { description: 'Компания, kind, url, note, checkedAt. official - опубликованный пример; candidate-report - рассказ кандидата; preparation - адаптация для подготовки; unverified - историческая метка без подтверждения.' } },
     {
       name: 'sourceUrl',
       type: 'text',

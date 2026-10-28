@@ -37,7 +37,7 @@ export default async function LeaderboardPage() {
       <div className="space-y-2">
         <h1 className="text-xl font-bold text-foreground sm:text-2xl">Лидерборд</h1>
         <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Рейтинг учеников по баллам. Баллы начисляются за пройденные уроки и решённые задачи тренажёра — по таблице видно, как ваш темп выглядит на фоне остальных.
+          Рейтинг учеников по баллам. Баллы начисляются за пройденные уроки и решённые задачи тренажёра - по таблице видно, как ваш темп выглядит на фоне остальных.
         </p>
       </div>
 

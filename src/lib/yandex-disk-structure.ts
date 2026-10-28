@@ -171,7 +171,7 @@ export function parseYandexDiskTree(
   }
   for (const section of withLessons) {
     if (section.lessons.every((lesson) => lesson.videos.length === 0)) {
-      warnings.push(`В секции "${section.title}" нет видео — импортированы только материалы`)
+      warnings.push(`В секции "${section.title}" нет видео - импортированы только материалы`)
     }
   }
   withLessons.forEach((section, index) => {
@@ -346,7 +346,7 @@ function materialsOf(node: TreeNode): ImportedMaterial[] {
 
   const handouts = files.filter((file) => HANDOUT_EXTENSIONS.has(extensionOf(file.name)))
   const folder: ImportedMaterial = {
-    title: `${cleanTitle(node.name) || 'Материалы'} — папка на Диске`,
+    title: `${cleanTitle(node.name) || 'Материалы'} - папка на Диске`,
     // Ссылка строится от корня публикации, поэтому путь нужен полный
     path: node.diskPath,
     isText: false,
@@ -761,7 +761,7 @@ function splitOversizedSection(section: ImportedSection): ImportedSection[] {
     const lessons = section.lessons.slice(start, start + SECTION_CHUNK)
     chunks.push({
       order: 0,
-      title: `Уроки ${start + 1}–${start + lessons.length}`,
+      title: `Уроки ${start + 1}-${start + lessons.length}`,
       lessons: lessons.map((lesson, index) => ({ ...lesson, order: index + 1 })),
     })
   }
@@ -947,7 +947,7 @@ function capMaterials(materials: ImportedMaterial[]): ImportedMaterial[] {
   return [
     ...keep,
     {
-      title: `${cleanTitle(folder.split('/').pop() ?? '') || 'Исходники'} — папка на Диске`,
+      title: `${cleanTitle(folder.split('/').pop() ?? '') || 'Исходники'} - папка на Диске`,
       path: folder,
       isText: false,
       size: null,

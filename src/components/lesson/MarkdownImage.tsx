@@ -51,9 +51,9 @@ function DiagramDialog({ src, alt, onClose, returnFocus }: { src: string; alt: s
         <div className="min-w-0 flex-1">
           <h2 id={titleId} className="truncate text-base font-semibold">{alt}</h2>
           {/* На телефоне полоса прокрутки скрыта: без подсказки не видно, что схема продолжается. */}
-          {wide && <p className="text-xs text-muted-foreground">Схема шире экрана — прокрутите вбок</p>}
+          {wide && <p className="text-xs text-muted-foreground">Схема шире экрана - прокрутите вбок</p>}
         </div>
-        <span className="hidden text-xs text-muted-foreground sm:inline">Esc — закрыть</span>
+        <span className="hidden text-xs text-muted-foreground sm:inline">Esc - закрыть</span>
         <button type="button" onClick={onClose} aria-label="Закрыть схему" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring">
           <X className="h-5 w-5" aria-hidden="true" />
         </button>
@@ -110,7 +110,7 @@ export function MarkdownImage({ src, alt }: { src?: string; alt?: string }) {
           ref={trigger}
           type="button"
           onClick={() => setOpen(true)}
-          aria-label={`${title} — открыть во весь экран`}
+          aria-label={`${title} - открыть во весь экран`}
           aria-haspopup="dialog"
           className="mx-auto block w-fit max-w-full cursor-zoom-in rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           style={width ? { minWidth: `min(${width}px, 560px)` } : undefined}

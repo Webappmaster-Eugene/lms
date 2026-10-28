@@ -382,7 +382,7 @@
           return drain()
         }
         if (++guard > TIMER_GUARD) {
-          return Promise.reject(new Error('Слишком много срабатываний таймеров — похоже на бесконечный интервал'))
+          return Promise.reject(new Error('Слишком много срабатываний таймеров - похоже на бесконечный интервал'))
         }
         now = timer.at
         if (timer.interval) {
@@ -429,7 +429,7 @@
         function step(emptyChecks) {
           if (++rounds > TIMER_GUARD) {
             return Promise.reject(
-              new Error('Слишком много таймеров — похоже на бесконечно планирующую себя задачу'),
+              new Error('Слишком много таймеров - похоже на бесконечно планирующую себя задачу'),
             )
           }
 

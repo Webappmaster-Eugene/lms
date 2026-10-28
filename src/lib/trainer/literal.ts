@@ -78,7 +78,7 @@ function write(value: unknown, seen: Set<object>, depth: number): string {
 
   const object = value as object
   if (seen.has(object)) {
-    throw new LiteralError('Циклическая ссылка — опишите значение через raw() с явным кодом')
+    throw new LiteralError('Циклическая ссылка - опишите значение через raw() с явным кодом')
   }
   const nested = new Set(seen).add(object)
 
@@ -111,7 +111,7 @@ function write(value: unknown, seen: Set<object>, depth: number): string {
   const prototype = Object.getPrototypeOf(value)
   if (prototype !== Object.prototype && prototype !== null) {
     throw new LiteralError(
-      `Экземпляр класса ${(value as object).constructor?.name ?? '?'} нельзя записать литералом — используйте raw()`,
+      `Экземпляр класса ${(value as object).constructor?.name ?? '?'} нельзя записать литералом - используйте raw()`,
     )
   }
 

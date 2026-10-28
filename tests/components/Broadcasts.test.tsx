@@ -415,8 +415,8 @@ describe('статус и сводка рассылки', () => {
 
   it('дата показывается по Москве, отсутствующая — прочерком', () => {
     expect(broadcastDate('2026-10-04T10:05:00.000Z')).toBe('4 октября в 13:05 мск')
-    expect(broadcastDate(null)).toBe('—')
-    expect(broadcastDate(undefined)).toBe('—')
+    expect(broadcastDate(null)).toBe('-')
+    expect(broadcastDate(undefined)).toBe('-')
   })
 })
 

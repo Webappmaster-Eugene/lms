@@ -145,7 +145,7 @@ export function parseYandexDiskFolder(
   for (const video of parsedVideos) {
     const key = `${video.sectionNumber}.${video.lessonOrder}`
     if (seen.has(key)) {
-      errors.push(`Дубликат нумерации: "${video.originalName}" (${key}) — будет пропущен`)
+      errors.push(`Дубликат нумерации: "${video.originalName}" (${key}) - будет пропущен`)
     }
     seen.add(key)
   }

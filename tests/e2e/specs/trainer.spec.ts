@@ -69,7 +69,7 @@ test('повторная отправка решённой задачи балл
   await page.goto(TASK_URL)
   await setCode(page, SUM_SOLUTION)
   await page.getByRole('button', { name: 'Отправить' }).click()
-  await expect(page.getByText('Задача решена — баллы уже начислены ранее')).toBeVisible()
+  await expect(page.getByText('Задача решена - баллы уже начислены ранее')).toBeVisible()
 })
 
 test('TypeScript: ошибка типов видна до отправки', async ({ page }) => {

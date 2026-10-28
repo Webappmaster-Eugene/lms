@@ -103,7 +103,7 @@ export default async function TrainerPage() {
       </div>
 
       <p className="text-muted-foreground">
-        Задачи с реальных собеседований — на JavaScript и TypeScript. Решение проверяется тестами,
+        Задачи с реальных собеседований - на JavaScript и TypeScript. Решение проверяется тестами,
         за каждую решённую задачу начисляются баллы.
       </p>
 

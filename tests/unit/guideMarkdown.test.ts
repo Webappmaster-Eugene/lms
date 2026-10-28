@@ -52,8 +52,8 @@ describe('файл гайда .md', () => {
     const parsed = parseGuideFile('---\ncategory: финансы\nreviewed: 22.10.2026\nreview_by: 2026-02-30\n---\nТекст')
     expect(parsed.fields).toEqual({ category: 'финансы' })
     expect(parsed.problems).toEqual([
-      'reviewed: «22.10.2026» — нужна дата вида 2026-10-22',
-      'review_by: «2026-02-30» — нужна дата вида 2026-10-22',
+      'reviewed: «22.10.2026» - нужна дата вида 2026-10-22',
+      'review_by: «2026-02-30» - нужна дата вида 2026-10-22',
     ])
   })
 

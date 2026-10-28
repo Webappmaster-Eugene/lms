@@ -94,7 +94,7 @@ function MentorThread({ thread, status }: { thread: QuestionThread; status: Thre
     try {
       await send('/api/comments', 'POST', { content: text, parentComment: Number(question.id) })
       setText('')
-      toast('Ответ отправлен — ученик получит уведомление', 'success')
+      toast('Ответ отправлен - ученик получит уведомление', 'success')
       router.refresh()
     } catch (error) {
       console.error('Не удалось отправить ответ', error)
@@ -166,7 +166,7 @@ function MentorThread({ thread, status }: { thread: QuestionThread; status: Thre
               }
             }}
             aria-label={`Ответ ученику ${authorName(question.user)}`}
-            placeholder="Ответ ученику… (Ctrl/⌘+Enter — отправить)"
+            placeholder="Ответ ученику… (Ctrl/⌘+Enter - отправить)"
             maxLength={2000}
             rows={3}
             className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"

@@ -192,7 +192,7 @@ describe('потоковый плеер MPEG-TS', () => {
     fireEvent.click(slider(), { clientX: 150 })
 
     expect(video.currentTime).toBe(0)
-    expect(screen.getByText('0:00 / —')).toBeInTheDocument()
+    expect(screen.getByText('0:00 / -')).toBeInTheDocument()
   })
 
   it('разворачивается на весь экран, а отказ браузера не роняет плеер', async () => {

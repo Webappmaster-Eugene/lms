@@ -87,7 +87,7 @@ export async function Footer({ trainerEnabled = true, bootcampEnabled = false }:
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 pt-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between lg:mt-8 lg:border-t lg:border-border lg:pt-5 lg:text-sm">
         <p>MentorCareer © {year}</p>
         <p>
-          Автор и ментор —{' '}
+          Автор и ментор -{' '}
           <a
             href={AUTHOR_URL}
             target="_blank"

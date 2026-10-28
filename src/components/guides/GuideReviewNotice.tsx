@@ -35,7 +35,7 @@ export async function GuideReviewNotice({ payload, user }: BeforeListServerProps
       )}
       {unreviewed.totalDocs > 0 && (
         <p>
-          Без даты проверки: {unreviewed.totalDocs}. Сверьте цифры и ссылки, поставьте «Данные проверены» — ученик увидит, насколько свежий гайд.
+          Без даты проверки: {unreviewed.totalDocs}. Сверьте цифры и ссылки, поставьте «Данные проверены» - ученик увидит, насколько свежий гайд.
         </p>
       )}
       <p className="guide-review-notice__hint">Ссылки всех гайдов проверяет команда <code>pnpm guide:check-links</code>.</p>

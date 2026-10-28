@@ -187,7 +187,7 @@ describe('гайд в Markdown', () => {
     const empty = await payload.create({ collection: 'guides', data: { title: uid('Пустой'), slug: uid('empty'), summary: 'Кратко', markdown: '  ' } }).catch((reason: unknown) => reason)
     expect(empty).toMatchObject({ data: { errors: [expect.objectContaining({ path: 'markdown', message: 'Добавьте текст гайда' })] } })
     const header = await payload.create({ collection: 'guides', data: { title: uid('Гайд'), slug: uid('bad'), summary: 'Кратко', markdown: '---\ncategory: финансы\n---\nТекст' } }).catch((reason: unknown) => reason)
-    expect(header).toMatchObject({ data: { errors: [expect.objectContaining({ path: 'markdown', message: expect.stringContaining('category: «финансы» — такой категории нет') })] } })
+    expect(header).toMatchObject({ data: { errors: [expect.objectContaining({ path: 'markdown', message: expect.stringContaining('category: «финансы» - такой категории нет') })] } })
   })
 })
 

@@ -146,9 +146,9 @@ describe('предел числа материалов урока', () => {
 
     const materials = parseYandexDiskTree(items).sections[0].lessons[0].materials
 
-    expect(materials.map((material) => material.title).sort()).toEqual(['Блок — папка на Диске', 'Конспект.pdf', 'ссылки.txt'].sort())
-    expect(materials.find((material) => material.title === 'Блок — папка на Диске')).toEqual({
-      title: 'Блок — папка на Диске', path: '/Блок', isText: false, size: null,
+    expect(materials.map((material) => material.title).sort()).toEqual(['Блок - папка на Диске', 'Конспект.pdf', 'ссылки.txt'].sort())
+    expect(materials.find((material) => material.title === 'Блок - папка на Диске')).toEqual({
+      title: 'Блок - папка на Диске', path: '/Блок', isText: false, size: null,
     })
   })
 
@@ -168,6 +168,6 @@ describe('предел числа материалов урока', () => {
 
     const materials = parseYandexDiskTree(items).sections[0].lessons[0].materials
 
-    expect(materials).toEqual([{ title: 'Исходники — папка на Диске', path: '/', isText: false, size: null }])
+    expect(materials).toEqual([{ title: 'Исходники - папка на Диске', path: '/', isText: false, size: null }])
   })
 })

@@ -85,7 +85,7 @@ export function RoadmapNodePanel({ data, onClose, managementRoadmapId, nodeId }:
         </section>
       ) : data.comingSoon ? (
         <p className="mt-4 rounded-lg bg-muted p-3 text-sm text-muted-foreground">
-          Курсов по этой теме пока нет — тема останется на карте, чтобы было видно, что изучать дальше.
+          Курсов по этой теме пока нет - тема останется на карте, чтобы было видно, что изучать дальше.
         </p>
       ) : null}
 

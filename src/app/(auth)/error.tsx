@@ -19,7 +19,7 @@ export default function AuthError({ error, reset }: { error: Error & { digest?: 
       tone="danger"
       eyebrow="Сбой на нашей стороне"
       title="Страница не загрузилась"
-      description="Мы уже получили отчёт. Попробуйте ещё раз через минуту — данные вашего аккаунта в безопасности."
+      description="Мы уже получили отчёт. Попробуйте ещё раз через минуту - данные вашего аккаунта в безопасности."
       terminal={[
         { kind: 'command', text: `open ${pathname ?? '/'}` },
         { kind: 'error', text: 'Error: сервис временно недоступен' },

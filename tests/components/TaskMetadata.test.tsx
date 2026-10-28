@@ -52,7 +52,7 @@ describe('метаданные задачи и подтверждения ком
   it('ссылка на LeetCode и источники доступны с клавиатуры без подмены тренировочного времени длительностью интервью', async () => {
     const user = userEvent.setup()
     render(<TaskMetadata task={{ recommendedMinutes: 30, sourceUrl: 'https://leetcode.com/problems/two-sum/', leetcodeNumber: 1, companyEvidence: [{ company: 'google', kind: 'official', url: 'https://example.org/source', note: 'Официальный учебный пример.', checkedAt }] }} />)
-    expect(screen.getByText(/Время — ориентир для самостоятельной тренировки/)).toBeInTheDocument()
+    expect(screen.getByText(/Время - ориентир для самостоятельной тренировки/)).toBeInTheDocument()
     const source = screen.getByRole('link', { name: 'Источник задачи' })
     const leetcode = screen.getByRole('link', { name: 'LeetCode #1' })
     expect(leetcode).toHaveAttribute('href', 'https://leetcode.com/problems/two-sum/')

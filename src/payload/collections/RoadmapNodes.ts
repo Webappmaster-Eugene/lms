@@ -135,9 +135,9 @@ export const RoadmapNodes: CollectionConfig = {
       options: [
         { label: 'Старт', value: 'start' },
         { label: 'База (1 неделя)', value: 'base' },
-        { label: 'Стажёр (2–4 недели)', value: 'stage1' },
+        { label: 'Стажёр (2-4 недели)', value: 'stage1' },
         { label: 'Junior (1 неделя)', value: 'stage2' },
-        { label: 'Middle (1–2 месяца)', value: 'practice' },
+        { label: 'Middle (1-2 месяца)', value: 'practice' },
         { label: 'Senior (продвинутое)', value: 'advanced' },
         { label: 'Рост (дополнительно)', value: 'growth' },
       ],
@@ -147,7 +147,7 @@ export const RoadmapNodes: CollectionConfig = {
       type: 'select',
       label: 'Цвет карточки',
       admin: {
-        description: 'Палитра Miro-доски. Если не указан — берётся цвет по умолчанию для стадии.',
+        description: 'Палитра Miro-доски. Если не указан - берётся цвет по умолчанию для стадии.',
       },
       options: [
         { label: 'Жёлтый (база)', value: 'yellow' },
@@ -165,7 +165,7 @@ export const RoadmapNodes: CollectionConfig = {
       label: 'Список под-тем (отображается внутри карточки)',
       maxRows: 20,
       admin: {
-        description: 'Маркированный список под-тем — отображается внутри карточки узла на графе, в стиле Miro.',
+        description: 'Маркированный список под-тем - отображается внутри карточки узла на графе, в стиле Miro.',
       },
       fields: [
         {

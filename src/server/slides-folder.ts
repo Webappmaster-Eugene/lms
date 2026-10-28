@@ -66,7 +66,7 @@ export async function listSlideFolder(folderUrl: string): Promise<SlideFolderFil
     throw new SlidesError('В папке на Яндекс Диске нет картинок, PDF и других файлов для презентации. Подпапки и видео не учитываются')
   }
   if (files.length > SLIDES_LIMIT) {
-    throw new SlidesError(`Файлов в папке: ${files.length}. В одной презентации помещается не больше ${SLIDES_LIMIT} — разделите папку на части`)
+    throw new SlidesError(`Файлов в папке: ${files.length}. В одной презентации помещается не больше ${SLIDES_LIMIT} - разделите папку на части`)
   }
   return files.sort((left, right) => compareSlideNames(left.fileName, right.fileName))
 }
@@ -81,6 +81,6 @@ export async function resolveSlideFileName(url: string): Promise<string> {
   } catch (error) {
     throw new SlidesError(diskProblem(error))
   }
-  if (meta.type !== 'file') throw new SlidesError('Это ссылка на папку — вставьте её в поле «Папка на Яндекс Диске»')
+  if (meta.type !== 'file') throw new SlidesError('Это ссылка на папку - вставьте её в поле «Папка на Яндекс Диске»')
   return meta.name
 }

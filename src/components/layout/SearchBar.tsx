@@ -266,7 +266,7 @@ export function SearchBar({ autoFocus, onNavigate, hotkey, trainerEnabled = true
             </ul>
           ) : (
             <p id={listId} role="status" className="px-4 py-3 text-sm text-muted-foreground">
-              {failed ? 'Поиск сейчас недоступен — попробуйте ещё раз' : `По запросу «${searched}» ничего не нашлось`}
+              {failed ? 'Поиск сейчас недоступен - попробуйте ещё раз' : `По запросу «${searched}» ничего не нашлось`}
             </p>
           )}
         </div>

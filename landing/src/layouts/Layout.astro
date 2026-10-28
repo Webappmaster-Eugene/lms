@@ -10,7 +10,7 @@ interface Props {
 }
 
 const {
-  title = 'Как пользоваться MentorCareer — инструкция для учеников',
+  title = 'Как пользоваться MentorCareer - инструкция для учеников',
   description = 'Пошаговая инструкция MentorCareer для учеников: вход, роадмапы, курсы, уроки, заметки и тренажёр кода. Скриншоты показывают, куда нажимать.',
   noindex = false,
 } = Astro.props
@@ -23,7 +23,7 @@ const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': [
     { '@type': 'Organization', '@id': `${SITE_URL}/#organization`, name: 'MentorCareer', url: LMS_URL, logo: { '@type': 'ImageObject', url: new URL('/apple-touch-icon.png', SITE_URL).href, width: 180, height: 180 } },
-    { '@type': 'WebSite', '@id': `${SITE_URL}/#website`, name: 'MentorCareer — инструкция', url: SITE_URL, inLanguage: 'ru', publisher: { '@id': `${SITE_URL}/#organization` } },
+    { '@type': 'WebSite', '@id': `${SITE_URL}/#website`, name: 'MentorCareer - инструкция', url: SITE_URL, inLanguage: 'ru', publisher: { '@id': `${SITE_URL}/#organization` } },
     { '@type': 'ImageObject', '@id': `${SITE_URL}/#primaryimage`, url: ogImage, width: 1200, height: 630, caption: ogImageAlt },
     { '@type': 'WebPage', '@id': `${canonicalUrl}#webpage`, name: title, description, url: canonicalUrl, inLanguage: 'ru', dateModified, isPartOf: { '@id': `${SITE_URL}/#website` }, publisher: { '@id': `${SITE_URL}/#organization` }, primaryImageOfPage: { '@id': `${SITE_URL}/#primaryimage` } },
     { '@type': 'FAQPage', '@id': `${SITE_URL}/#faq`, mainEntity: FAQ.map(({ question, answer }) => ({ '@type': 'Question', name: question, acceptedAnswer: { '@type': 'Answer', text: answer } })) },
@@ -51,7 +51,7 @@ const jsonLd = {
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="ru_RU" />
-    <meta property="og:site_name" content="MentorCareer — инструкция" />
+    <meta property="og:site_name" content="MentorCareer - инструкция" />
     <meta property="og:image" content={ogImage} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />

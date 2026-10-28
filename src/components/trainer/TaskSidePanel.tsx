@@ -137,7 +137,7 @@ export function TaskSidePanel({
 
 function hiddenCasesNote(count: number): string {
   const single = count % 10 === 1 && count % 100 !== 11
-  return `Плюс ${pluralize(count, 'скрытый тест', 'скрытых теста', 'скрытых тестов')} — ${single ? 'он прогоняется' : 'они прогоняются'} на сервере при отправке.`
+  return `Плюс ${pluralize(count, 'скрытый тест', 'скрытых теста', 'скрытых тестов')} - ${single ? 'он прогоняется' : 'они прогоняются'} на сервере при отправке.`
 }
 
 function TestsTab({
@@ -168,7 +168,7 @@ function TestsTab({
     return (
       <p className="text-sm text-muted-foreground">
         Решение сверяется с эталонным выводом в консоль. Нажмите «Запустить», чтобы увидеть свой
-        вывод, и «Отправить» — чтобы получить вердикт.
+        вывод, и «Отправить» - чтобы получить вердикт.
       </p>
     )
   }

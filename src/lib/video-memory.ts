@@ -40,7 +40,7 @@ function readPositions(): Positions {
     const parsed: unknown = raw ? JSON.parse(raw) : {}
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Positions) : {}
   } catch (error) {
-    console.warn('Позиции видео не прочитались — начнём с начала', error)
+    console.warn('Позиции видео не прочитались - начнём с начала', error)
     return {}
   }
 }

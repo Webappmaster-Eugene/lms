@@ -50,7 +50,7 @@ export function TaskMetadata({ task, compact = false, className }: { task: TaskM
       </div>
       {!compact && (
         <>
-          {minutes !== null && <p className="text-muted-foreground">Время — ориентир для самостоятельной тренировки, а не длительность интервью компании.</p>}
+          {minutes !== null && <p className="text-muted-foreground">Время - ориентир для самостоятельной тренировки, а не длительность интервью компании.</p>}
           {(source || invalidSource || leetcodeUrl) && <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
             {source && <a href={source} target="_blank" rel="nofollow noopener noreferrer" className={externalLinkClass}>Источник задачи</a>}
             {invalidSource && <span className="text-muted-foreground">Ссылка на источник задачи недоступна.</span>}
@@ -61,7 +61,7 @@ export function TaskMetadata({ task, compact = false, className }: { task: TaskM
               const row = byCompany.get(company)
               const url = safeSourceUrl(row?.url)
               return <li key={company} className="min-w-0 space-y-1">
-                <p><span className="font-medium text-foreground">{COMPANY_LABELS[company]}</span> — {row?.note ?? 'Источник метки компании не подтверждён. Это не означает, что задачу задавали на её собеседовании.'}</p>
+                <p><span className="font-medium text-foreground">{COMPANY_LABELS[company]}</span> - {row?.note ?? 'Источник метки компании не подтверждён. Это не означает, что задачу задавали на её собеседовании.'}</p>
                 {row && <p>Проверено <time dateTime={row.checkedAt}>{new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(row.checkedAt))}</time></p>}
                 {url && <a href={url} target="_blank" rel="nofollow noopener noreferrer" className={externalLinkClass}>Источник метки «{COMPANY_LABELS[company]}»</a>}
               </li>

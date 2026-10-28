@@ -18,7 +18,7 @@ export function VideoMemoryBar({ waitingFrom, resumedFrom, restart, rate, setRat
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs text-muted-foreground">
       <div className="flex items-center gap-2" aria-live="polite">
-        {waitingFrom !== null && waitingFrom !== undefined && <span>Подготавливаем продолжение с {formatTime(waitingFrom)} — ожидаем загрузку видео</span>}
+        {waitingFrom !== null && waitingFrom !== undefined && <span>Подготавливаем продолжение с {formatTime(waitingFrom)} - ожидаем загрузку видео</span>}
         {resumedFrom !== null && (
           <>
             <span>Продолжили с {formatTime(resumedFrom)}</span>

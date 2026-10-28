@@ -355,7 +355,7 @@ export const reactInterviewTopic: TrainerTopicSeed = {
 
 Требования:
 - input#new-title с label «Новая задача» и button#add добавляют trimmed-текст в конец списка. Пробелы без текста игнорируются, успешное добавление очищает поле. Одинаковые названия разрешены и обозначают разные записи. Новые id начинаются с 3 и возрастают, удалённые id не используются заново.
-- ul#todos содержит li[data-id]. Название — span.title. checkbox изменяет готовность; button.edit открывает редактор этой записи, button.delete удаляет только эту запись.
+- ul#todos содержит li[data-id]. Название - span.title. checkbox изменяет готовность; button.edit открывает редактор этой записи, button.delete удаляет только эту запись.
 - Кнопки #filter-all, #filter-active, #filter-done показывают все/активные/готовые записи без изменения данных. aria-pressed отмечает выбранный фильтр. Порядок записей сохраняется.
 - output#remaining содержит число активных записей во всём плане, включая скрытые фильтром. Пустой видимый список показывает p#empty «Нет задач».
 - Редактор содержит input#edit-title и кнопки #save-edit/#cancel-edit. Сохранение trimmed-непустого текста меняет название, сохраняет id и готовность и закрывает редактор. Пустой текст не сохраняется. Отмена не меняет запись.
@@ -364,7 +364,7 @@ export const reactInterviewTopic: TrainerTopicSeed = {
       starter: starter('План подготовки', '<label htmlFor="new-title">Новая задача</label><input id="new-title" /><button id="add" type="button">Добавить</button><div className="controls"><button id="filter-all" type="button">Все</button><button id="filter-active" type="button">Активные</button><button id="filter-done" type="button">Готовые</button></div><output id="remaining">1</output><ul id="todos"><li data-id="1"><span className="title">Повторить хуки</span><input type="checkbox" /><button className="edit" type="button">Изменить</button><button className="delete" type="button">Удалить</button></li><li data-id="2"><span className="title">Открыть редактор</span><input type="checkbox" defaultChecked /><button className="edit" type="button">Изменить</button><button className="delete" type="button">Удалить</button></li></ul>'),
       solution: todoSolution,
       incorrect: todoSolution.replace('todo.id !== item.id', 'todo.title !== item.title'),
-      solutionNotes: 'Идентификатор принадлежит записи, а не её названию или позиции. Фильтр — отдельное состояние; видимый список и количество активных задач вычисляются из полного массива. Черновик редактирования не меняет исходную запись до сохранения.',
+      solutionNotes: 'Идентификатор принадлежит записи, а не её названию или позиции. Фильтр - отдельное состояние; видимый список и количество активных задач вычисляются из полного массива. Черновик редактирования не меняет исходную запись до сохранения.',
       hints: ['Храните записи с id, title и done. Новый id удобно выдавать через useRef.', 'Отфильтруйте массив для отображения, но считайте remaining до фильтра.', 'Удаляйте и редактируйте по id, а не по индексу или названию.'],
       runtimeCases: [
         scenario('Добавление и очистка поля', false, [count('#todos > li', 2), fill('#new-title', '  Разобрать замыкания  '), click('#add'), count('#todos > li', 3), text('#todos > li[data-id="3"] .title', 'Разобрать замыкания'), text('#remaining', '2'), click('#add'), count('#todos > li', 3)]),
@@ -383,13 +383,13 @@ export const reactInterviewTopic: TrainerTopicSeed = {
       sourceUrl: 'https://www.greatfrontend.com/questions/user-interface/tabs',
       descriptionMd: `Реализуйте два независимых экземпляра Tabs в App.tsx. В каждом три вкладки: «Обзор», «Практика», «Материалы» с панелями «Основные сведения», «Решаем задачи», «Ссылки и записи».
 
-Первая группа id=first изначально выбирает индекс 0, вторая id=second — индекс 1. Используйте параметр initialIndex и отдельное состояние экземпляра.
+Первая группа id=first изначально выбирает индекс 0, вторая id=second - индекс 1. Используйте параметр initialIndex и отдельное состояние экземпляра.
 
 Требования:
 - Кнопки имеют id вида first-tab-0/second-tab-1 и role="tab". Контейнер имеет role="tablist". Панели имеют id first-panel-0 и т. д., role="tabpanel", tabIndex=0, aria-labelledby с id своей кнопки.
 - aria-controls кнопки ссылается на её панель. aria-selected равен true только у выбранной вкладки, tabIndex=0 только у неё; у остальных -1.
 - В каждой группе видна ровно одна панель. Сохраняйте остальные панели в DOM с hidden. Клик меняет только свою группу.
-- ArrowRight/ArrowLeft циклически выбирают соседнюю вкладку. Home выбирает первую, End — последнюю. Выбор и фокус меняются вместе, браузерная прокрутка по этим клавишам предотвращается.
+- ArrowRight/ArrowLeft циклически выбирают соседнюю вкладку. Home выбирает первую, End - последнюю. Выбор и фокус меняются вместе, браузерная прокрутка по этим клавишам предотвращается.
 
 Нативная кнопка обеспечивает Enter и пробел. Не объединяйте состояние двух групп в глобальную переменную. Наши условия расширяют тип задания Tabs; компании не приписываются без публичного подтверждения.`,
       starter: starter('Разделы курса', '<section id="first"><div role="tablist"><button id="first-tab-0" type="button" role="tab">Обзор</button><button id="first-tab-1" type="button" role="tab">Практика</button><button id="first-tab-2" type="button" role="tab">Материалы</button></div><div id="first-panel-0" role="tabpanel">Основные сведения</div><div id="first-panel-1" role="tabpanel">Решаем задачи</div><div id="first-panel-2" role="tabpanel">Ссылки и записи</div></section><section id="second"><div role="tablist"><button id="second-tab-0" type="button" role="tab">Обзор</button><button id="second-tab-1" type="button" role="tab">Практика</button><button id="second-tab-2" type="button" role="tab">Материалы</button></div><div id="second-panel-0" role="tabpanel">Основные сведения</div><div id="second-panel-1" role="tabpanel">Решаем задачи</div><div id="second-panel-2" role="tabpanel">Ссылки и записи</div></section>'),
@@ -413,7 +413,7 @@ export const reactInterviewTopic: TrainerTopicSeed = {
       sourceUrl: 'https://react.dev/learn/choosing-the-state-structure',
       descriptionMd: `Создайте каталог команды с поиском, обратным порядком и независимым выбором участников. В отличие от простого фильтра списка здесь выбранные записи должны переживать смену видимости и порядка.
 
-Данные: anna — Анна/React; boris — Борис/Go; vera — Вера/React; gleb — Глеб/Python. Начальный порядок: Анна, Борис, Вера, Глеб. Все участники изначально не выбраны.
+Данные: anna - Анна/React; boris - Борис/Go; vera - Вера/React; gleb - Глеб/Python. Начальный порядок: Анна, Борис, Вера, Глеб. Все участники изначально не выбраны.
 
 Требования:
 - input#query с label «Имя или навык» фильтрует по подстроке имени или навыка, без учёта регистра и пробелов по краям запроса.
@@ -426,7 +426,7 @@ export const reactInterviewTopic: TrainerTopicSeed = {
       starter: starter('Команда проекта', '<label htmlFor="query">Имя или навык</label><input id="query" /><button id="reverse" type="button">Обратный порядок</button><button id="clear-query" type="button">Очистить поиск</button><output id="selected-count">0</output><ul id="people">{[{ id: "anna", name: "Анна", skill: "React" }, { id: "boris", name: "Борис", skill: "Go" }, { id: "vera", name: "Вера", skill: "React" }, { id: "gleb", name: "Глеб", skill: "Python" }].map(person => <li key={person.id} data-id={person.id}><span className="name">{person.name}</span>: <span className="skill">{person.skill}</span><button className="select" type="button">Выбрать</button></li>)}</ul>'),
       solution: directorySolution,
       incorrect: directorySolution.replace('setQuery(event.target.value)', '(setSelected([]), setQuery(event.target.value))'),
-      solutionNotes: 'Состояние выбора — набор стабильных id. Фильтр и порядок меняют только представление, поэтому скрытые элементы сохраняют выбор. Количество выбранных вычисляется из набора id, а не из видимого списка.',
+      solutionNotes: 'Состояние выбора - набор стабильных id. Фильтр и порядок меняют только представление, поэтому скрытые элементы сохраняют выбор. Количество выбранных вычисляется из набора id, а не из видимого списка.',
       hints: ['Храните query, порядок и выбранные id отдельно.', 'Сначала фильтруйте исходные данные, затем меняйте порядок копии результата.', 'Проверяйте выбор через id записи, не через её индекс в отфильтрованном массиве.'],
       runtimeCases: [
         scenario('Поиск по навыку и пустой результат', false, [fill('#query', ' rEaCt '), count('#people > li', 2), text('#people > li:nth-child(1) .name', 'Анна'), text('#people > li:nth-child(2) .name', 'Вера'), fill('#query', 'нет такого'), count('#people > li', 0), text('#empty', 'Никого не нашли')]),
@@ -452,12 +452,12 @@ export const reactInterviewTopic: TrainerTopicSeed = {
 - checkbox#active-only с подписью «Только активные» оставляет только активных участников и тоже возвращает страницу 1. Обратное переключение возвращает полный набор, сохраняя размер страницы.
 - Последняя страница может содержать меньше записей; не добавляйте заполнители и не теряйте последнюю запись.
 
-Выводимая страница и число страниц вычисляются из текущего фильтра и размера. Сервер и внешние библиотеки не нужны. Условие — самостоятельная адаптация распространённого задания Data Table, без неподтверждённых тегов компаний.`,
+Выводимая страница и число страниц вычисляются из текущего фильтра и размера. Сервер и внешние библиотеки не нужны. Условие - самостоятельная адаптация распространённого задания Data Table, без неподтверждённых тегов компаний.`,
       starter: starter('Участники', '<label><input id="active-only" type="checkbox" /> Только активные</label><button id="size-2" type="button">По 2</button><button id="size-4" type="button">По 4</button><table><caption>Список участников</caption><thead><tr><th scope="col">ID</th><th scope="col">Имя</th></tr></thead><tbody id="rows"><tr data-id="1"><td>1</td><td className="name">Анна</td></tr><tr data-id="2"><td>2</td><td className="name">Борис</td></tr></tbody></table><output id="page-status">1/4</output><button id="previous" type="button" disabled>Назад</button><button id="next" type="button">Вперёд</button>'),
       solution: paginationSolution,
       incorrect: paginationSolution.replace('setPageSize(4); setPage(1)', 'setPageSize(4)'),
       solutionNotes: 'Храните только выбор пользователя: страницу, размер и фильтр. Для отображения используйте slice после фильтрации. Явный сброс на страницу 1 при изменении размера или фильтра предотвращает пустую страницу и противоречивый счётчик.',
-      hints: ['Номер страницы начинается с 1; начало slice — (page - 1) * pageSize.', 'Число страниц — Math.ceil(filtered.length / pageSize).', 'Изменение размера/фильтра должно обновлять и номер страницы.'],
+      hints: ['Номер страницы начинается с 1; начало slice - (page - 1) * pageSize.', 'Число страниц - Math.ceil(filtered.length / pageSize).', 'Изменение размера/фильтра должно обновлять и номер страницы.'],
       runtimeCases: [
         scenario('Первая и следующая страницы', false, [text('#page-status', '1/4'), attr('#previous', 'disabled', ''), count('#rows > tr', 2), text('#rows > tr:nth-child(1) .name', 'Анна'), click('#next'), text('#page-status', '2/4'), text('#rows > tr:nth-child(1) .name', 'Вера'), count('#previous:not([disabled])', 1)]),
         scenario('Последняя неполная страница и возврат', true, [click('#next'), click('#next'), click('#next'), text('#page-status', '4/4'), count('#rows > tr', 1), text('#rows > tr .name', 'Жанна'), attr('#next', 'disabled', ''), click('#previous'), text('#page-status', '3/4'), count('#rows > tr', 2)]),
@@ -482,7 +482,7 @@ export const reactInterviewTopic: TrainerTopicSeed = {
 - E-mail после trim имеет непустые части до/после @ и точку внутри домена; пробелы и дополнительные @ недопустимы. Ошибка #email-error: «Введите корректный e-mail».
 - Пароль содержит не менее 8 символов, хотя бы одну латинскую букву и цифру; не обрезайте его пробелы автоматически. Ошибка #password-error: «Не менее 8 символов, буква и цифра».
 - Без согласия показывайте #consent-error: «Нужно согласие».
-- Ошибки — элементы с role=alert. Для первых трёх полей aria-describedby ссылается на соответствующую ошибку; aria-invalid отражает результат последней отправки. До первой отправки сообщений об ошибке нет (можно оставить пустые контейнеры).
+- Ошибки - элементы с role=alert. Для первых трёх полей aria-describedby ссылается на соответствующую ошибку; aria-invalid отражает результат последней отправки. До первой отправки сообщений об ошибке нет (можно оставить пустые контейнеры).
 - Корректная отправка очищает ошибки и показывает output#success «Имя: e-mail», обрезав пробелы в имени и приведя trimmed e-mail к нижнему регистру. Любое последующее изменение поля скрывает старое подтверждение.
 - «Очистить» возвращает пустые поля, снятое согласие, отсутствие подтверждения и сообщений об ошибках.
 
@@ -520,7 +520,7 @@ export const reactInterviewTopic: TrainerTopicSeed = {
       starter: starter('Заметка к интервью', '<p id="saved-note">Первая заметка</p><button id="open-modal" type="button">Редактировать заметку</button><dialog id="note-dialog" aria-labelledby="dialog-title"><h2 id="dialog-title">Редактирование заметки</h2><label htmlFor="note">Заметка</label><input id="note" defaultValue="Первая заметка" /><output id="draft-preview">Первая заметка</output><button id="save-note" type="button">Сохранить</button><button id="cancel-note" type="button">Отмена</button></dialog>'),
       solution: modalSolution,
       incorrect: modalSolution.replace('setDraft(saved); setOpen(true)', 'setOpen(true)'),
-      solutionNotes: 'Сохранённый текст и черновик — разные состояния. При открытии черновик инициализируется заново; отмена не записывает его. showModal/close синхронизируются с React-состоянием через effect, событие cancel от Escape обрабатывается явно.',
+      solutionNotes: 'Сохранённый текст и черновик - разные состояния. При открытии черновик инициализируется заново; отмена не записывает его. showModal/close синхронизируются с React-состоянием через effect, событие cancel от Escape обрабатывается явно.',
       hints: ['Разделите saved, draft и open; храните ссылку на dialog через useRef.', 'В onCancel предотвратите стандартное закрытие и обновите open, чтобы состояние не расходилось с DOM.', 'При открытии копируйте saved в draft, а после закрытия возвращайте фокус кнопке.'],
       runtimeCases: [
         scenario('Открытие и сохранение', false, [visible('#note-dialog', false), click('#open-modal'), visible('#note-dialog'), count('#note-dialog:modal', 1), count('#note:focus', 1), attr('#note-dialog', 'aria-labelledby', 'dialog-title'), fill('#note', '  Повторить useEffect  '), text('#draft-preview', '  Повторить useEffect  '), click('#save-note'), visible('#note-dialog', false), text('#saved-note', 'Повторить useEffect'), count('#open-modal:focus', 1)]),
@@ -540,12 +540,12 @@ export const reactInterviewTopic: TrainerTopicSeed = {
       descriptionMd: `Реализуйте памятку React из трёх независимо раскрывающихся секций. Изначально все закрыты.
 
 Данные:
-- state — «Состояние»: «Храните изменяющиеся данные в состоянии.»
-- props — «Пропсы»: «Передавайте данные от родителя к ребёнку.»
-- effects — «Эффекты»: «Синхронизируйте компонент с внешней системой.»
+- state - «Состояние»: «Храните изменяющиеся данные в состоянии.»
+- props - «Пропсы»: «Передавайте данные от родителя к ребёнку.»
+- effects - «Эффекты»: «Синхронизируйте компонент с внешней системой.»
 
 Требования:
-- Заголовок секции — h2 с нативным button#trigger-state и аналогичными кнопками для props/effects.
+- Заголовок секции - h2 с нативным button#trigger-state и аналогичными кнопками для props/effects.
 - Кнопка имеет aria-expanded, соответствующий видимости, и aria-controls="panel-state" (аналогично для других секций).
 - Панель div#panel-state имеет role="region", aria-labelledby="trigger-state". Закрытые панели остаются в DOM с hidden.
 - Клик, Enter или пробел переключает только указанную секцию. Можно одновременно открыть несколько секций.
@@ -571,20 +571,20 @@ export const reactInterviewTopic: TrainerTopicSeed = {
       recommendedMinutes: 30,
       tags: ['react', 'hooks', 'state', 'arrays'],
       sourceUrl: 'https://react.dev/learn/choosing-the-state-structure',
-      descriptionMd: `Сделайте корзину с двумя товарами: book — «Книга», цена 400 ₽, остаток 3; pen — «Ручка», цена 100 ₽, остаток 5. Начальные количества равны нулю.
+      descriptionMd: `Сделайте корзину с двумя товарами: book - «Книга», цена 400 ₽, остаток 3; pen - «Ручка», цена 100 ₽, остаток 5. Начальные количества равны нулю.
 
 Требования:
 - ul#products содержит li[data-id="book"] и li[data-id="pen"]. Текущее количество выводится в output.quantity.
-- Кнопки .plus/.minus увеличивают/уменьшают количество на 1, не выходя за диапазон 0..остаток. На нижней границе .minus disabled, на верхней — .plus disabled. После изменения границы доступность восстанавливается.
+- Кнопки .plus/.minus увеличивают/уменьшают количество на 1, не выходя за диапазон 0..остаток. На нижней границе .minus disabled, на верхней - .plus disabled. После изменения границы доступность восстанавливается.
 - .remove обнуляет только количество своего товара.
-- #units — сумма количеств; #subtotal — сумма цена × количество. #discount равен 10% от subtotal, если subtotal >= 1000, иначе 0. #total = subtotal - discount.
+- #units - сумма количеств; #subtotal - сумма цена × количество. #discount равен 10% от subtotal, если subtotal >= 1000, иначе 0. #total = subtotal - discount.
 - Все четыре итога содержат только число без знака валюты. Цены подобраны так, что результаты целые. Скидка исчезает, как только сумма снова становится меньше 1000.
 
 Храните количества как состояние, а итоги вычисляйте при рендере. Не используйте API, хранение в localStorage или внешние пакеты. Это авторское упражнение на вычисляемое состояние; источник не утверждает использование такой корзины определённым работодателем.`,
       starter: starter('Корзина для подготовки', '<ul id="products">{[{ id: "book", title: "Книга", price: 400 }, { id: "pen", title: "Ручка", price: 100 }].map(product => <li key={product.id} data-id={product.id}><span>{product.title}: {product.price} ₽</span><output className="quantity">0</output><button className="minus" type="button" disabled>−</button><button className="plus" type="button">+</button><button className="remove" type="button">Убрать</button></li>)}</ul><dl><dt>Товаров</dt><dd id="units">0</dd><dt>Сумма до скидки</dt><dd id="subtotal">0</dd><dt>Скидка</dt><dd id="discount">0</dd><dt>К оплате</dt><dd id="total">0</dd></dl>'),
       solution: cartSolution,
       incorrect: cartSolution.replace('subtotal >= 1000', 'subtotal > 1000'),
-      solutionNotes: 'Цена и остаток — фиксированные данные, количества — состояние, subtotal/discount/total/units — производные значения. Пересчёт при каждом рендере предотвращает устаревшую скидку после уменьшения количества или удаления товара.',
+      solutionNotes: 'Цена и остаток - фиксированные данные, количества - состояние, subtotal/discount/total/units - производные значения. Пересчёт при каждом рендере предотвращает устаревшую скидку после уменьшения количества или удаления товара.',
       hints: ['Сложите price * quantity через reduce; отдельное состояние total не требуется.', 'Порог скидки включительный: ровно 1000 тоже даёт скидку.', 'Меняйте только один id функциональным обновлением объекта количеств.'],
       runtimeCases: [
         scenario('Добавление разных товаров и итоги', false, [text('#total', '0'), attr('#products > li[data-id="book"] .minus', 'disabled', ''), click('#products > li[data-id="book"] .plus'), click('#products > li[data-id="pen"] .plus'), text('#units', '2'), text('#subtotal', '500'), text('#discount', '0'), text('#total', '500'), count('#products > li[data-id="book"] .minus:not([disabled])', 1)]),

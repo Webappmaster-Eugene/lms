@@ -73,7 +73,7 @@ describe('«Гайд помог?»', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     render(<GuideFeedback guideId={5} initial={{ id: 12, helpful: null, comment: null }} maxComment={1000} />)
     await userEvent.click(screen.getByRole('button', { name: 'Да' }))
-    await waitFor(() => expect(toast).toHaveBeenCalledWith('Не удалось сохранить отзыв — попробуйте ещё раз', 'error'))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('Не удалось сохранить отзыв - попробуйте ещё раз', 'error'))
     expect(screen.getByRole('button', { name: 'Да' })).toHaveAttribute('aria-pressed', 'false')
   })
 
@@ -114,7 +114,7 @@ describe('«Гайд помог?»', () => {
     render(<GuideFeedback guideId={5} initial={{ id: 12, helpful: 'yes', comment: null }} maxComment={1000} />)
     await userEvent.type(screen.getByRole('textbox'), 'Добавьте скриншоты')
     await userEvent.click(screen.getByRole('button', { name: 'Отправить' }))
-    await waitFor(() => expect(toast).toHaveBeenCalledWith('Не удалось сохранить отзыв — попробуйте ещё раз', 'error'))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('Не удалось сохранить отзыв - попробуйте ещё раз', 'error'))
     expect(toast).not.toHaveBeenCalledWith('Спасибо! Ментор прочитает отзыв', 'success')
     expect(screen.queryByText('Отзыв отправлен')).not.toBeInTheDocument()
     expect(screen.getByRole('textbox')).toHaveValue('Добавьте скриншоты')

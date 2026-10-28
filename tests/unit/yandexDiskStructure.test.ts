@@ -472,7 +472,7 @@ describe('чистка названий и размер секций', () => {
     const result = parseYandexDiskTree(items)
 
     expect(result.sections.map((s) => s.title)).toEqual([
-      'Уроки 1–10', 'Уроки 11–20', 'Уроки 21–30', 'Уроки 31–35',
+      'Уроки 1-10', 'Уроки 11-20', 'Уроки 21-30', 'Уроки 31-35',
     ])
     expect(result.sections[3].lessons.map((l) => l.order)).toEqual([1, 2, 3, 4, 5])
     expect(result.totalVideos).toBe(35)
@@ -662,7 +662,7 @@ describe('материалы не превращают урок в файлов�
     const materials = result.sections[0].lessons[0].materials
 
     // сворачивается папка урока целиком — это и есть «все материалы урока»
-    expect(materials.map((m) => m.title)).toEqual(['Блок — папка на Диске', 'проект.zip'])
+    expect(materials.map((m) => m.title)).toEqual(['Блок - папка на Диске', 'проект.zip'])
   })
 
   it('рекламные ярлыки раздач в материалы не попадают, полезные остаются', () => {

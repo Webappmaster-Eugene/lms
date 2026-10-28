@@ -335,7 +335,7 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
           data.awardedPoints
             ? `Задача решена! +${data.awardedPoints} XP`
             : wasCompleted
-              ? 'Задача решена — баллы уже начислены ранее'
+              ? 'Задача решена - баллы уже начислены ранее'
               : 'Задача решена!',
           'success',
         )
@@ -504,7 +504,7 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
       )}
 
       <p className="hidden text-xs text-muted-foreground lg:block">
-        Ctrl+Enter — запустить, Ctrl+Shift+Enter — отправить (на Mac — ⌘)
+        Ctrl+Enter - запустить, Ctrl+Shift+Enter - отправить (на Mac - ⌘)
       </p>
     </div>
   )

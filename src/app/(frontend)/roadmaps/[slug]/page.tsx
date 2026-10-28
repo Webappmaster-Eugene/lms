@@ -364,7 +364,7 @@ function NextStepCard({ nextStep, allDone, assignedOnly = false }: { nextStep: C
       <div className="flex items-center gap-3 rounded-xl border border-success/40 bg-success/10 p-4">
         <PartyPopper className="h-6 w-6 shrink-0 text-success" aria-hidden="true" />
         <p className="text-sm text-foreground">
-          {assignedOnly ? 'Все назначенные уроки пройдены. Ваши сертификаты — в разделе ' : 'Все курсы роадмапа пройдены. Сертификаты — в разделе '}
+          {assignedOnly ? 'Все назначенные уроки пройдены. Ваши сертификаты - в разделе ' : 'Все курсы роадмапа пройдены. Сертификаты - в разделе '}
           <Link href="/certificates" className="font-medium underline underline-offset-2">
             «Сертификаты»
           </Link>

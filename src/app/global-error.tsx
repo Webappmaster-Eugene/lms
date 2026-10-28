@@ -19,7 +19,7 @@ export default function GlobalError({ error }: { error: Error & { digest?: strin
   return (
     <html lang="ru" suppressHydrationWarning>
       <head>
-        <title>Платформа временно недоступна — MentorCareer LMS</title>
+        <title>Платформа временно недоступна - MentorCareer LMS</title>
       </head>
       <body>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
@@ -29,10 +29,10 @@ export default function GlobalError({ error }: { error: Error & { digest?: strin
               tone="danger"
               eyebrow="MentorCareer LMS"
               title="Платформа временно недоступна"
-              description="Сервер ответил не так, как обычно. Мы уже получили отчёт и разбираемся. Обычно это проходит за пару минут — ваш прогресс и решения сохранены."
+              description="Сервер ответил не так, как обычно. Мы уже получили отчёт и разбираемся. Обычно это проходит за пару минут - ваш прогресс и решения сохранены."
               terminal={[
                 { kind: 'command', text: 'curl -I https://learn.mentorcareer.ru' },
-                { kind: 'error', text: 'HTTP/2 503 — сервис недоступен' },
+                { kind: 'error', text: 'HTTP/2 503 - сервис недоступен' },
                 { kind: 'comment', text: 'отчёт уже у разработчиков' },
                 { kind: 'hint', text: 'sleep 60 && reload' },
               ]}

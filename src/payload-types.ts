@@ -329,7 +329,7 @@ export interface Roadmap {
   order?: number | null;
   isPublished?: boolean | null;
   /**
-   * Допустимые форматы: https://miro.com/app/live-embed/<boardId>/ или https://miro.com/app/embed/<boardId>/. Доска должна быть публичной (Share → Anyone with the link). View-URL вида https://miro.com/app/board/... не подойдёт — iframe покажет экран логина Miro.
+   * Допустимые форматы: https://miro.com/app/live-embed/<boardId>/ или https://miro.com/app/embed/<boardId>/. Доска должна быть публичной (Share → Anyone with the link). View-URL вида https://miro.com/app/board/... не подойдёт - iframe покажет экран логина Miro.
    */
   miroEmbedUrl?: string | null;
   updatedAt: string;
@@ -372,11 +372,11 @@ export interface RoadmapNode {
    */
   stage?: ('start' | 'base' | 'stage1' | 'stage2' | 'practice' | 'advanced' | 'growth') | null;
   /**
-   * Палитра Miro-доски. Если не указан — берётся цвет по умолчанию для стадии.
+   * Палитра Miro-доски. Если не указан - берётся цвет по умолчанию для стадии.
    */
   color?: ('yellow' | 'lime' | 'white' | 'gray' | 'pink' | 'blue' | 'red') | null;
   /**
-   * Маркированный список под-тем — отображается внутри карточки узла на графе, в стиле Miro.
+   * Маркированный список под-тем - отображается внутри карточки узла на графе, в стиле Miro.
    */
   bullets?:
     | {
@@ -417,7 +417,7 @@ export interface Course {
   coverImage?: (number | null) | Media;
   roadmap: number | Roadmap;
   /**
-   * Тема на карте, к которой относится курс. По одной теме может быть несколько курсов — узел покажет их списком
+   * Тема на карте, к которой относится курс. По одной теме может быть несколько курсов - узел покажет их списком
    */
   roadmapNode?: (number | null) | RoadmapNode;
   order?: number | null;
@@ -427,7 +427,7 @@ export interface Course {
    */
   assignedOnly?: boolean | null;
   /**
-   * Показывается в разделе «Буткемп», а не в «Курсах» и роадмапах. Назначается только целиком, поэтому всегда «Только по назначению»; если снять флажок, «Только по назначению» останется — снимите его отдельно.
+   * Показывается в разделе «Буткемп», а не в «Курсах» и роадмапах. Назначается только целиком, поэтому всегда «Только по назначению»; если снять флажок, «Только по назначению» останется - снимите его отдельно.
    */
   isBootcamp?: boolean | null;
   estimatedHours?: number | null;
@@ -455,7 +455,7 @@ export interface Guide {
   summary: string;
   markdown?: string | null;
   /**
-   * По ней ученик фильтрует список гайдов. Нет нужной — создайте кнопкой рядом
+   * По ней ученик фильтрует список гайдов. Нет нужной - создайте кнопкой рядом
    */
   category?: (number | null) | GuideCategory;
   /**
@@ -463,7 +463,7 @@ export interface Guide {
    */
   reviewedAt?: string | null;
   /**
-   * Пустое — через 3 месяца после проверки. Просроченные гайды видны над списком
+   * Пустое - через 3 месяца после проверки. Просроченные гайды видны над списком
    */
   reviewBy?: string | null;
   /**
@@ -553,7 +553,7 @@ export interface Lesson {
   description?: string | null;
   course: number | Course;
   /**
-   * Секция внутри курса. Если не указана — урок отображается без группировки.
+   * Секция внутри курса. Если не указана - урок отображается без группировки.
    */
   section?: (number | null) | Section;
   order?: number | null;
@@ -667,7 +667,7 @@ export interface SlidesBlock {
    */
   folderUrl?: string | null;
   /**
-   * Картинки листаются как слайды, PDF — постранично, остальные файлы ученик скачивает.
+   * Картинки листаются как слайды, PDF - постранично, остальные файлы ученик скачивает.
    */
   items?:
     | {
@@ -835,7 +835,7 @@ export interface TrainerTask {
   order?: number | null;
   difficulty: 'easy' | 'medium' | 'hard';
   /**
-   * stdout — сравнение вывода; unit — JS/TS; types — типы TS; program — Go/Python; dom — frontend
+   * stdout - сравнение вывода; unit - JS/TS; types - типы TS; program - Go/Python; dom - frontend
    */
   checkMode: 'stdout' | 'unit' | 'types' | 'program' | 'dom';
   languages: ('js' | 'ts' | 'go' | 'python' | 'html' | 'react' | 'next')[];
@@ -942,15 +942,15 @@ export interface TrainerTask {
       }[]
     | null;
   /**
-   * Код, который выполняется ПЕРЕД решением: фикстуры, моки, вспомогательные классы. Доступен и решению, и тестам. Только JavaScript — преамбула одна на оба языка и в песочницу попадает без транспиляции.
+   * Код, который выполняется ПЕРЕД решением: фикстуры, моки, вспомогательные классы. Доступен и решению, и тестам. Только JavaScript - преамбула одна на оба языка и в песочницу попадает без транспиляции.
    */
   setupCode?: string | null;
   /**
-   * Объявления для компилятора: declare const helper: (x: number) => number. Нужны, когда задача решается на TypeScript, а преамбула написана на JavaScript — иначе strict-режим ругается на неявный any. Если пусто, tsc получит саму преамбулу.
+   * Объявления для компилятора: declare const helper: (x: number) => number. Нужны, когда задача решается на TypeScript, а преамбула написана на JavaScript - иначе strict-режим ругается на неявный any. Если пусто, tsc получит саму преамбулу.
    */
   setupTypes?: string | null;
   /**
-   * Только для режима stdout. Каждая строка — один вызов console.log.
+   * Только для режима stdout. Каждая строка - один вызов console.log.
    */
   expectedOutput?: string | null;
   /**
@@ -960,7 +960,7 @@ export interface TrainerTask {
     | {
         name: string;
         /**
-         * Список аргументов как в вызове, без скобок: 1, "a", [2]. Допустимы NaN, undefined, new Map([...]). Пусто — вызов без аргументов.
+         * Список аргументов как в вызове, без скобок: 1, "a", [2]. Допустимы NaN, undefined, new Map([...]). Пусто - вызов без аргументов.
          */
         argsCode?: string | null;
         expectedCode: string;
@@ -1073,7 +1073,7 @@ export interface TrainerTask {
    */
   recommendedMinutes?: number | null;
   /**
-   * Компания, kind, url, note, checkedAt. official — опубликованный пример; candidate-report — рассказ кандидата; preparation — адаптация для подготовки; unverified — историческая метка без подтверждения.
+   * Компания, kind, url, note, checkedAt. official - опубликованный пример; candidate-report - рассказ кандидата; preparation - адаптация для подготовки; unverified - историческая метка без подтверждения.
    */
   companyEvidence?:
     | {
@@ -1767,7 +1767,7 @@ export interface BootcampLead {
   submissionCount: number;
   lastSubmittedAt?: string | null;
   /**
-   * Пусто — письмо администраторам не ушло: заявка видна только в этом списке.
+   * Пусто - письмо администраторам не ушло: заявка видна только в этом списке.
    */
   notifiedAt?: string | null;
   /**
@@ -1775,7 +1775,7 @@ export interface BootcampLead {
    */
   entryTaskToken?: string | null;
   /**
-   * Пусто — письмо кандидату не ушло. Повторная заявка с того же адреса отправит его снова.
+   * Пусто - письмо кандидату не ушло. Повторная заявка с того же адреса отправит его снова.
    */
   entryTaskSentAt?: string | null;
   entryTaskDueAt?: string | null;

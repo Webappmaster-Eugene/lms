@@ -49,7 +49,7 @@ describe('файлы презентации', () => {
 
   it('папку и видео в список файлов положить нельзя', () => {
     expect(slideUrlProblem(FOLDER)).toContain('ссылка на папку')
-    expect(slideUrlProblem(disk('Легенда'))).toContain('нет расширения — если это папка')
+    expect(slideUrlProblem(disk('Легенда'))).toContain('нет расширения - если это папка')
     expect(slideUrlProblem('/api/media/file/readme')).toBe('у файла нет расширения')
     expect(slideUrlProblem(disk('Курс/урок.mp4'))).toContain('блоком «Видео»')
     expect(slideNameProblem('запись.MKV')).toContain('блоком «Видео»')

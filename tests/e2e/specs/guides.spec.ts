@@ -152,7 +152,7 @@ test.describe('администратор', () => {
     await expect(draft.getByText('Черновик', { exact: true })).toBeVisible()
     await draft.click()
     await expect(page.getByRole('heading', { name: CONTENT.draftGuide.title, level: 1 })).toBeVisible()
-    await expect(page.getByText('Черновик — ученики его пока не видят')).toBeVisible()
+    await expect(page.getByText('Черновик - ученики его пока не видят')).toBeVisible()
     // Черновик админ скачивает для проверки, но в «Сохранённое» его не кладут и отзыв не спрашивают.
     await expect(page.getByText('Черновик.')).toBeVisible()
     await expect(page.getByRole('link', { name: 'Скачать .md' })).toBeVisible()

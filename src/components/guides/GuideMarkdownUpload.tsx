@@ -15,7 +15,7 @@ async function findCategory(name: string): Promise<number> {
   const all = ((await response.json())?.docs ?? []) as { id: number; slug: string; title: string }[]
   const text = name.trim().toLowerCase()
   const match = all.find((item) => item.slug.toLowerCase() === text || (item.title ?? '').trim().toLowerCase() === text)
-  if (!match) throw new Error(`категории «${name.trim()}» нет — создайте её и выберите вручную`)
+  if (!match) throw new Error(`категории «${name.trim()}» нет - создайте её и выберите вручную`)
   return match.id
 }
 

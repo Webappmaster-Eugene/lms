@@ -40,7 +40,7 @@ export function CertificateActions() {
       </button>
       {copyFailed && (
         <p role="alert" className="w-full text-sm text-destructive">
-          Не удалось скопировать — скопируйте адрес из строки браузера.
+          Не удалось скопировать - скопируйте адрес из строки браузера.
         </p>
       )}
       <p className="w-full text-xs text-muted-foreground">

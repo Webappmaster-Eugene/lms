@@ -75,7 +75,7 @@ test('«Отметить пройденным» начисляет баллы: �
 
   await page.goto('/')
   await expect(page.getByText('Дней подряд', { exact: true }).locator('..')).toContainText('1')
-  await expect(page.getByText('Сегодня урок уже пройден — серия 1 день подряд')).toBeVisible()
+  await expect(page.getByText('Сегодня урок уже пройден - серия 1 день подряд')).toBeVisible()
 })
 
 test('заметка к уроку сохраняется, переживает перезагрузку и видна среди всех заметок', async ({ page }) => {
@@ -123,7 +123,7 @@ test('вопрос к уроку: ментор отвечает, ученик в
   const card = mentorPage.locator(`#comment-${questionId}`)
   await card.getByRole('textbox', { name: /Ответ ученику/ }).fill('Ответ ментора e2e')
   await card.getByRole('button', { name: 'Ответить' }).click()
-  await expect(mentorPage.getByText('Ответ отправлен — ученик получит уведомление')).toBeVisible()
+  await expect(mentorPage.getByText('Ответ отправлен - ученик получит уведомление')).toBeVisible()
   await mentorPage.getByRole('button', { name: /Есть ответ/ }).click()
   await expect(mentorPage.locator(`#comment-${questionId}`)).toContainText('Ответ ментора e2e')
   await mentor.close()

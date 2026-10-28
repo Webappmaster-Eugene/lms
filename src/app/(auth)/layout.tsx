@@ -6,7 +6,7 @@ import { ThemeProvider } from '@/components/layout/ThemeProvider'
 
 export const metadata: Metadata = {
   title: {
-    template: '%s — MentorCareer LMS',
+    template: '%s - MentorCareer LMS',
     default: 'MentorCareer LMS',
   },
 }

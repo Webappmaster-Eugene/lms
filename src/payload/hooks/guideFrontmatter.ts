@@ -25,7 +25,7 @@ export const applyGuideFile: CollectionBeforeValidateHook = async ({ data, origi
     )
     const match = all.find((item) => item.slug.toLowerCase() === text || (item.title ?? '').trim().toLowerCase() === text)
     if (match) categoryId = match.id
-    else problems.push(`category: «${fields.category.trim()}» — такой категории нет, есть ${all.map((item) => item.slug).join(', ') || '— сначала создайте категорию'}`)
+    else problems.push(`category: «${fields.category.trim()}» - такой категории нет, есть ${all.map((item) => item.slug).join(', ') || '- сначала создайте категорию'}`)
   }
 
   if (problems.length) {

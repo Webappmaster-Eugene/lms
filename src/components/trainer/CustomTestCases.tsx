@@ -28,7 +28,7 @@ export function CustomTestCases({ cases, onChange, disabled, entryName, exampleC
       </summary>
       <div className="max-h-80 space-y-3 overflow-y-auto px-3 pb-3">
         <p className="text-xs text-muted-foreground">
-          Свой тест — это дополнительный пример, на котором вы проверяете решение.
+          Свой тест - это дополнительный пример, на котором вы проверяете решение.
           Тренажёр вызовет вашу функцию <code className="font-mono text-foreground">{entryName}</code>
           {' '}и сравнит то, что она вернула, с указанным вами результатом.
         </p>
@@ -37,7 +37,7 @@ export function CustomTestCases({ cases, onChange, disabled, entryName, exampleC
           <li>
             В «Аргументы» введите значения как JavaScript-код, через запятую,
             не весь вызов функции. Например, <code className="font-mono text-foreground">2, 3</code>
-            {' '}— два аргумента, <code className="font-mono text-foreground">[2, 3]</code> — один массив.
+            {' '}- два аргумента, <code className="font-mono text-foreground">[2, 3]</code> - один массив.
             Строки пишите в кавычках: <code className="font-mono text-foreground">{'"hello"'}</code>.
             Если аргументов нет, оставьте поле пустым.
           </li>

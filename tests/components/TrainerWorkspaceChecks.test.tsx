@@ -427,7 +427,7 @@ describe('ответ сервера на отправку', () => {
 
     await user.click(screen.getByRole('button', { name: 'Отправить' }))
 
-    await waitFor(() => expect(toast).toHaveBeenCalledWith('Задача решена — баллы уже начислены ранее', 'success'))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('Задача решена - баллы уже начислены ранее', 'success'))
     expect(screen.getByText('Попыток: 4')).toBeInTheDocument()
     expect(navigationRouter().refresh).toHaveBeenCalledOnce()
   })

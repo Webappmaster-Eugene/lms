@@ -13,7 +13,7 @@ import { DATA_COLLECTION, sentryEnvironment } from '@/lib/error-reporting/sentry
 export function initServerSentry(overrides: Pick<Sentry.NodeOptions, 'transport'> = {}): boolean {
   const dsn = serverSentryDsn()
   if (!dsn) {
-    if (process.env.SENTRY_DSN?.trim()) console.error('[sentry] SENTRY_DSN задан в неверном формате — отчёты об ошибках выключены')
+    if (process.env.SENTRY_DSN?.trim()) console.error('[sentry] SENTRY_DSN задан в неверном формате - отчёты об ошибках выключены')
     return false
   }
 

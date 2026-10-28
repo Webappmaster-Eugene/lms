@@ -68,10 +68,10 @@ export function slideUrlProblem(url: string): string | null {
   if (!ref && mediaFileName(url) === null) return 'нужна ссылка на файл на Яндекс Диске или в медиатеке'
   const name = slideFileName(url)
   // Имя без расширения на Диске — обычно подпапка: подсказываем, куда её вставить.
-  if (name && ref && !FILE_NAME.test(name)) return 'у файла нет расширения — если это папка, вставьте ссылку в поле «Папка на Яндекс Диске»'
+  if (name && ref && !FILE_NAME.test(name)) return 'у файла нет расширения - если это папка, вставьте ссылку в поле «Папка на Яндекс Диске»'
   if (name) return slideNameProblem(name)
   // Папку ученику не отдаём: её файлы должны стоять в списке по одному.
-  return ref && new URL(ref.publicKey).pathname.startsWith('/i/') ? null : 'это ссылка на папку — вставьте её в поле «Папка на Яндекс Диске»'
+  return ref && new URL(ref.publicKey).pathname.startsWith('/i/') ? null : 'это ссылка на папку - вставьте её в поле «Папка на Яндекс Диске»'
 }
 
 /** Почему адрес не годится в поле папки; null — адрес подходит. */
@@ -79,7 +79,7 @@ export function slideFolderProblem(url: string): string | null {
   if (hasHiddenCharacters(url)) return 'в ссылке не должно быть пробелов и переводов строк'
   const ref = parsePublicResourceUrl(url)
   if (!ref) return 'нужна публичная ссылка Яндекс Диска вида https://disk.yandex.ru/d/…'
-  return new URL(ref.publicKey).pathname.startsWith('/i/') ? 'это ссылка на отдельный файл — добавьте её в список файлов' : null
+  return new URL(ref.publicKey).pathname.startsWith('/i/') ? 'это ссылка на отдельный файл - добавьте её в список файлов' : null
 }
 
 /** Лежит ли файл прямо в этой папке Диска: обновление списка из папки убирает только такие. */

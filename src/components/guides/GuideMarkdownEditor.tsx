@@ -210,7 +210,7 @@ export const GuideMarkdownEditor: TextareaFieldClientComponent = ({ field, path,
       return
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      setStatus({ error: true, text: `«${file.name}» больше 10 МБ — уменьшите картинку` })
+      setStatus({ error: true, text: `«${file.name}» больше 10 МБ - уменьшите картинку` })
       return
     }
     // Позицию запоминаем до загрузки: пока файл идёт, фокус может уйти из поля.
@@ -232,7 +232,7 @@ export const GuideMarkdownEditor: TextareaFieldClientComponent = ({ field, path,
       const before = text.slice(0, at.start)
       const lead = before === '' || before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n'
       apply({ start: at.start, end: at.end, text: `${lead}${markup}\n\n`, select: [at.start + lead.length + 2, at.start + lead.length + 2 + alt.length] })
-      setStatus({ error: false, text: `Картинка загружена в медиатеку. Поправьте описание в квадратных скобках — его прочитает экранный диктор.` })
+      setStatus({ error: false, text: `Картинка загружена в медиатеку. Поправьте описание в квадратных скобках - его прочитает экранный диктор.` })
     } catch (error) {
       console.error('Не удалось загрузить картинку гайда', error)
       setStatus({ error: true, text: `Не удалось загрузить «${file.name}»: ${error instanceof Error ? error.message : 'неизвестная ошибка'}` })
@@ -269,14 +269,14 @@ export const GuideMarkdownEditor: TextareaFieldClientComponent = ({ field, path,
     return `≈ ${guideReadingMinutes(deferred)} мин чтения · разделов: ${sections} · символов: ${deferred.length}`
   }, [deferred])
 
-  const description = typeof field.admin?.description === 'string' ? field.admin.description : 'Разделы «## Название» становятся оглавлением. Врезки: «> [!TIP]», «> [!WARNING]». Ctrl+B — жирный, Ctrl+I — курсив, Ctrl+K — ссылка.'
+  const description = typeof field.admin?.description === 'string' ? field.admin.description : 'Разделы «## Название» становятся оглавлением. Врезки: «> [!TIP]», «> [!WARNING]». Ctrl+B - жирный, Ctrl+I - курсив, Ctrl+K - ссылка.'
 
   return (
     <div className={`field-type guide-editor${fullscreen ? ' guide-editor--fullscreen' : ''}${showError ? ' error' : ''}`}>
       <FieldLabel htmlFor={inputId} label={field.label} path={path} required />
       <div className="guide-editor__bar" role="toolbar" aria-label="Форматирование текста гайда">
         <div className="guide-editor__group">
-          <ToolButton label="Раздел — пункт оглавления" onClick={() => heading(2)} disabled={disabled}>H2</ToolButton>
+          <ToolButton label="Раздел - пункт оглавления" onClick={() => heading(2)} disabled={disabled}>H2</ToolButton>
           <ToolButton label="Подраздел" onClick={() => heading(3)} disabled={disabled}>H3</ToolButton>
         </div>
         <div className="guide-editor__group">
@@ -285,13 +285,13 @@ export const GuideMarkdownEditor: TextareaFieldClientComponent = ({ field, path,
           <ToolButton label="Код в строке" onClick={() => wrap('`', '`', 'код')} disabled={disabled}>{'</>'}</ToolButton>
         </div>
         <div className="guide-editor__group">
-          <ToolButton label="Список" onClick={bullet} disabled={disabled}>• —</ToolButton>
+          <ToolButton label="Список" onClick={bullet} disabled={disabled}>• -</ToolButton>
           <ToolButton label="Нумерованный список" onClick={numbered} disabled={disabled}>1.</ToolButton>
           <ToolButton label="Чек-лист" onClick={checklist} disabled={disabled}>☐</ToolButton>
         </div>
         <div className="guide-editor__group">
           <ToolButton label="Ссылка" hint="Ctrl+K" onClick={link} disabled={disabled}>Ссылка</ToolButton>
-          <ToolButton label="Картинка — загрузить в медиатеку" onClick={() => imageInput.current?.click()} disabled={disabled || uploading}>{uploading ? 'Загрузка…' : 'Картинка'}</ToolButton>
+          <ToolButton label="Картинка - загрузить в медиатеку" onClick={() => imageInput.current?.click()} disabled={disabled || uploading}>{uploading ? 'Загрузка…' : 'Картинка'}</ToolButton>
           <ToolButton label="Таблица" onClick={table} disabled={disabled}>Таблица</ToolButton>
           <ToolButton label="Блок кода" onClick={codeBlock} disabled={disabled}>Код</ToolButton>
         </div>
@@ -321,12 +321,12 @@ export const GuideMarkdownEditor: TextareaFieldClientComponent = ({ field, path,
       <input ref={imageInput} type="file" accept={IMAGE_TYPES.join(',')} hidden onChange={uploadImage} />
       <details className="guide-editor__help">
         <summary>Как оформить Markdown</summary>
-        <p>Выделите текст и нажмите кнопку панели — разметка вставится автоматически. Справа сразу виден результат.</p>
+        <p>Выделите текст и нажмите кнопку панели - разметка вставится автоматически. Справа сразу виден результат.</p>
         <dl>
           <div><dt><code>## Раздел</code></dt><dd>Заголовок и пункт оглавления</dd></div>
           <div><dt><code>- Пункт</code></dt><dd>Список. Enter продолжает, Enter на пустом пункте завершает</dd></div>
           <div><dt><code>**жирный**</code> · <code>*курсив*</code> · <code>`код`</code></dt><dd>Также Ctrl/Cmd+B, I и K для ссылки</dd></div>
-          <div><dt>Пустая строка</dt><dd>Новый абзац. Для переноса внутри абзаца — два пробела в конце строки</dd></div>
+          <div><dt>Пустая строка</dt><dd>Новый абзац. Для переноса внутри абзаца - два пробела в конце строки</dd></div>
         </dl>
         <p>Списки с символом • при вставке превращаются в Markdown. Код и HTML в примерах сохраняются. Предпросмотр обновляется до сохранения; для публикации правок нажмите «Сохранить».</p>
       </details>
@@ -362,7 +362,7 @@ export const GuideMarkdownEditor: TextareaFieldClientComponent = ({ field, path,
             apply({ start, end, text: converted })
           }}
           onScroll={syncScroll}
-          placeholder="Начните с вступления, разделы — строкой «## Название». Пустой гайд можно начать с кнопки «Шаблон»."
+          placeholder="Начните с вступления, разделы - строкой «## Название». Пустой гайд можно начать с кнопки «Шаблон»."
           hidden={mode === 'preview'}
         />
         {mode !== 'write' && (

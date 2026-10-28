@@ -79,7 +79,7 @@ export function InstallExplanation({ paused = false }: { paused?: boolean }) {
           <p className="text-sm leading-relaxed">Добавьте MentorCareer на главный экран: курсы и ваше место в уроке будут под рукой, как в обычном приложении.</p>
         </div>
         <ul className="space-y-3 text-sm leading-relaxed text-muted-foreground">
-          <li className="flex gap-3"><BookOpen className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" /><span>Те же уроки, заметки и прогресс — без панели браузера.</span></li>
+          <li className="flex gap-3"><BookOpen className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" /><span>Те же уроки, заметки и прогресс - без панели браузера.</span></li>
           <li className="flex gap-3"><BellRing className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" /><span>Напоминания о занятиях и ответы ментора на телефоне. Уведомления включаются отдельно, когда вы захотите.</span></li>
         </ul>
         {!canInstall && guide && <div className="space-y-3 rounded-xl bg-muted p-4 text-sm leading-relaxed"><InstallInstructions guide={guide} /></div>}

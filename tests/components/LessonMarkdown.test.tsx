@@ -202,7 +202,7 @@ describe('копирование кода', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Копировать код' }))
     await act(async () => {})
-    fireEvent.click(screen.getByRole('button', { name: 'Схема 4 — открыть во весь экран' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Схема 4 - открыть во весь экран' }))
     await act(async () => { loaded(highlighter as unknown as HighlighterCore) })
 
     expect(container.querySelector('.shiki')).not.toBeNull()
@@ -217,7 +217,7 @@ describe('копирование кода', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Копировать код' }))
 
-    expect(await screen.findByText('Не удалось скопировать — выделите код вручную')).toHaveAttribute('role', 'status')
+    expect(await screen.findByText('Не удалось скопировать - выделите код вручную')).toHaveAttribute('role', 'status')
     expect(screen.getByRole('button', { name: 'Копировать код' })).toHaveTextContent('Копировать')
     expect(warn).toHaveBeenCalledWith('Не удалось скопировать код урока', expect.any(DOMException))
   })
@@ -228,7 +228,7 @@ describe('копирование кода', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Копировать код' }))
 
-    expect(await screen.findByText('Не удалось скопировать — выделите код вручную')).toBeInTheDocument()
+    expect(await screen.findByText('Не удалось скопировать - выделите код вручную')).toBeInTheDocument()
   })
 })
 
@@ -237,7 +237,7 @@ describe('схема во весь экран', () => {
 
   it('открывается по нажатию и закрывается по Esc, кнопке и фону, возвращая фокус', () => {
     render(<LessonMarkdown markdown={markdown} />)
-    const trigger = screen.getByRole('button', { name: 'Схема 3 — открыть во весь экран' })
+    const trigger = screen.getByRole('button', { name: 'Схема 3 - открыть во весь экран' })
     expect(within(trigger).getByRole('img', { name: 'Схема 3' })).toHaveAttribute('src', svg)
 
     fireEvent.click(trigger)
@@ -269,7 +269,7 @@ describe('схема во весь экран', () => {
     window.addEventListener('keydown', pageKeys)
     try {
       render(<LessonMarkdown markdown={markdown} />)
-      fireEvent.click(screen.getByRole('button', { name: 'Схема 3 — открыть во весь экран' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Схема 3 - открыть во весь экран' }))
       fireEvent.keyDown(screen.getByRole('region', { name: 'Схема в натуральную величину' }), { key: 'ArrowRight' })
       expect(pageKeys).not.toHaveBeenCalled()
       fireEvent.keyDown(document.body, { key: 'ArrowRight' })
@@ -281,7 +281,7 @@ describe('схема во весь экран', () => {
 
   it('подсказывает прокрутку, только если схема шире экрана', () => {
     render(<LessonMarkdown markdown={markdown} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Схема 3 — открыть во весь экран' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Схема 3 - открыть во весь экран' }))
     const dialog = screen.getByRole('dialog', { name: 'Схема 3' })
     const region = within(dialog).getByRole('region', { name: 'Схема в натуральную величину' })
     const image = within(dialog).getByRole('img', { name: 'Схема 3' })
@@ -289,11 +289,11 @@ describe('схема во весь экран', () => {
 
     Object.defineProperty(image, 'naturalWidth', { value: 300, configurable: true })
     fireEvent.load(image)
-    expect(within(dialog).queryByText('Схема шире экрана — прокрутите вбок')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('Схема шире экрана - прокрутите вбок')).not.toBeInTheDocument()
 
     Object.defineProperty(image, 'naturalWidth', { value: 1487, configurable: true })
     fireEvent.load(image)
-    expect(within(dialog).getByText('Схема шире экрана — прокрутите вбок')).toBeInTheDocument()
+    expect(within(dialog).getByText('Схема шире экрана - прокрутите вбок')).toBeInTheDocument()
   })
 
   it('картинка с отброшенным адресом не превращается в кнопку', () => {

@@ -69,7 +69,7 @@ export function RoadmapTopicNode({ data }: NodeProps) {
           ))}
           {nodeData.courses.length > visibleCourses.length && (
             <li className={cn('pl-3.5', classes.accent)}>
-              Ещё {nodeData.courses.length - visibleCourses.length} — в программе темы
+              Ещё {nodeData.courses.length - visibleCourses.length} - в программе темы
             </li>
           )}
         </ul>
@@ -85,7 +85,7 @@ export function RoadmapTopicNode({ data }: NodeProps) {
           ))}
           {nodeData.bullets.length > visibleBullets.length && (
             <li className={cn('pl-3.5', classes.accent)}>
-              Ещё {nodeData.bullets.length - visibleBullets.length} — в описании темы
+              Ещё {nodeData.bullets.length - visibleBullets.length} - в описании темы
             </li>
           )}
         </ul>

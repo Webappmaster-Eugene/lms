@@ -172,7 +172,7 @@ describe('сохранённый разбор собеседования', () =>
 
   it('не представляет непроверенную цитату и необсуждавшуюся тему как доказанный провал', () => {
     render(<InterviewReportView analysis={analysis} recordingId={4} />)
-    expect(screen.getByText('Цитата не подтверждена расшифровкой — проверьте фрагмент записи')).toBeInTheDocument()
+    expect(screen.getByText('Цитата не подтверждена расшифровкой - проверьте фрагмент записи')).toBeInTheDocument()
     expect(screen.getByText(/Цитата подтверждена расшифровкой/)).toBeInTheDocument()
     expect(screen.getAllByText('Не оценено')).toHaveLength(2)
     expect(screen.getByText('Обязательные требования, которые ещё нужно проверить')).toBeInTheDocument()

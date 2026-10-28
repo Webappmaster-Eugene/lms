@@ -16,11 +16,11 @@ export default function ContentError({ error, reset }: { error: Error & { digest
       tone="danger"
       eyebrow="Управление платформой"
       title="Раздел управления не загрузился"
-      description="Несохранённые изменения формы могли потеряться, сохранённые — на месте. Ошибка уже отправлена в Sentry."
+      description="Несохранённые изменения формы могли потеряться, сохранённые - на месте. Ошибка уже отправлена в Sentry."
       terminal={[
         { kind: 'command', text: `open ${pathname ?? '/manage'}` },
         { kind: 'error', text: 'Error: раздел не загрузился' },
-        { kind: 'comment', text: 'подробности — в Sentry по коду ниже' },
+        { kind: 'comment', text: 'подробности - в Sentry по коду ниже' },
       ]}
       reference={reference}
       actions={

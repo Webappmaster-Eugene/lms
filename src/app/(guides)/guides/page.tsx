@@ -67,11 +67,11 @@ export default async function GuidesPage({ searchParams }: Props) {
           <Compass className="h-7 w-7 text-primary" aria-hidden="true" />
           <h1 className="text-xl font-bold text-foreground sm:text-2xl">Гайды</h1>
         </div>
-        <p className="text-sm text-muted-foreground">Практические инструкции: карьера, работа с ИИ, своё дело — открывайте в любом порядке</p>
+        <p className="text-sm text-muted-foreground">Практические инструкции: карьера, работа с ИИ, своё дело - открывайте в любом порядке</p>
         {user && guides.some((guide) => guide.isPublished && guide.isPublic) && (
           <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
             <Globe className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />
-            С меткой «Публичный» гайд открывается без входа — ссылкой можно поделиться с кем угодно
+            С меткой «Публичный» гайд открывается без входа - ссылкой можно поделиться с кем угодно
           </p>
         )}
       </div>
@@ -107,7 +107,7 @@ export default async function GuidesPage({ searchParams }: Props) {
           ) : !user ? (
             <p>Открытых гайдов пока нет. <Link href="/login?redirect=%2Fguides" className="font-medium text-primary underline-offset-2 hover:underline">Войти в LMS</Link></p>
           ) : (
-            <p>Гайдов пока нет. Создайте первый в CMS — раздел «Гайды»</p>
+            <p>Гайдов пока нет. Создайте первый в CMS - раздел «Гайды»</p>
           )}
         </div>
       ) : (

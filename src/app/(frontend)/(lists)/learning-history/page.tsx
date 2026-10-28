@@ -35,7 +35,7 @@ export default async function LearningHistoryPage({ searchParams }: Props) {
           {courseId !== undefined && <Link href="/learning-history" prefetch={false} className="inline-flex min-h-11 items-center text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring">Все курсы</Link>}
         </div>
         {history.docs.length > 0 ? <LearningHistoryList entries={history.docs} /> : <div className="space-y-3 rounded-xl border border-border bg-card p-5">
-          <p className="text-sm text-muted-foreground">{page > 1 ? 'На этой странице нет просмотров. Вернитесь к предыдущей странице.' : courseId === undefined ? 'Откройте первый урок — он появится здесь. Просмотры сохраняются в аккаунте и доступны на другом устройстве.' : 'Доступных просмотров этого курса пока нет.'}</p>
+          <p className="text-sm text-muted-foreground">{page > 1 ? 'На этой странице нет просмотров. Вернитесь к предыдущей странице.' : courseId === undefined ? 'Откройте первый урок - он появится здесь. Просмотры сохраняются в аккаунте и доступны на другом устройстве.' : 'Доступных просмотров этого курса пока нет.'}</p>
           {page === 1 && courseId === undefined && <Link href="/courses" className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground">Выбрать курс</Link>}
         </div>}
         {(page > 1 || history.hasNextPage) && <nav aria-label="Страницы истории" className="flex flex-wrap items-center justify-between gap-3">

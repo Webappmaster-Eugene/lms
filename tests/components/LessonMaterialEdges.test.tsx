@@ -59,7 +59,7 @@ describe('текст урока из репозитория', () => {
 
   it('схема после загрузки не сжимается уже своей ширины, но не шире 560 пикселей', () => {
     render(<LessonMarkdown markdown={`![Схема запроса](${svg})`} />)
-    const button = screen.getByRole('button', { name: 'Схема запроса — открыть во весь экран' })
+    const button = screen.getByRole('button', { name: 'Схема запроса - открыть во весь экран' })
     const image = button.querySelector('img') as HTMLImageElement
     expect(button.style.minWidth).toBe('')
 

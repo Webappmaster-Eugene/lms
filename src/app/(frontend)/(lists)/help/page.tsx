@@ -49,7 +49,7 @@ export default async function HelpPage({ searchParams }: { searchParams: HelpSea
 
   // Почта открывается на месте: в новой вкладке почтовый клиент оставил бы пустую страницу.
   const channels = [
-    { href: '#support', external: false, icon: MessageSquare, title: 'Написать администратору', text: 'Задайте вопрос или сообщите о проблеме — мы ответим как можно скорее.', action: undefined },
+    { href: '#support', external: false, icon: MessageSquare, title: 'Написать администратору', text: 'Задайте вопрос или сообщите о проблеме - мы ответим как можно скорее.', action: undefined },
     contacts.telegramGroup
       ? { href: contacts.telegramGroup, external: true, icon: Users, title: 'Чат учеников в Telegram', text: 'Вопросы по задачам, разборы и общение с другими учениками и ментором.', action: 'Вступить в группу →' }
       : null,
@@ -58,7 +58,7 @@ export default async function HelpPage({ searchParams }: { searchParams: HelpSea
       : null,
   ].filter((channel) => channel !== null)
   if (channels.length < 3) {
-    channels.push({ href: '#faq', external: false, icon: HelpCircle, title: 'Частые вопросы', text: 'Ответы на самые распространённые вопросы учеников — ниже на странице.', action: undefined })
+    channels.push({ href: '#faq', external: false, icon: HelpCircle, title: 'Частые вопросы', text: 'Ответы на самые распространённые вопросы учеников - ниже на странице.', action: undefined })
   }
 
   const faqDocs = await collectAllPages(
@@ -100,7 +100,7 @@ export default async function HelpPage({ searchParams }: { searchParams: HelpSea
         <h1 className="text-xl font-bold text-foreground sm:text-2xl">Помощь</h1>
       </div>
       <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-        Здесь — ответы на частые вопросы, краткое описание каждого раздела платформы и форма, через которую можно написать администратору, если что-то не работает или непонятно.
+        Здесь - ответы на частые вопросы, краткое описание каждого раздела платформы и форма, через которую можно написать администратору, если что-то не работает или непонятно.
       </p>
 
       {/* Support channels */}

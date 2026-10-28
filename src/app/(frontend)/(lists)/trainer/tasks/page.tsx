@@ -155,7 +155,7 @@ export default async function AllTasksPage({ searchParams }: Props) {
 
       {visible.length === 0 ? (
         <p className="py-12 text-center text-muted-foreground">
-          Под эти условия ничего не нашлось — попробуйте ослабить фильтры
+          Под эти условия ничего не нашлось - попробуйте ослабить фильтры
         </p>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border bg-card">

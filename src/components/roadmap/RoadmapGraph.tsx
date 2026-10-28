@@ -233,7 +233,7 @@ function RoadmapCanvas({ nodes, edges, nextStepNodeId = null, managementRoadmapI
         {viewportError && <p role="alert" className="text-sm text-destructive">{viewportError}</p>}
         {notFound && (
           <p role="status" className="w-fit rounded-md bg-card px-2 py-1 text-xs text-muted-foreground shadow-sm">
-            Ничего не нашлось — попробуйте другое слово
+            Ничего не нашлось - попробуйте другое слово
           </p>
         )}
         <ul className="hidden w-fit flex-wrap gap-x-3 gap-y-1 rounded-md bg-card/90 px-2 py-1 text-xs text-muted-foreground shadow-sm sm:flex" aria-label="Обозначения">

@@ -175,14 +175,14 @@ describe('вкладка «Тесты»', () => {
     renderPanel({ hiddenCaseCount: 2 })
     await openTab('Тесты')
 
-    expect(screen.getByText(/Плюс 2 скрытых теста —/)).toBeInTheDocument()
+    expect(screen.getByText(/Плюс 2 скрытых теста -/)).toBeInTheDocument()
   })
 
   it('один скрытый тест программы согласован с числом', async () => {
     renderPanel({ checkMode: 'program', languages: ['python'], runtimeCases: [], hiddenCaseCount: 1 })
     await openTab('Тесты')
 
-    expect(screen.getByText(/Плюс 1 скрытый тест —/)).toBeInTheDocument()
+    expect(screen.getByText(/Плюс 1 скрытый тест -/)).toBeInTheDocument()
   })
 })
 

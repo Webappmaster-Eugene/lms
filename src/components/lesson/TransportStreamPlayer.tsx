@@ -227,7 +227,7 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
           </button>
 
           <span className="w-24 flex-shrink-0 text-xs tabular-nums text-white/80">
-            {formatTime(position)} / {duration ? formatTime(duration) : '—'}
+            {formatTime(position)} / {duration ? formatTime(duration) : '-'}
           </span>
 
           <div
@@ -242,7 +242,7 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
               if (event.key === 'ArrowRight') seekTo(position + 10)
               if (event.key === 'ArrowLeft') seekTo(position - 10)
             }}
-            title="Перемотка доступна по загруженной части — она обгоняет просмотр"
+            title="Перемотка доступна по загруженной части - она обгоняет просмотр"
             className="relative h-1.5 flex-1 cursor-pointer rounded-full bg-white/20"
           >
             {duration > 0 && (

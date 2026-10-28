@@ -192,7 +192,7 @@ export function SlidesEditor({ id, block, disabled, onChange }: {
       tone: failed.length || skipped ? 'error' : 'info',
       text: [
         `Загружено файлов: ${added.length}.`,
-        failed.length ? `Не загрузилось: ${failed.length} (${failed.join(', ')}) — проверьте формат (картинка или PDF), размер и соединение.` : '',
+        failed.length ? `Не загрузилось: ${failed.length} (${failed.join(', ')}) - проверьте формат (картинка или PDF), размер и соединение.` : '',
         skipped ? `Не поместилось в лимит ${SLIDES_LIMIT}: ${skipped}.` : '',
         added.length ? SAVE_HINT : '',
       ].filter(Boolean).join(' '),
@@ -212,7 +212,7 @@ export function SlidesEditor({ id, block, disabled, onChange }: {
         <button type="button" className={buttonClass} disabled={locked} onClick={() => void fillFromFolder()}>{busy === 'folder' ? 'Читаем папку…' : items.length ? 'Обновить список из папки' : 'Заполнить из папки'}</button>
       </div>
       <Message notice={notice} place="folder" />
-      <p className="text-sm text-muted-foreground">Файлы папки встанут по порядку имён: картинки листаются как слайды, PDF — постранично. Презентацию PowerPoint или Keynote сохраните как PDF, иначе ученик сможет её только скачать. Поменяли файлы на Диске — нажмите «Обновить список из папки» и сохраните урок: исчезнувшие из папки файлы уйдут из списка, а добавленные вручную останутся. Подпапки и видео не учитываются.</p>
+      <p className="text-sm text-muted-foreground">Файлы папки встанут по порядку имён: картинки листаются как слайды, PDF - постранично. Презентацию PowerPoint или Keynote сохраните как PDF, иначе ученик сможет её только скачать. Поменяли файлы на Диске - нажмите «Обновить список из папки» и сохраните урок: исчезнувшие из папки файлы уйдут из списка, а добавленные вручную останутся. Подпапки и видео не учитываются.</p>
     </div>
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -229,7 +229,7 @@ export function SlidesEditor({ id, block, disabled, onChange }: {
             {previews && <Preview url={item.url} image={kind === 'image'} />}
             <div className="min-w-0 flex-1 basis-56">
               <a href={slideSourceUrl(item.url)} target="_blank" rel="noopener noreferrer" title={fileName ?? undefined} className="block truncate text-sm font-medium underline-offset-2 hover:underline">{fileName || 'Файл по ссылке Диска'}</a>
-              <p className="text-xs text-muted-foreground">{fileName && OFFICE_DECK.test(fileName) ? 'скачивается файлом — чтобы листалась на сайте, сохраните её как PDF' : KIND_LABELS[kind]}</p>
+              <p className="text-xs text-muted-foreground">{fileName && OFFICE_DECK.test(fileName) ? 'скачивается файлом - чтобы листалась на сайте, сохраните её как PDF' : KIND_LABELS[kind]}</p>
             </div>
             <input aria-label={`Подпись файла ${index + 1}`} placeholder="Подпись (необязательно)" maxLength={300} value={item.caption ?? ''} disabled={locked} className={`${fieldClass} mt-0 min-w-0 flex-1 basis-56`} onChange={(event) => setItems(items.map((current, position) => position === index ? { ...current, caption: event.target.value } : current))} />
             <div className="flex gap-2">
