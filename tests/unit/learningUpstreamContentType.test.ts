@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { upstreamLearningMedia } from '@/server/learning-upstream'
 
 const { resolveHref, invalidateHref } = vi.hoisted(() => ({ resolveHref: vi.fn(), invalidateHref: vi.fn() }))
-vi.mock('@/lib/yandex-disk-href', () => ({ resolveHref, invalidateHref }))
+// Узел хранилища не запомнен: каждый запрос идёт через ссылку, как первый просмотр файла.
+vi.mock('@/lib/yandex-disk-href', () => ({ resolveHref, invalidateHref, cachedStorage: () => null, rememberStorage: vi.fn(), forgetStorage: vi.fn() }))
 const observability = vi.hoisted(() => ({ recordLearningAccess: vi.fn() }))
 vi.mock('@/lib/learning-observability', () => observability)
 

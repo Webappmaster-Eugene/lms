@@ -4,8 +4,10 @@ import { acquireLearningStream, LearningStreamLimitError, limitedLearningBody } 
 import { parseLearningRange } from '@/server/learning-media-response'
 import { safeLearningUpstream, upstreamLearningMedia, LearningUpstreamError } from '@/server/learning-upstream'
 
-const { resolveHref, invalidateHref } = vi.hoisted(() => ({ resolveHref: vi.fn(), invalidateHref: vi.fn() }))
-vi.mock('@/lib/yandex-disk-href', () => ({ resolveHref, invalidateHref }))
+const { resolveHref, invalidateHref, cachedStorage, rememberStorage, forgetStorage } = vi.hoisted(() => ({
+  resolveHref: vi.fn(), invalidateHref: vi.fn(), cachedStorage: vi.fn(), rememberStorage: vi.fn(), forgetStorage: vi.fn(),
+}))
+vi.mock('@/lib/yandex-disk-href', () => ({ resolveHref, invalidateHref, cachedStorage, rememberStorage, forgetStorage }))
 vi.mock('@/lib/learning-observability', () => ({ recordLearningAccess: vi.fn() }))
 const upstream = vi.fn()
 const ref = { publicKey: 'https://disk.yandex.ru/d/fixture', path: '/video.mp4' }
@@ -15,6 +17,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   viewerId++
   resolveHref.mockResolvedValue('https://downloader.disk.yandex.ru/disk/fixture/video.mp4')
+  cachedStorage.mockReturnValue(null)
   upstream.mockImplementation(async () => new Response(new Uint8Array([1, 2, 3]), { headers: { 'Content-Length': '3', 'Content-Type': 'video/mp4' } }))
   vi.stubGlobal('fetch', upstream)
 })
@@ -71,7 +74,7 @@ describe('native Range and closed upstream sources', () => {
     expect(upstream.mock.calls.every((call) => call[1].headers.Range === 'bytes=4-5')).toBe(true)
     expect(response.status).toBe(206)
     expect(response.headers.get('Content-Range')).toBe('bytes 4-5/20')
-    expect(response.headers.get('Server-Timing')).toMatch(/^disk_href;dur=\d+\.\d, disk_headers;dur=\d+\.\d$/)
+    expect(response.headers.get('Server-Timing')).toMatch(/^disk_href;dur=\d+\.\d, disk_headers;dur=\d+\.\d, disk_storage;desc=miss, disk_attempts;desc=2$/)
     expect(response.headers.get('Location')).toBeNull()
     expect(response.headers.get('Cache-Control')).toBe('private, no-store')
     expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([4, 5])
@@ -102,6 +105,7 @@ describe('native Range and closed upstream sources', () => {
   it('416 retains the complete file size and private caching', async () => {
     upstream.mockResolvedValue(new Response(null, { status: 416, headers: { 'Content-Range': 'bytes */3' } }))
     const response = await upstreamLearningMedia(new Request('https://lms.test/media', { headers: { Range: 'bytes=99-' } }), viewerId, ref)
+    expect(upstream).toHaveBeenCalledOnce()
     expect(response.status).toBe(416)
     expect(response.headers.get('Content-Range')).toBe('bytes */3')
     expect(response.headers.get('Cache-Control')).toBe('private, no-store')
@@ -167,19 +171,20 @@ describe('native Range and closed upstream sources', () => {
     expect(response.headers.get('Content-Range')).toBeNull()
     expect(response.headers.get('Cache-Control')).toBe('private, no-store')
     expect(await response.json()).toEqual({ error: 'Хранилище не отдало файл. Попробуйте позже' })
-    // A fresh link lands on the same storage node: a retry would only spend the shared download API quota.
-    expect(upstream).toHaveBeenCalledOnce()
+    // One more redirect through the same link may reach another node; a fresh link would only spend the download API quota.
+    expect(upstream).toHaveBeenCalledTimes(2)
     expect(resolveHref).toHaveBeenCalledOnce()
     expect(invalidateHref).not.toHaveBeenCalled()
     const { recordLearningAccess } = await import('@/lib/learning-observability')
     expect(recordLearningAccess).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'error', reason: 'upstream_empty' }))
     slotsAreFree()
   })
-  it('an expired link followed by an empty answer is still one refresh and a clean 502', async () => {
+  it('an expired link followed by empty answers is one refresh, one retry and a clean 502', async () => {
     upstream.mockResolvedValueOnce(new Response('expired', { status: 403 }))
-      .mockResolvedValueOnce(new Response(new ReadableStream<Uint8Array>({ start(stream) { stream.close() } }), emptyAnswer))
+      .mockImplementation(async () => new Response(new ReadableStream<Uint8Array>({ start(stream) { stream.close() } }), emptyAnswer))
     const response = await upstreamLearningMedia(new Request('https://lms.test/media', { headers: { Range: 'bytes=0-1' } }), viewerId, ref)
-    expect(upstream).toHaveBeenCalledTimes(2)
+    expect(upstream).toHaveBeenCalledTimes(3)
+    expect(resolveHref).toHaveBeenCalledTimes(2)
     expect(invalidateHref).toHaveBeenCalledOnce()
     expect(response.status).toBe(502)
     expect(await response.json()).toEqual({ error: 'Хранилище не отдало файл. Попробуйте позже' })
@@ -245,6 +250,125 @@ describe('native Range and closed upstream sources', () => {
     await failure
     const releases = Array.from({ length: 6 }, () => acquireLearningStream(viewerId))
     releases.forEach((release) => release())
+  })
+})
+
+describe('storage node shortcut and transient storage failures', () => {
+  const href = 'https://downloader.disk.yandex.ru/disk/fixture/video.mp4'
+  const node = 'https://s1.storage.yandex.net/rdisk/fixture?ts=1'
+  const slotsAreFree = () => {
+    const releases = Array.from({ length: 6 }, () => acquireLearningStream(viewerId))
+    releases.forEach((release) => release())
+  }
+  const bytes = () => new Response(new Uint8Array([7, 8]), { status: 206, headers: { 'Content-Range': 'bytes 2-3/20', 'Content-Length': '2', 'Content-Type': 'video/mp4' } })
+  const ranged = () => new Request('https://lms.test/media', { headers: { Range: 'bytes=2-3' } })
+
+  it('a known storage node answers the next Range without the download link redirect', async () => {
+    cachedStorage.mockReturnValue(node)
+    upstream.mockResolvedValue(bytes())
+    const response = await upstreamLearningMedia(ranged(), viewerId, ref)
+    expect(upstream.mock.calls.map((call) => String(call[0]))).toEqual([node])
+    expect(upstream.mock.calls[0][1].headers.Range).toBe('bytes=2-3')
+    expect(resolveHref).not.toHaveBeenCalled()
+    expect(response.status).toBe(206)
+    expect(response.headers.get('Server-Timing')).toContain('disk_storage;desc=hit, disk_attempts;desc=1')
+    expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([7, 8])
+    slotsAreFree()
+  })
+  it('the node behind a download link redirect is remembered and never reaches the viewer', async () => {
+    upstream.mockResolvedValueOnce(new Response(null, { status: 302, headers: { Location: node } })).mockResolvedValueOnce(bytes())
+    const response = await upstreamLearningMedia(ranged(), viewerId, ref)
+    expect(rememberStorage).toHaveBeenCalledWith(ref, href, node)
+    expect(response.headers.get('Location')).toBeNull()
+    expect([...response.headers.values()].join(' ')).not.toContain('storage.yandex')
+    expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([7, 8])
+  })
+  it('a link answered without a redirect is not remembered as a node', async () => {
+    upstream.mockResolvedValue(bytes())
+    await (await upstreamLearningMedia(ranged(), viewerId, ref)).arrayBuffer()
+    expect(rememberStorage).not.toHaveBeenCalled()
+  })
+  it.each([
+    ['answers 503', () => Promise.resolve(new Response('busy', { status: 503 }))],
+    ['drops the connection', () => Promise.reject(new TypeError('fetch failed'))],
+    ['answers 403 after its signature expired', () => Promise.resolve(new Response('expired', { status: 403 }))],
+    ['sends headers without a byte', () => Promise.resolve(new Response(new ReadableStream<Uint8Array>({ start(stream) { stream.close() } }), { status: 206, headers: { 'Content-Length': '2' } }))],
+  ])('a remembered node that %s is forgotten and the download link still serves the Range', async (_name, failure) => {
+    cachedStorage.mockReturnValue(node)
+    upstream.mockImplementationOnce(failure).mockResolvedValueOnce(bytes())
+    const response = await upstreamLearningMedia(ranged(), viewerId, ref)
+    expect(forgetStorage).toHaveBeenCalledWith(ref, node)
+    expect(upstream.mock.calls.map((call) => String(call[0]))).toEqual([node, href])
+    expect(invalidateHref).not.toHaveBeenCalled()
+    expect(response.status).toBe(206)
+    expect(response.headers.get('Server-Timing')).toContain('disk_storage;desc=miss, disk_attempts;desc=2')
+    expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([7, 8])
+    slotsAreFree()
+  })
+  it('a stalled remembered node gives up after five seconds and leaves the rest of the deadline to the link', async () => {
+    vi.useFakeTimers()
+    cachedStorage.mockReturnValue(node)
+    upstream.mockImplementationOnce((_url, init) => new Promise((_resolve, reject) => init.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })))
+      .mockResolvedValueOnce(bytes())
+    const pending = upstreamLearningMedia(ranged(), viewerId, ref)
+    await vi.advanceTimersByTimeAsync(5001)
+    const response = await pending
+    expect(response.status).toBe(206)
+    expect(upstream.mock.calls.map((call) => String(call[0]))).toEqual([node, href])
+    expect(upstream.mock.calls[1][1].signal.aborted).toBe(false)
+    expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([7, 8])
+    slotsAreFree()
+  })
+  it.each([
+    ['503', () => Promise.resolve(new Response('busy', { status: 503 }))],
+    ['429', () => Promise.resolve(new Response('slow down', { status: 429 }))],
+    ['a dropped connection', () => Promise.reject(new TypeError('fetch failed'))],
+  ])('a single %s from the link is retried once through the same link', async (_name, failure) => {
+    upstream.mockImplementationOnce(failure).mockResolvedValueOnce(bytes())
+    const response = await upstreamLearningMedia(ranged(), viewerId, ref)
+    expect(response.status).toBe(206)
+    expect(upstream.mock.calls.map((call) => String(call[0]))).toEqual([href, href])
+    expect(resolveHref).toHaveBeenCalledOnce()
+    expect(invalidateHref).not.toHaveBeenCalled()
+    expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([7, 8])
+    slotsAreFree()
+  })
+  it('a part of the file that the storage keeps refusing ends in a clean 502 after at most three requests', async () => {
+    cachedStorage.mockReturnValue(node)
+    upstream.mockImplementation(async () => new Response('busy', { status: 503 }))
+    const response = await upstreamLearningMedia(ranged(), viewerId, ref)
+    expect(response.status).toBe(502)
+    expect(upstream).toHaveBeenCalledTimes(3)
+    expect(JSON.stringify(await response.json())).not.toContain('yandex')
+    const { recordLearningAccess } = await import('@/lib/learning-observability')
+    expect(recordLearningAccess).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'error', reason: 'upstream_unavailable' }))
+    slotsAreFree()
+  })
+  it('connections that keep dropping are reported as the network failure itself', async () => {
+    upstream.mockRejectedValue(new TypeError('fetch failed'))
+    await expect(upstreamLearningMedia(ranged(), viewerId, ref)).rejects.toThrow('fetch failed')
+    expect(upstream).toHaveBeenCalledTimes(2)
+    slotsAreFree()
+  })
+  it('a missing file is not retried even when a node was remembered', async () => {
+    cachedStorage.mockReturnValue(node)
+    upstream.mockResolvedValue(new Response('missing', { status: 404 }))
+    const response = await upstreamLearningMedia(ranged(), viewerId, ref)
+    expect(response.status).toBe(404)
+    expect(upstream.mock.calls.map((call) => String(call[0]))).toEqual([node, href])
+  })
+  it('a viewer who leaves while a remembered node is awaited stops the retries', async () => {
+    cachedStorage.mockReturnValue(node)
+    const controller = new AbortController()
+    upstream.mockImplementation((_url, init) => new Promise((_resolve, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true })))
+    const pending = upstreamLearningMedia(new Request('https://lms.test/media', { signal: controller.signal }), viewerId, ref)
+    const failure = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    controller.abort()
+    await failure
+    expect(upstream).toHaveBeenCalledOnce()
+    expect(forgetStorage).not.toHaveBeenCalled()
+    slotsAreFree()
   })
 })
 

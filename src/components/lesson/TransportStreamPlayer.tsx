@@ -21,8 +21,11 @@ type Props = {
   /**
    * 'unsupported' — браузер не умеет MediaSource: повторять попытку бессмысленно.
    * 'network' — файл перестал приходить; без пометки отказ считается ошибкой разбора.
+   * `playing` — смотрел ли ученик в момент сбоя: тогда следующий запуск продолжит сам.
    */
-  onFailure: (reason?: 'unsupported' | 'network') => void
+  onFailure: (reason?: 'unsupported' | 'network', playing?: boolean) => void
+  /** Запуск после сбоя во время просмотра: играть с восстановленной позиции. */
+  resumePlaying?: boolean
 }
 
 type PlayerHandle = {
@@ -49,7 +52,7 @@ function bufferedCovers(video: HTMLVideoElement, seconds: number): boolean {
   return false
 }
 
-export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailure }: Props) {
+export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailure, resumePlaying = false }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const playerRef = useRef<PlayerHandle | null>(null)
 
@@ -113,7 +116,7 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
         playerRef.current = { destroy: () => player.destroy() }
 
         player.on(mpegts.Events.ERROR, (errorType: string) => {
-          if (!cancelled) onFailure(errorType === mpegts.ErrorTypes.NETWORK_ERROR ? 'network' : undefined)
+          if (!cancelled) onFailure(errorType === mpegts.ErrorTypes.NETWORK_ERROR ? 'network' : undefined, !element.paused && !element.ended)
         })
 
         player.attachMediaElement(element)
@@ -162,6 +165,16 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
       video.removeEventListener('volumechange', onVolume)
     }
   }, [])
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || !resumePlaying) return
+    // Поток перематывается только по загруженному, поэтому играть начинаем после возврата на сохранённую секунду.
+    // Отказ автозапуска оставляет видео на паузе на нужном месте.
+    const resume = () => { if (video.paused) void video.play().catch(() => undefined) }
+    video.addEventListener('seeked', resume, { once: true })
+    return () => video.removeEventListener('seeked', resume)
+  }, [resumePlaying])
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current

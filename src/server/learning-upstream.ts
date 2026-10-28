@@ -1,13 +1,18 @@
 import 'server-only'
 
 import { recordLearningAccess } from '@/lib/learning-observability'
-import { invalidateHref, resolveHref } from '@/lib/yandex-disk-href'
+import { cachedStorage, forgetStorage, invalidateHref, rememberStorage, resolveHref } from '@/lib/yandex-disk-href'
 import type { PublicResourceRef } from '@/lib/yandex-disk-url'
 import { PRIVATE_MEDIA_HEADERS, mediaError } from '@/server/learning-media-response'
 import { acquireLearningStream, limitedLearningBody } from '@/server/learning-stream-limits'
 
 const HEADERS_DEADLINE_MS = 15000
+/** Узел хранилища отвечает за доли секунды; зависший не должен съесть дедлайн запасного пути через ссылку. */
+const STORAGE_ATTEMPT_MS = 5000
+/** Запросов к Диску на один запрос плеера, считая кешированный узел; редиректы внутри попытки не считаются. */
+const MAX_ATTEMPTS = 3
 const FORWARDED_HEADERS = ['content-length', 'content-range', 'accept-ranges', 'last-modified']
+const REDIRECTS = [301, 302, 303, 307, 308]
 
 export class LearningUpstreamError extends Error {
   constructor(readonly reason: 'upstream_timeout' | 'invalid_source') { super(reason) }
@@ -74,6 +79,60 @@ function resumeBody(reader: ReadableStreamDefaultReader<Uint8Array>, first: Uint
   })
 }
 
+type Attempt = {
+  upstream: Response
+  /** Адрес после редиректов: при успехе через ссылку это узел хранилища. */
+  target: string
+  opened?: { reader: ReadableStreamDefaultReader<Uint8Array>; first: Uint8Array }
+  empty: boolean
+}
+
+async function openUpstream(source: string, method: 'GET' | 'HEAD', range: string | null, signal: AbortSignal): Promise<Attempt> {
+  let target = safeLearningUpstream(source)
+  let upstream: Response
+  for (let redirects = 0; ; redirects++) {
+    upstream = await fetch(target, {
+      method,
+      headers: { 'Accept-Encoding': 'identity', ...(range ? { Range: range } : {}) },
+      cache: 'no-store', redirect: 'manual', signal,
+    })
+    if (!REDIRECTS.includes(upstream.status)) break
+    const location = upstream.headers.get('location')
+    await upstream.body?.cancel()
+    if (!location || redirects === 3) throw new LearningUpstreamError('invalid_source')
+    target = safeLearningUpstream(new URL(location, target).href)
+  }
+  const encoding = upstream.headers.get('content-encoding')
+  if (upstream.body && method !== 'HEAD' && [200, 206].includes(upstream.status)
+    && upstream.headers.get('content-length') !== '0' && (!encoding || encoding === 'identity')) {
+    const reader = upstream.body.getReader()
+    const first = await firstBodyChunk(reader, signal)
+    if (first) return { upstream, target: target.href, opened: { reader, first }, empty: false }
+    await reader.cancel().catch(() => undefined)
+    return { upstream, target: target.href, empty: true }
+  }
+  return { upstream, target: target.href, empty: false }
+}
+
+/**
+ * Отказ уже учтён следующей попыткой, а отмена оборванного тела может сама упасть: сообщать нечего.
+ * Пустое тело уже отменено в openUpstream, его поток заблокирован читателем.
+ */
+async function discard(attempt: Attempt | undefined): Promise<void> {
+  if (attempt && !attempt.empty) await attempt.upstream.body?.cancel().catch(() => undefined)
+}
+
+function served(attempt: Attempt | undefined): attempt is Attempt {
+  if (!attempt || attempt.empty) return false
+  const encoding = attempt.upstream.headers.get('content-encoding')
+  return attempt.upstream.status === 416 || ([200, 206].includes(attempt.upstream.status) && (!encoding || encoding === 'identity'))
+}
+
+/** Сбой узла, сети или пустой ответ: следующий редирект может привести к исправному узлу. */
+function transient(attempt: Attempt | undefined): boolean {
+  return !attempt || attempt.empty || attempt.upstream.status === 429 || attempt.upstream.status >= 500
+}
+
 export async function upstreamLearningMedia(request: Request, userId: number, ref: PublicResourceRef, kind: 'video' | 'asset' = 'video'): Promise<Response> {
   const release = acquireLearningStream(userId)
   const controller = new AbortController()
@@ -89,53 +148,76 @@ export async function upstreamLearningMedia(request: Request, userId: number, re
       recordLearningAccess({ resource: 'media', outcome: 'deny', reason: 'invalid_range', userId })
       return mediaError('Некорректный диапазон файла', 416)
     }
+    const method = request.method === 'HEAD' ? 'HEAD' : 'GET'
     let hrefDuration = 0
     let upstreamDuration = 0
-    let upstream: Response | undefined
-    let opened: { reader: ReadableStreamDefaultReader<Uint8Array>; first: Uint8Array } | undefined
-    let emptyBody = false
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const hrefStarted = performance.now()
-      const href = await resolveHref(ref, controller.signal)
-      hrefDuration += performance.now() - hrefStarted
-      let target = safeLearningUpstream(href)
-      const upstreamStarted = performance.now()
-      for (let redirects = 0; redirects <= 3; redirects++) {
-        upstream = await fetch(target, {
-          method: request.method === 'HEAD' ? 'HEAD' : 'GET',
-          headers: { 'Accept-Encoding': 'identity', ...(range ? { Range: range } : {}) },
-          cache: 'no-store', redirect: 'manual', signal: controller.signal,
-        })
-        if (![301, 302, 303, 307, 308].includes(upstream.status)) break
-        const location = upstream.headers.get('location')
-        await upstream.body?.cancel()
-        if (!location || redirects === 3) throw new LearningUpstreamError('invalid_source')
-        target = safeLearningUpstream(new URL(location, target).href)
+    let storage = cachedStorage(ref)
+    let href: string | undefined
+    let refreshed = false
+    let retried = false
+    let fromStorage = false
+    let attempts = 0
+    let attempt: Attempt | undefined
+    let failure: unknown
+    while (attempts < MAX_ATTEMPTS) {
+      attempts++
+      const viaStorage = storage
+      let source: string
+      if (viaStorage) source = viaStorage
+      else {
+        if (!href) {
+          const hrefStarted = performance.now()
+          href = await resolveHref(ref, controller.signal)
+          hrefDuration += performance.now() - hrefStarted
+        }
+        source = href
       }
-      upstreamDuration += performance.now() - upstreamStarted
+      const ceiling = new AbortController()
+      const limit = viaStorage ? setTimeout(() => ceiling.abort(), STORAGE_ATTEMPT_MS) : undefined
+      const started = performance.now()
+      try {
+        // Тело удачного ответа живёт дольше попытки: потолок снимается до того, как поток уйдёт плееру.
+        attempt = await openUpstream(source, method, range, viaStorage ? AbortSignal.any([controller.signal, ceiling.signal]) : controller.signal)
+        failure = undefined
+      } catch (error) {
+        if (error instanceof LearningUpstreamError || controller.signal.aborted) throw error
+        attempt = undefined
+        failure = error
+      } finally {
+        clearTimeout(limit)
+        upstreamDuration += performance.now() - started
+      }
+      if (viaStorage) {
+        if (served(attempt)) { fromStorage = true; break }
+        forgetStorage(ref, viaStorage)
+        storage = null
+        await discard(attempt)
+        continue
+      }
       // A CDN capability can expire before our conservative TTL; retry once,
       // with the same Range and deadline, rather than breaking native playback.
-      if (!upstream || ![403, 410].includes(upstream.status)) break
-      invalidateHref(ref, href)
-      if (attempt === 1) break
-      await upstream.body?.cancel()
+      if (attempt && [403, 410].includes(attempt.upstream.status)) {
+        invalidateHref(ref, source)
+        if (refreshed || attempts === MAX_ATTEMPTS) break
+        refreshed = true
+        href = undefined
+        await discard(attempt)
+        continue
+      }
+      // Повтор идёт через ту же ссылку: download API не тратится, а редирект может выбрать другой узел.
+      if (transient(attempt) && !retried && attempts < MAX_ATTEMPTS) {
+        retried = true
+        await discard(attempt)
+        continue
+      }
+      if (served(attempt) && attempt.upstream.status !== 416 && attempt.target !== source) rememberStorage(ref, source, attempt.target)
+      break
     }
-    if (!upstream) throw new LearningUpstreamError('invalid_source')
-    // Пустой ответ не повторяем и ссылку не сбрасываем: новая ведёт на тот же узел хранилища,
-    // а лишние обращения к download API бьют по общему лимиту, от которого зависят исправные записи.
-    const encoding = upstream.headers.get('content-encoding')
-    if (upstream.body && request.method !== 'HEAD' && [200, 206].includes(upstream.status)
-      && upstream.headers.get('content-length') !== '0' && (!encoding || encoding === 'identity')) {
-      const opening = performance.now()
-      const reader = upstream.body.getReader()
-      const first = await firstBodyChunk(reader, controller.signal)
-      upstreamDuration += performance.now() - opening
-      if (first) opened = { reader, first }
-      else { emptyBody = true; await reader.cancel().catch(() => undefined) }
-    }
+    if (!attempt) throw failure ?? new LearningUpstreamError('invalid_source')
+    const { upstream, opened, empty: emptyBody } = attempt
     clearTimeout(timer)
     const headers = new Headers(PRIVATE_MEDIA_HEADERS)
-    headers.set('Server-Timing', `disk_href;dur=${hrefDuration.toFixed(1)}, disk_headers;dur=${upstreamDuration.toFixed(1)}`)
+    headers.set('Server-Timing', `disk_href;dur=${hrefDuration.toFixed(1)}, disk_headers;dur=${upstreamDuration.toFixed(1)}, disk_storage;desc=${fromStorage ? 'hit' : 'miss'}, disk_attempts;desc=${attempts}`)
     for (const name of FORWARDED_HEADERS) {
       const value = upstream.headers.get(name)
       if (value) headers.set(name, value)

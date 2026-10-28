@@ -12,18 +12,24 @@ import { fetchPublicDownloadHref, type PublicResourceRef } from '@/lib/yandex-di
 
 /** Прямые ссылки Яндекса живут заметно дольше, но перевыпускаем их чаще — с запасом. */
 const HREF_TTL_MS = 5 * 60 * 1000
+/** Замер 28.10.2026: адрес узла принимал любые Range не меньше 6,5 минуты после редиректа. */
+const STORAGE_TTL_MS = 5 * 60 * 1000
 const CACHE_LIMIT = 500
 
 type CacheEntry = { href: string; expiresAt: number }
+type StorageEntry = { url: string; href: string; expiresAt: number }
 type PendingHref = { controller: AbortController; promise: Promise<string>; subscribers: number; settled: boolean }
 
 // Stream and proxy are separately bundled Next routes, but share one process.
 const processState = globalThis as typeof globalThis & {
-  __lmsYandexDiskHrefs?: { hrefCache: Map<string, CacheEntry>; pendingHrefs: Map<string, PendingHref> }
+  __lmsYandexDiskHrefs?: { hrefCache: Map<string, CacheEntry>; pendingHrefs: Map<string, PendingHref>; storageCache?: Map<string, StorageEntry> }
 }
-const { hrefCache, pendingHrefs } = processState.__lmsYandexDiskHrefs ??= {
+const state = processState.__lmsYandexDiskHrefs ??= {
   hrefCache: new Map<string, CacheEntry>(), pendingHrefs: new Map<string, PendingHref>(),
 }
+const { hrefCache, pendingHrefs } = state
+// Состояние, созданное прежней сборкой в том же процессе, этой карты ещё не знает.
+const storageCache = state.storageCache ??= new Map<string, StorageEntry>()
 
 function resourceKey(ref: PublicResourceRef): string {
   return JSON.stringify([ref.publicKey, ref.path ?? null])
@@ -33,6 +39,35 @@ function resourceKey(ref: PublicResourceRef): string {
 export function invalidateHref(ref: PublicResourceRef, rejectedHref: string): void {
   const key = resourceKey(ref)
   if (hrefCache.get(key)?.href === rejectedHref) hrefCache.delete(key)
+  if (storageCache.get(key)?.href === rejectedHref) storageCache.delete(key)
+}
+
+/**
+ * Узел хранилища, куда ведёт ссылка.
+ *
+ * Редирект downloader по ссылке занимает от 0,7 до 15 секунд, а узел после него отвечает за
+ * доли секунды на любой Range. Плеер докачивает файл десятками Range, и без этого адреса
+ * каждый из них заново ждёт редирект.
+ */
+export function cachedStorage(ref: PublicResourceRef): string | null {
+  const key = resourceKey(ref)
+  const entry = storageCache.get(key)
+  if (!entry) return null
+  if (entry.expiresAt > Date.now()) return entry.url
+  storageCache.delete(key)
+  return null
+}
+
+export function rememberStorage(ref: PublicResourceRef, href: string, url: string): void {
+  const now = Date.now()
+  evictExpired(storageCache, now)
+  storageCache.set(resourceKey(ref), { url, href, expiresAt: now + STORAGE_TTL_MS })
+}
+
+/** Как и у ссылки: отказ старого узла не стирает адрес, который уже получил соседний поток. */
+export function forgetStorage(ref: PublicResourceRef, rejectedUrl: string): void {
+  const key = resourceKey(ref)
+  if (storageCache.get(key)?.url === rejectedUrl) storageCache.delete(key)
 }
 
 export async function resolveHref(ref: PublicResourceRef, signal?: AbortSignal): Promise<string> {
@@ -54,7 +89,7 @@ export async function resolveHref(ref: PublicResourceRef, signal?: AbortSignal):
     }).then((href) => {
       controller.signal.throwIfAborted()
       const completedAt = Date.now()
-      evictExpired(completedAt)
+      evictExpired(hrefCache, completedAt)
       hrefCache.set(key, { href, expiresAt: completedAt + HREF_TTL_MS })
       return href
     }).finally(() => {
@@ -89,14 +124,14 @@ export async function resolveHref(ref: PublicResourceRef, signal?: AbortSignal):
 }
 
 /** Кеш живёт в памяти инстанса: чистим протухшее и держим размер ограниченным. */
-function evictExpired(now: number): void {
-  for (const [key, entry] of hrefCache) {
-    if (entry.expiresAt <= now) hrefCache.delete(key)
+function evictExpired(cache: Map<string, { expiresAt: number }>, now: number): void {
+  for (const [key, entry] of cache) {
+    if (entry.expiresAt <= now) cache.delete(key)
   }
 
-  while (hrefCache.size >= CACHE_LIMIT) {
-    const oldest = hrefCache.keys().next()
+  while (cache.size >= CACHE_LIMIT) {
+    const oldest = cache.keys().next()
     if (oldest.done) break
-    hrefCache.delete(oldest.value)
+    cache.delete(oldest.value)
   }
 }

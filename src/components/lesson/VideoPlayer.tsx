@@ -211,6 +211,8 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
   const formatTries = useRef(0)
   const lastFailure = useRef(0)
   const pending = useRef<{ controller: AbortController; timer?: ReturnType<typeof setTimeout> } | null>(null)
+  // Перезапуск после сбоя продолжает просмотр, если ученик смотрел: иначе каждый сбой Диска оставлял видео на паузе.
+  const [resumePlaying, setResumePlaying] = useState(false)
   // У ученика адрес потока уже готов, исходник скрыт; у администратора в блоке лежит ссылка на Диск.
   const recording = isRecordingSource(videoUrl)
   const protectedSource = isLessonSource(videoUrl) || recording
@@ -231,8 +233,9 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
     setMode(next)
   }, [])
 
-  const handleFailure = useCallback(async (failed: 'native' | 'stream', hint?: FailureHint) => {
+  const handleFailure = useCallback(async (failed: 'native' | 'stream', hint?: FailureHint, playing?: boolean) => {
     cancelPending()
+    if (playing !== undefined) setResumePlaying(playing)
     if (hint === 'unsupported') { setMode('unsupported'); return }
     if (Date.now() - lastFailure.current > RETRY_WINDOW_MS) { tries.current = 0; formatTries.current = 0 }
     lastFailure.current = Date.now()
@@ -254,10 +257,10 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
     pending.current = { controller, timer: setTimeout(() => { if (!controller.signal.aborted) start(failed) }, delay) }
   }, [cancelPending, isMedia, proxyUrl, start, streamUrl])
 
-  const handleNativeFailure = useCallback((code?: number) => {
-    void handleFailure('native', code === MEDIA_ERR_NETWORK ? 'network' : undefined)
+  const handleNativeFailure = useCallback((code?: number, playing?: boolean) => {
+    void handleFailure('native', code === MEDIA_ERR_NETWORK ? 'network' : undefined, playing)
   }, [handleFailure])
-  const handleStreamFailure = useCallback((reason?: FailureHint) => { void handleFailure('stream', reason) }, [handleFailure])
+  const handleStreamFailure = useCallback((reason?: FailureHint, playing?: boolean) => { void handleFailure('stream', reason, playing) }, [handleFailure])
   const retry = useCallback(() => {
     cancelPending()
     tries.current = 0
@@ -329,29 +332,43 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
           src={playbackUrl(proxyUrl, attempt)}
           memoryKey={memoryId ?? videoUrl}
           durationMinutes={durationMinutes}
+          resumePlaying={resumePlaying}
           onFailure={handleStreamFailure}
         />
       ) : (
-        <NativeVideo key={attempt} memoryId={memoryId} videoUrl={videoUrl} playbackAttempt={attempt} direct={protectedSource} label={recording ? `Собеседование: ${title}` : undefined} onFailure={handleNativeFailure} />
+        <NativeVideo key={attempt} memoryId={memoryId} videoUrl={videoUrl} playbackAttempt={attempt} direct={protectedSource} label={recording ? `Собеседование: ${title}` : undefined} resumePlaying={resumePlaying} onFailure={handleNativeFailure} />
       )}
     </div>
   )
 }
 
-function NativeVideo({ memoryId, videoUrl, playbackAttempt = 0, direct = false, label, onFailure }: { memoryId?: string; videoUrl: string; playbackAttempt?: number; direct?: boolean; label?: string; onFailure: (code?: number) => void }) {
+function NativeVideo({ memoryId, videoUrl, playbackAttempt = 0, direct = false, label, resumePlaying = false, onFailure }: { memoryId?: string; videoUrl: string; playbackAttempt?: number; direct?: boolean; label?: string; resumePlaying?: boolean; onFailure: (code?: number, playing?: boolean) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const memory = useVideoMemory(videoRef, memoryId ?? videoUrl)
   const source = playbackUrl(direct ? videoUrl : getStreamUrl(videoUrl), playbackAttempt)
+  // Намерение ученика, а не состояние элемента: перезапущенный плеер ещё на паузе, пока грузится.
+  const wantsPlay = useRef(resumePlaying)
 
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
     // Также восстанавливает src после пробного cleanup в React StrictMode.
     if (video.getAttribute('src') !== source) video.setAttribute('src', source)
-    const failed = () => onFailure(video.error?.code)
+    const failed = () => onFailure(video.error?.code, wantsPlay.current)
+    const played = () => { wantsPlay.current = true }
+    const stopped = () => { wantsPlay.current = false }
     video.addEventListener('error', failed)
+    video.addEventListener('play', played)
+    video.addEventListener('pause', stopped)
+    video.addEventListener('ended', stopped)
+    // Позицию возвращает useVideoMemory по loadedmetadata, до первого кадра, поэтому play() можно звать сразу.
+    // Отказ автозапуска оставляет видео на паузе на нужной секунде: это и есть запасной вариант.
+    if (wantsPlay.current && video.paused) void video.play().catch(() => undefined)
     return () => {
       video.removeEventListener('error', failed)
+      video.removeEventListener('play', played)
+      video.removeEventListener('pause', stopped)
+      video.removeEventListener('ended', stopped)
       // Удаление DOM-узла само по себе не гарантирует отмену загрузки и освобождение слота.
       video.removeAttribute('src')
       video.load()

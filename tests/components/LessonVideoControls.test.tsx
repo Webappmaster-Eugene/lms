@@ -91,9 +91,25 @@ describe('потоковый плеер MPEG-TS', () => {
     expect(mpegts.create.mock.calls[0][0]).toMatchObject({ url: `${window.location.origin}/api/yandex-disk/proxy?lesson=10&block=rec`, duration: 600_000, withCredentials: true })
 
     mpegts.handlers.get('error')?.('NetworkError')
-    expect(failure).toHaveBeenLastCalledWith('network')
+    expect(failure).toHaveBeenLastCalledWith('network', false)
     mpegts.handlers.get('error')?.('MediaError')
-    expect(failure).toHaveBeenLastCalledWith(undefined)
+    expect(failure).toHaveBeenLastCalledWith(undefined, false)
+  })
+
+  it('сообщает, что сбой случился во время просмотра, а запуск после него сам продолжает с восстановленной секунды', async () => {
+    const { failure, video } = await renderStream()
+    await waitFor(() => expect(mpegts.handlers.has('error')).toBe(true))
+    await act(async () => { await video.play() })
+    mpegts.handlers.get('error')?.('NetworkError')
+    expect(failure).toHaveBeenLastCalledWith('network', true)
+
+    const view = render(<TransportStreamPlayer src="/api/yandex-disk/proxy?lesson=10&block=rec&playbackAttempt=1" memoryKey="rec:hash" durationMinutes={10} resumePlaying onFailure={vi.fn()} />)
+    const resumed = attachMedia(view.container.querySelector('video') as HTMLVideoElement)
+    expect(resumed.play).not.toHaveBeenCalled()
+    fireEvent.seeked(resumed)
+    expect(resumed.play).toHaveBeenCalledOnce()
+    fireEvent.seeked(resumed)
+    expect(resumed.play).toHaveBeenCalledOnce()
   })
 
   it('после ухода со страницы поздняя ошибка плеера не сообщается', async () => {

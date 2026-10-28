@@ -240,6 +240,76 @@ describe('кеш ссылок на файлы Яндекс.Диска', () => {
     })
   })
 
+  describe('адрес узла хранилища', () => {
+    const NODE = 'https://s1.storage.yandex.net/rdisk/abc?ts=1'
+
+    async function freshModule() {
+      await freshResolver()
+      return import('@/lib/yandex-disk-href')
+    }
+
+    it('запомненный узел отдаётся без обращения к API и разделяется по файлам', async () => {
+      const { cachedStorage, rememberStorage } = await freshModule()
+
+      expect(cachedStorage(REF)).toBeNull()
+      rememberStorage(REF, 'https://downloader.yandex.ru/file-1', NODE)
+
+      expect(cachedStorage(REF)).toBe(NODE)
+      expect(cachedStorage(ref(REF.publicKey, '/other.mp4'))).toBeNull()
+      expect(fetchPublicDownloadHref).not.toHaveBeenCalled()
+    })
+
+    it('живёт пять минут от получения', async () => {
+      const { cachedStorage, rememberStorage } = await freshModule()
+
+      rememberStorage(REF, 'https://downloader.yandex.ru/file-1', NODE)
+      vi.advanceTimersByTime(TTL_MS - 1000)
+      expect(cachedStorage(REF)).toBe(NODE)
+      vi.advanceTimersByTime(2000)
+      expect(cachedStorage(REF)).toBeNull()
+    })
+
+    it('отказ старого узла не стирает адрес, который уже получил соседний поток', async () => {
+      const { cachedStorage, forgetStorage, rememberStorage } = await freshModule()
+
+      rememberStorage(REF, 'https://downloader.yandex.ru/file-1', 'https://s2.storage.yandex.net/new')
+      forgetStorage(REF, NODE)
+      expect(cachedStorage(REF)).toBe('https://s2.storage.yandex.net/new')
+      forgetStorage(REF, 'https://s2.storage.yandex.net/new')
+      expect(cachedStorage(REF)).toBeNull()
+    })
+
+    it('отклонённая ссылка уносит узел, полученный через неё, но не узел более новой ссылки', async () => {
+      const { cachedStorage, invalidateHref, rememberStorage } = await freshModule()
+
+      rememberStorage(REF, 'https://downloader.yandex.ru/old', NODE)
+      invalidateHref(REF, 'https://downloader.yandex.ru/old')
+      expect(cachedStorage(REF)).toBeNull()
+
+      rememberStorage(REF, 'https://downloader.yandex.ru/new', NODE)
+      invalidateHref(REF, 'https://downloader.yandex.ru/old')
+      expect(cachedStorage(REF)).toBe(NODE)
+    })
+
+    it('кеш узлов ограничен по размеру', async () => {
+      const { cachedStorage, rememberStorage } = await freshModule()
+
+      for (let i = 0; i < 520; i++) rememberStorage(ref(`key-${i}`), 'https://downloader.yandex.ru/x', `${NODE}&i=${i}`)
+
+      expect(cachedStorage(ref('key-0'))).toBeNull()
+      expect(cachedStorage(ref('key-519'))).toBe(`${NODE}&i=519`)
+    })
+
+    it('процесс с состоянием прежней сборки без карты узлов не падает', async () => {
+      vi.resetModules()
+      Reflect.set(globalThis, '__lmsYandexDiskHrefs', { hrefCache: new Map(), pendingHrefs: new Map() })
+      const { cachedStorage, rememberStorage } = await import('@/lib/yandex-disk-href')
+
+      rememberStorage(REF, 'https://downloader.yandex.ru/file-1', NODE)
+      expect(cachedStorage(REF)).toBe(NODE)
+    })
+  })
+
   describe('размер кеша', () => {
     it('протухшие записи вычищаются при новом запросе', async () => {
       const resolveHref = await freshResolver()

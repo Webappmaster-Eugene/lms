@@ -310,6 +310,65 @@ describe('отказ плеера в уроке', () => {
     expect(container.querySelector('video')).toHaveAttribute('src', `${url}&playbackAttempt=1`)
   })
 
+  it('сбой во время просмотра: перезапущенный плеер сам продолжает, второй сбой до старта тоже', async () => {
+    fetchMock.mockImplementation(async () => sourceResponse(mp4Head))
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
+    const watched = container.querySelector('video') as HTMLVideoElement
+    expect(play).not.toHaveBeenCalled()
+    fireEvent.play(watched)
+    Object.defineProperty(watched, 'error', { value: { code: 2 }, configurable: true })
+    fireEvent.error(watched)
+    await flush()
+    await wait(2000)
+    const resumed = container.querySelector('video') as HTMLVideoElement
+    expect(resumed).toHaveAttribute('src', `${url}&playbackAttempt=1`)
+    expect(play.mock.contexts).toEqual([resumed])
+
+    // Новый плеер ещё не заиграл, но ученик смотреть не передумал.
+    Object.defineProperty(resumed, 'error', { value: { code: 2 }, configurable: true })
+    fireEvent.error(resumed)
+    await flush()
+    await wait(5000)
+    const again = container.querySelector('video') as HTMLVideoElement
+    expect(again).toHaveAttribute('src', `${url}&playbackAttempt=2`)
+    expect(play.mock.contexts.at(-1)).toBe(again)
+    play.mockRestore()
+  })
+
+  it('сбой после паузы не запускает видео само', async () => {
+    fetchMock.mockImplementation(async () => sourceResponse(mp4Head))
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
+    const watched = container.querySelector('video') as HTMLVideoElement
+    fireEvent.play(watched)
+    fireEvent.pause(watched)
+    Object.defineProperty(watched, 'error', { value: { code: 2 }, configurable: true })
+    fireEvent.error(watched)
+    await flush()
+    await wait(2000)
+    expect(container.querySelector('video')).toHaveAttribute('src', `${url}&playbackAttempt=1`)
+    expect(play).not.toHaveBeenCalled()
+    play.mockRestore()
+  })
+
+  it('запрет автозапуска оставляет видео на паузе без сообщения об ошибке', async () => {
+    fetchMock.mockImplementation(async () => sourceResponse(mp4Head))
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockRejectedValue(new DOMException('blocked', 'NotAllowedError'))
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
+    const watched = container.querySelector('video') as HTMLVideoElement
+    fireEvent.play(watched)
+    Object.defineProperty(watched, 'error', { value: { code: 2 }, configurable: true })
+    fireEvent.error(watched)
+    await flush()
+    await wait(2000)
+    expect(play).toHaveBeenCalledOnce()
+    expect(container.querySelector('video')).toHaveAttribute('src', `${url}&playbackAttempt=1`)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    play.mockRestore()
+  })
+
   it('администратор с исходной ссылкой получает те же повторы и ссылку на Диск, а ученик ссылки не видит', async () => {
     const raw = 'https://disk.yandex.ru/d/key/lesson.mp4'
     const stream = `/api/yandex-disk/stream?url=${encodeURIComponent(raw)}`
