@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, render, screen, waitFor } from '@testing-library/react'
 
+import { ENTRY_TASKS } from '@/data/bootcamp-entry/tasks'
+
 type EditorProps = {
   theme?: string
   beforeMount?: (api: unknown) => void
@@ -27,7 +29,10 @@ const { MonacoCodeEditor } = await import('@/components/trainer/MonacoCodeEditor
  */
 
 function createMonaco() {
-  const defaults = { setCompilerOptions: vi.fn(), setDiagnosticsOptions: vi.fn(), addExtraLib: vi.fn() }
+  const addExtraLib = vi.fn()
+  const createDefaults = () => ({ setCompilerOptions: vi.fn(), setDiagnosticsOptions: vi.fn(), addExtraLib })
+  const typescriptDefaults = createDefaults()
+  const javascriptDefaults = createDefaults()
   const defineTheme = vi.fn()
   const api = {
     MarkerSeverity: { Error: 8, Warning: 4 },
@@ -35,14 +40,14 @@ function createMonaco() {
     KeyCode: { Enter: 3 },
     editor: { defineTheme, setModelMarkers: vi.fn(), getModels: () => [] },
     languages: { typescript: {
-      typescriptDefaults: defaults,
-      javascriptDefaults: defaults,
+      typescriptDefaults,
+      javascriptDefaults,
       ScriptTarget: { ES2022: 9 },
       JsxEmit: { ReactJSX: 4 },
       ModuleResolutionKind: { NodeJs: 2 },
     } },
   }
-  return { api, defineTheme, addExtraLib: defaults.addExtraLib }
+  return { api, defineTheme, addExtraLib, typescriptDefaults, javascriptDefaults }
 }
 
 const instance = {
@@ -60,7 +65,7 @@ function startEditor(api: unknown) {
   })
 }
 
-function editorProps(language: 'js' | 'react' = 'js') {
+function editorProps(language: 'js' | 'ts' | 'react' = 'js') {
   return { value: '', onChange: vi.fn(), onReady: vi.fn(), language, ...(language === 'react' ? { filePath: 'App.tsx', editorLanguage: 'typescript' as const } : {}) }
 }
 
@@ -98,6 +103,59 @@ describe('тема редактора', () => {
     const light = screen.getByTestId('monaco').getAttribute('data-theme')
     expect(light).not.toBe(dark)
     expect(defineTheme.mock.calls.map(([name]) => name)).toEqual(expect.arrayContaining([dark, light]))
+  })
+})
+
+type WorkerDiagnostic = { code: number, messageText: string | { messageText: string } }
+type TypeScriptWorkerClass = new (
+  ctx: { getMirrorModels: () => { uri: { toString: () => string, path: string }, version: number, getValue: () => string }[] },
+  createData: { compilerOptions: unknown, extraLibs: Record<string, never> },
+) => {
+  getSyntacticDiagnostics: (fileName: string) => Promise<WorkerDiagnostic[]>
+  getSemanticDiagnostics: (fileName: string) => Promise<WorkerDiagnostic[]>
+}
+
+// Модуль воркера без деклараций типов: спецификатор в переменной, чтобы tsc его не разрешал.
+// Грузится при сборе тестов: компилятор весит 9 МБ, и внутри теста загрузка съела бы таймаут.
+const TS_WORKER_MODULE = 'monaco-editor/esm/vs/language/typescript/tsWorker.js'
+const { TypeScriptWorker } = await import(/* @vite-ignore */ TS_WORKER_MODULE) as { TypeScriptWorker: TypeScriptWorkerClass }
+
+type CapturedDefaults = { setCompilerOptions: ReturnType<typeof vi.fn>, setDiagnosticsOptions: ReturnType<typeof vi.fn> }
+
+/**
+ * Прогоняет код через настоящий воркер TypeScript из Monaco с теми настройками,
+ * что компонент передал движку. Модель без пути, как у редактора задачи: Monaco
+ * называет её inmemory://model/<номер>, без расширения файла.
+ */
+async function editorDiagnostics(defaults: CapturedDefaults, code: string): Promise<string[]> {
+  const [compilerOptions] = defaults.setCompilerOptions.mock.lastCall ?? []
+  const [diagnosticsOptions] = defaults.setDiagnosticsOptions.mock.lastCall ?? []
+  const ignored = new Set<number>(diagnosticsOptions?.diagnosticCodesToIgnore ?? [])
+  const fileName = 'inmemory://model/1'
+  const model = { uri: { toString: () => fileName, path: '/1' }, version: 1, getValue: () => code }
+  const worker = new TypeScriptWorker({ getMirrorModels: () => [model] }, { compilerOptions, extraLibs: {} })
+  const diagnostics = [...await worker.getSyntacticDiagnostics(fileName), ...await worker.getSemanticDiagnostics(fileName)]
+  return diagnostics
+    .filter((diagnostic) => !ignored.has(diagnostic.code))
+    .map((diagnostic) => `${diagnostic.code}: ${typeof diagnostic.messageText === 'string' ? diagnostic.messageText : diagnostic.messageText.messageText}`)
+}
+
+describe('подсветка ошибок в коде', () => {
+  it.each(ENTRY_TASKS.map((task) => [task.title, task.solutionCode]))('эталон входного задания «%s» в JS-редакторе не подчёркнут', async (_title, solution) => {
+    const { api, javascriptDefaults } = createMonaco()
+    render(<MonacoCodeEditor {...editorProps('js')} />)
+    startEditor(api)
+
+    expect(await editorDiagnostics(javascriptDefaults, solution)).toEqual([])
+  })
+
+  it('в TS-редакторе строгая проверка остаётся: параметр без типа подчёркнут', async () => {
+    const { api, typescriptDefaults } = createMonaco()
+    render(<MonacoCodeEditor {...editorProps('ts')} />)
+    startEditor(api)
+
+    expect(await editorDiagnostics(typescriptDefaults, 'function double(value) {\n  return value * 2\n}\n'))
+      .toEqual([expect.stringMatching(/^7006: Parameter 'value' implicitly has an 'any' type/)])
   })
 })
 

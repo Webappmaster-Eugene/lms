@@ -108,6 +108,9 @@ function configureTypeScript(monaco: Monaco): void {
       noEmit: true,
       jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
       allowNonTsExtensions: true,
+      // Модель без пути (inmemory://model/1) воркер без allowJs читает как TS, и strict
+      // подчёркивает в JS-решении каждый параметр без типа.
+      allowJs: target === monaco.languages.typescript.javascriptDefaults,
       moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
     })
     target.setDiagnosticsOptions({
