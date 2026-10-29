@@ -119,7 +119,7 @@ export function EntryTaskWorkspace({ token, tasks, saved, lastSubmission, review
               language="js"
               ariaLabel={`Решение задачи «${task.title}»`}
               readOnly={submitting}
-              height={260}
+              height={320}
               onRun={() => { if (!busy) void check(task.slug) }}
             />
           </div>

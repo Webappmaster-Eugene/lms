@@ -4,14 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const editor = vi.hoisted(() => ({
   value: '',
+  height: undefined as number | string | undefined,
   onReady: null as null | ((instance: unknown) => void),
   setSelection: vi.fn(),
   focus: vi.fn(),
 }))
 
 vi.mock('@/components/trainer/MonacoCodeEditor', () => ({
-  MonacoCodeEditor: ({ value, onReady }: { value: string; onReady: (instance: unknown) => void }) => {
+  MonacoCodeEditor: ({ value, height, onReady }: { value: string; height?: number | string; onReady: (instance: unknown) => void }) => {
     editor.value = value
+    editor.height = height
     editor.onReady = onReady
     return <div data-testid="full-editor">{value}</div>
   },
@@ -138,6 +140,16 @@ describe('редактор при медленной загрузке Monaco', (
     })
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(screen.getByTestId('full-editor')).toBeVisible()
+  })
+
+  it('Monaco заполняет рамку целиком, даже если запрошенная высота ниже минимальной', async () => {
+    render(<CodeEditor value="" onChange={vi.fn()} language="js" height={260} />)
+    await waitFor(() => expect(screen.getByTestId('full-editor')).toBeInTheDocument())
+
+    const frame = screen.getByTestId('full-editor').parentElement?.parentElement
+    expect(frame).toHaveClass('min-h-[320px]')
+    expect(frame).toHaveStyle({ height: '260px' })
+    expect(editor.height).toBe('100%')
   })
 
   it('вставляет два пробела клавишей Tab и запрещает команды в readOnly', async () => {

@@ -132,7 +132,8 @@ export function CodeEditor(props: CodeEditorProps) {
       )}
       {FullEditor && (
         <div className="absolute inset-0" style={{ visibility: ready ? 'visible' : 'hidden' }} aria-hidden={!ready}>
-          <FullEditor {...props} onReady={handleReady} />
+          {/* Высоту задаёт рамка (с минимумом 320 px), Monaco её заполняет: с height ниже минимума под ним оставалась пустая полоса. */}
+          <FullEditor {...props} height="100%" onReady={handleReady} />
         </div>
       )}
     </div>
