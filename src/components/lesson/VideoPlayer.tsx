@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ExternalLink, Play, Clock, Loader2, RotateCw } from 'lucide-react'
 
 import { useVideoMemory } from '@/hooks/use-video-memory'
+import { MEDIA_SOURCE_HEADER } from '@/lib/media-source-status'
 import { parsePublicResourceUrl } from '@/lib/yandex-disk-url'
 import { TransportStreamPlayer } from './TransportStreamPlayer'
 import { VideoMemoryBar } from './VideoMemoryBar'
@@ -161,12 +162,20 @@ const MEDIA_ERR_NETWORK = 2
 
 type SourceCheck = 'transport-stream' | 'playable' | 'unavailable'
 type FailureHint = 'network' | 'unsupported'
+/** Что сервер знает о файле на Диске: без пометки причина отказа неизвестна. */
+type DiskFault = 'unavailable' | 'missing' | null
+
+function diskFault(response: Response): DiskFault {
+  const status = response.headers.get(MEDIA_SOURCE_HEADER)
+  if (status === 'missing') return 'missing'
+  return status === 'unavailable' || status === 'degraded' ? 'unavailable' : null
+}
 
 /**
  * Ошибка плеера не говорит, что случилось: сервер не отдал файл или браузер не понял формат.
  * Короткий запрос начала файла это различает — от ответа зависит, повторять, менять плеер или объяснять.
  */
-async function checkLessonSource(url: string, signal: AbortSignal): Promise<SourceCheck> {
+async function checkLessonSource(url: string, signal: AbortSignal): Promise<{ check: SourceCheck; disk: DiskFault }> {
   const controller = new AbortController()
   const abort = () => controller.abort()
   signal.addEventListener('abort', abort, { once: true })
@@ -174,8 +183,9 @@ async function checkLessonSource(url: string, signal: AbortSignal): Promise<Sour
   const timer = setTimeout(abort, CHECK_TIMEOUT_MS)
   try {
     const response = await fetch(url, { headers: { Range: `bytes=0-${HEAD_BYTES - 1}` }, credentials: 'same-origin', cache: 'no-store', signal: controller.signal })
+    const disk = diskFault(response)
     const reader = response.ok ? response.body?.getReader() : undefined
-    if (!reader) return 'unavailable'
+    if (!reader) return { check: 'unavailable', disk }
     // Читаем только начало: если Range проигнорирован, остальной файл в память не попадает.
     const head = new Uint8Array(HEAD_BYTES)
     let length = 0
@@ -186,12 +196,12 @@ async function checkLessonSource(url: string, signal: AbortSignal): Promise<Sour
       head.set(part, length)
       length += part.byteLength
     }
-    if (length === 0) return 'unavailable'
+    if (length === 0) return { check: 'unavailable', disk }
     const declaredLength = Number(response.headers.get('content-length'))
-    if (declaredLength > 0 && length < Math.min(declaredLength, HEAD_BYTES)) return 'unavailable'
-    return length === HEAD_BYTES && head[0] === 0x47 && head[TS_PACKET_BYTES] === 0x47 ? 'transport-stream' : 'playable'
+    if (declaredLength > 0 && length < Math.min(declaredLength, HEAD_BYTES)) return { check: 'unavailable', disk }
+    return { check: length === HEAD_BYTES && head[0] === 0x47 && head[TS_PACKET_BYTES] === 0x47 ? 'transport-stream' : 'playable', disk }
   } catch {
-    return 'unavailable'
+    return { check: 'unavailable', disk: null }
   } finally {
     clearTimeout(timer)
     signal.removeEventListener('abort', abort)
@@ -200,7 +210,7 @@ async function checkLessonSource(url: string, signal: AbortSignal): Promise<Sour
   }
 }
 
-type LessonPlayback = 'native' | 'stream' | 'retrying' | 'unavailable' | 'playback-failed' | 'unsupported'
+type LessonPlayback = 'native' | 'stream' | 'retrying' | 'unavailable' | 'disk-unavailable' | 'disk-missing' | 'playback-failed' | 'unsupported'
 
 function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }: Omit<Props, 'displayMode'>) {
   const initial: 'native' | 'stream' = isTransportStream(videoUrl) ? 'stream' : 'native'
@@ -210,6 +220,8 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
   const tries = useRef(0)
   const formatTries = useRef(0)
   const lastFailure = useRef(0)
+  // Хоть одна проверка в серии повторов застала отказ Диска: сообщение называет его, а не интернет ученика.
+  const diskFailed = useRef(false)
   const pending = useRef<{ controller: AbortController; timer?: ReturnType<typeof setTimeout> } | null>(null)
   // Перезапуск после сбоя продолжает просмотр, если ученик смотрел: иначе каждый сбой Диска оставлял видео на паузе.
   const [resumePlaying, setResumePlaying] = useState(false)
@@ -237,22 +249,25 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
     cancelPending()
     if (playing !== undefined) setResumePlaying(playing)
     if (hint === 'unsupported') { setMode('unsupported'); return }
-    if (Date.now() - lastFailure.current > RETRY_WINDOW_MS) { tries.current = 0; formatTries.current = 0 }
+    if (Date.now() - lastFailure.current > RETRY_WINDOW_MS) { tries.current = 0; formatTries.current = 0; diskFailed.current = false }
     lastFailure.current = Date.now()
     const controller = new AbortController()
     pending.current = { controller }
     // Пока идёт проверка, вместо сломанного плеера показываем состояние ожидания.
     setMode('retrying')
-    const check = await checkLessonSource(failed === 'stream' ? proxyUrl : streamUrl, controller.signal)
+    const { check, disk } = await checkLessonSource(failed === 'stream' ? proxyUrl : streamUrl, controller.signal)
     if (controller.signal.aborted) return
     // Часть потоков MPEG-TS лежит под именем .mp4: нативный плеер их не понимает, потоковый — да.
     if (failed === 'native' && check === 'transport-stream' && !isMedia) { start('stream'); return }
+    // Файла по этому пути на Диске нет: повтор ничего не изменит.
+    if (disk === 'missing') { setMode('disk-missing'); return }
+    if (disk) diskFailed.current = true
     // Доступное начало файла не доказывает доступность остальных Range или поддержку кодеков.
     // Повторяем и такой отказ, но не называем его несовместимостью браузера.
-    const formatSuspected = check !== 'unavailable' && hint !== 'network'
+    const formatSuspected = check !== 'unavailable' && hint !== 'network' && !disk
     const counter = formatSuspected ? formatTries : tries
     const delay = (formatSuspected ? RETRY_DELAYS_MS.slice(0, 1) : RETRY_DELAYS_MS)[counter.current]
-    if (delay === undefined) { setMode(formatSuspected ? 'playback-failed' : 'unavailable'); return }
+    if (delay === undefined) { setMode(formatSuspected ? 'playback-failed' : diskFailed.current ? 'disk-unavailable' : 'unavailable'); return }
     counter.current += 1
     pending.current = { controller, timer: setTimeout(() => { if (!controller.signal.aborted) start(failed) }, delay) }
   }, [cancelPending, isMedia, proxyUrl, start, streamUrl])
@@ -265,6 +280,7 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
     cancelPending()
     tries.current = 0
     formatTries.current = 0
+    diskFailed.current = false
     start(player.current)
   }, [cancelPending, start])
 
@@ -306,7 +322,23 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
           <p className="text-sm text-muted-foreground">
             {recording
               ? 'Хранилище записей не отдало этот файл. Попробуйте ещё раз через несколько минут. Если ошибка сохраняется, сообщите название записи в поддержку.'
-              : 'Хранилище записей не отдало этот файл. Обычно это проходит само: попробуйте ещё раз через несколько минут. Текст, файлы и заметки урока доступны.'}
+              : 'Видео не загрузилось. Попробуйте ещё раз через несколько минут. Если не поможет, проверьте подключение к интернету. Текст, файлы и заметки урока доступны.'}
+          </p>
+          {actions}
+        </div>
+      ) : mode === 'disk-unavailable' ? (
+        <div role="alert" className="space-y-3 rounded-xl border border-border bg-card p-6">
+          <p className="font-medium text-foreground">{recording ? 'Запись временно недоступна' : 'Видео временно недоступно'} на стороне Яндекс Диска</p>
+          <p className="text-sm text-muted-foreground">
+            {recording ? 'Запись хранится' : 'Видео хранится'} на Яндекс Диске, а Диск сейчас не отдаёт этот файл. Это сбой у Яндекса, обычно он проходит сам. Попробуйте позже.{recording ? '' : ' Текст, файлы и заметки урока доступны.'}
+          </p>
+          {actions}
+        </div>
+      ) : mode === 'disk-missing' ? (
+        <div role="alert" className="space-y-3 rounded-xl border border-border bg-card p-6">
+          <p className="font-medium text-foreground">{recording ? 'Запись не найдена' : 'Видео не найдено'} на Яндекс Диске</p>
+          <p className="text-sm text-muted-foreground">
+            Файл удалили или переместили на Диске. Сообщите название {recording ? 'записи' : 'урока'} в поддержку.{recording ? '' : ' Текст, файлы и заметки урока доступны.'}
           </p>
           {actions}
         </div>

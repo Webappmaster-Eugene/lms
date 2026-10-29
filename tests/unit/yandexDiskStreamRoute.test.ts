@@ -71,6 +71,7 @@ describe('доступ', () => {
     auth.mockResolvedValue({ user: { id: 1, role: 'student' } })
     const response = await GET(streamRequest(uniqueVideoUrl()))
     expect(response.status).toBe(403)
+    expect(response.headers.get('X-Media-Source')).toBeNull()
     expect(fetchPublicDownloadHref).not.toHaveBeenCalled()
   })
 })
@@ -148,6 +149,7 @@ describe('ошибки Яндекс.Диска', () => {
     const response = await GET(streamRequest(uniqueVideoUrl()))
 
     expect(response.status).toBe(404)
+    expect(response.headers.get('X-Media-Source')).toBe('missing')
     await expect(response.json()).resolves.toMatchObject({ error: 'Не удалось открыть файл. Попробуйте ещё раз' })
   })
 
@@ -157,9 +159,19 @@ describe('ошибки Яндекс.Диска', () => {
     const response = await GET(streamRequest(uniqueVideoUrl()))
 
     expect(response.status).toBe(502)
+    expect(response.headers.get('X-Media-Source')).toBe('unavailable')
     await expect(response.json()).resolves.toMatchObject({
       error: 'Не удалось открыть файл. Попробуйте ещё раз',
     })
+  })
+
+  it('хранилище, которое не отдаёт файл, называется плееру отказом Диска', async () => {
+    upstream.mockImplementation(async () => new Response('busy', { status: 503 }))
+
+    const response = await GET(streamRequest(uniqueVideoUrl()))
+
+    expect(response.status).toBe(502)
+    expect(response.headers.get('X-Media-Source')).toBe('unavailable')
   })
 
   it('упавший запрос не кешируется', async () => {

@@ -1,8 +1,11 @@
 import 'server-only'
 
 import { recordLearningAccess } from '@/lib/learning-observability'
+import { MEDIA_SOURCE_HEADER, type MediaSourceStatus } from '@/lib/media-source-status'
+import { YandexDiskError } from '@/lib/yandex-disk'
 import { cachedStorage, forgetStorage, invalidateHref, rememberStorage, resolveHref } from '@/lib/yandex-disk-href'
 import type { PublicResourceRef } from '@/lib/yandex-disk-url'
+import { recentSourceFailure, rememberSourceFailure } from '@/server/disk-source-failures'
 import { PRIVATE_MEDIA_HEADERS, mediaError } from '@/server/learning-media-response'
 import { acquireLearningStream, limitedLearningBody } from '@/server/learning-stream-limits'
 
@@ -133,6 +136,22 @@ function transient(attempt: Attempt | undefined): boolean {
   return !attempt || attempt.empty || attempt.upstream.status === 429 || attempt.upstream.status >= 500
 }
 
+function sourceError(message: string, status: number, source: MediaSourceStatus): Response {
+  const response = mediaError(message, status)
+  response.headers.set(MEDIA_SOURCE_HEADER, source)
+  return response
+}
+
+function isViewerAbort(request: Request, timedOut: boolean): boolean {
+  return request.signal.aborted && !timedOut
+}
+
+/** Отказ Диска, а не адрес вне списка и не отсутствующий файл. */
+export function isDiskFailure(error: unknown): boolean {
+  if (error instanceof LearningUpstreamError) return error.reason === 'upstream_timeout'
+  return !(error instanceof YandexDiskError && error.statusCode === 404)
+}
+
 export async function upstreamLearningMedia(request: Request, userId: number, ref: PublicResourceRef, kind: 'video' | 'asset' = 'video'): Promise<Response> {
   const release = acquireLearningStream(userId)
   const controller = new AbortController()
@@ -222,6 +241,7 @@ export async function upstreamLearningMedia(request: Request, userId: number, re
       const value = upstream.headers.get(name)
       if (value) headers.set(name, value)
     }
+    if (recentSourceFailure(ref)) headers.set(MEDIA_SOURCE_HEADER, 'degraded')
     if (upstream.status === 416) {
       await upstream.body?.cancel()
       return new Response(null, { status: 416, headers })
@@ -229,11 +249,14 @@ export async function upstreamLearningMedia(request: Request, userId: number, re
     if (upstream.status !== 200 && upstream.status !== 206) {
       await upstream.body?.cancel()
       recordLearningAccess({ resource: 'media', outcome: 'error', reason: 'upstream_unavailable', userId })
-      return mediaError('Источник файла временно недоступен', upstream.status === 404 ? 404 : 502)
+      if (upstream.status === 404) return sourceError('Источник файла временно недоступен', 404, 'missing')
+      rememberSourceFailure(ref)
+      return sourceError('Источник файла временно недоступен', 502, 'unavailable')
     }
     if (emptyBody) {
       recordLearningAccess({ resource: 'media', outcome: 'error', reason: 'upstream_empty', userId })
-      return mediaError('Хранилище не отдало файл. Попробуйте позже', 502)
+      rememberSourceFailure(ref)
+      return sourceError('Хранилище не отдало файл. Попробуйте позже', 502, 'unavailable')
     }
     if (upstream.headers.get('content-encoding') && upstream.headers.get('content-encoding') !== 'identity') {
       await upstream.body?.cancel()
@@ -254,10 +277,13 @@ export async function upstreamLearningMedia(request: Request, userId: number, re
     const finish = () => { request.signal.removeEventListener('abort', onAbort); release() }
     const body = limitedLearningBody(opened ? resumeBody(opened.reader, opened.first) : upstream.body, finish, request.signal, () => {
       recordLearningAccess({ resource: 'media', outcome: 'error', reason: 'stream_error', userId })
+      rememberSourceFailure(ref)
     })
     handedOff = true
     return new Response(body, { status: upstream.status, headers })
   } catch (error) {
+    // Ответ на брошенную ошибку собирает маршрут; здесь только отметка для проверки плеера.
+    if (!isViewerAbort(request, timedOut) && isDiskFailure(error)) rememberSourceFailure(ref)
     if (timedOut) throw new LearningUpstreamError('upstream_timeout')
     throw error
   } finally {

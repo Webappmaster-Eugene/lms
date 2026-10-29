@@ -4,11 +4,12 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 
 import { recordLearningAccess, withLearningSpan } from '@/lib/learning-observability'
+import { MEDIA_SOURCE_HEADER } from '@/lib/media-source-status'
 import { YandexDiskError } from '@/lib/yandex-disk'
 import { LessonVideoAccessError, resolveLessonVideoSource } from '@/server/lesson-video-access'
 import { localLearningMedia, mediaError } from '@/server/learning-media-response'
 import { LearningStreamLimitError } from '@/server/learning-stream-limits'
-import { LearningUpstreamError, upstreamLearningMedia } from '@/server/learning-upstream'
+import { isDiskFailure, LearningUpstreamError, upstreamLearningMedia } from '@/server/learning-upstream'
 
 export async function lessonMediaRoute(request: Request, allowMaterial = false): Promise<Response> {
   return withLearningSpan('media', 'stream', async () => {
@@ -19,8 +20,10 @@ export async function lessonMediaRoute(request: Request, allowMaterial = false):
       recordLearningAccess({ resource: 'media', outcome: 'deny', reason: 'unauthenticated' })
       return mediaError('Требуется авторизация', 401)
     }
+    let fromDisk = false
     try {
       const source = await resolveLessonVideoSource(payload, user, new URL(request.url).searchParams, allowMaterial)
+      fromDisk = source.kind === 'yandex'
       const response = source.kind === 'media'
         ? await localLearningMedia(request, payload, user, decodeURIComponent(source.path.slice('/api/media/file/'.length)))
         : await upstreamLearningMedia(request, user.id, source.ref, allowMaterial ? 'asset' : 'video')
@@ -39,7 +42,11 @@ export async function lessonMediaRoute(request: Request, allowMaterial = false):
       }
       const reason = error instanceof LearningUpstreamError ? error.reason : 'upstream_error'
       recordLearningAccess({ resource: 'media', outcome: 'error', reason, userId: user.id })
-      return mediaError('Не удалось открыть файл. Попробуйте ещё раз', error instanceof YandexDiskError && error.statusCode === 404 ? 404 : 502)
+      const missing = error instanceof YandexDiskError && error.statusCode === 404
+      const response = mediaError('Не удалось открыть файл. Попробуйте ещё раз', missing ? 404 : 502)
+      if (fromDisk && missing) response.headers.set(MEDIA_SOURCE_HEADER, 'missing')
+      else if (fromDisk && isDiskFailure(error)) response.headers.set(MEDIA_SOURCE_HEADER, 'unavailable')
+      return response
     }
   }).catch(() => {
     recordLearningAccess({ resource: 'media', outcome: 'error', reason: 'internal_error' })

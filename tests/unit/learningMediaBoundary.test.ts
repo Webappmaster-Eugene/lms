@@ -372,6 +372,81 @@ describe('storage node shortcut and transient storage failures', () => {
   })
 })
 
+describe('the player learns that the Disk, not the viewer, failed', () => {
+  let file = 0
+  /** Отметка сбоя живёт в процессе между тестами: каждому тесту свой файл. */
+  const fresh = () => ({ publicKey: 'https://disk.yandex.ru/d/fixture', path: `/health-${++file}.mp4` })
+  const served = () => new Response(new Uint8Array([7, 8]), { status: 206, headers: { 'Content-Range': 'bytes 0-1/20', 'Content-Length': '2', 'Content-Type': 'video/mp4' } })
+  const head = () => new Request('https://lms.test/media', { headers: { Range: 'bytes=0-1' } })
+  const sourceOf = async (target: { publicKey: string; path: string }) => {
+    upstream.mockResolvedValue(served())
+    const response = await upstreamLearningMedia(head(), viewerId, target)
+    await response.arrayBuffer()
+    return response.headers.get('X-Media-Source')
+  }
+
+  it('a refusal names the Disk, and the same file later served whole still carries the mark for the player check', async () => {
+    const target = fresh()
+    upstream.mockImplementation(async () => new Response('busy', { status: 503 }))
+    const refused = await upstreamLearningMedia(head(), viewerId, target)
+    expect(refused.status).toBe(502)
+    expect(refused.headers.get('X-Media-Source')).toBe('unavailable')
+    expect(await sourceOf(target)).toBe('degraded')
+    expect(await sourceOf(fresh())).toBeNull()
+  })
+  it('an empty answer and connections that keep dropping are Disk failures too', async () => {
+    const empty = fresh()
+    upstream.mockImplementation(async () => new Response(new ReadableStream<Uint8Array>({ start(stream) { stream.close() } }), { status: 206, headers: { 'Content-Length': '2' } }))
+    const response = await upstreamLearningMedia(head(), viewerId, empty)
+    expect(response.headers.get('X-Media-Source')).toBe('unavailable')
+    const dropped = fresh()
+    upstream.mockRejectedValue(new TypeError('fetch failed'))
+    await expect(upstreamLearningMedia(head(), viewerId, dropped)).rejects.toThrow('fetch failed')
+    expect(await sourceOf(dropped)).toBe('degraded')
+  })
+  it('a transfer the Disk breaks off midway marks the file for the next check', async () => {
+    const target = fresh()
+    let sent = false
+    upstream.mockResolvedValue(new Response(new ReadableStream<Uint8Array>({
+      pull(stream) { if (sent) stream.error(new Error('other side closed')); else { sent = true; stream.enqueue(new Uint8Array([1])) } },
+    }), { status: 206, headers: { 'Content-Range': 'bytes 0-8/20', 'Content-Length': '9', 'Content-Type': 'video/mp4' } }))
+    const broken = await upstreamLearningMedia(head(), viewerId, target)
+    await expect(broken.arrayBuffer()).rejects.toThrow()
+    expect(await sourceOf(target)).toBe('degraded')
+  })
+  it('a missing file is named as missing and does not mark the file as failing', async () => {
+    const target = fresh()
+    upstream.mockResolvedValue(new Response('missing', { status: 404 }))
+    const response = await upstreamLearningMedia(head(), viewerId, target)
+    expect(response.status).toBe(404)
+    expect(response.headers.get('X-Media-Source')).toBe('missing')
+    expect(await sourceOf(target)).toBeNull()
+  })
+  it('a viewer who leaves and a redirect outside the allowlist are not blamed on the Disk', async () => {
+    const left = fresh()
+    const controller = new AbortController()
+    upstream.mockImplementation((_url, init) => new Promise((_resolve, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true })))
+    const pending = upstreamLearningMedia(new Request('https://lms.test/media', { signal: controller.signal }), viewerId, left)
+    const failure = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    controller.abort()
+    await failure
+    expect(await sourceOf(left)).toBeNull()
+    const redirected = fresh()
+    upstream.mockResolvedValue(new Response(null, { status: 302, headers: { Location: 'http://169.254.169.254/latest/meta-data' } }))
+    await expect(upstreamLearningMedia(head(), viewerId, redirected)).rejects.toMatchObject({ reason: 'invalid_source' })
+    expect(await sourceOf(redirected)).toBeNull()
+  })
+  it('the mark expires with the player retry window', async () => {
+    vi.useFakeTimers()
+    const target = fresh()
+    upstream.mockImplementation(async () => new Response('busy', { status: 503 }))
+    await upstreamLearningMedia(head(), viewerId, target)
+    await vi.advanceTimersByTimeAsync(2 * 60 * 1000 + 1)
+    expect(await sourceOf(target)).toBeNull()
+  })
+})
+
 describe('bounded stream lifecycle', () => {
   it('limits concurrency to 6, releasing a slot once', () => {
     const releases = Array.from({ length: 6 }, () => acquireLearningStream(viewerId))

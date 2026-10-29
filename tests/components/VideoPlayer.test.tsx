@@ -266,6 +266,8 @@ describe('отказ плеера в уроке', () => {
     await failNative(container)
     expect(screen.getByRole('alert')).toHaveTextContent('Видео сейчас не загружается')
     expect(screen.getByRole('alert')).toHaveTextContent('Текст, файлы и заметки урока доступны')
+    // Без пометки сервера причина неизвестна: Диск не называем.
+    expect(screen.getByRole('alert')).not.toHaveTextContent('Яндекс Диск')
     expect(screen.queryByTestId('transport-stream')).not.toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledTimes(3)
 
@@ -308,6 +310,61 @@ describe('отказ плеера в уроке', () => {
     expect(screen.getByRole('status')).toBeVisible()
     await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
     expect(container.querySelector('video')).toHaveAttribute('src', `${url}&playbackAttempt=1`)
+  })
+
+  const diskRefusal = () => new Response(null, { status: 502, headers: { 'X-Media-Source': 'unavailable' } })
+  const failThreeTimes = async (fail: () => Promise<void>) => {
+    await fail()
+    await wait(2000)
+    await fail()
+    await wait(5000)
+    await fail()
+  }
+
+  it('отказ Диска после повторов называет Яндекс Диск; «Попробовать снова» начинает разбор заново', async () => {
+    fetchMock.mockImplementation(async () => diskRefusal())
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
+    await failThreeTimes(() => failNative(container))
+    expect(screen.getByRole('alert')).toHaveTextContent('Видео временно недоступно на стороне Яндекс Диска')
+    expect(screen.getByRole('alert')).toHaveTextContent('Текст, файлы и заметки урока доступны')
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+
+    fetchMock.mockImplementation(async () => new Response(null, { status: 502 }))
+    fireEvent.click(screen.getByRole('button', { name: 'Попробовать снова' }))
+    await failThreeTimes(() => failNative(container))
+    expect(screen.getByRole('alert')).toHaveTextContent('Видео сейчас не загружается')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('Яндекс Диск')
+  })
+
+  it('обрыв посреди просмотра у файла, который Диск отдаёт кусками, объясняется сбоем Диска, хотя начало файла отвечает', async () => {
+    fetchMock.mockImplementation(async () => new Response(mp4Head.slice().buffer as ArrayBuffer, { status: 206, headers: { 'X-Media-Source': 'degraded' } }))
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
+    await failThreeTimes(async () => {
+      const video = container.querySelector('video') as HTMLVideoElement
+      Object.defineProperty(video, 'error', { value: { code: 2 }, configurable: true })
+      fireEvent.error(video)
+      await flush()
+    })
+    expect(screen.getByRole('alert')).toHaveTextContent('Видео временно недоступно на стороне Яндекс Диска')
+  })
+
+  it('файла нет на Диске: сообщение сразу, без бесполезных повторов', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 404, headers: { 'X-Media-Source': 'missing' } }))
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="embed" />)
+    await failNative(container)
+    expect(screen.getByRole('alert')).toHaveTextContent('Видео не найдено на Яндекс Диске')
+    expect(screen.getByRole('alert')).toHaveTextContent('Сообщите название урока в поддержку')
+    await wait(10_000)
+    expect(container.querySelector('video')).toBeNull()
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('запись собеседования с Диска получает своё сообщение без упоминания урока', async () => {
+    fetchMock.mockImplementation(async () => diskRefusal())
+    const { container } = render(<VideoPlayer title="Запись собеседования" videoUrl="/api/interviews/63/stream" displayMode="embed" />)
+    await failThreeTimes(() => failNative(container))
+    expect(screen.getByRole('alert')).toHaveTextContent('Запись временно недоступна на стороне Яндекс Диска')
+    expect(screen.queryByText(/заметки урока/)).not.toBeInTheDocument()
   })
 
   it('сбой во время просмотра: перезапущенный плеер сам продолжает, второй сбой до старта тоже', async () => {
