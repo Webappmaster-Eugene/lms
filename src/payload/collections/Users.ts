@@ -16,6 +16,7 @@ import { resetPasswordEmail } from '@/payload/emails/templates'
 import { sendInviteEmail } from '@/payload/hooks/sendNotification'
 import { cleanupUserRelations } from '@/payload/hooks/cleanupOwnedRelations'
 import { recordStudentLogin, recordStudentLogout } from '@/server/student-analytics'
+import { noteBootcampFirstLogin } from '@/payload/hooks/bootcampFirstLogin'
 
 type ForgotPasswordArgs = {
   token?: string
@@ -58,7 +59,7 @@ export const Users: CollectionConfig = {
   hooks: {
     beforeOperation: [rejectForeignLoginOrigin, captureRawCollectionPatch, captureProfileCredentials, lockSdkAuthOperation],
     beforeLogin: [normalizeLearningLoginIdentity],
-    afterLogin: [recordStudentLogin],
+    afterLogin: [recordStudentLogin, noteBootcampFirstLogin],
     beforeChange: [lockLearningModeChange, protectProfileCredentials, validateStudentAvatar],
     afterChange: [createLearningAccessPolicy, sendInviteEmail, auditLearningAccessMode],
     afterRead: [reflectLearningAccessPolicy, filterRevokedAuthSessions],

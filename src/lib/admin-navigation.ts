@@ -23,6 +23,7 @@ export const ADMIN_NAV_GROUPS = [
     label: 'Буткемпы',
     items: [
       { href: '/admin/collections/bootcamp-leads', label: 'Заявки на буткемп' },
+      { href: '/admin/collections/bootcamp-enrollments', label: 'Зачисления' },
       { href: '/admin/collections/bootcamp-entry-tasks', label: 'Входные задания' },
     ],
   },

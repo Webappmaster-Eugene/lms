@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { logger } from '@/lib/telemetry'
 import { collectAllPages } from '@/lib/paginate'
+import { adminLink, excerpt, notifyAdmins } from '@/server/admin-telegram'
 
 type SupportMessageRequest = {
   subject: string
@@ -107,6 +108,11 @@ export async function POST(request: Request) {
   }
 
   logger.info(`Support message from user ${user.id}: "${subject}"`)
+  void notifyAdmins({
+    title: `Обращение ученика: ${subject.trim()}`,
+    lines: [`${userName}, ${user.email}`, excerpt(message, 1500)],
+    link: adminLink(userLink),
+  })
 
   return NextResponse.json({ success: true })
 }

@@ -8,6 +8,7 @@ import {
 import { collectAllPages } from '@/lib/paginate'
 import { relationId } from '@/lib/relation-id'
 import { logger, withSpan } from '@/lib/telemetry'
+import { adminLink, excerpt as longExcerpt, notifyAdminsAfterCommit } from '@/server/admin-telegram'
 
 /**
  * Вопросы к уроку — приватная переписка ученика с ментором: корневой вопрос
@@ -69,6 +70,11 @@ export const restrictCommentThread: CollectionBeforeValidateHook = async ({ data
   return data
 }
 
+function questionEvent(req: PayloadRequest, title: string, content: unknown, commentId: number) {
+  const author = req.user ? [req.user.firstName, req.user.lastName].filter(Boolean).join(' ') || req.user.email : 'ученик'
+  return { title, lines: [author, longExcerpt(String(content ?? ''), 1500)], link: adminLink(`/admin/questions#comment-${commentId}`) }
+}
+
 async function lessonOf(req: PayloadRequest, lesson: unknown) {
   return req.payload.findByID({
     collection: 'lessons',
@@ -90,8 +96,11 @@ export const notifyCommentThread: CollectionAfterChangeHook = async ({ doc, oper
       if (doc.parentComment) {
         const root = await findRoot(req, doc.parentComment)
         const asker = relationId(root.user)
-        // Своё уточнение в своей ветке — уведомлять некого.
-        if (asker === author) return doc
+        // Своё уточнение в своей ветке: в CMS уведомлять некого, но наставнику в Telegram оно нужно.
+        if (asker === author) {
+          if (req.user?.role !== 'admin') await notifyAdminsAfterCommit(req, questionEvent(req, `Уточнение к вопросу по уроку «${lesson.title}»`, doc.content, root.id))
+          return doc
+        }
         await req.payload.create({
           req,
           collection: 'notifications',
@@ -122,6 +131,7 @@ export const notifyCommentThread: CollectionAfterChangeHook = async ({ doc, oper
           }),
         { label: 'администраторы для уведомления о вопросе' },
       )
+      await notifyAdminsAfterCommit(req, questionEvent(req, `Вопрос к уроку «${lesson.title}»`, doc.content, doc.id))
       for (const admin of admins) {
         await req.payload.create({
           req,

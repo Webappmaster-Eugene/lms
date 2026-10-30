@@ -76,14 +76,15 @@ export function entryTaskResendDue(lead: Pick<BootcampLead, 'createdAt' | 'entry
 /**
  * Письмо кандидату с личной ссылкой. Ссылка не меняется при повторной отправке,
  * срок считается от первого ушедшего письма. Сбой пишется в журнал и не мешает заявке.
+ * Возвращает срок задания, если письмо ушло, и null, если нет.
  */
-export async function sendEntryTask(payload: Payload, lead: BootcampLead): Promise<void> {
-  if (sending.has(lead.id)) return
+export async function sendEntryTask(payload: Payload, lead: BootcampLead): Promise<string | null> {
+  if (sending.has(lead.id)) return null
   sending.add(lead.id)
   try {
     if (!candidateMail.take('all')) {
       logger.warn('Bootcamp entry task was not emailed: hourly mail limit reached', { 'lead.id': lead.id })
-      return
+      return null
     }
     // Новая заявка создаётся с токеном. Старой, без него, токен пишем до письма: ссылка должна открыться сразу.
     const token = lead.entryTaskToken ?? await ensureLeadEntryTaskToken(payload, lead.id, newEntryTaskToken())
@@ -101,8 +102,10 @@ export async function sendEntryTask(payload: Payload, lead: BootcampLead): Promi
     })
     await payload.sendEmail({ to: lead.email, ...content, ...(replyTo ? { replyTo } : {}) })
     await markLeadEntryTaskSent(payload, lead.id, dueAt)
+    return dueAt
   } catch (error) {
     logger.error('Bootcamp entry task email failed', error, { 'lead.id': lead.id })
+    return null
   } finally {
     sending.delete(lead.id)
   }

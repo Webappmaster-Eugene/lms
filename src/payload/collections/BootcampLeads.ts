@@ -3,6 +3,7 @@ import type { CollectionConfig } from 'payload'
 import { ENTRY_TASK_MAX_SUBMISSIONS } from '@/lib/bootcamp-entry-task'
 import { BOOTCAMP_LEAD_STATUSES, BOOTCAMP_PROGRAMS } from '@/lib/bootcamp-leads'
 import { isAdmin } from '@/payload/access/isAdmin'
+import { notifyLeadStatusChange } from '@/payload/hooks/bootcampLeadNotices'
 
 const readOnly = { readOnly: true }
 const sourceField = (name: string, label: string) => ({ name, type: 'text' as const, maxLength: 100, label, admin: readOnly })
@@ -27,9 +28,11 @@ export const BootcampLeads: CollectionConfig = {
     update: isAdmin,
     delete: isAdmin,
   },
+  hooks: { afterChange: [notifyLeadStatusChange] },
   // Одна заявка на адрес в программе: параллельные отправки не плодят дубли.
   indexes: [{ fields: ['program', 'email'], unique: true }],
   fields: [
+    { name: 'enrollmentPanel', type: 'ui', admin: { components: { Field: '/components/bootcamp/EnrollmentPanel#EnrollmentPanel' } } },
     { name: 'email', type: 'email', required: true, label: 'Email', admin: readOnly },
     { name: 'name', type: 'text', maxLength: 100, label: 'Имя' },
     { name: 'program', type: 'select', required: true, defaultValue: 'nodejs', label: 'Программа', options: BOOTCAMP_PROGRAMS.map(({ value, label }) => ({ value, label })), admin: readOnly },

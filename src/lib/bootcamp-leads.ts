@@ -12,6 +12,7 @@ export const BOOTCAMP_LEAD_STATUSES = [
   { value: 'contacted', label: 'Связались' },
   { value: 'diagnostic', label: 'Входное задание' },
   { value: 'admitted', label: 'Допущен' },
+  { value: 'enrolled', label: 'Зачислен' },
   { value: 'preparation', label: 'Нужна подготовка' },
   { value: 'rejected', label: 'Отказ' },
   { value: 'withdrawn', label: 'Отозвана' },

@@ -82,6 +82,8 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   'yandex-disk-imports': (ctx) => ({ publicUrl: 'https://disk.yandex.ru/d/test', course: ctx.courseId, importedBy: ctx.userId }),
   // Адрес уникален в программе: фабрика каждый раз даёт новый.
   'bootcamp-leads': () => ({ email: `${uid('lead')}@mail.test`.toLowerCase(), program: 'nodejs', consentVersion: '2026-10-26', consentAt: new Date().toISOString(), entryTaskToken: uid('entry-token') }),
+  // Заявку (уникальная связь) создаёт makeValid.
+  'bootcamp-enrollments': () => ({ lead: 0, email: `${uid('enr')}@mail.test`.toLowerCase(), firstName: 'Имя', lastName: 'Фамилия', gitlabUsername: uid('enr').toLowerCase().replace(/[^a-z0-9-]/g, '-'), streamGroup: 'nodejs-test', status: 'queued' }),
 }
 
 /** Коллекции, где пользователь может владеть документом (поле user). */
@@ -147,6 +149,9 @@ export async function makeValid(payload: Payload, slug: string, ctx: FixtureCont
     data.achievement = (await payload.create({ collection: 'achievements', data: { title: uid('achievement'), description: 'Тестовое достижение', criteriaType: 'lesson_count', criteriaValue: 1000000, isActive: false } })).id
   }
   if (slug === 'certificates') data.relatedEntity = uid('certificate-entity')
+  if (slug === 'bootcamp-enrollments') {
+    data.lead = (await payload.create({ collection: 'bootcamp-leads', data: VALID['bootcamp-leads'](ctx) as never, overrideAccess: true })).id
+  }
   if (slug === 'email-broadcast-deliveries') {
     data.broadcast = (await payload.create({ collection: 'email-broadcasts', data: VALID['email-broadcasts'](ctx) as never })).id
   }

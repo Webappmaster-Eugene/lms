@@ -49,6 +49,7 @@ import { GuideCategories } from '@/payload/collections/GuideCategories'
 import { GuideReads } from '@/payload/collections/GuideReads'
 import { YandexDiskImports } from '@/payload/collections/YandexDiskImports'
 import { BootcampEntryTasks } from '@/payload/collections/BootcampEntryTasks'
+import { BootcampEnrollments } from '@/payload/collections/BootcampEnrollments'
 import { BootcampLeads } from '@/payload/collections/BootcampLeads'
 import { withLessonSourceGuard } from '@/payload/hooks/denyLessonSourceQueries'
 import { SiteSettings } from '@/payload/globals/SiteSettings'
@@ -137,6 +138,7 @@ export default buildConfig({
     YandexDiskImports,
     BootcampLeads,
     BootcampEntryTasks,
+    BootcampEnrollments,
   ].map(withLessonSourceGuard),
 
   globals: [SiteSettings],

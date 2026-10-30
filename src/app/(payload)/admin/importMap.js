@@ -29,6 +29,8 @@ import { GuideMarkdownUpload as GuideMarkdownUpload_9a93610bcf303e47c490a6cd4aa1
 import { GuideMarkdownEditor as GuideMarkdownEditor_5b2ee100f2b3e15873839a20511d4768 } from '../../../components/guides/GuideMarkdownEditor'
 import { GuideStats as GuideStats_1a4f84ba8de58b6727962a56507ad8fc } from '../../../components/guides/GuideStats'
 import { GuideReviewNotice as GuideReviewNotice_bcdf88773d109f3f48d20e8972a750ca } from '../../../components/guides/GuideReviewNotice'
+import { EnrollmentPanel as EnrollmentPanel_cfb9ac65bd203544f94bfbaca48d5373 } from '../../../components/bootcamp/EnrollmentPanel'
+import { EnrollmentProgressField as EnrollmentProgressField_375df25925f8453f06d864f495f2f5ed } from '../../../components/bootcamp/EnrollmentProgressField'
 import { RoadmapEditorNavLink as RoadmapEditorNavLink_f543dd02c2a139dbdd43078f7bfc45ce } from '../../../components/roadmap-editor/NavLink'
 import { AdminActivityProvider as AdminActivityProvider_51efc6cd3b75e18d34a4901e7d4dc858 } from '../../../components/analytics/AdminActivityProvider'
 import { StudentAnalyticsView as StudentAnalyticsView_11a6f208e64acffcd4c11171f3d5bde8 } from '../../../components/student-analytics/StudentAnalyticsView'
@@ -69,6 +71,8 @@ export const importMap = {
   "/components/guides/GuideMarkdownEditor#GuideMarkdownEditor": GuideMarkdownEditor_5b2ee100f2b3e15873839a20511d4768,
   "/components/guides/GuideStats#GuideStats": GuideStats_1a4f84ba8de58b6727962a56507ad8fc,
   "/components/guides/GuideReviewNotice#GuideReviewNotice": GuideReviewNotice_bcdf88773d109f3f48d20e8972a750ca,
+  "/components/bootcamp/EnrollmentPanel#EnrollmentPanel": EnrollmentPanel_cfb9ac65bd203544f94bfbaca48d5373,
+  "/components/bootcamp/EnrollmentProgressField#EnrollmentProgressField": EnrollmentProgressField_375df25925f8453f06d864f495f2f5ed,
   "/components/roadmap-editor/NavLink#RoadmapEditorNavLink": RoadmapEditorNavLink_f543dd02c2a139dbdd43078f7bfc45ce,
   "/components/analytics/AdminActivityProvider#AdminActivityProvider": AdminActivityProvider_51efc6cd3b75e18d34a4901e7d4dc858,
   "/components/student-analytics/StudentAnalyticsView#StudentAnalyticsView": StudentAnalyticsView_11a6f208e64acffcd4c11171f3d5bde8,

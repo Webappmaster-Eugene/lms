@@ -10,6 +10,7 @@ import type { TrainerRunResult } from '@/lib/trainer/types'
 import { pluralize } from '@/lib/utils'
 import { bootcampEntrySubmissionEmail } from '@/payload/emails/templates'
 import { markLeadEntrySubmitted } from '@/server/bootcamp-lead-marks'
+import { adminLink, notifyAdmins } from '@/server/admin-telegram'
 import { adminEmails } from '@/server/bootcamp-leads'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
 import { runSolution } from '@/server/trainer/sandbox'
@@ -117,6 +118,14 @@ export async function submitEntrySolutions(payload: Payload, lead: BootcampLead,
   }, ENTRY_TASK_MAX_SUBMISSIONS)
   if (count === null) throw new EntrySubmissionError(ENTRY_SUBMISSIONS_EXHAUSTED, 409)
   void notifyTeam(payload, lead, summary)
+  void notifyAdmins({
+    title: `Решение входного задания: ${lead.email}, ${summary.passed} из ${summary.total} тестов`,
+    lines: [
+      `Отправка ${count} из ${ENTRY_TASK_MAX_SUBMISSIONS}${count >= ENTRY_TASK_MAX_SUBMISSIONS ? ', больше отправок не будет' : ''}`,
+      ...tasks.map(describe),
+    ],
+    link: adminLink(`/admin/collections/bootcamp-leads/${lead.id}`),
+  })
   return { ...summary, submissionsLeft: Math.max(0, ENTRY_TASK_MAX_SUBMISSIONS - count) }
 }
 
@@ -143,5 +152,6 @@ async function notifyTeam(payload: Payload, lead: BootcampLead, summary: EntrySu
     for (const to of recipients) await payload.sendEmail({ to, ...content })
   } catch (error) {
     logger.error('Entry task solution notification failed', error, { 'lead.id': lead.id })
+    await notifyAdmins({ title: 'Письмо команде о решении входного задания не ушло', lines: [lead.email, 'Решение сохранено в заявке, подробности в журнале приложения'], link: adminLink(`/admin/collections/bootcamp-leads/${lead.id}`) })
   }
 }

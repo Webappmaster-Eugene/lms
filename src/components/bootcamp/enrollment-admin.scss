@@ -1,0 +1,92 @@
+/* Зачисление в CMS. В админке нет Tailwind - только переменные темы Payload, поэтому светлая и тёмная темы работают сами. */
+
+.enrollment {
+  margin-bottom: calc(var(--base) * 1.5);
+  padding: 16px 20px;
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: 6px;
+  background: var(--theme-elevation-50);
+
+  &__title {
+    margin: 0 0 4px;
+    font-size: 1.15rem;
+  }
+
+  &__hint {
+    margin: 0 0 12px;
+    color: var(--theme-elevation-650);
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px 16px;
+    margin-bottom: 12px;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    input {
+      padding: 8px 10px;
+      border: 1px solid var(--theme-elevation-250);
+      border-radius: 4px;
+      background: var(--theme-input-bg, var(--theme-bg));
+      color: var(--theme-text);
+      font: inherit;
+    }
+
+    small {
+      color: var(--theme-elevation-600);
+    }
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  &__steps {
+    margin: 8px 0 12px;
+    padding: 0;
+    list-style: none;
+
+    li {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 12px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--theme-elevation-100);
+    }
+  }
+
+  &__state {
+    color: var(--theme-elevation-650);
+
+    &--done { color: var(--theme-success-600, var(--theme-success-500)); }
+    &--failed { color: var(--theme-error-500); }
+    &--skipped { color: var(--theme-elevation-500); }
+  }
+
+  &__detail {
+    display: block;
+    color: var(--theme-elevation-600);
+  }
+
+  &__error {
+    margin: 8px 0;
+    color: var(--theme-error-500);
+    white-space: pre-wrap;
+  }
+
+  &__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 8px 0;
+  }
+}

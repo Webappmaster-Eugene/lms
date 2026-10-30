@@ -113,6 +113,7 @@ export interface Config {
     'yandex-disk-imports': YandexDiskImport;
     'bootcamp-leads': BootcampLead;
     'bootcamp-entry-tasks': BootcampEntryTask;
+    'bootcamp-enrollments': BootcampEnrollment;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -166,6 +167,7 @@ export interface Config {
     'yandex-disk-imports': YandexDiskImportsSelect<false> | YandexDiskImportsSelect<true>;
     'bootcamp-leads': BootcampLeadsSelect<false> | BootcampLeadsSelect<true>;
     'bootcamp-entry-tasks': BootcampEntryTasksSelect<false> | BootcampEntryTasksSelect<true>;
+    'bootcamp-enrollments': BootcampEnrollmentsSelect<false> | BootcampEnrollmentsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -1747,7 +1749,7 @@ export interface BootcampLead {
   email: string;
   name?: string | null;
   program: 'nodejs';
-  status: 'new' | 'contacted' | 'diagnostic' | 'admitted' | 'preparation' | 'rejected' | 'withdrawn';
+  status: 'new' | 'contacted' | 'diagnostic' | 'admitted' | 'enrolled' | 'preparation' | 'rejected' | 'withdrawn';
   assignee?: (number | null) | User;
   nextActionAt?: string | null;
   note?: string | null;
@@ -1825,6 +1827,49 @@ export interface BootcampEntryTask {
   height?: number | null;
   focalX?: number | null;
   focalY?: number | null;
+}
+/**
+ * Зачисляют из заявки кнопкой «Зачислить». LMS сразу заводит учётку и открывает курс методичек, учётку и проект в GitLab создаёт исполнитель в VM GitLab, обычно за полминуты.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-enrollments".
+ */
+export interface BootcampEnrollment {
+  id: number;
+  lead: number | BootcampLead;
+  email: string;
+  firstName: string;
+  lastName: string;
+  gitlabUsername: string;
+  streamGroup: string;
+  /**
+   * Пусто - без срока.
+   */
+  accessUntil?: string | null;
+  status: 'queued' | 'running' | 'done' | 'failed';
+  steps?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  error?: string | null;
+  attempts?: number | null;
+  lmsUser?: (number | null) | User;
+  gitlabUserId?: number | null;
+  gitlabProjectId?: number | null;
+  gitlabProjectUrl?: string | null;
+  requestedBy?: (number | null) | User;
+  queuedAt?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  lmsSignedInAt?: string | null;
+  gitlabSignedInAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1969,6 +2014,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'bootcamp-entry-tasks';
         value: number | BootcampEntryTask;
+      } | null)
+    | ({
+        relationTo: 'bootcamp-enrollments';
+        value: number | BootcampEnrollment;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -2992,6 +3041,35 @@ export interface BootcampEntryTasksSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-enrollments_select".
+ */
+export interface BootcampEnrollmentsSelect<T extends boolean = true> {
+  lead?: T;
+  email?: T;
+  firstName?: T;
+  lastName?: T;
+  gitlabUsername?: T;
+  streamGroup?: T;
+  accessUntil?: T;
+  status?: T;
+  steps?: T;
+  error?: T;
+  attempts?: T;
+  lmsUser?: T;
+  gitlabUserId?: T;
+  gitlabProjectId?: T;
+  gitlabProjectUrl?: T;
+  requestedBy?: T;
+  queuedAt?: T;
+  startedAt?: T;
+  finishedAt?: T;
+  lmsSignedInAt?: T;
+  gitlabSignedInAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

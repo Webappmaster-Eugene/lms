@@ -1,0 +1,19 @@
+[Unit]
+Description=LMS bootcamp enrollment worker (LMS -> GitLab)
+After=network-online.target gitlab-runsvdir.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -I /usr/local/sbin/lms-gitlab-worker
+Restart=always
+RestartSec=15
+Environment=LMS_URL=https://learn.mentorcareer.ru
+# Читает только ключ LMS и заголовок токена root; писать на диск ему нечего.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

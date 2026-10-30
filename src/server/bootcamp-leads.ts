@@ -2,10 +2,12 @@ import 'server-only'
 
 import { ValidationError, type Payload } from 'payload'
 
+import { formatEntryTaskDate } from '@/lib/bootcamp-entry-task'
 import { BOOTCAMP_PROGRAMS, describeLeadSource, type BootcampLeadInput } from '@/lib/bootcamp-leads'
 import { collectAllPages } from '@/lib/paginate'
 import { logger } from '@/lib/telemetry'
 import { bootcampLeadEmail } from '@/payload/emails/templates'
+import { adminLink, notifyAdmins } from '@/server/admin-telegram'
 import { entryTaskResendDue, newEntryTaskToken, sendEntryTask } from '@/server/bootcamp-entry-task'
 import { markLeadResubmitted, markLeadTeamNotified } from '@/server/bootcamp-lead-marks'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
@@ -60,7 +62,11 @@ export async function saveBootcampLead(payload: Payload, input: BootcampLeadInpu
           entryTaskToken: newEntryTaskToken(),
         },
       })
-      return { outcome: 'created', notification: Promise.all([sendEntryTask(payload, lead), notifyTeam(payload, lead)]).then(() => undefined) }
+      const created = lead
+      return {
+        outcome: 'created',
+        notification: Promise.all([sendEntryTask(payload, created), notifyTeam(payload, created)]).then(([dueAt]) => notifyAdmins(leadEvent(created, 1, dueAt === null ? 'failed' : dueAt))),
+      }
     } catch (error) {
       if (!isUniqueViolation(error)) throw error
       lead = await findLead(payload, input)
@@ -68,8 +74,29 @@ export async function saveBootcampLead(payload: Payload, input: BootcampLeadInpu
     }
   }
   await markLeadResubmitted(payload, lead.id, now)
+  const repeated = lead
+  const count = (lead.submissionCount ?? 1) + 1
   // Повтор — обычно «письмо не пришло»: присылаем ту же ссылку ещё раз, но не чаще раза в 15 минут.
-  return { outcome: 'repeat', notification: entryTaskResendDue(lead) ? sendEntryTask(payload, lead) : Promise.resolve() }
+  const notification = entryTaskResendDue(lead)
+    ? sendEntryTask(payload, lead).then((dueAt) => notifyAdmins(leadEvent(repeated, count, dueAt === null ? 'failed' : dueAt)))
+    : notifyAdmins(leadEvent(repeated, count, 'not-due'))
+  return { outcome: 'repeat', notification }
+}
+
+/** Сообщение в Telegram о заявке: кто, откуда и ушло ли письмо с заданием. */
+function leadEvent(lead: BootcampLead, submission: number, entryTask: string | 'failed' | 'not-due') {
+  const program = BOOTCAMP_PROGRAMS.find((item) => item.value === lead.program)?.short ?? lead.program
+  const who = [lead.name?.trim(), lead.email].filter(Boolean).join(', ')
+  const task = entryTask === 'failed'
+    ? 'Письмо с входным заданием не ушло, подробности в журнале приложения'
+    : entryTask === 'not-due'
+      ? 'Письмо с заданием повторно не отправлялось: с прошлого прошло меньше 15 минут'
+      : `Письмо с входным заданием ушло, срок до ${formatEntryTaskDate(entryTask)}`
+  return {
+    title: submission === 1 ? `Новая заявка на буткемп ${program}` : `Повторная заявка на буткемп ${program} (${submission}-я отправка формы)`,
+    lines: [who, `Откуда: ${describeLeadSource(lead.source)}`, task],
+    link: adminLink(`/admin/collections/bootcamp-leads/${lead.id}`),
+  }
 }
 
 /** Адреса действующих администраторов: им уходят письма о заявках и решениях входного задания. */
@@ -113,5 +140,6 @@ async function notifyTeam(payload: Payload, lead: BootcampLead): Promise<void> {
     await markLeadTeamNotified(payload, lead.id)
   } catch (error) {
     logger.error('Bootcamp lead notification failed', error, { 'lead.id': lead.id })
+    await notifyAdmins({ title: 'Письмо команде о заявке на буткемп не ушло', lines: [lead.email, 'Заявка сохранена, подробности в журнале приложения'], link: adminLink(`/admin/collections/bootcamp-leads/${lead.id}`) })
   }
 }

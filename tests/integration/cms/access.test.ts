@@ -34,6 +34,8 @@ const MATRIX: Record<string, Matrix> = {
   'learning-access-grants': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
   // Заявки с лендинга — персональные данные: публичная форма пишет через свой маршрут, а не REST.
   'bootcamp-leads': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
+  // Зачисление создаёт и ведёт только сервер (кнопка в заявке и исполнитель в VM GitLab); удалить может админ.
+  'bootcamp-enrollments': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'admin' },
   'learning-access-audit': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'learning-access-policies': { create: 'nobody', read: 'own', update: 'nobody', delete: 'nobody' },
   'auth-session-revocations': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
@@ -84,6 +86,7 @@ const PATCH: Record<string, Record<string, unknown>> = {
   'guide-categories': { order: 7 },
   'learning-access-grants': { note: 'Обновлено' },
   'bootcamp-leads': { status: 'contacted' },
+  'bootcamp-enrollments': { error: 'Обновлено' },
   'learning-access-audit': { effect: 'deny' },
   'learning-access-policies': { mode: 'all' },
   'auth-session-revocations': { expiresAt: new Date().toISOString() },
