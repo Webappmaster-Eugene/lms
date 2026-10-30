@@ -100,7 +100,8 @@ async function post(cfg: AdminTelegramConfig, method: string, payload: unknown):
       path: `/bot${cfg.token}/${method}`,
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
       timeout: TIMEOUT_MS,
-      ...(socket ? { agent: false, createConnection: () => tlsConnect({ socket, servername: API_HOST }) } : {}),
+      // Без agent: с agent: false Node берёт свой агент и молча идёт мимо прокси.
+      ...(socket ? { createConnection: () => tlsConnect({ socket, servername: API_HOST }) } : {}),
     }, (response) => {
       const chunks: Buffer[] = []
       response.on('data', (chunk: Buffer) => chunks.push(chunk))

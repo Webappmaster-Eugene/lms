@@ -1,3 +1,5 @@
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const logger = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }))
@@ -55,6 +57,31 @@ describe('уведомления администратору в Telegram', () =
     const logged = JSON.stringify(logger.error.mock.calls.map(([message, error]) => [message, (error as Error).message]))
     expect(logged).not.toContain(TOKEN)
     expect(logged).toContain('/bot<token>/sendMessage')
+  })
+
+  it('с прокси TLS к Telegram идёт внутри CONNECT, а не напрямую', async () => {
+    const tunnels: string[] = []
+    let tlsThroughProxy = 0
+    const proxy = createServer()
+    proxy.on('connect', (request, socket) => {
+      tunnels.push(String(request.url))
+      socket.write('HTTP/1.1 200 Connection Established\r\n\r\n')
+      // Первый байт ClientHello TLS - 0x16: значит, рукопожатие пошло через туннель.
+      socket.once('data', (chunk: Buffer) => {
+        if (chunk[0] === 0x16) tlsThroughProxy += 1
+        socket.destroy()
+      })
+    })
+    await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve))
+    try {
+      const { port } = proxy.address() as AddressInfo
+      const cfg = { token: TOKEN, chats: ['42'], proxy: new URL(`http://127.0.0.1:${port}`) }
+      await expect(adminTelegramTransport.send(cfg, '42', 'Событие')).rejects.toThrow()
+      expect(tunnels).toEqual(['api.telegram.org:443', 'api.telegram.org:443', 'api.telegram.org:443'])
+      expect(tlsThroughProxy).toBe(3)
+    } finally {
+      proxy.close()
+    }
   })
 
   it('больше 40 сообщений в минуту не отправляет', async () => {
