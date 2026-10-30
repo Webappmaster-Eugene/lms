@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { CodeEditor } from '@/components/trainer/CodeEditor'
 import { TestResultsPanel } from '@/components/trainer/TestResultsPanel'
 import type { TrainerRunResult } from '@/lib/trainer/types'
+import { pluralize } from '@/lib/utils'
 
 export type EntryTaskView = {
   slug: string
@@ -15,7 +16,7 @@ export type EntryTaskView = {
   description: ReactNode
 }
 
-type Submission = { passed: number, total: number, tasks: { slug: string, title: string, attempted: boolean, passed: number, total: number }[] }
+type Submission = { passed: number, total: number, submissionsLeft: number, tasks: { slug: string, title: string, attempted: boolean, passed: number, total: number }[] }
 
 type Props = {
   token: string
@@ -23,6 +24,8 @@ type Props = {
   /** Код последней отправки: открывает задание с того места, где кандидат остановился, и на другом устройстве. */
   saved: Record<string, string>
   lastSubmission: { at: string, passed: number, total: number } | null
+  maxSubmissions: number
+  submissionsLeft: number
   reviewDays: number
 }
 
@@ -45,16 +48,22 @@ function writeDraft(token: string, slug: string, code: string): void {
   }
 }
 
+class EntryRequestError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message)
+  }
+}
+
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   const data = await response.json().catch(() => null) as (T & { error?: string }) | null
-  if (!response.ok || !data) throw new Error(data?.error ?? 'Не получилось связаться с сервером. Проверьте интернет и попробуйте ещё раз.')
+  if (!response.ok || !data) throw new EntryRequestError(data?.error ?? 'Не получилось связаться с сервером. Проверьте интернет и попробуйте ещё раз.', response.status)
   return data
 }
 
 const formatAt = (value: string) => new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' }).format(new Date(value))
 
-export function EntryTaskWorkspace({ token, tasks, saved, lastSubmission, reviewDays }: Props) {
+export function EntryTaskWorkspace({ token, tasks, saved, lastSubmission, maxSubmissions, submissionsLeft, reviewDays }: Props) {
   const [code, setCode] = useState<Record<string, string>>(() => Object.fromEntries(tasks.map((task) => [task.slug, saved[task.slug] ?? task.starterCode])))
   const [results, setResults] = useState<Record<string, TrainerRunResult | undefined>>({})
   const [errors, setErrors] = useState<Record<string, string | undefined>>({})
@@ -62,6 +71,8 @@ export function EntryTaskWorkspace({ token, tasks, saved, lastSubmission, review
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submission, setSubmission] = useState<Submission | null>(null)
+  // Отправки могли кончиться в другой вкладке: сервер ответит 409, и кнопка пропадёт и здесь.
+  const [exhausted, setExhausted] = useState(false)
 
   // Черновик из браузера свежее отправленного кода: подставляем его после гидратации, чтобы разметка сервера совпала.
   useEffect(() => {
@@ -98,13 +109,17 @@ export function EntryTaskWorkspace({ token, tasks, saved, lastSubmission, review
       const solutions = Object.fromEntries(tasks.map((task) => [task.slug, code[task.slug] === task.starterCode ? '' : code[task.slug]]))
       setSubmission(await postJson<Submission>(`/api/entry-task/${token}/submit`, { solutions }))
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : String(error))
+      if (error instanceof EntryRequestError && error.status === 409) {
+        setExhausted(true)
+        setSubmission(null)
+      } else setSubmitError(error instanceof Error ? error.message : String(error))
     } finally {
       setSubmitting(false)
     }
   }
 
   const busy = checking !== null || submitting
+  const left = exhausted ? 0 : submission?.submissionsLeft ?? submissionsLeft
 
   return (
     <div className="space-y-10">
@@ -148,20 +163,29 @@ export function EntryTaskWorkspace({ token, tasks, saved, lastSubmission, review
         <h2 id="entry-submit" className="text-2xl font-semibold tracking-tight">Отправить решение</h2>
         <p className="text-base leading-relaxed">
           Когда будете готовы, отправьте решение. Сервер ещё раз прогонит тесты всех задач, а мы получим ваш код и ответим в течение {reviewDays} дней.
-          Нерешённую задачу можно оставить как есть. До ответа решение можно исправить и отправить ещё раз, мы посмотрим последнюю отправку.
+          Нерешённую задачу можно оставить как есть. Всего у вас {pluralize(maxSubmissions, 'отправка', 'отправки', 'отправок')}, мы посмотрим последнюю, поэтому сначала проверьте задачи кнопкой «Проверить».
         </p>
         {lastSubmission && !submission && (
-          <p className="text-base text-muted-foreground">Последняя отправка {formatAt(lastSubmission.at)}: пройдено {lastSubmission.passed} из {lastSubmission.total} тестов.</p>
+          <p className="text-base text-muted-foreground">
+            Последняя отправка {formatAt(lastSubmission.at)}: пройдено {lastSubmission.passed} из {lastSubmission.total} тестов.
+            {left > 0 && ` Осталось отправок: ${left}.`}
+          </p>
         )}
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={busy}
-          className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 text-base font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          <Send className="h-4 w-4" aria-hidden="true" />
-          {submitting ? 'Отправляем…' : 'Отправить решение'}
-        </button>
+        {left > 0 ? (
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={busy}
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 text-base font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <Send className="h-4 w-4" aria-hidden="true" />
+            {submitting ? 'Отправляем…' : 'Отправить решение'}
+          </button>
+        ) : !submission && (
+          <p role="status" className="text-base leading-relaxed">
+            Вы отправили решение {pluralize(maxSubmissions, 'раз', 'раза', 'раз')}, больше отправок нет. Мы посмотрим последнюю отправку и ответим на почту из заявки в течение {reviewDays} дней.
+          </p>
+        )}
         {submitError && <p role="alert" className="text-base text-destructive">{submitError}</p>}
         {submission && (
           <div role="status" className="space-y-2 text-base leading-relaxed">
@@ -174,7 +198,11 @@ export function EntryTaskWorkspace({ token, tasks, saved, lastSubmission, review
                 <li key={task.slug}>{task.title}: {task.attempted ? `${task.passed} из ${task.total}` : 'не решалась'}</li>
               ))}
             </ul>
-            <p>Спасибо! Мы ответим на почту из заявки в течение {reviewDays} дней.</p>
+            <p>
+              {left > 0
+                ? `Спасибо! Мы ответим на почту из заявки в течение ${reviewDays} дней. Если захотите что-то исправить, осталось отправок: ${left}.`
+                : `Спасибо! Это была последняя отправка. Мы ответим на почту из заявки в течение ${reviewDays} дней.`}
+            </p>
           </div>
         )}
       </section>

@@ -44,7 +44,14 @@ export type LeadEntrySubmission = {
   solutions: Record<string, string>
 }
 
-/** Последняя отправка решения входного задания: счётчик растёт, прежний код заменяется. */
-export async function markLeadEntrySubmitted(payload: Payload, id: number, input: LeadEntrySubmission): Promise<void> {
-  await db(payload).execute(sql`update bootcamp_leads set entry_submitted_at = now(), entry_submission_count = coalesce(entry_submission_count, 0) + 1, entry_passed = ${input.passed}, entry_total = ${input.total}, entry_result = ${input.result}, entry_solution = ${input.solution}, entry_solutions = ${JSON.stringify(input.solutions)}::jsonb, updated_at = now() where id = ${id}`)
+/**
+ * Последняя отправка решения входного задания: счётчик растёт, прежний код заменяется.
+ * Предел проверяется в том же запросе: две одновременные отправки не проскочат его обе.
+ * Возвращает новое число отправок или null, если предел уже исчерпан.
+ */
+export async function markLeadEntrySubmitted(payload: Payload, id: number, input: LeadEntrySubmission, limit: number): Promise<number | null> {
+  const result = await db(payload).execute(sql`update bootcamp_leads set entry_submitted_at = now(), entry_submission_count = coalesce(entry_submission_count, 0) + 1, entry_passed = ${input.passed}, entry_total = ${input.total}, entry_result = ${input.result}, entry_solution = ${input.solution}, entry_solutions = ${JSON.stringify(input.solutions)}::jsonb, updated_at = now() where id = ${id} and coalesce(entry_submission_count, 0) < ${limit} returning entry_submission_count`)
+  const row = (result as { rows?: { entry_submission_count?: number | string | null }[] }).rows?.[0]
+  // Колонка numeric: драйвер отдаёт её строкой.
+  return row ? Number(row.entry_submission_count) : null
 }

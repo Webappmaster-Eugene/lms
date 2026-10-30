@@ -6,6 +6,9 @@
 
 export const ENTRY_TASK_DUE_DAYS = 7
 export const ENTRY_TASK_REVIEW_DAYS = 5
+// Решение владельца 30.10.2026: каждая отправка шлёт письмо команде, бесконечные повторы не нужны.
+// «Проверить» не ограничено: оно ничего не пишет и писем не шлёт.
+export const ENTRY_TASK_MAX_SUBMISSIONS = 3
 
 /** 24 случайных байта в base64url: ссылку нельзя подобрать, поэтому вход не нужен. */
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{32}$/

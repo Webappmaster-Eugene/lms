@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { EntryTaskWorkspace } from '@/components/bootcamp/EntryTaskWorkspace'
 import { GuideMarkdown } from '@/components/guides/GuideMarkdown'
 import { ENTRY_TASK_MINUTES, ENTRY_TASKS } from '@/data/bootcamp-entry/tasks'
-import { ENTRY_TASK_DUE_DAYS, ENTRY_TASK_REVIEW_DAYS, formatEntryTaskDate } from '@/lib/bootcamp-entry-task'
+import { ENTRY_TASK_DUE_DAYS, ENTRY_TASK_MAX_SUBMISSIONS, ENTRY_TASK_REVIEW_DAYS, formatEntryTaskDate } from '@/lib/bootcamp-entry-task'
 import { BOOTCAMP_PROGRAMS } from '@/lib/bootcamp-leads'
 import { getPayload } from '@/lib/payload'
 import { findLeadByEntryTaskToken } from '@/server/bootcamp-entry-task'
@@ -69,6 +69,8 @@ export default async function EntryTaskPage({ params }: Props) {
         }))}
         saved={savedSolutions(lead.entrySolutions)}
         lastSubmission={lastSubmission}
+        maxSubmissions={ENTRY_TASK_MAX_SUBMISSIONS}
+        submissionsLeft={Math.max(0, ENTRY_TASK_MAX_SUBMISSIONS - (lead.entrySubmissionCount ?? 0))}
         reviewDays={ENTRY_TASK_REVIEW_DAYS}
       />
     </article>

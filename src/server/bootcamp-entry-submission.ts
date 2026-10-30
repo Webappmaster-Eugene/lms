@@ -3,10 +3,11 @@ import 'server-only'
 import type { Payload } from 'payload'
 
 import { ENTRY_TASKS, entryTaskSpec, findEntryTask, type EntryTask } from '@/data/bootcamp-entry/tasks'
-import { ENTRY_TASK_REVIEW_DAYS } from '@/lib/bootcamp-entry-task'
+import { ENTRY_TASK_MAX_SUBMISSIONS, ENTRY_TASK_REVIEW_DAYS } from '@/lib/bootcamp-entry-task'
 import { logger } from '@/lib/telemetry'
 import { TRAINER_LIMITS } from '@/lib/trainer/constants'
 import type { TrainerRunResult } from '@/lib/trainer/types'
+import { pluralize } from '@/lib/utils'
 import { bootcampEntrySubmissionEmail } from '@/payload/emails/templates'
 import { markLeadEntrySubmitted } from '@/server/bootcamp-lead-marks'
 import { adminEmails } from '@/server/bootcamp-leads'
@@ -35,6 +36,10 @@ export type EntrySubmissionSummary = {
   total: number
   tasks: EntryTaskOutcome[]
 }
+
+export type EntrySubmissionResult = EntrySubmissionSummary & { submissionsLeft: number }
+
+export const ENTRY_SUBMISSIONS_EXHAUSTED = `Решение уже отправлено ${pluralize(ENTRY_TASK_MAX_SUBMISSIONS, 'раз', 'раза', 'раз')}, больше отправок нет. Мы посмотрим последнюю отправку и ответим на почту из заявки.`
 
 // Письма команде по отправкам: страница открыта по ссылке, предел не даёт превратить её в рассылку.
 const teamMail = createRateLimiter('bootcamp-entry-submission-mail', 30, 60 * 60_000)
@@ -81,7 +86,9 @@ function describe(outcome: EntryTaskOutcome): string {
  * Прогоняет все задачи на сервере и записывает последнюю отправку в заявку.
  * Результат браузера сюда не приходит: как и в тренажёре, верят только серверному прогону.
  */
-export async function submitEntrySolutions(payload: Payload, lead: BootcampLead, solutions: Record<string, string>): Promise<EntrySubmissionSummary> {
+export async function submitEntrySolutions(payload: Payload, lead: BootcampLead, solutions: Record<string, string>): Promise<EntrySubmissionResult> {
+  // Ранний отказ бережёт песочницы; окончательно предел держит запись в базе.
+  if ((lead.entrySubmissionCount ?? 0) >= ENTRY_TASK_MAX_SUBMISSIONS) throw new EntrySubmissionError(ENTRY_SUBMISSIONS_EXHAUSTED, 409)
   const tasks: EntryTaskOutcome[] = []
   // По очереди: пул песочниц общий с тренажёром, три прогона разом заняли бы его целиком.
   for (const task of ENTRY_TASKS) {
@@ -101,15 +108,16 @@ export async function submitEntrySolutions(payload: Payload, lead: BootcampLead,
   const solution = tasks
     .map((outcome, index) => `// ${index + 1}. ${describe(outcome)}\n${solutions[outcome.slug]?.trimEnd() ?? '// решения нет'}`)
     .join('\n\n')
-  await markLeadEntrySubmitted(payload, lead.id, {
+  const count = await markLeadEntrySubmitted(payload, lead.id, {
     passed: summary.passed,
     total: summary.total,
     result: tasks.map(describe).join('\n'),
     solution,
     solutions,
-  })
+  }, ENTRY_TASK_MAX_SUBMISSIONS)
+  if (count === null) throw new EntrySubmissionError(ENTRY_SUBMISSIONS_EXHAUSTED, 409)
   void notifyTeam(payload, lead, summary)
-  return summary
+  return { ...summary, submissionsLeft: Math.max(0, ENTRY_TASK_MAX_SUBMISSIONS - count) }
 }
 
 async function notifyTeam(payload: Payload, lead: BootcampLead, summary: EntrySubmissionSummary): Promise<void> {

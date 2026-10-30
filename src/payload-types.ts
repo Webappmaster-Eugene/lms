@@ -1780,6 +1780,9 @@ export interface BootcampLead {
   entryTaskSentAt?: string | null;
   entryTaskDueAt?: string | null;
   entrySubmittedAt?: string | null;
+  /**
+   * Не больше 3: после этого страница задания решение не принимает.
+   */
   entrySubmissionCount?: number | null;
   entryPassed?: number | null;
   entryTotal?: number | null;

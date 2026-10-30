@@ -6,6 +6,7 @@ import { POST } from '@/app/api/bootcamp/leads/route'
 import { POST as checkEntry } from '@/app/api/entry-task/[token]/check/route'
 import { POST as submitEntry } from '@/app/api/entry-task/[token]/submit/route'
 import { ENTRY_TASKS } from '@/data/bootcamp-entry/tasks'
+import { ENTRY_TASK_MAX_SUBMISSIONS } from '@/lib/bootcamp-entry-task'
 import { logger } from '@/lib/telemetry'
 import { ENTRY_TASK_RESEND_AFTER_MS } from '@/server/bootcamp-entry-task'
 import { captureEmails, createAdmin, createStudent, getTestPayload, login, rest, uid, type TestUser } from '../helpers/payload'
@@ -278,6 +279,41 @@ describe('POST /api/bootcamp/leads: предзапись с лендинга', (
       expect(replaced?.entrySubmissionCount).toBe(2)
       expect(replaced?.entrySolution).not.toContain('return false')
       expect(replaced?.entrySolution).toContain('// 1. Стоимость аренды: не решалась')
+    } finally {
+      mail.restore()
+    }
+  })
+
+  it('решение принимается не больше трёх раз, одновременные отправки предел не обходят', async () => {
+    const email = `${uid('limit')}@mail.test`
+    expect((await send(lead(email))).status).toBe(200)
+    await vi.waitFor(async () => expect((await stored(email))[0]?.entryTaskSentAt).toBeTruthy())
+    const token = (await stored(email))[0]?.entryTaskToken ?? ''
+    const [price] = ENTRY_TASKS
+    const solution = (code: string) => ({ solutions: { [price?.slug ?? '']: code } })
+    const subject = (message: { subject?: string }) => message.subject?.startsWith(`Решение входного задания: ${email},`)
+    const mail = captureEmails(payload)
+    try {
+      for (let sent = 1; sent < ENTRY_TASK_MAX_SUBMISSIONS; sent += 1) {
+        const response = await entryRequest(submitEntry, token, solution(`function rentalPrice(p, d) { return ${sent} }`))
+        expect(response.status).toBe(200)
+        expect((await response.json() as { submissionsLeft: number }).submissionsLeft).toBe(ENTRY_TASK_MAX_SUBMISSIONS - sent)
+      }
+      // Обе прошли раннюю проверку по счётчику заявки; последнее место достаётся одной.
+      const pair = await Promise.all([1, 2].map(() => entryRequest(submitEntry, token, solution(price?.solutionCode ?? ''))))
+      expect(pair.map((response) => response.status).sort()).toEqual([200, 409])
+      const won = pair.find((response) => response.status === 200)
+      expect((await won?.json() as { submissionsLeft: number }).submissionsLeft).toBe(0)
+      const lost = await pair.find((response) => response.status === 409)?.json() as { error: string }
+      expect(lost.error).toContain('больше отправок нет')
+
+      const late = await entryRequest(submitEntry, token, solution('function rentalPrice() { return 0 }'))
+      expect(late.status).toBe(409)
+      const [saved] = await stored(email)
+      expect(saved?.entrySubmissionCount).toBe(ENTRY_TASK_MAX_SUBMISSIONS)
+      expect(saved?.entryPassed).toBe(price?.cases.length)
+      expect(saved?.entrySolution).not.toContain('return 0')
+      await vi.waitFor(() => expect(mail.sent.filter((message) => message.to === admin.email && subject(message))).toHaveLength(ENTRY_TASK_MAX_SUBMISSIONS))
     } finally {
       mail.restore()
     }

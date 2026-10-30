@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
+import { ENTRY_TASK_MAX_SUBMISSIONS } from '@/lib/bootcamp-entry-task'
 import { BOOTCAMP_LEAD_STATUSES, BOOTCAMP_PROGRAMS } from '@/lib/bootcamp-leads'
 import { isAdmin } from '@/payload/access/isAdmin'
 
@@ -70,7 +71,7 @@ export const BootcampLeads: CollectionConfig = {
       admin: { description: 'Кандидат решает задачи на странице задания и нажимает «Отправить решение». Тесты прогоняет сервер, здесь последняя отправка.' },
       fields: [
         { name: 'entrySubmittedAt', type: 'date', label: 'Решение отправлено', admin: { ...readOnly, date: { pickerAppearance: 'dayAndTime' } } },
-        { name: 'entrySubmissionCount', type: 'number', label: 'Отправок решения', admin: readOnly },
+        { name: 'entrySubmissionCount', type: 'number', label: 'Отправок решения', admin: { ...readOnly, description: `Не больше ${ENTRY_TASK_MAX_SUBMISSIONS}: после этого страница задания решение не принимает.` } },
         { name: 'entryPassed', type: 'number', label: 'Тестов пройдено', admin: readOnly },
         { name: 'entryTotal', type: 'number', label: 'Тестов всего', admin: readOnly },
         { name: 'entryResult', type: 'textarea', label: 'Итог по задачам', admin: readOnly },
