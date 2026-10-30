@@ -26,11 +26,15 @@ describe('входное задание буткемпа', () => {
     expect(starter.passedCount).toBe(0)
   }, sandboxTestTimeoutMs(3000))
 
-  it('решения с типичными ошибками не проходят', async () => {
-    // Скидка с шестого дня вместо седьмого и пересечение без общего последнего дня.
-    expect((await run('rental-price', 'function rentalPrice(p, d) { return Math.round(d >= 6 ? p * d * 0.9 : p * d) }')).status).toBe('failed')
-    expect((await run('bookings-overlap', 'function overlaps(a, b) { return a.from < b.to && b.from < a.to }')).status).toBe('failed')
-    expect((await run('catalog-summary', 'function catalogSummary(items) { return items.length ? { all: items.length } : {} }')).status).toBe('failed')
+  it.each([
+    ['rental-price', 'скидка с шестого дня', 'function rentalPrice(p, d) { return Math.round(d >= 6 ? p * d * 0.9 : p * d) }'],
+    ['rental-price', 'округление всегда вверх', 'function rentalPrice(p, d) { return Math.ceil(d >= 7 ? p * d * 0.9 : p * d) }'],
+    ['bookings-overlap', 'без общего крайнего дня', 'function overlaps(a, b) { return a.from < b.to && b.from < a.to }'],
+    ['bookings-overlap', 'только вторая начинается внутри первой', 'function overlaps(a, b) { return a.from <= b.from && b.from <= a.to }'],
+    ['bookings-overlap', 'только дата второй внутри первой', 'function overlaps(a, b) { const inA = (day) => a.from <= day && day <= a.to; return inA(b.from) || inA(b.to) }'],
+    ['catalog-summary', 'не та форма ответа', 'function catalogSummary(items) { return items.length ? { all: items.length } : {} }'],
+  ])('%s: решение с типичной ошибкой (%s) не проходит', async (slug, _mistake, code) => {
+    expect((await run(slug, code)).status).toBe('failed')
   }, sandboxTestTimeoutMs(3000))
 
   it('в условиях нет длинного тире: тексты задания видит кандидат', () => {
