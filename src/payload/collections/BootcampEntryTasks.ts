@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import { BOOTCAMP_PROGRAMS } from '@/lib/bootcamp-leads'
+import { validateProgramKey } from '@/payload/fields/bootcampProgramKey'
 import { isAdmin } from '@/payload/access/isAdmin'
 
 /**
@@ -34,7 +34,7 @@ export const BootcampEntryTasks: CollectionConfig = {
     },
   },
   fields: [
-    { name: 'program', type: 'select', required: true, defaultValue: 'nodejs', label: 'Программа', options: BOOTCAMP_PROGRAMS.map(({ value, label }) => ({ value, label })) },
+    { name: 'program', type: 'text', required: true, defaultValue: 'nodejs', maxLength: 40, label: 'Программа', validate: validateProgramKey, admin: { description: 'Ключ программы буткемпа, например nodejs.' } },
     { name: 'active', type: 'checkbox', defaultValue: true, label: 'Выдавать кандидатам', admin: { position: 'sidebar' } },
     {
       name: 'readme',

@@ -5,10 +5,11 @@
  * Модуль общий для сервера и панели в CMS.
  */
 
-export const BOOTCAMP_COURSE_PROJECT = 'bootcamp/course'
-// Курс методичек в LMS: назначается каждому зачисленному. Тот же slug у импорта методичек.
-export const BOOTCAMP_MANUALS_COURSE_SLUG = 'nodejs-bootcamp-manuals'
-export const DEFAULT_STREAM_GROUP = 'nodejs-bootcamp'
+// Курс методичек, репозиторий курса, группа потока и проект проверки - в программе буткемпа
+// (bootcamp-programs) и запоминаются в зачислении. Эти значения нужны только зачислениям,
+// созданным до программ: у них этих полей нет.
+export const DEFAULT_COURSE_PROJECT = 'bootcamp/course'
+export const DEFAULT_GRADING_PROJECT = 'bootcamp-staff/grading'
 
 export const ENROLLMENT_STATUSES = [
   { value: 'queued', label: 'Ждёт GitLab' },
@@ -23,7 +24,7 @@ export const ENROLLMENT_STEPS = [
   { key: 'lms_account', label: 'Учётка LMS и приглашение' },
   { key: 'lms_course', label: 'Курс методичек в LMS' },
   { key: 'gitlab_user', label: 'Учётка GitLab и письмо для пароля' },
-  { key: 'gitlab_project', label: 'Проект ученика из bootcamp/course' },
+  { key: 'gitlab_project', label: 'Проект ученика из репозитория курса' },
   { key: 'gitlab_protect', label: 'Ветка main защищена, сливает наставник' },
   { key: 'gitlab_member', label: 'Роль Developer в своём проекте' },
   { key: 'gitlab_webhook', label: 'События проекта приходят в LMS' },

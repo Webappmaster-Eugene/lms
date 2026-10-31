@@ -6,19 +6,16 @@
 
 import { EnrollmentInputError, parseEnrollmentInput, type EnrollmentInput } from '@/lib/bootcamp-enrollment'
 
-/** Цена потока (решение владельца 27.10.2026). Та же цифра на лендинге: landing/src/data/bootcamp.ts, PRICE. */
-export const BOOTCAMP_PRICE_KOPECKS = 4_500_000
-export const PAYMENT_DUE_DAYS = 7
+/**
+ * Цена, срок оплаты, оферта и строка чека - в программе буткемпа (коллекция
+ * bootcamp-programs): у каждой программы свои. Здесь только общие для всех правила.
+ */
+export type AdmissionDefaults = { priceKopecks: number, paymentDueDays: number }
+
 /** Напоминание об оплате за 2 дня до срока. */
 export const PAYMENT_REMINDER_BEFORE_DAYS = 2
 /** Ответ на решение входного задания обещан за 5 дней: на четвёртый день без решения - тревога наставнику. */
 export const REVIEW_ALERT_AFTER_DAYS = 4
-/** Редакция оферты, которую кандидат принимает перед оплатой: та же, что OFFER_VERSION лендинга. */
-export const OFFER_VERSION = '2026-10-31'
-export const OFFER_URL = 'https://info.mentorcareer.ru/bootcamp/nodejs/offer/'
-/** Строка чека: «Робочеки СМЗ» самозанятого, как в работающем магазине podbor-minuta (документ 28 плана). */
-export const RECEIPT_ITEM_NAME = 'Буткемп Node.js: онлайн-обучение backend-разработке, 20 недель'
-
 /** 24 случайных байта в base64url, как у ссылки на входное задание. */
 const PAYMENT_TOKEN = /^[A-Za-z0-9_-]{32}$/
 export const isPaymentToken = (value: string) => PAYMENT_TOKEN.test(value)
@@ -68,13 +65,13 @@ function object(body: unknown): Record<string, unknown> {
   return body as Record<string, unknown>
 }
 
-/** Форма «Допустить»: данные для будущего зачисления, сумма, срок оплаты и комментарий в письмо. */
-export function parseAdmissionInput(body: unknown, now = new Date()): AdmissionInput {
+/** Форма «Допустить»: данные для будущего зачисления, сумма, срок оплаты и комментарий в письмо. Пустые сумма и срок - условия программы. */
+export function parseAdmissionInput(body: unknown, defaults: AdmissionDefaults, now = new Date()): AdmissionInput {
   const data = object(body)
   return {
     enrollment: parseEnrollmentInput(data, now),
-    amountKopecks: data.amount === undefined || data.amount === '' ? BOOTCAMP_PRICE_KOPECKS : parseRubles(data.amount),
-    dueDays: parseDays(data.dueDays, PAYMENT_DUE_DAYS),
+    amountKopecks: data.amount === undefined || data.amount === '' ? defaults.priceKopecks : parseRubles(data.amount),
+    dueDays: parseDays(data.dueDays, defaults.paymentDueDays),
     comment: optionalText(data.comment, 'Комментарий'),
   }
 }
@@ -92,8 +89,8 @@ export function parseManualPayment(body: unknown): { amountKopecks: number, comm
   return { amountKopecks: parseRubles(data.amount), comment }
 }
 
-export function parseDueDays(body: unknown): number {
-  return parseDays(object(body).dueDays, PAYMENT_DUE_DAYS)
+export function parseDueDays(body: unknown, fallback: number): number {
+  return parseDays(object(body).dueDays, fallback)
 }
 
 /** 4500000 → «45 000 ₽», 4500050 → «45 000,50 ₽». */

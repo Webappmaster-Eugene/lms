@@ -5,12 +5,12 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Payload } from 'payload'
 
-import { ENTRY_TASK_MINUTES } from '@/data/bootcamp-entry/tasks'
+import { entryTaskSetOf, type EntryTaskSet } from '@/data/bootcamp-entry/sets'
 import { entryTaskDueAt, entryTaskPath, ENTRY_TASK_REVIEW_DAYS, formatEntryTaskDate, isEntryTaskToken } from '@/lib/bootcamp-entry-task'
-import { BOOTCAMP_PROGRAMS } from '@/lib/bootcamp-leads'
 import { logger } from '@/lib/telemetry'
 import { bootcampEntryTaskEmail, emailBaseUrl } from '@/payload/emails/templates'
 import { ensureLeadEntryTaskToken, markLeadEntryTaskSent } from '@/server/bootcamp-lead-marks'
+import { findProgram } from '@/server/bootcamp-programs'
 import { contactReplyTo } from '@/server/contact-reply-to'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
 import type { BootcampEntryTask, BootcampLead } from '@/payload-types'
@@ -67,6 +67,12 @@ export async function readEntryTaskArchive(payload: Payload, task: BootcampEntry
   }
 }
 
+/** Набор входного задания программы заявки: страница, «Проверить» и «Отправить» решают одни задачи. */
+export async function entryTaskSetForLead(payload: Payload, lead: Pick<BootcampLead, 'program'>): Promise<EntryTaskSet> {
+  const program = await findProgram(payload, lead.program)
+  return entryTaskSetOf(program?.entryTaskSet)
+}
+
 /** Повтор заявки: письмо не дошло или ушло в спам. Сразу после первого письма повтор его не дублирует. */
 export function entryTaskResendDue(lead: Pick<BootcampLead, 'createdAt' | 'entryTaskSentAt'>, now = Date.now()): boolean {
   const last = Date.parse(lead.entryTaskSentAt ?? lead.createdAt)
@@ -89,15 +95,19 @@ export async function sendEntryTask(payload: Payload, lead: BootcampLead): Promi
     // Новая заявка создаётся с токеном. Старой, без него, токен пишем до письма: ссылка должна открыться сразу.
     const token = lead.entryTaskToken ?? await ensureLeadEntryTaskToken(payload, lead.id, newEntryTaskToken())
     const dueAt = lead.entryTaskSentAt && lead.entryTaskDueAt ? lead.entryTaskDueAt : entryTaskDueAt(new Date()).toISOString()
-    const program = BOOTCAMP_PROGRAMS.find((item) => item.value === lead.program)?.short ?? lead.program
+    // Программа и её набор задания: название в письме, время и что предстоит решать.
+    const program = await findProgram(payload, lead.program)
+    if (!program) logger.warn('Bootcamp entry task email without program config', { 'lead.id': lead.id, 'program.key': lead.program })
+    const set = entryTaskSetOf(program?.entryTaskSet)
     const replyTo = await contactReplyTo(payload)
     const content = bootcampEntryTaskEmail({
       name: lead.name ?? null,
-      program,
+      program: program?.shortTitle ?? lead.program,
       url: `${emailBaseUrl()}${entryTaskPath(token)}`,
       dueDate: formatEntryTaskDate(dueAt),
       reviewDays: ENTRY_TASK_REVIEW_DAYS,
-      minutes: ENTRY_TASK_MINUTES,
+      minutes: set.minutes,
+      summary: set.summary,
       replyable: Boolean(replyTo),
     })
     await payload.sendEmail({ to: lead.email, ...content, ...(replyTo ? { replyTo } : {}) })

@@ -3,7 +3,8 @@ import 'server-only'
 import { ValidationError, type Payload } from 'payload'
 
 import { formatEntryTaskDate } from '@/lib/bootcamp-entry-task'
-import { BOOTCAMP_PROGRAMS, describeLeadSource, type BootcampLeadInput } from '@/lib/bootcamp-leads'
+import { BootcampLeadError, describeLeadSource, type BootcampLeadInput } from '@/lib/bootcamp-leads'
+import type { BootcampProgramConfig } from '@/lib/bootcamp-programs'
 import { collectAllPages } from '@/lib/paginate'
 import { logger } from '@/lib/telemetry'
 import { bootcampLeadEmail } from '@/payload/emails/templates'
@@ -11,6 +12,7 @@ import { adminLink, notifyAdmins } from '@/server/admin-telegram'
 import { entryTaskResendDue, newEntryTaskToken, sendEntryTask } from '@/server/bootcamp-entry-task'
 import { journal } from '@/server/bootcamp-lead-events'
 import { markLeadResubmitted, markLeadTeamNotified } from '@/server/bootcamp-lead-marks'
+import { findProgram } from '@/server/bootcamp-programs'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
 import type { BootcampLead } from '@/payload-types'
 
@@ -49,8 +51,13 @@ async function findLead(payload: Payload, input: BootcampLeadInput): Promise<Boo
  * вторую запись и не подменяет первую: растёт только счётчик отправок.
  */
 export async function saveBootcampLead(payload: Payload, input: BootcampLeadInput): Promise<SavedBootcampLead> {
+  // Программа - запись в CMS: форма лендинга присылает только её ключ.
+  const program = await findProgram(payload, input.program)
+  if (!program) throw new BootcampLeadError('Такой программы нет. Обновите страницу и отправьте заявку ещё раз.')
   const now = new Date().toISOString()
   let lead = await findLead(payload, input)
+  // Закрытый набор не принимает новые заявки, а повтор старой (письмо не дошло) обрабатывается как обычно.
+  if (!lead && !program.isActive) throw new BootcampLeadError(`Набор на буткемп ${program.shortTitle} сейчас закрыт. Следите за новостями на странице буткемпа.`)
   if (!lead) {
     try {
       lead = await payload.create({
@@ -66,9 +73,9 @@ export async function saveBootcampLead(payload: Payload, input: BootcampLeadInpu
       const created = lead
       return {
         outcome: 'created',
-        notification: Promise.all([sendEntryTask(payload, created), notifyTeam(payload, created)]).then(async ([dueAt]) => {
+        notification: Promise.all([sendEntryTask(payload, created), notifyTeam(payload, created, program)]).then(async ([dueAt]) => {
           await journal(payload, { lead: created.id, type: 'lead_created', message: dueAt ? `Заявка с лендинга, входное задание отправлено, срок ${formatEntryTaskDate(dueAt)}` : 'Заявка с лендинга, письмо с заданием не ушло' })
-          await notifyAdmins(leadEvent(created, 1, dueAt === null ? 'failed' : dueAt))
+          await notifyAdmins(leadEvent(created, program, 1, dueAt === null ? 'failed' : dueAt))
         }),
       }
     } catch (error) {
@@ -82,14 +89,14 @@ export async function saveBootcampLead(payload: Payload, input: BootcampLeadInpu
   const count = (lead.submissionCount ?? 1) + 1
   // Повтор — обычно «письмо не пришло»: присылаем ту же ссылку ещё раз, но не чаще раза в 15 минут.
   const notification = entryTaskResendDue(lead)
-    ? sendEntryTask(payload, lead).then((dueAt) => notifyAdmins(leadEvent(repeated, count, dueAt === null ? 'failed' : dueAt)))
-    : notifyAdmins(leadEvent(repeated, count, 'not-due'))
+    ? sendEntryTask(payload, lead).then((dueAt) => notifyAdmins(leadEvent(repeated, program, count, dueAt === null ? 'failed' : dueAt)))
+    : notifyAdmins(leadEvent(repeated, program, count, 'not-due'))
   return { outcome: 'repeat', notification }
 }
 
 /** Сообщение в Telegram о заявке: кто, откуда и ушло ли письмо с заданием. */
-function leadEvent(lead: BootcampLead, submission: number, entryTask: string | 'failed' | 'not-due') {
-  const program = BOOTCAMP_PROGRAMS.find((item) => item.value === lead.program)?.short ?? lead.program
+function leadEvent(lead: BootcampLead, config: BootcampProgramConfig, submission: number, entryTask: string | 'failed' | 'not-due') {
+  const program = config.shortTitle
   const who = [lead.name?.trim(), lead.email].filter(Boolean).join(', ')
   const task = entryTask === 'failed'
     ? 'Письмо с входным заданием не ушло, подробности в журнале приложения'
@@ -122,7 +129,7 @@ export async function adminEmails(payload: Payload): Promise<string[]> {
   return admins.filter((admin) => admin.isActive !== false && admin.email && !admin.email.endsWith('.invalid')).map((admin) => admin.email)
 }
 
-async function notifyTeam(payload: Payload, lead: BootcampLead): Promise<void> {
+async function notifyTeam(payload: Payload, lead: BootcampLead, program: BootcampProgramConfig): Promise<void> {
   if (!teamMail.take('all')) {
     logger.warn('Bootcamp lead saved without team email: hourly mail limit reached', { 'lead.id': lead.id })
     return
@@ -137,7 +144,7 @@ async function notifyTeam(payload: Payload, lead: BootcampLead): Promise<void> {
       id: lead.id,
       address: lead.email,
       name: lead.name ?? null,
-      program: BOOTCAMP_PROGRAMS.find((item) => item.value === lead.program)?.label ?? lead.program,
+      program: program.title,
       source: describeLeadSource(lead.source),
     })
     for (const to of recipients) await payload.sendEmail({ to, ...content })

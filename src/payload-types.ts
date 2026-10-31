@@ -111,6 +111,7 @@ export interface Config {
     'interview-analysis-usage': InterviewAnalysisUsage;
     'faq-items': FaqItem;
     'yandex-disk-imports': YandexDiskImport;
+    'bootcamp-programs': BootcampProgram;
     'bootcamp-leads': BootcampLead;
     'bootcamp-entry-tasks': BootcampEntryTask;
     'bootcamp-enrollments': BootcampEnrollment;
@@ -167,6 +168,7 @@ export interface Config {
     'interview-analysis-usage': InterviewAnalysisUsageSelect<false> | InterviewAnalysisUsageSelect<true>;
     'faq-items': FaqItemsSelect<false> | FaqItemsSelect<true>;
     'yandex-disk-imports': YandexDiskImportsSelect<false> | YandexDiskImportsSelect<true>;
+    'bootcamp-programs': BootcampProgramsSelect<false> | BootcampProgramsSelect<true>;
     'bootcamp-leads': BootcampLeadsSelect<false> | BootcampLeadsSelect<true>;
     'bootcamp-entry-tasks': BootcampEntryTasksSelect<false> | BootcampEntryTasksSelect<true>;
     'bootcamp-enrollments': BootcampEnrollmentsSelect<false> | BootcampEnrollmentsSelect<true>;
@@ -1743,7 +1745,69 @@ export interface YandexDiskImport {
   createdAt: string;
 }
 /**
- * Предзапись с info.mentorcareer.ru/bootcamp/nodejs. Повторная отправка того же адреса не создаёт новую заявку, а увеличивает счётчик отправок.
+ * Условия каждого буткемпа. Новая заявка, допуск, оплата и зачисление берут их из программы заявки.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-programs".
+ */
+export interface BootcampProgram {
+  id: number;
+  /**
+   * Как в форме лендинга, например nodejs. После создания не меняется.
+   */
+  key: string;
+  /**
+   * Полностью, для команды: «Node.js: backend сервиса проката».
+   */
+  title: string;
+  /**
+   * Подставляется в тексты писем и страниц после слова «буткемп»: для «буткемп Node.js» здесь Node.js.
+   */
+  shortTitle: string;
+  /**
+   * Снятый флажок закрывает форму лендинга для этой программы. Начатые заявки идут дальше.
+   */
+  isActive?: boolean | null;
+  /**
+   * Ссылка «О буткемпе» на страницах задания и оплаты.
+   */
+  landingUrl: string;
+  /**
+   * Сумма в форме «Допустить» по умолчанию. Та же цена должна стоять на лендинге.
+   */
+  priceKopecks: number;
+  paymentDueDays: number;
+  offerUrl: string;
+  /**
+   * Пишется в каждую оплату. Менять вместе с текстом оферты на лендинге.
+   */
+  offerVersion: string;
+  /**
+   * Наименование услуги в чеке Робокассы, до 128 знаков.
+   */
+  receiptItemName: string;
+  /**
+   * Назначается каждому зачисленному. Без него допустить на программу нельзя.
+   */
+  manualsCourse?: (number | null) | Course;
+  /**
+   * Из него создаётся проект ученика.
+   */
+  gitlabCourseProject: string;
+  /**
+   * Подставляется в форму допуска. Группа должна быть в GitLab и в GRADER_GROUPS проекта проверки.
+   */
+  gitlabStreamGroup: string;
+  gradingProject: string;
+  /**
+   * Ключ набора задач из кода (src/data/bootcamp-entry). Сейчас есть: rental-js (Три функции JavaScript про прокат). Смена набора меняет задачи и у тех, кто ещё решает.
+   */
+  entryTaskSet: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Предзапись со страниц буткемпов на info.mentorcareer.ru. Повторная отправка того же адреса в той же программе не создаёт новую заявку, а увеличивает счётчик отправок.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "bootcamp-leads".
@@ -1752,7 +1816,7 @@ export interface BootcampLead {
   id: number;
   email: string;
   name?: string | null;
-  program: 'nodejs';
+  program: string;
   /**
    * Меняется кнопками в блоке «Путь заявки» вверху карточки.
    */
@@ -1851,7 +1915,10 @@ export interface BootcampLead {
  */
 export interface BootcampEntryTask {
   id: number;
-  program: 'nodejs';
+  /**
+   * Ключ программы буткемпа, например nodejs.
+   */
+  program: string;
   active?: boolean | null;
   /**
    * README из архива: кандидат читает его на странице задания.
@@ -1883,6 +1950,9 @@ export interface BootcampEnrollment {
   lastName: string;
   gitlabUsername: string;
   streamGroup: string;
+  program?: string | null;
+  courseProject?: string | null;
+  gradingProject?: string | null;
   /**
    * Пусто - без срока.
    */
@@ -2135,6 +2205,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'yandex-disk-imports';
         value: number | YandexDiskImport;
+      } | null)
+    | ({
+        relationTo: 'bootcamp-programs';
+        value: number | BootcampProgram;
       } | null)
     | ({
         relationTo: 'bootcamp-leads';
@@ -3121,6 +3195,29 @@ export interface YandexDiskImportsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-programs_select".
+ */
+export interface BootcampProgramsSelect<T extends boolean = true> {
+  key?: T;
+  title?: T;
+  shortTitle?: T;
+  isActive?: T;
+  landingUrl?: T;
+  priceKopecks?: T;
+  paymentDueDays?: T;
+  offerUrl?: T;
+  offerVersion?: T;
+  receiptItemName?: T;
+  manualsCourse?: T;
+  gitlabCourseProject?: T;
+  gitlabStreamGroup?: T;
+  gradingProject?: T;
+  entryTaskSet?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "bootcamp-leads_select".
  */
 export interface BootcampLeadsSelect<T extends boolean = true> {
@@ -3204,6 +3301,9 @@ export interface BootcampEnrollmentsSelect<T extends boolean = true> {
   lastName?: T;
   gitlabUsername?: T;
   streamGroup?: T;
+  program?: T;
+  courseProject?: T;
+  gradingProject?: T;
   accessUntil?: T;
   status?: T;
   steps?: T;

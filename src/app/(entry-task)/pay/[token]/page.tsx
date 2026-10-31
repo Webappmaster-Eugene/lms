@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
+import { CandidateFrame } from '@/components/bootcamp/CandidateFrame'
 import { PaymentCheckout } from '@/components/bootcamp/PaymentCheckout'
-import { OFFER_URL } from '@/lib/bootcamp-admission'
 import { getPayload } from '@/lib/payload'
 import { findLeadByPaymentToken, paymentPageState } from '@/server/bootcamp-payment'
 
@@ -28,6 +28,7 @@ export default async function PaymentPage({ params }: Props) {
   const support = <a className="underline underline-offset-4" href={`mailto:${SUPPORT}`}>{SUPPORT}</a>
 
   return (
+    <CandidateFrame landingUrl={state.landingUrl} program={state.program}>
     <article className="mx-auto max-w-3xl space-y-8">
       <header className="space-y-4">
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Оплата буткемпа {state.program}</h1>
@@ -46,7 +47,7 @@ export default async function PaymentPage({ params }: Props) {
             <p className="mt-2 text-muted-foreground">Сразу после оплаты на почту придут два письма: приглашение в учебный кабинет MentorCareer и ссылка для пароля в GitLab курса.</p>
             {state.test && <p className="mt-2 font-medium">Магазин работает в тестовом режиме: деньги не списываются.</p>}
           </div>
-          <PaymentCheckout token={token} amount={state.amount} offerUrl={OFFER_URL} />
+          <PaymentCheckout token={token} amount={state.amount} offerUrl={state.offerUrl ?? ''} />
         </>
       )}
       {state.kind === 'paid' && (
@@ -71,5 +72,6 @@ export default async function PaymentPage({ params }: Props) {
       )}
       <p className="text-sm text-muted-foreground">Ссылка на эту страницу личная, пожалуйста, не пересылайте её.</p>
     </article>
+    </CandidateFrame>
   )
 }

@@ -9,21 +9,20 @@ import {
   DECISION_STAGES,
   formatRubles,
   leadEventLabel,
-  OFFER_URL,
   paymentDueAt,
   paymentPath,
-  BOOTCAMP_PRICE_KOPECKS,
-  PAYMENT_DUE_DAYS,
+  type AdmissionDefaults,
   type AdmissionInput,
 } from '@/lib/bootcamp-admission'
-import { BOOTCAMP_MANUALS_COURSE_SLUG, EnrollmentInputError, type EnrollmentInput } from '@/lib/bootcamp-enrollment'
+import { EnrollmentInputError, type EnrollmentInput } from '@/lib/bootcamp-enrollment'
 import { formatEntryTaskDate } from '@/lib/bootcamp-entry-task'
-import { BOOTCAMP_PROGRAMS, leadStatusLabel } from '@/lib/bootcamp-leads'
+import { leadStatusLabel } from '@/lib/bootcamp-leads'
 import { logger } from '@/lib/telemetry'
 import { bootcampAdmittedEmail, bootcampDecisionEmail, emailBaseUrl } from '@/payload/emails/templates'
 import { leadEnrollmentState, startEnrollment, type EnrollmentView } from '@/server/bootcamp-enrollment'
 import { sendEntryTask } from '@/server/bootcamp-entry-task'
 import { actorName, inTransaction, journal, leadAdminLink, recordLeadEvent, rowsOf, txDb } from '@/server/bootcamp-lead-events'
+import { programNames, requireProgram } from '@/server/bootcamp-programs'
 import { contactReplyTo } from '@/server/contact-reply-to'
 import { robokassaConfig } from '@/server/robokassa'
 import type { BootcampLead, User } from '@/payload-types'
@@ -52,13 +51,19 @@ export function readAdmissionDraft(value: unknown): AdmissionDraft | null {
   }
 }
 
-const program = (lead: BootcampLead) => BOOTCAMP_PROGRAMS.find((item) => item.value === lead.program)?.short ?? lead.program
+const programName = async (payload: Payload, lead: BootcampLead) => (await programNames(payload, lead.program)).short
 const paymentUrl = (token: string) => `${emailBaseUrl()}${paymentPath(token)}`
 
 async function findLead(payload: Payload, id: number): Promise<BootcampLead> {
   const lead = await payload.findByID({ collection: 'bootcamp-leads', id, depth: 0, overrideAccess: true, disableErrors: true })
   if (!lead) throw new EnrollmentInputError('Заявка не найдена', 404)
   return lead
+}
+
+/** Условия программы заявки для формы «Допустить» и «Отправить ссылку ещё раз»: пустые поля берутся из них. */
+export async function admissionDefaults(payload: Payload, leadId: number): Promise<AdmissionDefaults> {
+  const program = await requireProgram(payload, (await findLead(payload, leadId)).program)
+  return { priceKopecks: program.priceKopecks, paymentDueDays: program.paymentDueDays }
 }
 
 function requireStage(lead: BootcampLead, allowed: readonly string[], action: string): void {
@@ -80,6 +85,7 @@ export type LeadPathState = {
     name: string | null
     status: string
     statusLabel: string
+    program: string
     createdAt: string
     entryTaskSentAt: string | null
     entryTaskDueAt: string | null
@@ -110,6 +116,7 @@ export type LeadPathState = {
 
 export async function leadPathState(payload: Payload, leadId: number): Promise<LeadPathState> {
   const lead = await findLead(payload, leadId)
+  const program = await requireProgram(payload, lead.program)
   const base = await leadEnrollmentState(payload, leadId)
   const [payments, events] = await Promise.all([
     payload.find({ collection: 'bootcamp-payments', where: { lead: { equals: leadId } }, sort: '-createdAt', limit: 20, depth: 0, overrideAccess: true }),
@@ -125,6 +132,7 @@ export async function leadPathState(payload: Payload, leadId: number): Promise<L
       name: lead.name ?? null,
       status: lead.status,
       statusLabel: leadStatusLabel(lead.status),
+      program: program.title,
       createdAt: lead.createdAt,
       entryTaskSentAt: lead.entryTaskSentAt ?? null,
       entryTaskDueAt: lead.entryTaskDueAt ?? null,
@@ -156,7 +164,7 @@ export async function leadPathState(payload: Payload, leadId: number): Promise<L
       paymentMethod: doc.paymentMethod ?? doc.incCurrLabel ?? null,
     })),
     enrollment: base.enrollment,
-    defaults: { ...base.defaults, amount: String(BOOTCAMP_PRICE_KOPECKS / 100), dueDays: PAYMENT_DUE_DAYS },
+    defaults: { ...base.defaults, amount: String(program.priceKopecks / 100), dueDays: program.paymentDueDays },
     paymentsEnabled: config !== null,
     paymentsTest: config?.isTest === true,
     events: events.docs.map((doc) => ({
@@ -177,13 +185,14 @@ export async function sendPaymentLink(payload: Payload, leadId: number, resend: 
   try {
     const replyTo = await contactReplyTo(payload)
     const draft = readAdmissionDraft(lead.admission)
+    const config = await requireProgram(payload, lead.program)
     const content = bootcampAdmittedEmail({
       name: lead.name ?? null,
-      program: program(lead),
+      program: config.shortTitle,
       amount: formatRubles(lead.paymentAmountKopecks),
       dueDate: formatEntryTaskDate(lead.paymentDueAt),
       url: paymentUrl(lead.paymentToken),
-      offerUrl: OFFER_URL,
+      offerUrl: config.offerUrl,
       comment: resend ? null : draft?.comment ?? null,
       resend,
       replyable: Boolean(replyTo),
@@ -213,8 +222,9 @@ export async function admitLead(payload: Payload, admin: User, leadId: number, i
   if (taken.docs[0]) throw new EnrollmentInputError(`Логин ${username} уже у зачисленного ученика (${taken.docs[0].email})`, 409)
   const reserved = rowsOf<{ email: string }>(await db(payload).execute(sql`select email from bootcamp_leads where id <> ${leadId} and status in ('admitted', 'paid') and admission->'enrollment'->>'username' = ${username} limit 1`))
   if (reserved[0]) throw new EnrollmentInputError(`Логин ${username} уже отдан при допуске другой заявке (${reserved[0].email})`, 409)
-  const course = await payload.find({ collection: 'courses', where: { slug: { equals: BOOTCAMP_MANUALS_COURSE_SLUG } }, limit: 1, depth: 0, overrideAccess: true })
-  if (!course.docs[0]) throw new EnrollmentInputError(`В LMS нет курса методичек «${BOOTCAMP_MANUALS_COURSE_SLUG}»: после оплаты зачислить будет некуда. Сначала импортируйте методички.`, 409)
+  const program = await requireProgram(payload, lead.program)
+  const course = program.manualsCourseId === null ? null : await payload.findByID({ collection: 'courses', id: program.manualsCourseId, depth: 0, overrideAccess: true, disableErrors: true })
+  if (!course) throw new EnrollmentInputError(`У программы «${program.shortTitle}» не выбран курс методичек или его нет: после оплаты зачислить будет некуда. Выберите курс в CMS, Буткемпы, Программы буткемпов.`, 409)
 
   const dueAt = paymentDueAt(new Date(), input.dueDays).toISOString()
   const draft: AdmissionDraft = { enrollment: input.enrollment, comment: input.comment }
@@ -323,7 +333,7 @@ export async function decideLead(payload: Payload, admin: User, leadId: number, 
   if (decision !== 'withdrawn') {
     try {
       const replyTo = await contactReplyTo(payload)
-      const content = bootcampDecisionEmail({ name: lead.name ?? null, program: program(lead), decision, message, replyable: Boolean(replyTo) })
+      const content = bootcampDecisionEmail({ name: lead.name ?? null, program: await programName(payload, lead), decision, message, replyable: Boolean(replyTo) })
       await payload.sendEmail({ to: lead.email, ...content, ...(replyTo ? { replyTo } : {}) })
     } catch (error) {
       logger.error('Bootcamp decision email failed', error, { 'lead.id': leadId })

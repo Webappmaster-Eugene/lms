@@ -29,6 +29,7 @@ GITLAB_HEADER_FILE = os.environ.get('GITLAB_HEADER_FILE', '/root/gitlab-api-head
 POLL_SECONDS = int(os.environ.get('POLL_SECONDS', '15'))
 WATCH_EVERY_SECONDS = 300
 
+# Проект проверки приходит в задании из программы буткемпа; это значение - для LMS до программ.
 GRADING_PROJECT = 'bootcamp-staff/grading'
 DEVELOPER = 30
 MAINTAINER = 40
@@ -152,9 +153,10 @@ class Job:
         group = self.job['group']
         if not gl('GET', '/groups/%s' % q(group), allow404=True):
             raise StepError('В GitLab нет группы %s: поток заводится по ops/grading/README.md эталона' % group)
-        graded = gl('GET', '/projects/%s/variables/GRADER_GROUPS' % q(GRADING_PROJECT))['value']
+        grading = self.job.get('gradingProject') or GRADING_PROJECT
+        graded = gl('GET', '/projects/%s/variables/GRADER_GROUPS' % q(grading))['value']
         if group not in [name.strip() for name in graded.split(',')]:
-            raise StepError('Группы %s нет в GRADER_GROUPS проекта %s: сдачи не проверялись бы' % (group, GRADING_PROJECT))
+            raise StepError('Группы %s нет в GRADER_GROUPS проекта %s: сдачи не проверялись бы' % (group, grading))
 
     def gitlab_user(self):
         username, email = self.job['username'], self.job['email'].lower()

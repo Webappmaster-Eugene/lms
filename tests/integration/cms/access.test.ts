@@ -32,6 +32,8 @@ const MATRIX: Record<string, Matrix> = {
   // Справочник категорий: названия видят все вошедшие, меняет только админ.
   'guide-categories': CONTENT,
   'learning-access-grants': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
+  // Условия буткемпов (цена, оферта, проекты GitLab) ведёт только админ; публичная форма их не читает.
+  'bootcamp-programs': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
   // Заявки с лендинга — персональные данные: публичная форма пишет через свой маршрут, а не REST.
   'bootcamp-leads': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
   // Зачисление создаёт и ведёт только сервер (кнопка в заявке и исполнитель в VM GitLab); удалить может админ.
@@ -89,6 +91,7 @@ const PATCH: Record<string, Record<string, unknown>> = {
   'guide-categories': { order: 7 },
   'learning-access-grants': { note: 'Обновлено' },
   // Этап админ через REST не меняет (поле только для кнопок пути заявки), заметки - меняет.
+  'bootcamp-programs': { title: 'Обновлено' },
   'bootcamp-leads': { note: 'Обновлено' },
   'bootcamp-enrollments': { error: 'Обновлено' },
   'bootcamp-payments': { comment: 'Обновлено' },

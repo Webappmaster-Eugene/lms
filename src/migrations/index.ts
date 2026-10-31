@@ -44,6 +44,7 @@ import * as migration_20261030_201902_bootcamp_enrollments from './20261030_2019
 import * as migration_20261031_090000_bootcamp_group_rename from './20261031_090000_bootcamp_group_rename';
 import * as migration_20261031_090450_bootcamp_lead_path from './20261031_090450_bootcamp_lead_path';
 import * as migration_20261031_132906_bootcamp_weekly_summary from './20261031_132906_bootcamp_weekly_summary';
+import * as migration_20261031_225020_bootcamp_programs from './20261031_225020_bootcamp_programs';
 
 export const migrations = [
   {
@@ -275,5 +276,10 @@ export const migrations = [
     up: migration_20261031_132906_bootcamp_weekly_summary.up,
     down: migration_20261031_132906_bootcamp_weekly_summary.down,
     name: '20261031_132906_bootcamp_weekly_summary',
+  },
+  {
+    up: migration_20261031_225020_bootcamp_programs.up,
+    down: migration_20261031_225020_bootcamp_programs.down,
+    name: '20261031_225020_bootcamp_programs'
   },
 ];

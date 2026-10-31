@@ -3,16 +3,18 @@ import 'server-only'
 import { sql } from '@payloadcms/db-postgres'
 import type { Payload } from 'payload'
 
-import { formatRubles, isPaymentToken, OFFER_VERSION, RECEIPT_ITEM_NAME } from '@/lib/bootcamp-admission'
+import { formatRubles, isPaymentToken } from '@/lib/bootcamp-admission'
 import { EnrollmentInputError } from '@/lib/bootcamp-enrollment'
 import { formatEntryTaskDate } from '@/lib/bootcamp-entry-task'
-import { BOOTCAMP_PROGRAMS, leadStatusLabel } from '@/lib/bootcamp-leads'
+import { leadStatusLabel } from '@/lib/bootcamp-leads'
+import { relationId } from '@/lib/relation-id'
 import { logger } from '@/lib/telemetry'
 import { bootcampPaymentReceivedEmail, bootcampPaymentTeamEmail } from '@/payload/emails/templates'
 import { startEnrollment } from '@/server/bootcamp-enrollment'
 import { inTransaction, journal, leadAdminLink, recordLeadEvent, rowsOf, txDb } from '@/server/bootcamp-lead-events'
 import { readAdmissionDraft } from '@/server/bootcamp-lead-path'
 import { adminEmails } from '@/server/bootcamp-leads'
+import { candidateLanding, findProgram, programNames } from '@/server/bootcamp-programs'
 import { contactReplyTo } from '@/server/contact-reply-to'
 import { buildPaymentUrl, robokassaConfig, verifyResultNotice, verifySuccessReturn, type RobokassaNotice } from '@/server/robokassa'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
@@ -35,7 +37,7 @@ const mismatchAlerts = createRateLimiter('bootcamp-payment-mismatch-alerts', 10,
 // Страница ошибки открыта без подписи: перебор номеров счетов не должен засыпать журнал.
 const failReturns = createRateLimiter('bootcamp-payment-fail-returns', 30, 60 * 60_000)
 
-const programName = (lead: Pick<BootcampLead, 'program'>) => BOOTCAMP_PROGRAMS.find((item) => item.value === lead.program)?.short ?? lead.program
+const programName = async (payload: Payload, lead: Pick<BootcampLead, 'program'>) => (await programNames(payload, lead.program)).short
 
 export async function findLeadByPaymentToken(payload: Payload, token: string): Promise<BootcampLead | null> {
   if (!isPaymentToken(token)) return null
@@ -50,6 +52,8 @@ export type PaymentPageState = {
   amount: string
   dueDate: string | null
   test: boolean
+  offerUrl: string | null
+  landingUrl: string | null
 }
 
 /** Что видит кандидат по личной ссылке. Первое открытие уходит наставнику в Telegram. */
@@ -70,13 +74,18 @@ export async function paymentPageState(payload: Payload, lead: BootcampLead): Pr
       })
     }
   }
+  const program = await findProgram(payload, lead.program)
+  if (!program) logger.error('Bootcamp payment page without program config', undefined, { 'lead.id': lead.id, 'program.key': lead.program })
   return {
-    kind,
+    // Без программы нет оферты: платить не по чему, кандидат видит «временно недоступна».
+    kind: kind === 'open' && !program ? 'unavailable' : kind,
     name: lead.name?.trim() || null,
-    program: programName(lead),
+    program: program?.shortTitle ?? lead.program,
     amount: formatRubles(lead.paymentAmountKopecks ?? 0),
     dueDate: lead.paymentDueAt ? formatEntryTaskDate(lead.paymentDueAt) : null,
     test: config?.isTest === true,
+    offerUrl: program?.offerUrl ?? null,
+    landingUrl: program?.landingUrl ?? null,
   }
 }
 
@@ -93,6 +102,12 @@ export async function startCheckout(payload: Payload, token: string, acceptOffer
   if (acceptOffer !== true) throw new EnrollmentInputError('Отметьте, что прочитали договор-оферту и принимаете её условия.', 400)
   const amountKopecks = lead.paymentAmountKopecks
   if (!amountKopecks || !lead.paymentDueAt) throw new EnrollmentInputError('В заявке нет суммы или срока оплаты. Напишите нам на support@mentorcareer.ru.', 409)
+  // Редакция оферты и строка чека - из программы заявки; без программы платить не по чему.
+  const program = await findProgram(payload, lead.program)
+  if (!program) {
+    logger.error('Bootcamp checkout without program config', undefined, { 'lead.id': lead.id, 'program.key': lead.program })
+    throw new EnrollmentInputError('Оплата временно недоступна. Напишите нам на support@mentorcareer.ru.', 503)
+  }
 
   const payment = await inTransaction(payload, null, async (req) => {
     // Заявка блокируется до создания счёта: отмена допуска в ту же секунду не оставит висящий счёт со старой суммой.
@@ -103,7 +118,7 @@ export async function startCheckout(payload: Payload, token: string, acceptOffer
     if (!stillOpen) throw new EnrollmentInputError('Условия оплаты только что изменились. Обновите страницу.', 409)
     const created = await payload.create({
       collection: 'bootcamp-payments',
-      data: { lead: lead.id, amountKopecks, status: 'pending', method: 'robokassa', isTest: config.isTest, offerVersion: OFFER_VERSION, offerAcceptedAt: new Date().toISOString() },
+      data: { lead: lead.id, amountKopecks, status: 'pending', method: 'robokassa', isTest: config.isTest, offerVersion: program.offerVersion, offerAcceptedAt: new Date().toISOString() },
       overrideAccess: true,
       depth: 0,
       req,
@@ -122,8 +137,8 @@ export async function startCheckout(payload: Payload, token: string, acceptOffer
   return buildPaymentUrl(config, {
     invId: payment.id,
     amountKopecks,
-    description: `Буткемп ${programName(lead)}, заявка ${lead.id}`,
-    receipt: { items: [{ name: RECEIPT_ITEM_NAME, quantity: 1, sum: amountKopecks / 100, payment_method: 'full_payment', payment_object: 'service', tax: 'none' }] },
+    description: `Буткемп ${program.shortTitle}, заявка ${lead.id}`,
+    receipt: { items: [{ name: program.receiptItemName, quantity: 1, sum: amountKopecks / 100, payment_method: 'full_payment', payment_object: 'service', tax: 'none' }] },
     email: lead.email,
     expiresAt: new Date(lead.paymentDueAt),
   })
@@ -202,7 +217,7 @@ export async function afterPaid(payload: Payload, leadId: number, invId: number)
   const test = payment.method === 'robokassa' && payment.isTest === true
   try {
     const replyTo = await contactReplyTo(payload)
-    await payload.sendEmail({ to: lead.email, ...bootcampPaymentReceivedEmail({ name: lead.name ?? null, program: programName(lead), amount, invoice: invId, test, replyable: Boolean(replyTo) }), ...(replyTo ? { replyTo } : {}) })
+    await payload.sendEmail({ to: lead.email, ...bootcampPaymentReceivedEmail({ name: lead.name ?? null, program: await programName(payload, lead), amount, invoice: invId, test, replyable: Boolean(replyTo) }), ...(replyTo ? { replyTo } : {}) })
   } catch (error) {
     logger.error('Bootcamp payment receipt email failed', error, { 'lead.id': leadId })
     await journal(payload, { lead: leadId, type: 'payment_alert', message: 'Письмо «Оплата получена» кандидату не ушло', telegram: { title: `Письмо об оплате не ушло: ${lead.email}`, lines: ['Подробности в журнале приложения. Напишите кандидату вручную.'], link: leadAdminLink(leadId) } })
@@ -297,16 +312,21 @@ async function paidResponse(payload: Payload, notice: RobokassaNotice, source: P
   return { status: 200, body: `OK${notice.invId}` }
 }
 
-export type ReturnState = { kind: 'paid' | 'pending' | 'invalid', amount: string | null, invId: number | null, test: boolean }
+export type ReturnState = { kind: 'paid' | 'pending' | 'invalid', amount: string | null, invId: number | null, test: boolean, landingUrl: string | null, program: string | null }
 
 /** SuccessURL: подпись Пароля #1 говорит, что ссылку дала Робокасса, а итог берём из базы. */
 export async function successReturnState(payload: Payload, params: Record<string, string>): Promise<ReturnState> {
   const config = robokassaConfig()
   const checked = config ? verifySuccessReturn(config, params) : null
-  if (!checked?.ok) return { kind: 'invalid', amount: null, invId: null, test: false }
+  if (!checked?.ok) return { kind: 'invalid', amount: null, invId: null, test: false, ...await candidateLanding(payload) }
   const payment = await payload.findByID({ collection: 'bootcamp-payments', id: checked.notice.invId, depth: 0, overrideAccess: true, disableErrors: true })
-  if (!payment) return { kind: 'invalid', amount: null, invId: null, test: false }
-  return { kind: payment.status === 'paid' ? 'paid' : 'pending', amount: formatRubles(payment.amountKopecks), invId: payment.id, test: payment.isTest === true }
+  if (!payment) return { kind: 'invalid', amount: null, invId: null, test: false, ...await candidateLanding(payload) }
+  const lead = await payload.findByID({ collection: 'bootcamp-leads', id: relationId(payment.lead), depth: 0, overrideAccess: true, disableErrors: true, select: { program: true } })
+  const program = await findProgram(payload, lead?.program)
+  return {
+    kind: payment.status === 'paid' ? 'paid' : 'pending', amount: formatRubles(payment.amountKopecks), invId: payment.id, test: payment.isTest === true,
+    landingUrl: program?.landingUrl ?? null, program: program?.shortTitle ?? null,
+  }
 }
 
 /**

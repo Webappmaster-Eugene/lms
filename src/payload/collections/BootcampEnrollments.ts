@@ -36,6 +36,10 @@ export const BootcampEnrollments: CollectionConfig = {
     { name: 'lastName', type: 'text', required: true, maxLength: 100, label: 'Фамилия', admin: readOnly },
     { name: 'gitlabUsername', type: 'text', required: true, unique: true, maxLength: 60, label: 'Логин GitLab', admin: readOnly },
     { name: 'streamGroup', type: 'text', required: true, maxLength: 100, label: 'Группа потока в GitLab', admin: readOnly },
+    // Снимок условий программы на момент зачисления: правка программы не меняет начатое.
+    { name: 'program', type: 'text', maxLength: 40, label: 'Программа', admin: readOnly },
+    { name: 'courseProject', type: 'text', maxLength: 200, label: 'Репозиторий курса в GitLab', admin: readOnly },
+    { name: 'gradingProject', type: 'text', maxLength: 200, label: 'Проект проверки', admin: readOnly },
     { name: 'accessUntil', type: 'date', label: 'Курс методичек открыт до', admin: { ...readOnly, description: 'Пусто - без срока.' } },
     { name: 'status', type: 'select', required: true, defaultValue: 'queued', label: 'Состояние', options: ENROLLMENT_STATUSES.map(({ value, label }) => ({ value, label })), admin: { ...readOnly, position: 'sidebar' } },
     { name: 'steps', type: 'json', admin: { hidden: true } },

@@ -80,6 +80,13 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   'user-trainer-progress': (ctx) => ({ user: ctx.studentId, task: ctx.taskId }),
   'faq-items': () => ({ question: 'Вопрос?', answer: lexical('Ответ') }),
   'yandex-disk-imports': (ctx) => ({ publicUrl: 'https://disk.yandex.ru/d/test', course: ctx.courseId, importedBy: ctx.userId }),
+  // Ключ уникален и в формате ключа программы: латиница, цифры и дефис.
+  'bootcamp-programs': () => ({
+    key: uid('program').toLowerCase().replace(/[^a-z0-9-]/g, '-'), title: 'Программа фикстуры', shortTitle: 'Фикстура', isActive: false,
+    landingUrl: 'https://info.test/bootcamp/fixture/', priceKopecks: 100_000, paymentDueDays: 7, offerUrl: 'https://info.test/bootcamp/fixture/offer/',
+    offerVersion: '2026-11-01', receiptItemName: 'Фикстура', gitlabCourseProject: 'bootcamp/course', gitlabStreamGroup: 'fixture-stream',
+    gradingProject: 'bootcamp-staff/grading', entryTaskSet: 'rental-js',
+  }),
   // Адрес уникален в программе: фабрика каждый раз даёт новый.
   'bootcamp-leads': () => ({ email: `${uid('lead')}@mail.test`.toLowerCase(), program: 'nodejs', consentVersion: '2026-10-26', consentAt: new Date().toISOString(), entryTaskToken: uid('entry-token') }),
   // Заявку (уникальная связь) создаёт makeValid.

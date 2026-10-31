@@ -54,6 +54,13 @@ function send(body: unknown, { ip = nextIp(), headers = {} as Record<string, str
   }))
 }
 
+/** Программа для тестов: те же условия, что у nodejs, свой ключ. */
+const programData = (key: string) => ({
+  key, title: `Программа ${key}`, shortTitle: key, isActive: true, landingUrl: `https://info.test/bootcamp/${key}/`,
+  priceKopecks: 3_000_000, paymentDueDays: 5, offerUrl: `https://info.test/bootcamp/${key}/offer/`, offerVersion: '2026-11-01',
+  receiptItemName: `Буткемп ${key}`, gitlabCourseProject: 'bootcamp/course', gitlabStreamGroup: 'nodejs-bootcamp', gradingProject: 'bootcamp-staff/grading', entryTaskSet: 'rental-js',
+})
+
 const lead = (email: string, extra: Record<string, unknown> = {}) => ({ program: 'nodejs', email, name: 'Иван', consent: true, consentVersion: '2026-10-26', ...extra })
 
 type EntryRoute = (request: Request, context: { params: Promise<{ token: string }> }) => Promise<Response>
@@ -129,6 +136,56 @@ describe('POST /api/bootcamp/leads: предзапись с лендинга', (
     expect((await send(lead(email, { name: 'x'.repeat(5000) }))).status).toBe(413)
     expect((await send(lead(email), { headers: { 'Content-Type': 'text/plain' } })).status).toBe(415)
     expect(await stored(email)).toHaveLength(0)
+  })
+
+  it('заявка только в существующую программу, которая принимает заявки', async () => {
+    const email = `${uid('prog')}@mail.test`
+    const unknown = await send(lead(email, { program: 'no-such-program' }))
+    expect(unknown.status).toBe(400)
+    expect((await unknown.json()).error).toMatch(/Такой программы нет/)
+    expect((await send(lead(email, { program: 'Bad Key!' }))).status).toBe(400)
+    const closed = await payload.create({ collection: 'bootcamp-programs', data: { ...programData(`closed-${Date.now().toString(36)}`), isActive: false }, overrideAccess: true })
+    const rejected = await send(lead(email, { program: closed.key }))
+    expect(rejected.status).toBe(400)
+    expect((await rejected.json()).error).toMatch(/Набор на буткемп .* сейчас закрыт/)
+    expect(await stored(email)).toHaveLength(0)
+
+    // Набор закрыли после заявки: повтор («письмо не пришло») принимается, новой записи нет.
+    const open = await payload.create({ collection: 'bootcamp-programs', data: programData(`later-${Date.now().toString(36)}`), overrideAccess: true })
+    expect((await send(lead(email, { program: open.key }))).status).toBe(200)
+    await payload.update({ collection: 'bootcamp-programs', id: open.id, data: { isActive: false }, overrideAccess: true })
+    expect((await send(lead(email, { program: open.key }))).status).toBe(200)
+    const [row] = await stored(email)
+    expect(row?.submissionCount).toBe(2)
+    expect((await send(lead(`${uid('late')}@mail.test`, { program: open.key }))).status).toBe(400)
+  })
+
+  it('вторая программа: своя заявка на тот же адрес и своё название в письме', async () => {
+    const mail = captureEmails(payload)
+    try {
+      const program = await payload.create({ collection: 'bootcamp-programs', data: { ...programData(`python-${Date.now().toString(36)}`), shortTitle: 'Python' }, overrideAccess: true })
+      const email = `${uid('two')}@mail.test`
+      expect((await send(lead(email))).status).toBe(200)
+      expect((await send(lead(email, { program: program.key }))).status).toBe(200)
+      const rows = await stored(email)
+      expect(rows.map((row) => row.program).sort()).toEqual(['nodejs', program.key].sort())
+      await vi.waitFor(() => expect(mail.sent.filter((message) => message.to === email)).toHaveLength(2))
+      expect(mail.sent.filter((message) => message.to === email).map((message) => message.subject).sort())
+        .toEqual(['Входное задание буткемпа Node.js', 'Входное задание буткемпа Python'])
+    } finally {
+      mail.restore()
+    }
+  })
+
+  it('программу с заявками удалить нельзя, ключ после создания не меняется', async () => {
+    const program = await payload.create({ collection: 'bootcamp-programs', data: programData(`keep-${Date.now().toString(36)}`), overrideAccess: true })
+    expect((await send(lead(`${uid('keep')}@mail.test`, { program: program.key }))).status).toBe(200)
+    await expect(payload.delete({ collection: 'bootcamp-programs', id: program.id, overrideAccess: true })).rejects.toThrow(/есть заявки/)
+    const renamed = await rest('PATCH', `/bootcamp-programs/${program.id}`, { token: adminToken, body: { key: 'renamed-key', title: 'Новое название' } })
+    expect(renamed.status).toBe(200)
+    const after = await payload.findByID({ collection: 'bootcamp-programs', id: program.id, depth: 0, overrideAccess: true })
+    expect(after.key).toBe(program.key)
+    expect(after.title).toBe('Новое название')
   })
 
   it('робот со скрытым полем получает обычный ответ, но заявки нет', async () => {

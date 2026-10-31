@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { ExternalLink, Tent } from 'lucide-react'
 import { HELP_LINK, LockedSection } from '@/components/access/LockedSection'
 import { BOOTCAMP_LANDING_URL } from '@/lib/site-links'
+import { openProgramLinks } from '@/server/bootcamp-programs'
 import { getLearningRequest } from '@/server/learning-request'
 import { getBootcamps } from '@/server/bootcamps'
 
@@ -26,6 +27,10 @@ export default async function BootcampPage({ searchParams }: Props) {
   if (only && bootcamps.length === 1 && !lockedRequested) redirect(`/bootcamp/${only.slug}`)
   const isAdmin = user.role === 'admin'
   const showLocked = !isAdmin && (bootcamps.length === 0 || lockedRequested)
+  // Куда записаться - открытые программы из CMS; если их нет, страница буткемпа Node.js, как раньше.
+  const programs = showLocked ? await openProgramLinks(payload) : []
+  const links = programs.length > 0 ? programs : [{ title: 'Node.js', url: BOOTCAMP_LANDING_URL }]
+  const linkClass = 'inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-ring'
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -41,13 +46,17 @@ export default async function BootcampPage({ searchParams }: Props) {
       {showLocked && (
         <LockedSection
           title={bootcamps.length === 0 ? 'Буткемп вам пока не открыт' : 'Этот буткемп вам пока не открыт'}
-          description="В буткемпе вы вместе с наставником неделя за неделей делаете backend-сервис на Node.js по методичкам и сдаёте каждую часть на проверку. Раздел откроется, когда вы запишетесь на поток."
+          description="В буткемпе вы вместе с наставником неделя за неделей делаете свой проект по методичкам и сдаёте каждую часть на проверку. Раздел откроется, когда вы запишетесь на поток."
           help={<>Если вы уже записались и ждёте доступа, напишите в разделе {HELP_LINK}.</>}
           action={
-            <a href={BOOTCAMP_LANDING_URL} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-ring">
-              Узнать о буткемпе и записаться
-              <ExternalLink className="h-4 w-4" aria-hidden="true" />
-            </a>
+            <div className="flex flex-wrap gap-3">
+              {links.map((link) => (
+                <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" className={linkClass}>
+                  {links.length === 1 ? 'Узнать о буткемпе и записаться' : `Буткемп ${link.title}: узнать и записаться`}
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                </a>
+              ))}
+            </div>
           }
         />
       )}

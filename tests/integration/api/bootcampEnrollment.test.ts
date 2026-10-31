@@ -10,10 +10,10 @@ import { GET as enrollmentState, POST as enrollRoute } from '@/app/api/bootcamp/
 import { POST as claimRoute } from '@/app/api/internal/bootcamp-enrollments/claim/route'
 import { POST as reportRoute } from '@/app/api/internal/bootcamp-enrollments/[id]/report/route'
 import { POST as signedInRoute } from '@/app/api/internal/bootcamp-enrollments/[id]/signed-in/route'
-import { BOOTCAMP_MANUALS_COURSE_SLUG } from '@/lib/bootcamp-enrollment'
 import { adminTelegramTransport } from '@/server/admin-telegram'
 import type { BootcampLead } from '@/payload-types'
 import { captureEmails, createAdmin, createCourseTree, createStudent, getTestPayload, login, uid, type TestUser } from '../helpers/payload'
+import { createProgram, ensureNodejsProgramCourse } from '../helpers/bootcamp'
 
 let payload: Payload
 let admin: TestUser
@@ -32,12 +32,7 @@ beforeAll(async () => {
   admin = await createAdmin(payload)
   adminToken = await login(payload, admin)
   studentToken = await login(payload, await createStudent(payload))
-  const existing = await payload.find({ collection: 'courses', where: { slug: { equals: BOOTCAMP_MANUALS_COURSE_SLUG } }, limit: 1, overrideAccess: true })
-  if (existing.docs[0]) courseId = existing.docs[0].id
-  else {
-    const { course } = await createCourseTree(payload, { lessons: 1 })
-    courseId = (await payload.update({ collection: 'courses', id: course.id, data: { slug: BOOTCAMP_MANUALS_COURSE_SLUG }, overrideAccess: true })).id
-  }
+  courseId = await ensureNodejsProgramCourse(payload)
   process.env.TELEGRAM_BOT_TOKEN = `123456:${'a'.repeat(32)}`
   process.env.TELEGRAM_ADMIN_CHAT_ID = '42'
   delete process.env.TELEGRAM_PROXY_URL
@@ -59,7 +54,7 @@ beforeEach(() => {
 })
 
 /** Зачисляют только оплаченную заявку: по умолчанию она уже оплачена. */
-async function newLead(extra: Partial<Pick<BootcampLead, 'email' | 'status' | 'paidAt'>> = {}): Promise<BootcampLead> {
+async function newLead(extra: Partial<Pick<BootcampLead, 'email' | 'status' | 'paidAt' | 'program'>> = {}): Promise<BootcampLead> {
   return payload.create({
     collection: 'bootcamp-leads',
     data: { email: `${uid('cand')}@mail.test`.toLowerCase(), name: 'Иван Петров', program: 'nodejs', status: 'paid', paidAt: new Date().toISOString(), consentVersion: '2026-10-26', consentAt: new Date().toISOString(), submissionCount: 1, entryTaskToken: uid('entry-token'), ...extra },
@@ -142,7 +137,7 @@ describe('зачисление из заявки', () => {
     const { enrollment } = await (await enroll(lead.id, form(username))).json() as { enrollment: { id: number } }
 
     const claimed = await claimJob(enrollment.id) as { job: { id: number, username: string, group: string, courseProject: string }, webhook: { url: string, token: string } }
-    expect(claimed.job).toMatchObject({ id: enrollment.id, username, group: 'nodejs-bootcamp', courseProject: 'bootcamp/course' })
+    expect(claimed.job).toMatchObject({ id: enrollment.id, username, group: 'nodejs-bootcamp', courseProject: 'bootcamp/course', gradingProject: 'bootcamp-staff/grading' })
     expect(claimed.webhook.url).toMatch(/\/api\/bootcamp\/gitlab-events$/)
     expect(claimed.webhook.token).toBe(webhookToken())
 
@@ -167,6 +162,29 @@ describe('зачисление из заявки', () => {
     await vi.waitFor(() => expect(telegram.filter((text) => text.startsWith(`Ученик впервые вошёл в GitLab: ${username}`))).toHaveLength(1))
     const after = await payload.findByID({ collection: 'bootcamp-enrollments', id: enrollment.id, depth: 0, overrideAccess: true })
     expect(after.gitlabSignedInAt).toBe('2026-10-31T10:00:00.000Z')
+  })
+
+  it('зачисление на другую программу: её курс в LMS, её репозиторий и проект проверки в задании', async () => {
+    const tree = await createCourseTree(payload, { lessons: 1 })
+    const program = await createProgram(payload, { manualsCourse: tree.course.id })
+    const lead = await newLead({ program: program.key })
+    const state = await (await call(enrollmentState, { id: String(lead.id) }, { method: 'GET', headers: asAdmin() })).json() as { defaults: { group: string } }
+    expect(state.defaults.group).toBe(program.gitlabStreamGroup)
+    const username = uid('py').toLowerCase().replace(/[^a-z0-9-]/g, '-')
+    const response = await enroll(lead.id, { ...form(username), group: program.gitlabStreamGroup })
+    expect(response.status).toBe(201)
+    const { enrollment } = await response.json() as { enrollment: { id: number } }
+    const saved = await payload.findByID({ collection: 'bootcamp-enrollments', id: enrollment.id, depth: 0, overrideAccess: true })
+    expect(saved).toMatchObject({ program: program.key, courseProject: program.gitlabCourseProject, gradingProject: program.gradingProject })
+    const user = (await payload.find({ collection: 'users', where: { email: { equals: lead.email } }, depth: 0, overrideAccess: true })).docs[0]
+    const grant = await payload.find({ collection: 'learning-access-grants', where: { ruleKey: { equals: `${user?.id}:courses:${tree.course.id}` } }, depth: 0, overrideAccess: true })
+    expect(grant.docs[0]?.effect).toBe('allow')
+
+    // Правка программы после зачисления задание не меняет: в нём снимок условий.
+    await payload.update({ collection: 'bootcamp-programs', id: program.id, data: { gradingProject: 'other/grading' }, overrideAccess: true })
+    const claimed = await claimJob(enrollment.id) as unknown as { job: { courseProject: string, gradingProject: string, group: string } }
+    expect(claimed.job).toMatchObject({ courseProject: program.gitlabCourseProject, gradingProject: program.gradingProject, group: program.gitlabStreamGroup })
+    expect((await report(enrollment.id, { status: 'failed', steps: [], error: 'проверка теста' })).status).toBe(200)
   })
 
   it('ошибка исполнителя видна в Telegram, «Повторить» возвращает задание в очередь', async () => {

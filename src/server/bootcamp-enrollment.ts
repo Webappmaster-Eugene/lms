@@ -5,9 +5,8 @@ import { sql } from '@payloadcms/db-postgres'
 import { commitTransaction, createLocalReq, initTransaction, killTransaction, type Payload } from 'payload'
 
 import {
-  BOOTCAMP_COURSE_PROJECT,
-  BOOTCAMP_MANUALS_COURSE_SLUG,
-  DEFAULT_STREAM_GROUP,
+  DEFAULT_COURSE_PROJECT,
+  DEFAULT_GRADING_PROJECT,
   EnrollmentInputError,
   initialSteps,
   mergeSteps,
@@ -25,6 +24,7 @@ import { BOOTCAMP_LEAD_STATUSES } from '@/lib/bootcamp-leads'
 import { relationId } from '@/lib/relation-id'
 import { adminLink, notifyAdmins } from '@/server/admin-telegram'
 import { actorName, journal } from '@/server/bootcamp-lead-events'
+import { requireProgram } from '@/server/bootcamp-programs'
 import { gitlabWebhookToken } from '@/server/bootcamp-worker-auth'
 import type { BootcampEnrollment, BootcampLead, User } from '@/payload-types'
 
@@ -105,12 +105,13 @@ export async function leadEnrollmentState(payload: Payload, leadId: number): Pro
   const lead = await findLead(payload, leadId)
   if (!lead) throw new EnrollmentInputError('Заявка не найдена', 404)
   const enrollment = await enrollmentOfLead(payload, leadId)
-  // Обычно поток один на всех, кого зачисляют в эти недели: берём группу последнего зачисления.
-  const last = await payload.find({ collection: 'bootcamp-enrollments', sort: '-createdAt', limit: 1, depth: 0, overrideAccess: true })
+  const program = await requireProgram(payload, lead.program)
+  // Обычно поток один на всех, кого зачисляют в эти недели: берём группу последнего зачисления этой программы.
+  const last = await payload.find({ collection: 'bootcamp-enrollments', where: { program: { equals: program.key } }, sort: '-createdAt', limit: 1, depth: 0, overrideAccess: true })
   return {
     lead: { id: lead.id, email: lead.email, name: lead.name ?? null, status: lead.status, statusLabel: BOOTCAMP_LEAD_STATUSES.find((item) => item.value === lead.status)?.label ?? lead.status },
     enrollment: enrollment ? enrollmentView(enrollment) : null,
-    defaults: { ...splitName(lead.name), username: suggestUsername(lead.email), group: last.docs[0]?.streamGroup ?? DEFAULT_STREAM_GROUP },
+    defaults: { ...splitName(lead.name), username: suggestUsername(lead.email), group: last.docs[0]?.streamGroup ?? program.gitlabStreamGroup },
   }
 }
 
@@ -129,8 +130,9 @@ export async function startEnrollment(payload: Payload, admin: User, leadId: num
   if (await enrollmentOfLead(payload, leadId)) throw new EnrollmentInputError('По этой заявке уже есть зачисление, его ход виден в панели', 409)
   const taken = await payload.find({ collection: 'bootcamp-enrollments', where: { gitlabUsername: { equals: input.username } }, limit: 1, depth: 0, overrideAccess: true })
   if (taken.docs[0]) throw new EnrollmentInputError(`Логин ${input.username} уже у другого зачисления (${taken.docs[0].email})`, 409)
-  const course = (await payload.find({ collection: 'courses', where: { slug: { equals: BOOTCAMP_MANUALS_COURSE_SLUG } }, limit: 1, depth: 0, overrideAccess: true })).docs[0]
-  if (!course) throw new EnrollmentInputError(`В LMS нет курса методичек «${BOOTCAMP_MANUALS_COURSE_SLUG}»: сначала импортируйте методички`, 409)
+  const program = await requireProgram(payload, lead.program)
+  const course = program.manualsCourseId === null ? null : await payload.findByID({ collection: 'courses', id: program.manualsCourseId, depth: 0, overrideAccess: true, disableErrors: true })
+  if (!course) throw new EnrollmentInputError(`У программы «${program.shortTitle}» не выбран курс методичек или его нет: CMS, Буткемпы, Программы буткемпов`, 409)
 
   const req = await createLocalReq({ user: admin }, payload)
   if (!(await initTransaction(req))) throw new Error('Enrollment requires a transaction')
@@ -184,6 +186,7 @@ export async function startEnrollment(payload: Payload, admin: User, leadId: num
       data: {
         lead: lead.id, email: lead.email, firstName: input.firstName, lastName: input.lastName,
         gitlabUsername: input.username, streamGroup: input.group, accessUntil: input.accessUntil,
+        program: program.key, courseProject: program.gitlabCourseProject, gradingProject: program.gradingProject,
         status: 'queued', steps, attempts: 0, lmsUser: user.id, requestedBy: admin.id, queuedAt: now,
       },
       overrideAccess: true,
@@ -231,6 +234,8 @@ export type WorkerJob = {
   username: string
   group: string
   courseProject: string
+  /** Проект проверки сдач: в его GRADER_GROUPS должна быть группа потока. */
+  gradingProject: string
   steps: EnrollmentStep[]
 }
 
@@ -258,7 +263,10 @@ export async function claimEnrollment(payload: Payload): Promise<ClaimResult> {
   let job: WorkerJob | null = null
   if (claimed[0]) {
     const doc = await payload.findByID({ collection: 'bootcamp-enrollments', id: claimed[0].id, depth: 0, overrideAccess: true })
-    job = { id: doc.id, email: doc.email, firstName: doc.firstName, lastName: doc.lastName, username: doc.gitlabUsername, group: doc.streamGroup, courseProject: BOOTCAMP_COURSE_PROJECT, steps: readSteps(doc.steps) }
+    job = {
+      id: doc.id, email: doc.email, firstName: doc.firstName, lastName: doc.lastName, username: doc.gitlabUsername, group: doc.streamGroup,
+      courseProject: doc.courseProject || DEFAULT_COURSE_PROJECT, gradingProject: doc.gradingProject || DEFAULT_GRADING_PROJECT, steps: readSteps(doc.steps),
+    }
   }
   const since = new Date(Date.now() - WATCH_DAYS * 86_400_000).toISOString()
   const watching = await payload.find({

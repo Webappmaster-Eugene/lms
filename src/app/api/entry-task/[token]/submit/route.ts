@@ -1,4 +1,5 @@
 import { parseEntrySolutions, submitEntrySolutions } from '@/server/bootcamp-entry-submission'
+import { entryTaskSetForLead } from '@/server/bootcamp-entry-task'
 import { entryTaskResponse, handleEntryTaskRequest } from '@/server/entry-task-route'
 import { readRequestJson } from '@/server/read-json-body'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
@@ -15,7 +16,8 @@ type Props = { params: Promise<{ token: string }> }
 export async function POST(request: Request, { params }: Props) {
   const { token } = await params
   return handleEntryTaskRequest(request, token, { perLink, overall, windowSeconds: 600 }, async (payload, lead) => {
-    const solutions = parseEntrySolutions(await readRequestJson(request, 256 * 1024))
-    return entryTaskResponse(await submitEntrySolutions(payload, lead, solutions))
+    const set = await entryTaskSetForLead(payload, lead)
+    const solutions = parseEntrySolutions(await readRequestJson(request, 256 * 1024), set)
+    return entryTaskResponse(await submitEntrySolutions(payload, lead, solutions, set))
   })
 }

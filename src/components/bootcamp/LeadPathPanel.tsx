@@ -157,6 +157,7 @@ export function LeadPathPanel() {
   return (
     <div className="enrollment lead-path" aria-live="polite">
       <p className="enrollment__title">Путь заявки: {lead.statusLabel}</p>
+      <p className="enrollment__hint">Программа: {lead.program}. Цена, оферта, курс методичек и проект GitLab берутся из неё.</p>
       {!state.paymentsEnabled && <p className="enrollment__hint">Робокасса не подключена: переменные ROBOKASSA_* не заданы. Допустить можно, оплату тогда отмечают вручную.</p>}
       {state.paymentsTest && <p className="enrollment__hint">Робокасса в тестовом режиме: оплаты не настоящие.</p>}
 

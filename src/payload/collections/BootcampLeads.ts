@@ -1,7 +1,8 @@
 import { APIError, type CollectionBeforeDeleteHook, type CollectionConfig } from 'payload'
 
 import { ENTRY_TASK_MAX_SUBMISSIONS } from '@/lib/bootcamp-entry-task'
-import { BOOTCAMP_LEAD_STATUSES, BOOTCAMP_PROGRAMS } from '@/lib/bootcamp-leads'
+import { BOOTCAMP_LEAD_STATUSES } from '@/lib/bootcamp-leads'
+import { validateProgramKey } from '@/payload/fields/bootcampProgramKey'
 import { isAdmin } from '@/payload/access/isAdmin'
 import { notifyLeadStatusChange } from '@/payload/hooks/bootcampLeadNotices'
 
@@ -30,8 +31,8 @@ export const BootcampLeads: CollectionConfig = {
   admin: {
     group: 'Буткемпы',
     useAsTitle: 'email',
-    defaultColumns: ['email', 'name', 'status', 'nextActionAt', 'createdAt', 'entrySubmittedAt', 'entryPassed', 'paidAt'],
-    description: 'Предзапись с info.mentorcareer.ru/bootcamp/nodejs. Повторная отправка того же адреса не создаёт новую заявку, а увеличивает счётчик отправок.',
+    defaultColumns: ['email', 'name', 'program', 'status', 'nextActionAt', 'createdAt', 'entrySubmittedAt', 'entryPassed', 'paidAt'],
+    description: 'Предзапись со страниц буткемпов на info.mentorcareer.ru. Повторная отправка того же адреса в той же программе не создаёт новую заявку, а увеличивает счётчик отправок.',
   },
   access: {
     create: isAdmin,
@@ -46,7 +47,8 @@ export const BootcampLeads: CollectionConfig = {
     { name: 'leadPath', type: 'ui', admin: { components: { Field: '/components/bootcamp/LeadPathPanel#LeadPathPanel' } } },
     { name: 'email', type: 'email', required: true, label: 'Email', admin: readOnly },
     { name: 'name', type: 'text', maxLength: 100, label: 'Имя' },
-    { name: 'program', type: 'select', required: true, defaultValue: 'nodejs', label: 'Программа', options: BOOTCAMP_PROGRAMS.map(({ value, label }) => ({ value, label })), admin: readOnly },
+    // Ключ программы буткемпа (bootcamp-programs.key): от неё цена, оферта, курс и входное задание.
+    { name: 'program', type: 'text', required: true, maxLength: 40, label: 'Программа', validate: validateProgramKey, admin: readOnly },
     {
       name: 'status',
       type: 'select',

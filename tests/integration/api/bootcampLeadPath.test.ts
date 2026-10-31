@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { sql } from '@payloadcms/db-postgres'
 import type { Payload } from 'payload'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -5,13 +6,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { GET as pathState, POST as pathAction } from '@/app/api/bootcamp/leads/[id]/path/route'
 import { POST as startRoute } from '@/app/api/bootcamp/pay/[token]/start/route'
 import { POST as resultRoute } from '@/app/api/bootcamp/robokassa/result/route'
-import { BOOTCAMP_MANUALS_COURSE_SLUG } from '@/lib/bootcamp-enrollment'
 import { adminTelegramTransport } from '@/server/admin-telegram'
 import { noteFailReturn, paymentPageState } from '@/server/bootcamp-payment'
 import { runBootcampSchedule } from '@/server/bootcamp-schedule'
 import { noticeSignatureBase, signatureHash } from '@/server/robokassa'
 import type { BootcampLead } from '@/payload-types'
 import { captureEmails, createAdmin, createCourseTree, getTestPayload, login, uid, type TestUser } from '../helpers/payload'
+import { createProgram, ensureNodejsProgramCourse } from '../helpers/bootcamp'
 
 let payload: Payload
 let admin: TestUser
@@ -29,11 +30,7 @@ beforeAll(async () => {
   payload = await getTestPayload()
   admin = await createAdmin(payload)
   adminToken = await login(payload, admin)
-  const existing = await payload.find({ collection: 'courses', where: { slug: { equals: BOOTCAMP_MANUALS_COURSE_SLUG } }, limit: 1, overrideAccess: true })
-  if (!existing.docs[0]) {
-    const { course } = await createCourseTree(payload, { lessons: 1 })
-    await payload.update({ collection: 'courses', id: course.id, data: { slug: BOOTCAMP_MANUALS_COURSE_SLUG }, overrideAccess: true })
-  }
+  await ensureNodejsProgramCourse(payload)
   for (const [key, value] of Object.entries({ ...ROBOKASSA, ...TELEGRAM })) {
     if (value === undefined) delete process.env[key]
     else process.env[key] = value
@@ -170,6 +167,58 @@ describe('путь заявки: этап только кнопками', () => 
 })
 
 describe('оплата через Робокассу', () => {
+  it('условия берутся из программы заявки: сумма, срок, оферта, строка чека и курс методичек', async () => {
+    const mail = captureEmails(payload)
+    try {
+      const noCourse = await createProgram(payload)
+      const blocked = await act((await newLead({ program: noCourse.key })).id, admitBody())
+      expect(blocked.status).toBe(409)
+      expect((await blocked.json() as { error: string }).error).toMatch(/не выбран курс методичек/)
+
+      const { course } = await createCourseTree(payload, { lessons: 1 })
+      const program = await createProgram(payload, { manualsCourse: course.id })
+      const lead = await newLead({ program: program.key })
+      const before = await (await pathState(new Request('http://lms.test/api/x', { headers: asAdmin() }), { params: Promise.resolve({ id: String(lead.id) }) })).json() as { lead: { program: string }, defaults: { amount: string, dueDays: number, group: string } }
+      expect(before.lead.program).toBe(program.title)
+      expect(before.defaults).toMatchObject({ amount: '30000', dueDays: 5, group: program.gitlabStreamGroup })
+
+      // Пустые сумма и срок в форме - условия программы.
+      expect((await act(lead.id, { ...admitBody(), amount: '', dueDays: '' })).status).toBe(200)
+      const fresh = await reload(lead.id)
+      expect(fresh.paymentAmountKopecks).toBe(3_000_000)
+      const days = (Date.parse(fresh.paymentDueAt ?? '') - Date.now()) / 86_400_000
+      expect(days).toBeGreaterThan(4)
+      expect(days).toBeLessThan(6)
+      const letter = mail.sent.find((message) => message.to === lead.email)
+      expect(letter?.subject).toBe('Вы допущены на буткемп Python')
+      expect(letter?.text).toContain(program.offerUrl)
+      expect(letter?.text).toContain('30 000 ₽')
+
+      const page = await paymentPageState(payload, fresh)
+      expect(page).toMatchObject({ kind: 'open', program: 'Python', offerUrl: program.offerUrl, landingUrl: program.landingUrl })
+      const response = await start(fresh.paymentToken ?? '')
+      expect(response.status).toBe(200)
+      const params = new URL((await response.json() as { url: string }).url).searchParams
+      expect(params.get('Description')).toBe(`Буткемп Python, заявка ${lead.id}`)
+      expect(decodeURIComponent(params.get('Receipt') ?? '')).toContain(program.receiptItemName)
+      const [payment] = (await payload.find({ collection: 'bootcamp-payments', where: { lead: { equals: lead.id } }, overrideAccess: true })).docs
+      expect(payment).toMatchObject({ offerVersion: '2026-11-01', amountKopecks: 3_000_000 })
+    } finally {
+      mail.restore()
+    }
+  })
+
+  it('заявка без программы в CMS: панель объясняет, а кандидат не может платить', async () => {
+    const lead = await newLead({ program: 'deleted-program' })
+    const response = await pathState(new Request('http://lms.test/api/x', { headers: asAdmin() }), { params: Promise.resolve({ id: String(lead.id) }) })
+    expect(response.status).toBe(409)
+    expect((await response.json() as { error: string }).error).toMatch(/Программы «deleted-program» нет в CMS/)
+    const token = randomBytes(24).toString('base64url')
+    await db().execute(sql`update bootcamp_leads set status = 'admitted', payment_token = ${token}, payment_amount_kopecks = 100000, payment_due_at = now() + interval '3 days' where id = ${lead.id}`)
+    expect((await paymentPageState(payload, await reload(lead.id))).kind).toBe('unavailable')
+    expect((await start(token)).status).toBe(503)
+  })
+
   it('без согласия с офертой счёт не создаётся, с ним - ссылка на тестовую Робокассу', async () => {
     const { lead, token } = await admitted()
     expect((await start(token, { acceptOffer: false })).status).toBe(400)

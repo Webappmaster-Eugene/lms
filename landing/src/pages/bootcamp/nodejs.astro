@@ -7,7 +7,7 @@ import screens from '../../data/screens.json'
 import { AUTHOR_URL, SITE_URL } from '../../config'
 import {
   AUDIENCE, BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, ENTRY_TASK_DAYS, ENTRY_TASK_MINUTES, FACTS, FAQ, LOG, MENTOR_EXPERIENCE, OFFER_PATH, PAINS, PATH, PAYMENT_PATH, PREP_START, PRICE,
-  PRIVACY_PATH, PROGRAM, QUALITY_PATH, RENTAL_FLOW, REVIEW_DAYS, SAMPLE_MANUAL, SAMPLE_QUESTIONS, START, START_ISO,
+  PRIVACY_PATH, PROGRAM, PROGRAM_KEY, QUALITY_PATH, RENTAL_FLOW, REVIEW_DAYS, SAMPLE_MANUAL, SAMPLE_QUESTIONS, START, START_ISO,
 } from '../../data/bootcamp'
 
 // В заголовке то, что ищут: «буткемп», «Node.js», «курс backend».
@@ -257,7 +257,7 @@ const extraSize = (screen: string) => {
         <h2 id="apply-title">Оставьте заявку, и входное задание сразу придёт на email</h2>
         <p>Точное время занятий сообщим до начала недели подготовки. Заявка ни к чему не обязывает, а оплаты на этой странице нет: платить нужно только после допуска, по личной ссылке из письма.</p>
       </div>
-      <form class="bc-form" data-lead-form data-consent-version={CONSENT_VERSION} novalidate>
+      <form class="bc-form" data-lead-form data-program={PROGRAM_KEY} data-consent-version={CONSENT_VERSION} novalidate>
         <div class="bc-field">
           <label for="lead-email">Email</label>
           <input id="lead-email" name="email" type="email" autocomplete="email" inputmode="email" required maxlength="254" aria-describedby="lead-email-error" />

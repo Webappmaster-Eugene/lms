@@ -1,12 +1,13 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { CandidateFrame } from '@/components/bootcamp/CandidateFrame'
 import { EntryTaskWorkspace } from '@/components/bootcamp/EntryTaskWorkspace'
 import { GuideMarkdown } from '@/components/guides/GuideMarkdown'
-import { ENTRY_TASK_MINUTES, ENTRY_TASKS } from '@/data/bootcamp-entry/tasks'
+import { entryTaskSetOf } from '@/data/bootcamp-entry/sets'
 import { ENTRY_TASK_DUE_DAYS, ENTRY_TASK_MAX_SUBMISSIONS, ENTRY_TASK_REVIEW_DAYS, formatEntryTaskDate } from '@/lib/bootcamp-entry-task'
-import { BOOTCAMP_PROGRAMS } from '@/lib/bootcamp-leads'
 import { getPayload } from '@/lib/payload'
 import { findLeadByEntryTaskToken } from '@/server/bootcamp-entry-task'
+import { findProgram } from '@/server/bootcamp-programs'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +30,9 @@ export default async function EntryTaskPage({ params }: Props) {
   const payload = await getPayload()
   const lead = await findLeadByEntryTaskToken(payload, token)
   if (!lead) notFound()
-  const program = BOOTCAMP_PROGRAMS.find((item) => item.value === lead.program)?.short ?? lead.program
+  const config = await findProgram(payload, lead.program)
+  const program = config?.shortTitle ?? lead.program
+  const set = entryTaskSetOf(config?.entryTaskSet)
   // Страница динамическая: срок сверяется с моментом запроса.
   const now = new Date()
   const overdue = lead.entryTaskDueAt ? Date.parse(lead.entryTaskDueAt) < now.getTime() : false
@@ -39,12 +42,13 @@ export default async function EntryTaskPage({ params }: Props) {
     : null
 
   return (
+    <CandidateFrame landingUrl={config?.landingUrl ?? null} program={config?.shortTitle ?? null}>
     <article className="mx-auto max-w-3xl space-y-10">
       <header className="space-y-4">
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Входное задание буткемпа {program}</h1>
         <p className="text-lg leading-relaxed text-muted-foreground">
           {name ? `${name}, спасибо за заявку. ` : 'Спасибо за заявку. '}
-          Здесь три небольшие задачи на JavaScript из жизни проката инструментов: на них обычно уходит {ENTRY_TASK_MINUTES} минут.
+          Здесь {set.intro}: на них обычно уходит {set.minutes} минут.
           Решайте прямо на этой странице, ничего устанавливать не нужно. Кнопка «Проверить» сразу прогоняет тесты и показывает, что получилось.
           Так мы поймём, с чего вам удобнее начать, а вы увидите, как устроены задачи в буткемпе.
         </p>
@@ -60,7 +64,7 @@ export default async function EntryTaskPage({ params }: Props) {
 
       <EntryTaskWorkspace
         token={token}
-        tasks={ENTRY_TASKS.map((task) => ({
+        tasks={set.tasks.map((task) => ({
           slug: task.slug,
           title: task.title,
           starterCode: task.starterCode,
@@ -74,5 +78,6 @@ export default async function EntryTaskPage({ params }: Props) {
         reviewDays={ENTRY_TASK_REVIEW_DAYS}
       />
     </article>
+    </CandidateFrame>
   )
 }

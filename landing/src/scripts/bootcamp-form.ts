@@ -59,7 +59,7 @@ function setup(form: HTMLFormElement) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          program: 'nodejs', email: email.value.trim(), name: name.value.trim(), consent: consent.checked,
+          program: form.dataset.program, email: email.value.trim(), name: name.value.trim(), consent: consent.checked,
           consentVersion: form.dataset.consentVersion, website: website.value, utm, referrer,
         }),
         signal: controller.signal,

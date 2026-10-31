@@ -311,14 +311,16 @@ type BootcampEntryTaskEmailInput = {
   dueDate: string
   reviewDays: number
   minutes: string
+  /** Что предстоит решить, из набора задания программы: «три небольшие функции на JavaScript». */
+  summary?: string
   replyable: boolean
 }
 
 /** Кандидату сразу после заявки: личная ссылка на входное задание и сроки. */
-export function bootcampEntryTaskEmail({ name, program, url, dueDate, reviewDays, minutes, replyable }: BootcampEntryTaskEmailInput): EmailContent {
+export function bootcampEntryTaskEmail({ name, program, url, dueDate, reviewDays, minutes, summary = 'три небольшие функции на JavaScript', replyable }: BootcampEntryTaskEmailInput): EmailContent {
   const hello = name?.trim() ? `Здравствуйте, ${name.trim()}!` : 'Здравствуйте!'
   const intro = `Спасибо за заявку на буткемп ${program}. Входное задание ждёт вас на платформе MentorCareer по личной ссылке. Она открывает только ваше задание, поэтому не пересылайте её.`
-  const terms = `Задание решается прямо на странице, ничего устанавливать не нужно: три небольшие функции на JavaScript, обычно на них уходит ${minutes} минут. Решение отправляется кнопкой на той же странице, срок до ${dueDate} включительно. Мы ответим в течение ${reviewDays} дней после отправки.`
+  const terms = `Задание решается прямо на странице, ничего устанавливать не нужно: ${summary}, обычно на них уходит ${minutes} минут. Решение отправляется кнопкой на той же странице, срок до ${dueDate} включительно. Мы ответим в течение ${reviewDays} дней после отправки.`
   const reply = replyable ? 'Если появятся вопросы, ответьте на это письмо.' : ''
   const reason = 'Вы получили это письмо, потому что оставили заявку на буткемп на info.mentorcareer.ru. Если заявку оставили не вы, письмо можно удалить.'
   return email(

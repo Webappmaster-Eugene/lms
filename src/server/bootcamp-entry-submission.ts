@@ -2,7 +2,8 @@ import 'server-only'
 
 import type { Payload } from 'payload'
 
-import { ENTRY_TASKS, entryTaskSpec, findEntryTask, type EntryTask } from '@/data/bootcamp-entry/tasks'
+import { findTaskInSet, type EntryTaskSet } from '@/data/bootcamp-entry/sets'
+import { entryTaskSpec, type EntryTask } from '@/data/bootcamp-entry/tasks'
 import { ENTRY_TASK_MAX_SUBMISSIONS, ENTRY_TASK_REVIEW_DAYS } from '@/lib/bootcamp-entry-task'
 import { logger } from '@/lib/telemetry'
 import { TRAINER_LIMITS } from '@/lib/trainer/constants'
@@ -53,22 +54,22 @@ function readCode(value: unknown): string {
   return value
 }
 
-/** Тело «Проверить»: одна задача и её код. */
-export function parseEntryCheck(body: unknown): { task: EntryTask, code: string } {
+/** Тело «Проверить»: одна задача набора программы и её код. */
+export function parseEntryCheck(body: unknown, set: EntryTaskSet): { task: EntryTask, code: string } {
   const input = body && typeof body === 'object' ? body as Record<string, unknown> : {}
-  const task = typeof input.task === 'string' ? findEntryTask(input.task) : undefined
+  const task = typeof input.task === 'string' ? findTaskInSet(set, input.task) : undefined
   if (!task) throw new EntrySubmissionError('Неизвестная задача', 400)
   const code = readCode(input.code)
   if (!code.trim()) throw new EntrySubmissionError('Напишите решение, потом проверяйте', 400)
   return { task, code }
 }
 
-/** Тело «Отправить решение»: код по задачам, нерешённые можно не присылать. */
-export function parseEntrySolutions(body: unknown): Record<string, string> {
+/** Тело «Отправить решение»: код по задачам набора, нерешённые можно не присылать. */
+export function parseEntrySolutions(body: unknown, set: EntryTaskSet): Record<string, string> {
   const input = body && typeof body === 'object' ? (body as Record<string, unknown>).solutions : undefined
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new EntrySubmissionError('Нет решений', 400)
   const solutions: Record<string, string> = {}
-  for (const task of ENTRY_TASKS) {
+  for (const task of set.tasks) {
     const code = readCode((input as Record<string, unknown>)[task.slug])
     if (code.trim()) solutions[task.slug] = code
   }
@@ -88,12 +89,12 @@ function describe(outcome: EntryTaskOutcome): string {
  * Прогоняет все задачи на сервере и записывает последнюю отправку в заявку.
  * Результат браузера сюда не приходит: как и в тренажёре, верят только серверному прогону.
  */
-export async function submitEntrySolutions(payload: Payload, lead: BootcampLead, solutions: Record<string, string>): Promise<EntrySubmissionResult> {
+export async function submitEntrySolutions(payload: Payload, lead: BootcampLead, solutions: Record<string, string>, set: EntryTaskSet): Promise<EntrySubmissionResult> {
   // Ранний отказ бережёт песочницы; окончательно предел держит запись в базе.
   if ((lead.entrySubmissionCount ?? 0) >= ENTRY_TASK_MAX_SUBMISSIONS) throw new EntrySubmissionError(ENTRY_SUBMISSIONS_EXHAUSTED, 409)
   const tasks: EntryTaskOutcome[] = []
   // По очереди: пул песочниц общий с тренажёром, три прогона разом заняли бы его целиком.
-  for (const task of ENTRY_TASKS) {
+  for (const task of set.tasks) {
     const code = solutions[task.slug]
     if (!code) {
       tasks.push({ slug: task.slug, title: task.title, attempted: false, passed: 0, total: task.cases.length, status: 'not_started' })

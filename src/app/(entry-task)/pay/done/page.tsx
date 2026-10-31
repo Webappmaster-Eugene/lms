@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 
+import { CandidateFrame } from '@/components/bootcamp/CandidateFrame'
 import { PaymentStatusRefresh } from '@/components/bootcamp/PaymentStatusRefresh'
 import { getPayload } from '@/lib/payload'
 import { successReturnState } from '@/server/bootcamp-payment'
@@ -22,6 +23,7 @@ export default async function PaymentDonePage({ searchParams }: Props) {
   const state = await successReturnState(await getPayload(), params)
   const support = <a className="underline underline-offset-4" href={`mailto:${SUPPORT}`}>{SUPPORT}</a>
   return (
+    <CandidateFrame landingUrl={state.landingUrl} program={state.program}>
     <article className="mx-auto max-w-3xl space-y-6">
       <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{state.kind === 'paid' ? 'Оплата получена' : 'Проверяем оплату'}</h1>
       <div className="rounded-xl border border-border bg-card px-5 py-4 text-base leading-relaxed" aria-live="polite">
@@ -40,5 +42,6 @@ export default async function PaymentDonePage({ searchParams }: Props) {
         )}
       </div>
     </article>
+    </CandidateFrame>
   )
 }

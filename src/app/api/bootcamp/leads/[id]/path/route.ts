@@ -1,7 +1,7 @@
 import { parseAdmissionInput, parseDueDays, parseManualPayment, parseMessage } from '@/lib/bootcamp-admission'
 import { EnrollmentInputError, parseEnrollmentInput } from '@/lib/bootcamp-enrollment'
 import { adminRequest, handleRoute, routeId, routeResponse } from '@/server/bootcamp-enrollment-routes'
-import { admitLead, cancelAdmission, decideLead, enrollPaidLead, extendEntryTask, leadPathState, reopenLead, resendPaymentLink } from '@/server/bootcamp-lead-path'
+import { admissionDefaults, admitLead, cancelAdmission, decideLead, enrollPaidLead, extendEntryTask, leadPathState, reopenLead, resendPaymentLink } from '@/server/bootcamp-lead-path'
 import { markPaidManually } from '@/server/bootcamp-payment'
 import { readRequestJson } from '@/server/read-json-body'
 
@@ -25,13 +25,13 @@ export async function POST(request: Request, { params }: Props) {
     const body = await readRequestJson(request, 8192)
     const action = body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>).action : undefined
     switch (action) {
-      case 'admit': return routeResponse(await admitLead(payload, user, leadId, parseAdmissionInput(body)))
+      case 'admit': return routeResponse(await admitLead(payload, user, leadId, parseAdmissionInput(body, await admissionDefaults(payload, leadId))))
       case 'prepare': return routeResponse(await decideLead(payload, user, leadId, 'preparation', parseMessage(body, true)))
       case 'reject': return routeResponse(await decideLead(payload, user, leadId, 'rejected', parseMessage(body, false)))
       case 'withdraw': return routeResponse(await decideLead(payload, user, leadId, 'withdrawn', parseMessage(body, false)))
       case 'reopen': return routeResponse(await reopenLead(payload, user, leadId))
       case 'extend-entry-task': return routeResponse(await extendEntryTask(payload, user, leadId))
-      case 'resend-payment': return routeResponse(await resendPaymentLink(payload, user, leadId, parseDueDays(body)))
+      case 'resend-payment': return routeResponse(await resendPaymentLink(payload, user, leadId, parseDueDays(body, (await admissionDefaults(payload, leadId)).paymentDueDays)))
       case 'cancel-admission': return routeResponse(await cancelAdmission(payload, user, leadId))
       case 'mark-paid': {
         const { amountKopecks, comment } = parseManualPayment(body)

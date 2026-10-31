@@ -53,6 +53,7 @@ import { BootcampEnrollments } from '@/payload/collections/BootcampEnrollments'
 import { BootcampLeads } from '@/payload/collections/BootcampLeads'
 import { BootcampLeadEvents } from '@/payload/collections/BootcampLeadEvents'
 import { BootcampPayments } from '@/payload/collections/BootcampPayments'
+import { BootcampPrograms } from '@/payload/collections/BootcampPrograms'
 import { withLessonSourceGuard } from '@/payload/hooks/denyLessonSourceQueries'
 import { SiteSettings } from '@/payload/globals/SiteSettings'
 
@@ -142,6 +143,7 @@ export default buildConfig({
     InterviewAnalysisUsage,
     FaqItems,
     YandexDiskImports,
+    BootcampPrograms,
     BootcampLeads,
     BootcampEntryTasks,
     BootcampEnrollments,

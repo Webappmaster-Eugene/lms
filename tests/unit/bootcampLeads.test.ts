@@ -27,9 +27,10 @@ describe('предзапись на буткемп: разбор формы', ()
     expect(parseBootcampLead({ ...valid, name: undefined }).name).toBeNull()
   })
 
-  it('без согласия, с неизвестной программой или версией согласия — отказ с объяснением', () => {
+  // Есть ли программа и принимает ли она заявки, проверяет сервер по CMS (интеграционный тест заявок).
+  it('без согласия, с ключом программы не в том формате или версией согласия — отказ с объяснением', () => {
     expect(error({ ...valid, consent: 'true' })).toMatch(/согласие/)
-    expect(error({ ...valid, program: 'python' })).toMatch(/программы нет/)
+    expect(error({ ...valid, program: 'Python!' })).toMatch(/программы нет/)
     expect(error({ ...valid, consentVersion: '../policy' })).toMatch(/версию согласия/)
     expect(error([valid])).toMatch(/неверном формате/)
   })

@@ -1,22 +1,25 @@
 import { describe, expect, it } from 'vitest'
 
-import { BOOTCAMP_PRICE_KOPECKS, formatRubles, parseAdmissionInput, parseManualPayment, parseMessage, parseRubles, paymentDueAt } from '@/lib/bootcamp-admission'
+import { formatRubles, parseAdmissionInput, parseManualPayment, parseMessage, parseRubles, paymentDueAt } from '@/lib/bootcamp-admission'
 import { bootcampAdmittedEmail, bootcampDecisionEmail, bootcampPaymentReceivedEmail, bootcampPaymentReminderEmail } from '@/payload/emails/templates'
 
 const enrollment = { firstName: 'Иван', lastName: 'Петров', username: 'ivan', group: 'nodejs-bootcamp', accessUntil: '' }
+// Условия программы: пустые сумма и срок в форме берутся из них.
+const program = { priceKopecks: 4_500_000, paymentDueDays: 7 }
 
 describe('допуск: разбор формы', () => {
-  it('сумма и срок по умолчанию, комментарий обрезается', () => {
-    expect(parseAdmissionInput({ ...enrollment, comment: '  ждём  ' })).toMatchObject({ amountKopecks: BOOTCAMP_PRICE_KOPECKS, dueDays: 7, comment: 'ждём', enrollment: { username: 'ivan' } })
-    expect(parseAdmissionInput({ ...enrollment, amount: '40 000,50', dueDays: '3' })).toMatchObject({ amountKopecks: 4_000_050, dueDays: 3, comment: null })
+  it('сумма и срок по умолчанию из программы, комментарий обрезается', () => {
+    expect(parseAdmissionInput({ ...enrollment, comment: '  ждём  ' }, program)).toMatchObject({ amountKopecks: 4_500_000, dueDays: 7, comment: 'ждём', enrollment: { username: 'ivan' } })
+    expect(parseAdmissionInput({ ...enrollment }, { priceKopecks: 6_000_000, paymentDueDays: 10 })).toMatchObject({ amountKopecks: 6_000_000, dueDays: 10 })
+    expect(parseAdmissionInput({ ...enrollment, amount: '40 000,50', dueDays: '3' }, program)).toMatchObject({ amountKopecks: 4_000_050, dueDays: 3, comment: null })
   })
 
   it('отклоняет кривую сумму, срок и логин', () => {
     expect(() => parseRubles('45000.555')).toThrow('Сумма')
     expect(() => parseRubles('-1')).toThrow('Сумма')
     expect(() => parseRubles('0.50')).toThrow('не меньше 1 рубля')
-    expect(() => parseAdmissionInput({ ...enrollment, dueDays: '0' })).toThrow('Срок оплаты')
-    expect(() => parseAdmissionInput({ ...enrollment, username: 'Bad Login' })).toThrow('Логин GitLab')
+    expect(() => parseAdmissionInput({ ...enrollment, dueDays: '0' }, program)).toThrow('Срок оплаты')
+    expect(() => parseAdmissionInput({ ...enrollment, username: 'Bad Login' }, program)).toThrow('Логин GitLab')
   })
 
   it('подготовка требует текст, ручная оплата требует комментарий', () => {

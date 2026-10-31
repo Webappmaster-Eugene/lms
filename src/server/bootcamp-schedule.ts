@@ -5,12 +5,12 @@ import type { Payload } from 'payload'
 
 import { formatRubles, paymentPath, PAYMENT_REMINDER_BEFORE_DAYS, REVIEW_ALERT_AFTER_DAYS } from '@/lib/bootcamp-admission'
 import { formatEntryTaskDate } from '@/lib/bootcamp-entry-task'
-import { BOOTCAMP_PROGRAMS } from '@/lib/bootcamp-leads'
 import { sendWeeklySummary } from '@/server/bootcamp-funnel'
 import { logger } from '@/lib/telemetry'
 import { bootcampPaymentReminderEmail, emailBaseUrl } from '@/payload/emails/templates'
 import { journal, leadAdminLink, rowsOf } from '@/server/bootcamp-lead-events'
 import { applyPaid } from '@/server/bootcamp-payment'
+import { programNames } from '@/server/bootcamp-programs'
 import { contactReplyTo } from '@/server/contact-reply-to'
 import { fetchOperationState, robokassaConfig } from '@/server/robokassa'
 
@@ -62,7 +62,7 @@ async function paymentReminders(payload: Payload): Promise<number> {
     try {
       const content = bootcampPaymentReminderEmail({
         name: lead.name,
-        program: BOOTCAMP_PROGRAMS.find((item) => item.value === lead.program)?.short ?? lead.program,
+        program: (await programNames(payload, lead.program)).short,
         amount: formatRubles(Number(lead.payment_amount_kopecks)),
         dueDate,
         url: `${emailBaseUrl()}${paymentPath(lead.payment_token)}`,

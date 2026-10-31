@@ -1,11 +1,10 @@
+import { PROGRAM_KEY_PATTERN } from '@/lib/bootcamp-programs'
+
 /**
  * Предзапись на буткемп с публичного лендинга: что принимает форма и в каком виде
  * это хранится. Посетитель анонимный, поэтому всё, что приходит, проверяется и
  * обрезается здесь, до записи в базу.
  */
-
-export const BOOTCAMP_PROGRAMS = [{ value: 'nodejs', label: 'Node.js: backend сервиса проката', short: 'Node.js' }] as const
-export type BootcampProgram = (typeof BOOTCAMP_PROGRAMS)[number]['value']
 
 /**
  * Порядок - порядок в списке CMS. Этап меняют только кнопки в карточке заявки и события
@@ -36,7 +35,8 @@ export const BOOTCAMP_UTM_FIELDS = [
 export type BootcampLeadSource = Record<(typeof BOOTCAMP_UTM_FIELDS)[number][1] | 'referrerHost', string | null>
 
 export type BootcampLeadInput = {
-  program: BootcampProgram
+  /** Ключ программы; есть ли она и принимает ли заявки, сервер проверяет по CMS. */
+  program: string
   email: string
   name: string | null
   consentVersion: string
@@ -86,7 +86,7 @@ export function parseBootcampLead(body: unknown): BootcampLeadInput {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new BootcampLeadError('Заявка пришла в неверном формате. Обновите страницу и отправьте ещё раз.')
   const data = body as Record<string, unknown>
 
-  const program = BOOTCAMP_PROGRAMS.find((item) => item.value === data.program)?.value
+  const program = typeof data.program === 'string' && PROGRAM_KEY_PATTERN.test(data.program) ? data.program : null
   if (!program) throw new BootcampLeadError('Такой программы нет. Обновите страницу и отправьте заявку ещё раз.')
 
   const email = (text(data.email) ?? '').trim().toLowerCase()

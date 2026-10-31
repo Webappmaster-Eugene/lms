@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
 
+import { CandidateFrame } from '@/components/bootcamp/CandidateFrame'
 import { getPayload } from '@/lib/payload'
 import { noteFailReturn } from '@/server/bootcamp-payment'
+import { candidateLanding } from '@/server/bootcamp-programs'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,8 +19,11 @@ type Props = { searchParams: Promise<Record<string, string | string[] | undefine
 /** FailURL магазина: подписи у него нет, поэтому данные заявки здесь не показываем. */
 export default async function PaymentFailPage({ searchParams }: Props) {
   const { InvId } = await searchParams
-  await noteFailReturn(await getPayload(), typeof InvId === 'string' ? InvId : undefined)
+  const payload = await getPayload()
+  await noteFailReturn(payload, typeof InvId === 'string' ? InvId : undefined)
+  const landing = await candidateLanding(payload)
   return (
+    <CandidateFrame {...landing}>
     <article className="mx-auto max-w-3xl space-y-6">
       <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Оплата не прошла</h1>
       <div className="rounded-xl border border-border bg-card px-5 py-4 text-base leading-relaxed">
@@ -26,5 +31,6 @@ export default async function PaymentFailPage({ searchParams }: Props) {
         <p className="mt-2 text-muted-foreground">Если не получается, напишите нам на <a className="underline underline-offset-4" href={`mailto:${SUPPORT}`}>{SUPPORT}</a>.</p>
       </div>
     </article>
+    </CandidateFrame>
   )
 }
