@@ -11,11 +11,11 @@ vi.mock('next/link', async () => (await import('../helpers/component-mocks')).li
 const { EnrollmentPanel } = await import('@/components/bootcamp/EnrollmentPanel')
 
 const lead = { id: 5, email: 'ivan@mail.test', name: 'Иван Петров', status: 'admitted', statusLabel: 'Допущен' }
-const defaults = { firstName: 'Иван', lastName: 'Петров', username: 'ivan', group: 'nodejs-test' }
+const defaults = { firstName: 'Иван', lastName: 'Петров', username: 'ivan', group: 'nodejs-bootcamp' }
 const step = (key: string, label: string, state: string, detail?: string) => ({ key, label, state, ...(detail ? { detail } : {}) })
 const enrollment = (status: string, extra: Record<string, unknown> = {}) => ({
   id: 9, status, statusLabel: { queued: 'Ждёт GitLab', failed: 'Ошибка', done: 'Готово' }[status], error: null,
-  firstName: 'Иван', lastName: 'Петров', gitlabUsername: 'ivan', streamGroup: 'nodejs-test', accessUntil: null,
+  firstName: 'Иван', lastName: 'Петров', gitlabUsername: 'ivan', streamGroup: 'nodejs-bootcamp', accessUntil: null,
   gitlabProjectUrl: null, lmsUserId: 31, attempts: 0, queuedAt: null, startedAt: null, finishedAt: null, lmsSignedInAt: null, gitlabSignedInAt: null,
   steps: [step('lms_account', 'Учётка LMS и приглашение', 'done', 'создана'), step('gitlab_user', 'Учётка GitLab и письмо для пароля', 'pending')],
   ...extra,

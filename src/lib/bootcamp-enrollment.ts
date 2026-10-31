@@ -8,7 +8,7 @@
 export const BOOTCAMP_COURSE_PROJECT = 'bootcamp/course'
 // Курс методичек в LMS: назначается каждому зачисленному. Тот же slug у импорта методичек.
 export const BOOTCAMP_MANUALS_COURSE_SLUG = 'nodejs-bootcamp-manuals'
-export const DEFAULT_STREAM_GROUP = 'nodejs-test'
+export const DEFAULT_STREAM_GROUP = 'nodejs-bootcamp'
 
 export const ENROLLMENT_STATUSES = [
   { value: 'queued', label: 'Ждёт GitLab' },

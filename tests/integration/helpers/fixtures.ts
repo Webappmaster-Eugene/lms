@@ -83,7 +83,7 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   // Адрес уникален в программе: фабрика каждый раз даёт новый.
   'bootcamp-leads': () => ({ email: `${uid('lead')}@mail.test`.toLowerCase(), program: 'nodejs', consentVersion: '2026-10-26', consentAt: new Date().toISOString(), entryTaskToken: uid('entry-token') }),
   // Заявку (уникальная связь) создаёт makeValid.
-  'bootcamp-enrollments': () => ({ lead: 0, email: `${uid('enr')}@mail.test`.toLowerCase(), firstName: 'Имя', lastName: 'Фамилия', gitlabUsername: uid('enr').toLowerCase().replace(/[^a-z0-9-]/g, '-'), streamGroup: 'nodejs-test', status: 'queued' }),
+  'bootcamp-enrollments': () => ({ lead: 0, email: `${uid('enr')}@mail.test`.toLowerCase(), firstName: 'Имя', lastName: 'Фамилия', gitlabUsername: uid('enr').toLowerCase().replace(/[^a-z0-9-]/g, '-'), streamGroup: 'nodejs-bootcamp', status: 'queued' }),
 }
 
 /** Коллекции, где пользователь может владеть документом (поле user). */

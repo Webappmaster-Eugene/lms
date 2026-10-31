@@ -72,7 +72,7 @@ function call<T extends string>(route: (request: Request, ctx: Ctx<T>) => Promis
 const enroll = (leadId: number, body: unknown, headers: Record<string, string> = asAdmin()) => call(enrollRoute, { id: String(leadId) }, { headers, body })
 const claim = (key = workerKey()) => claimRoute(new Request('http://lms.test/api/internal/bootcamp-enrollments/claim', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-lms-worker-key': key }, body: '{}' }))
 const report = (id: number, body: unknown) => call(reportRoute, { id: String(id) }, { headers: { 'Content-Type': 'application/json', 'x-lms-worker-key': workerKey() }, body })
-const form = (username: string) => ({ firstName: 'Иван', lastName: 'Петров', username, group: 'nodejs-test', accessUntil: '' })
+const form = (username: string) => ({ firstName: 'Иван', lastName: 'Петров', username, group: 'nodejs-bootcamp', accessUntil: '' })
 
 /** Пока в базе нет чужих заданий в очереди, исполнитель берёт именно это. */
 async function claimJob(id: number) {
@@ -133,7 +133,7 @@ describe('зачисление из заявки', () => {
     const { enrollment } = await (await enroll(lead.id, form(username))).json() as { enrollment: { id: number } }
 
     const claimed = await claimJob(enrollment.id) as { job: { id: number, username: string, group: string, courseProject: string }, webhook: { url: string, token: string } }
-    expect(claimed.job).toMatchObject({ id: enrollment.id, username, group: 'nodejs-test', courseProject: 'bootcamp/course' })
+    expect(claimed.job).toMatchObject({ id: enrollment.id, username, group: 'nodejs-bootcamp', courseProject: 'bootcamp/course' })
     expect(claimed.webhook.url).toMatch(/\/api\/bootcamp\/gitlab-events$/)
     expect(claimed.webhook.token).toBe(webhookToken())
 
@@ -144,10 +144,10 @@ describe('зачисление из заявки', () => {
     // Отчёт исполнителя шаги LMS не трогает.
     expect((running.steps as { key: string, state: string }[]).find((step) => step.key === 'lms_account')?.state).toBe('done')
 
-    const done = await report(enrollment.id, { status: 'done', steps: [{ key: 'gitlab_webhook', state: 'done' }], gitlabProjectId: 501, gitlabProjectUrl: `https://git.test/nodejs-test/${username}` })
+    const done = await report(enrollment.id, { status: 'done', steps: [{ key: 'gitlab_webhook', state: 'done' }], gitlabProjectId: 501, gitlabProjectUrl: `https://git.test/nodejs-bootcamp/${username}` })
     expect(done.status).toBe(200)
     expect((await payload.findByID({ collection: 'bootcamp-leads', id: lead.id, depth: 0, overrideAccess: true })).status).toBe('enrolled')
-    await vi.waitFor(() => expect(telegram.find((text) => text.startsWith(`Зачислен: ${lead.email}`))).toContain(`https://git.test/nodejs-test/${username}`))
+    await vi.waitFor(() => expect(telegram.find((text) => text.startsWith(`Зачислен: ${lead.email}`))).toContain(`https://git.test/nodejs-bootcamp/${username}`))
     // Своё сообщение о смене этапа зачисление не дублирует.
     expect(telegram.some((text) => text.startsWith('Этап заявки'))).toBe(false)
     expect((await report(enrollment.id, { status: 'running', steps: [] })).status).toBe(409)
@@ -245,7 +245,7 @@ describe('события буткемпа в Telegram', () => {
     const lead = await newLead()
     const username = uid('gh').toLowerCase().replace(/[^a-z0-9-]/g, '-')
     await enroll(lead.id, form(username))
-    const project = { id: 900_000 + Math.floor(Math.random() * 1000), path_with_namespace: `nodejs-test/${username}`, web_url: `https://git.test/nodejs-test/${username}` }
+    const project = { id: 900_000 + Math.floor(Math.random() * 1000), path_with_namespace: `nodejs-bootcamp/${username}`, web_url: `https://git.test/nodejs-bootcamp/${username}` }
     const hook = (event: string, body: unknown, token = webhookToken()) => gitlabEvents(new Request('http://lms.test/api/bootcamp/gitlab-events', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Gitlab-Event': event, 'X-Gitlab-Token': token }, body: JSON.stringify(body) }))
     const mr = { iid: 3, title: 'Неделя 1', url: `${project.web_url}/-/merge_requests/3` }
 

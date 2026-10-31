@@ -64,7 +64,8 @@ Astro). Тексты — `landing/src/pages/bootcamp/nodejs.astro` и `landing/s
 
 Снято 27.10.2026, на снимках только демонстрационные учётки:
 
-- GitLab курса — ученик `test-student`, проект `nodejs-test/test-student`: MR !2
+- GitLab курса — ученик `test-student`, проект `nodejs-test/test-student` (с 31.10.2026 группа
+  называется `nodejs-bootcamp`, на снимках старый путь): MR !2
   «Материалы недели 1» и MR !3 с решением недели 1 из `checkpoint-01` эталона,
   настоящий CI, доверенная проверка (26 из 26), ревью и слияние от root (наставник,
   имя «Евгений Надточеев»). Пароль test-student — в связке «GitLab test-student».
