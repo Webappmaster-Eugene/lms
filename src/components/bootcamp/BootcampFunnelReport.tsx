@@ -21,7 +21,7 @@ export function BootcampFunnelReport({ report, filter, action }: Props) {
     <div className="bootcamp-funnel">
       <header>
         <h1>Воронка буткемпа</h1>
-        <p>Заявки, пришедшие за выбранный период, и сколько из них дошло до каждого шага. Деньги считаются по дате оплаты. Тестовые оплаты Робокассы не учитываются.</p>
+        <p>Заявки, пришедшие за выбранный период, и сколько из них дошло до каждого шага. Деньги считаются по дате оплаты. Заявки с отметкой «Тестовая заявка» и тестовые оплаты Робокассы не учитываются.</p>
       </header>
 
       <form className="bootcamp-funnel__filter" method="get" action={action}>
@@ -91,14 +91,14 @@ export function BootcampFunnelReport({ report, filter, action }: Props) {
               {report.queue.map((item) => (
                 <li key={item.id}>
                   <Link href={`/admin/collections/bootcamp-leads/${item.id}`}>{item.name ? `${item.name}, ${item.email}` : item.email}</Link>
-                  <span>{actionReasonLabel(item.reason)}, с {at(item.since)}</span>
+                  <span>{item.test ? 'Тестовая заявка. ' : ''}{actionReasonLabel(item.reason)}, с {at(item.since)}</span>
                 </li>
               ))}
             </ul>
             {report.queueTotal > report.queue.length && <p className="bootcamp-funnel__notice">Всего таких заявок {report.queueTotal}, здесь самые давние {report.queue.length}.</p>}
           </>
         )}
-        <p className="bootcamp-funnel__notice">Список не зависит от периода и источника: в нём все заявки, где следующий шаг за командой.</p>
+        <p className="bootcamp-funnel__notice">Список не зависит от периода и источника: в нём все заявки, где следующий шаг за командой, и тестовые тоже.</p>
       </section>
     </div>
   )

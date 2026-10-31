@@ -1860,6 +1860,10 @@ export interface BootcampLead {
     | 'withdrawn';
   assignee?: (number | null) | User;
   nextActionAt?: string | null;
+  /**
+   * Проверка команды: заявка не попадает в воронку, деньги за период и итоги недели. Письма, оплата и зачисление работают как обычно.
+   */
+  isTest?: boolean | null;
   note?: string | null;
   /**
    * Метки рекламы из адреса страницы и сайт, с которого перешли. Полный адрес не хранится.
@@ -3267,6 +3271,7 @@ export interface BootcampLeadsSelect<T extends boolean = true> {
   status?: T;
   assignee?: T;
   nextActionAt?: T;
+  isTest?: T;
   note?: T;
   source?:
     | T

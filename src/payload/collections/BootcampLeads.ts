@@ -62,6 +62,13 @@ export const BootcampLeads: CollectionConfig = {
     },
     { name: 'assignee', type: 'relationship', relationTo: 'users', label: 'Ответственный', filterOptions: { role: { equals: 'admin' } }, admin: { position: 'sidebar' } },
     { name: 'nextActionAt', type: 'date', label: 'Следующее действие', admin: { position: 'sidebar', date: { pickerAppearance: 'dayAndTime' } } },
+    {
+      name: 'isTest',
+      type: 'checkbox',
+      defaultValue: false,
+      label: 'Тестовая заявка',
+      admin: { position: 'sidebar', description: 'Проверка команды: заявка не попадает в воронку, деньги за период и итоги недели. Письма, оплата и зачисление работают как обычно.' },
+    },
     { name: 'note', type: 'textarea', maxLength: 5000, label: 'Заметки команды' },
     {
       name: 'source',

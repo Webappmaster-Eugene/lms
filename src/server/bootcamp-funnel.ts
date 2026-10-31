@@ -10,7 +10,8 @@ import { inTransaction, recordLeadEvent, rowsOf, txDb } from '@/server/bootcamp-
 
 /**
  * Воронка считается по заявкам, созданным за период: сколько из них дошло до каждого шага.
- * Деньги за период - по дате оплаты. Тестовые оплаты Робокассы нигде не учитываются.
+ * Деньги за период - по дате оплаты. Тестовые заявки и тестовые оплаты Робокассы нигде не учитываются,
+ * кроме списка дел: проверку тоже надо довести до конца.
  */
 
 type Db = { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }
@@ -40,14 +41,15 @@ const cohort = (filter: FunnelFilter) => sql`
   left join lateral (select min(e.created_at) as at from bootcamp_lead_events e where e.lead_id = l.id and e.type = 'admitted') adm on true
   left join lateral (select min(p.paid_at) as at from bootcamp_payments p where p.lead_id = l.id and p.status = 'paid' and not coalesce(p.is_test, false)) pay on true
   left join lateral (select min(e.created_at) as at from bootcamp_lead_events e where e.lead_id = l.id and e.type = 'gitlab_event' and e.data->>'event' = 'Merge Request Hook') mr on true
-  where (${iso(filter.from)}::timestamptz is null or l.created_at >= ${iso(filter.from)}::timestamptz)
+  where not coalesce(l.is_test, false)
+    and (${iso(filter.from)}::timestamptz is null or l.created_at >= ${iso(filter.from)}::timestamptz)
     and l.created_at < ${iso(filter.to)}::timestamptz`
 
 const median = (later: string, earlier: string) => sql.raw(`percentile_cont(0.5) within group (order by greatest(0, extract(epoch from ${later} - ${earlier}))) filter (where ${later} is not null and ${earlier} is not null)`)
 
 export type FunnelStep = { key: FunnelStepKey, label: string, count: number, fromPrevious: number | null, fromLeads: number | null, median: number | null }
 export type FunnelSource = { key: string, label: string, leads: number, submitted: number, admitted: number, paid: number, enrolled: number }
-export type FunnelQueueItem = { id: number, email: string, name: string | null, reason: string, since: string | null }
+export type FunnelQueueItem = { id: number, email: string, name: string | null, reason: string, since: string | null, test: boolean }
 export type FunnelReport = {
   steps: FunnelStep[]
   entryScore: number | null
@@ -107,7 +109,7 @@ export async function bootcampFunnel(payload: Payload, filter: FunnelFilter): Pr
   const [money] = rowsOf<{ kopecks: string | null, payments: string }>(await db(payload).execute(sql`
     select sum(p.amount_kopecks) as kopecks, count(*) as payments
     from bootcamp_payments p join bootcamp_leads l on l.id = p.lead_id
-    where p.status = 'paid' and not coalesce(p.is_test, false)
+    where p.status = 'paid' and not coalesce(p.is_test, false) and not coalesce(l.is_test, false)
       and (${iso(filter.from)}::timestamptz is null or p.paid_at >= ${iso(filter.from)}::timestamptz) and p.paid_at < ${iso(filter.to)}::timestamptz
       and (${filter.source}::text is null or ${SOURCE} = ${filter.source}::text)`))
 
@@ -124,11 +126,14 @@ export async function bootcampFunnel(payload: Payload, filter: FunnelFilter): Pr
 
 const QUEUE_LIMIT = 50
 
-/** Заявки, где следующий шаг за командой: от самой давней. Без фильтров страницы - это список дел. */
-export async function actionQueue(payload: Payload): Promise<{ queue: FunnelQueueItem[], total: number }> {
-  const rows = rowsOf<{ id: number, email: string, name: string | null, reason: string, since: string | null, total: string }>(await db(payload).execute(sql`
-    select id, email, name, reason, since, count(*) over () as total from (
-      select l.id, l.email, l.name,
+/**
+ * Заявки, где следующий шаг за командой: от самой давней. Без фильтров страницы - это список дел.
+ * Тестовые заявки в нём есть с пометкой; в число для итогов недели они не входят.
+ */
+export async function actionQueue(payload: Payload, { withTest = true }: { withTest?: boolean } = {}): Promise<{ queue: FunnelQueueItem[], total: number }> {
+  const rows = rowsOf<{ id: number, email: string, name: string | null, reason: string, since: string | null, test: boolean, total: string }>(await db(payload).execute(sql`
+    select id, email, name, reason, since, test, count(*) over () as total from (
+      select l.id, l.email, l.name, coalesce(l.is_test, false) as test,
         case
           when l.status in ('new', 'contacted', 'diagnostic') and l.entry_submitted_at is not null then 'review'
           when l.status = 'admitted' and l.paid_at is null and l.payment_due_at < now() then 'payment_expired'
@@ -145,11 +150,11 @@ export async function actionQueue(payload: Payload): Promise<{ queue: FunnelQueu
         end as since
       from bootcamp_leads l left join bootcamp_enrollments en on en.lead_id = l.id
     ) waiting
-    where reason is not null
+    where reason is not null and (${withTest}::boolean or not test)
     order by since asc nulls last, id
     limit ${QUEUE_LIMIT}`))
   return {
-    queue: rows.map(({ id, email, name, reason, since }) => ({ id: Number(id), email, name, reason, since: since ? new Date(since).toISOString() : null })),
+    queue: rows.map(({ id, email, name, reason, since, test }) => ({ id: Number(id), email, name, reason, since: since ? new Date(since).toISOString() : null, test: test === true })),
     total: num(rows[0]?.total),
   }
 }
@@ -159,14 +164,18 @@ export type WeekActivity = { leads: number, submitted: number, admitted: number,
 export async function weekActivity(payload: Payload, window: SummaryWindow): Promise<WeekActivity> {
   const from = window.from.toISOString()
   const to = window.to.toISOString()
+  // Счета, события и зачисления без заявки (заявка удалена) тоже не считаем: проверить, тестовая ли она, нельзя.
   const [row] = rowsOf<Record<keyof WeekActivity, string | null>>(await db(payload).execute(sql`
+    with counted as (select id, created_at, entry_submitted_at from bootcamp_leads where not coalesce(is_test, false)),
+    paid as (select p.amount_kopecks from bootcamp_payments p join counted on counted.id = p.lead_id
+      where p.status = 'paid' and not coalesce(p.is_test, false) and p.paid_at >= ${from}::timestamptz and p.paid_at < ${to}::timestamptz)
     select
-      (select count(*) from bootcamp_leads where created_at >= ${from}::timestamptz and created_at < ${to}::timestamptz) as leads,
-      (select count(*) from bootcamp_leads where entry_submitted_at >= ${from}::timestamptz and entry_submitted_at < ${to}::timestamptz) as submitted,
-      (select count(distinct lead_id) from bootcamp_lead_events where type = 'admitted' and created_at >= ${from}::timestamptz and created_at < ${to}::timestamptz) as admitted,
-      (select count(*) from bootcamp_payments where status = 'paid' and not coalesce(is_test, false) and paid_at >= ${from}::timestamptz and paid_at < ${to}::timestamptz) as paid,
-      (select sum(amount_kopecks) from bootcamp_payments where status = 'paid' and not coalesce(is_test, false) and paid_at >= ${from}::timestamptz and paid_at < ${to}::timestamptz) as "paidKopecks",
-      (select count(*) from bootcamp_enrollments where status = 'done' and finished_at >= ${from}::timestamptz and finished_at < ${to}::timestamptz) as enrolled`))
+      (select count(*) from counted where created_at >= ${from}::timestamptz and created_at < ${to}::timestamptz) as leads,
+      (select count(*) from counted where entry_submitted_at >= ${from}::timestamptz and entry_submitted_at < ${to}::timestamptz) as submitted,
+      (select count(distinct e.lead_id) from bootcamp_lead_events e join counted on counted.id = e.lead_id where e.type = 'admitted' and e.created_at >= ${from}::timestamptz and e.created_at < ${to}::timestamptz) as admitted,
+      (select count(*) from paid) as paid,
+      (select sum(amount_kopecks) from paid) as "paidKopecks",
+      (select count(*) from bootcamp_enrollments en join counted on counted.id = en.lead_id where en.status = 'done' and en.finished_at >= ${from}::timestamptz and en.finished_at < ${to}::timestamptz) as enrolled`))
   return { leads: num(row?.leads), submitted: num(row?.submitted), admitted: num(row?.admitted), paid: num(row?.paid), paidKopecks: num(row?.paidKopecks), enrolled: num(row?.enrolled) }
 }
 
@@ -187,7 +196,7 @@ export async function sendWeeklySummary(payload: Payload, now = new Date()): Pro
     const sent = rowsOf(await tx.execute(sql`select 1 from bootcamp_lead_events where type = 'weekly_summary' and data->>'week' = ${window.week} limit 1`))
     if (sent.length > 0) return false
     const week = await weekActivity(payload, window)
-    const { total: waiting } = await actionQueue(payload)
+    const { total: waiting } = await actionQueue(payload, { withTest: false })
     const lines = [
       `Новых заявок: ${week.leads}`,
       `Прислали решение: ${week.submitted}`,

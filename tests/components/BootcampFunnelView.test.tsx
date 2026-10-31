@@ -35,7 +35,10 @@ const report: FunnelReport = {
     { key: 'utm:telegram', label: 'telegram', leads: 7, submitted: 4, admitted: 3, paid: 2, enrolled: 2 },
     { key: 'direct', label: 'прямой заход', leads: 3, submitted: 2, admitted: 1, paid: 0, enrolled: 0 },
   ],
-  queue: [{ id: 41, email: 'ivan@mail.test', name: 'Иван', reason: 'review', since: '2026-10-28T09:00:00.000Z' }],
+  queue: [
+    { id: 41, email: 'ivan@mail.test', name: 'Иван', reason: 'review', since: '2026-10-28T09:00:00.000Z', test: false },
+    { id: 42, email: 'check@mail.test', name: null, reason: 'not_enrolled', since: '2026-10-29T09:00:00.000Z', test: true },
+  ],
   queueTotal: 51,
 }
 const filter = parseFunnelFilter({ period: '30', source: 'utm:telegram' }, new Date('2026-10-31T12:00:00Z'))
@@ -99,8 +102,10 @@ describe('отчёт воронки', () => {
     expect(sources.getByRole('row', { name: /прямой заход/ })).toHaveTextContent('прямой заход32100')
     const queue = within(screen.getByRole('region', { name: 'Ждут вашего действия' }))
     expect(queue.getByRole('link', { name: 'Иван, ivan@mail.test' })).toHaveAttribute('href', '/admin/collections/bootcamp-leads/41')
-    expect(queue.getByText(/Решение ждёт ответа, с 28 октября/)).toBeInTheDocument()
-    expect(queue.getByText('Всего таких заявок 51, здесь самые давние 1.')).toBeInTheDocument()
+    expect(queue.getByText(/^Решение ждёт ответа, с 28 октября/)).toBeInTheDocument()
+    // Тестовая заявка в списке дел остаётся, но видно, что это проверка.
+    expect(queue.getByText(/^Тестовая заявка\. Оплачен, зачисление не начато, с 29 октября/)).toBeInTheDocument()
+    expect(queue.getByText('Всего таких заявок 51, здесь самые давние 2.')).toBeInTheDocument()
   })
 
   it('пустой период - подсказка вместо таблицы, тексты без длинного тире', () => {

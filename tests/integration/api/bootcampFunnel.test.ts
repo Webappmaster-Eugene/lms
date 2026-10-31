@@ -6,7 +6,7 @@ import { parseFunnelFilter } from '@/lib/bootcamp-funnel'
 import { adminTelegramTransport } from '@/server/admin-telegram'
 import { actionQueue, bootcampFunnel, sendWeeklySummary } from '@/server/bootcamp-funnel'
 import type { BootcampLead } from '@/payload-types'
-import { getTestPayload, uid } from '../helpers/payload'
+import { createAdmin, getTestPayload, uid } from '../helpers/payload'
 
 let payload: Payload
 const telegram: string[] = []
@@ -138,6 +138,50 @@ describe('воронка буткемпа', () => {
     // Отказ с назначенным действием в список не попадает: заявка закрыта.
     expect(mine.map((item) => [item.id, item.reason])).toEqual([[review.id, 'review'], [expired.id, 'payment_expired'], [notEnrolled.id, 'not_enrolled'], [failed.id, 'enrollment_failed']])
     expect(total).toBeGreaterThanOrEqual(4)
+  })
+})
+
+describe('тестовые заявки', () => {
+  it('админ ставит отметку в карточке; заявка уходит из воронки, денег и итогов недели, но остаётся в списке дел', async () => {
+    const source = uid('utm').toLowerCase()
+    const real = await lead(source)
+    await db().execute(sql`update bootcamp_leads set created_at = ${ago(2)} where id = ${real.id}`)
+    const check = await lead(source)
+    const admin = await createAdmin(payload)
+    // Отметку ставит админ через форму Payload: поле не закрыто, как серверные поля заявки.
+    const marked = await payload.update({ collection: 'bootcamp-leads', id: check.id, data: { isTest: true }, user: admin, overrideAccess: false })
+    expect(marked.isTest).toBe(true)
+    await db().execute(sql`update bootcamp_leads set created_at = ${ago(2)}, status = 'paid', paid_at = ${ago(1)} where id = ${check.id}`)
+    const payment = await payload.create({ collection: 'bootcamp-payments', data: { lead: check.id, amountKopecks: 4_500_000, status: 'pending', method: 'manual' }, overrideAccess: true })
+    await db().execute(sql`update bootcamp_payments set status = 'paid', paid_at = ${ago(1)} where id = ${payment.id}`)
+
+    const report = await bootcampFunnel(payload, parseFunnelFilter({ period: '7', source: `utm:${source}` }, new Date()))
+    expect(report.steps.map((item) => item.count)).toEqual([1, 0, 0, 0, 0, 0, 0])
+    expect(report.revenue).toEqual({ kopecks: 0, payments: 0 })
+    expect(report.sources.find((item) => item.key === `utm:${source}`)?.leads).toBe(1)
+
+    const withTest = await actionQueue(payload)
+    expect(withTest.queue.find((item) => item.id === check.id)).toMatchObject({ reason: 'not_enrolled', test: true })
+    const withoutTest = await actionQueue(payload, { withTest: false })
+    expect(withoutTest.queue.some((item) => item.id === check.id)).toBe(false)
+    expect(withoutTest.total).toBe(withTest.total - withTest.queue.filter((item) => item.test).length)
+  })
+
+  it('в итоги недели не попадают ни сама тестовая заявка, ни её оплата и допуск', async () => {
+    // 16 марта 2020 - понедельник: неделя с 9 марта, в других тестах её нет.
+    await db().execute(sql`delete from bootcamp_lead_events where type = 'weekly_summary' and data->>'week' = '2020-03-09'`)
+    const inWeek = sql`${'2020-03-10T10:00:00Z'}::timestamptz`
+    const real = await lead('summary-test')
+    const check = await lead('summary-test')
+    await db().execute(sql`update bootcamp_leads set created_at = ${inWeek} where id = ${real.id}`)
+    await db().execute(sql`update bootcamp_leads set created_at = ${inWeek}, entry_submitted_at = ${inWeek}, is_test = true where id = ${check.id}`)
+    await db().execute(sql`insert into bootcamp_lead_events (lead_id, type, message, created_at, updated_at) values (${check.id}, 'admitted', 'фикстура', ${inWeek}, now())`)
+    const payment = await payload.create({ collection: 'bootcamp-payments', data: { lead: check.id, amountKopecks: 4_500_000, status: 'pending', method: 'manual' }, overrideAccess: true })
+    await db().execute(sql`update bootcamp_payments set status = 'paid', paid_at = ${inWeek} where id = ${payment.id}`)
+
+    expect(await sendWeeklySummary(payload, new Date('2020-03-16T08:00:00Z'))).toBe(true)
+    await vi.waitFor(() => expect(telegram).toHaveLength(1))
+    expect(telegram[0].split('\n').slice(1, 6)).toEqual(['Новых заявок: 1', 'Прислали решение: 0', 'Допущены: 0', 'Оплат не было', 'Зачислены: 0'])
   })
 })
 

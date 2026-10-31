@@ -46,6 +46,7 @@ import * as migration_20261031_090450_bootcamp_lead_path from './20261031_090450
 import * as migration_20261031_132906_bootcamp_weekly_summary from './20261031_132906_bootcamp_weekly_summary';
 import * as migration_20261031_225020_bootcamp_programs from './20261031_225020_bootcamp_programs';
 import * as migration_20261101_091948_lesson_notes_block from './20261101_091948_lesson_notes_block';
+import * as migration_20261101_140250_bootcamp_test_leads from './20261101_140250_bootcamp_test_leads';
 
 export const migrations = [
   {
@@ -286,6 +287,11 @@ export const migrations = [
   {
     up: migration_20261101_091948_lesson_notes_block.up,
     down: migration_20261101_091948_lesson_notes_block.down,
-    name: '20261101_091948_lesson_notes_block'
+    name: '20261101_091948_lesson_notes_block',
+  },
+  {
+    up: migration_20261101_140250_bootcamp_test_leads.up,
+    down: migration_20261101_140250_bootcamp_test_leads.down,
+    name: '20261101_140250_bootcamp_test_leads'
   },
 ];
