@@ -20,7 +20,7 @@ const ROUTE_GROUP = /^\(.+\)$/
 const CMS_GROUP = '(payload)'
 
 /** Должен совпадать с PUBLIC_PATHS в middleware. */
-const PUBLIC_PAGES = new Set(['/login', '/forgot-password', '/reset-password', '/unsubscribe', '/guides', '/guides/[slug]', '/entry-task/[token]'])
+const PUBLIC_PAGES = new Set(['/login', '/forgot-password', '/reset-password', '/unsubscribe', '/guides', '/guides/[slug]', '/entry-task/[token]', '/pay/[token]', '/pay/done', '/pay/fail'])
 
 /**
  * Пропускаются по префиксу `/admin`, отданному админке Payload, поэтому
@@ -123,6 +123,13 @@ describe('доступ ко всем страницам приложения', (
     expect(visit('/entry-task/AbCdEfGhIjKlMnOpQrStUvWxYz012345/download')).toBe('passed')
     expect(visit('/entry-task/AbCdEfGhIjKlMnOpQrStUvWxYz012345/other')).toBe('redirected')
     expect(visit('/entry-task')).toBe('redirected')
+  })
+
+  it('открыты только страницы оплаты одного уровня, а не всё под /pay', () => {
+    expect(visit('/pay/AbCdEfGhIjKlMnOpQrStUvWxYz012345')).toBe('passed')
+    expect(visit('/pay/done')).toBe('passed')
+    expect(visit('/pay/AbCdEfGhIjKlMnOpQrStUvWxYz012345/other')).toBe('redirected')
+    expect(visit('/pay')).toBe('redirected')
   })
 
   it.each(protectedRoutes)('с токеном открыта: %s', (route) => {

@@ -36,6 +36,11 @@ export async function markLeadEntryTaskSent(payload: Payload, id: number, dueAt:
   await db(payload).execute(sql`update bootcamp_leads set entry_task_sent_at = now(), entry_task_due_at = ${dueAt}, updated_at = now() where id = ${id}`)
 }
 
+/** Пришло решение: заявка ждёт решения наставника. Решённую заявку (допуск, отказ) не трогаем. */
+export async function markLeadUnderReview(payload: Payload, id: number): Promise<void> {
+  await db(payload).execute(sql`update bootcamp_leads set status = 'diagnostic', updated_at = now() where id = ${id} and status in ('new', 'contacted')`)
+}
+
 export type LeadEntrySubmission = {
   passed: number
   total: number

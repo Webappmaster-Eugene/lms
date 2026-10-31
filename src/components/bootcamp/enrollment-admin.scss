@@ -29,7 +29,8 @@
     flex-direction: column;
     gap: 4px;
 
-    input {
+    input,
+    textarea {
       padding: 8px 10px;
       border: 1px solid var(--theme-elevation-250);
       border-radius: 4px;
@@ -88,5 +89,39 @@
     flex-wrap: wrap;
     gap: 6px 16px;
     margin: 8px 0;
+  }
+}
+
+/* Путь заявки: шаги сверху вниз, у текущего - кнопки, внизу история. */
+.lead-path {
+  &__step {
+    margin: 0 0 12px;
+    padding: 10px 0 2px 14px;
+    border-left: 3px solid var(--theme-elevation-250);
+
+    &--done {
+      border-left-color: var(--theme-success-500, var(--theme-elevation-500));
+    }
+  }
+
+  &__step-title {
+    margin: 0 0 6px;
+    font-weight: 600;
+  }
+
+  &__list {
+    margin: 4px 0 12px;
+    padding: 0;
+    list-style: none;
+
+    li {
+      padding: 4px 0;
+      border-bottom: 1px solid var(--theme-elevation-100);
+    }
+  }
+
+  &__history summary {
+    cursor: pointer;
+    font-weight: 600;
   }
 }

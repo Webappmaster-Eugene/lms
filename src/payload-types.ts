@@ -114,6 +114,8 @@ export interface Config {
     'bootcamp-leads': BootcampLead;
     'bootcamp-entry-tasks': BootcampEntryTask;
     'bootcamp-enrollments': BootcampEnrollment;
+    'bootcamp-payments': BootcampPayment;
+    'bootcamp-lead-events': BootcampLeadEvent;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -168,6 +170,8 @@ export interface Config {
     'bootcamp-leads': BootcampLeadsSelect<false> | BootcampLeadsSelect<true>;
     'bootcamp-entry-tasks': BootcampEntryTasksSelect<false> | BootcampEntryTasksSelect<true>;
     'bootcamp-enrollments': BootcampEnrollmentsSelect<false> | BootcampEnrollmentsSelect<true>;
+    'bootcamp-payments': BootcampPaymentsSelect<false> | BootcampPaymentsSelect<true>;
+    'bootcamp-lead-events': BootcampLeadEventsSelect<false> | BootcampLeadEventsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -1749,7 +1753,19 @@ export interface BootcampLead {
   email: string;
   name?: string | null;
   program: 'nodejs';
-  status: 'new' | 'contacted' | 'diagnostic' | 'admitted' | 'enrolled' | 'preparation' | 'rejected' | 'withdrawn';
+  /**
+   * Меняется кнопками в блоке «Путь заявки» вверху карточки.
+   */
+  status:
+    | 'new'
+    | 'contacted'
+    | 'diagnostic'
+    | 'admitted'
+    | 'paid'
+    | 'enrolled'
+    | 'preparation'
+    | 'rejected'
+    | 'withdrawn';
   assignee?: (number | null) | User;
   nextActionAt?: string | null;
   note?: string | null;
@@ -1791,6 +1807,31 @@ export interface BootcampLead {
   entryResult?: string | null;
   entrySolution?: string | null;
   entrySolutions?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  admittedAt?: string | null;
+  admittedBy?: (number | null) | User;
+  paymentAmountKopecks?: number | null;
+  paymentDueAt?: string | null;
+  /**
+   * Страница оплаты на платформе: /pay/<эта строка>.
+   */
+  paymentToken?: string | null;
+  paymentLinkSentAt?: string | null;
+  paymentPageOpenedAt?: string | null;
+  paymentStartedAt?: string | null;
+  paymentReminderSentAt?: string | null;
+  paymentExpiredNoticeAt?: string | null;
+  paidAt?: string | null;
+  decisionMessage?: string | null;
+  reviewAlertAt?: string | null;
+  admission?:
     | {
         [k: string]: unknown;
       }
@@ -1868,6 +1909,93 @@ export interface BootcampEnrollment {
   finishedAt?: string | null;
   lmsSignedInAt?: string | null;
   gitlabSignedInAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Номер записи - номер счёта в Робокассе. Каждый переход к оплате создаёт новую запись, оплачена из них обычно одна.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-payments".
+ */
+export interface BootcampPayment {
+  id: number;
+  lead: number | BootcampLead;
+  amountKopecks: number;
+  status: 'pending' | 'paid' | 'cancelled';
+  method: 'robokassa' | 'manual';
+  isTest?: boolean | null;
+  offerVersion?: string | null;
+  offerAcceptedAt?: string | null;
+  paidAt?: string | null;
+  /**
+   * Повторное уведомление Робокассы с этой отметкой ничего не меняет.
+   */
+  processedAt?: string | null;
+  paymentMethod?: string | null;
+  incCurrLabel?: string | null;
+  fee?: string | null;
+  /**
+   * Нужен для возврата через API. В уведомлении об оплате его нет, приходит при сверке.
+   */
+  opKey?: string | null;
+  checkedAt?: string | null;
+  failReturnAt?: string | null;
+  comment?: string | null;
+  markedBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Что происходило с заявками: решения, письма, оплата, зачисление, первые входы и работа в GitLab.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-lead-events".
+ */
+export interface BootcampLeadEvent {
+  id: number;
+  lead?: (number | null) | BootcampLead;
+  type:
+    | 'lead_created'
+    | 'entry_task_sent'
+    | 'entry_task_extended'
+    | 'solution_submitted'
+    | 'review_overdue'
+    | 'admitted'
+    | 'preparation'
+    | 'rejected'
+    | 'withdrawn'
+    | 'reopened'
+    | 'admission_cancelled'
+    | 'payment_link_sent'
+    | 'payment_page_opened'
+    | 'checkout_started'
+    | 'payment_failed_return'
+    | 'payment_reminder'
+    | 'payment_expired'
+    | 'paid'
+    | 'paid_manually'
+    | 'payment_alert'
+    | 'enrollment_started'
+    | 'enrollment_failed'
+    | 'enrolled'
+    | 'lms_signed_in'
+    | 'gitlab_signed_in'
+    | 'gitlab_event';
+  message: string;
+  /**
+   * Пусто - событие системы или кандидата.
+   */
+  actor?: (number | null) | User;
+  data?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -2018,6 +2146,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'bootcamp-enrollments';
         value: number | BootcampEnrollment;
+      } | null)
+    | ({
+        relationTo: 'bootcamp-payments';
+        value: number | BootcampPayment;
+      } | null)
+    | ({
+        relationTo: 'bootcamp-lead-events';
+        value: number | BootcampLeadEvent;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -3019,6 +3155,20 @@ export interface BootcampLeadsSelect<T extends boolean = true> {
   entryResult?: T;
   entrySolution?: T;
   entrySolutions?: T;
+  admittedAt?: T;
+  admittedBy?: T;
+  paymentAmountKopecks?: T;
+  paymentDueAt?: T;
+  paymentToken?: T;
+  paymentLinkSentAt?: T;
+  paymentPageOpenedAt?: T;
+  paymentStartedAt?: T;
+  paymentReminderSentAt?: T;
+  paymentExpiredNoticeAt?: T;
+  paidAt?: T;
+  decisionMessage?: T;
+  reviewAlertAt?: T;
+  admission?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3068,6 +3218,44 @@ export interface BootcampEnrollmentsSelect<T extends boolean = true> {
   finishedAt?: T;
   lmsSignedInAt?: T;
   gitlabSignedInAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-payments_select".
+ */
+export interface BootcampPaymentsSelect<T extends boolean = true> {
+  lead?: T;
+  amountKopecks?: T;
+  status?: T;
+  method?: T;
+  isTest?: T;
+  offerVersion?: T;
+  offerAcceptedAt?: T;
+  paidAt?: T;
+  processedAt?: T;
+  paymentMethod?: T;
+  incCurrLabel?: T;
+  fee?: T;
+  opKey?: T;
+  checkedAt?: T;
+  failReturnAt?: T;
+  comment?: T;
+  markedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-lead-events_select".
+ */
+export interface BootcampLeadEventsSelect<T extends boolean = true> {
+  lead?: T;
+  type?: T;
+  message?: T;
+  actor?: T;
+  data?: T;
   updatedAt?: T;
   createdAt?: T;
 }

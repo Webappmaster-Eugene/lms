@@ -364,6 +364,132 @@ export function bootcampEntrySubmissionEmail({ id, address, name, passed, total,
   )
 }
 
+const BOOTCAMP_REASON = 'Вы получили это письмо, потому что оставили заявку на буткемп на info.mentorcareer.ru.'
+const bootcampFooter = { html: `<p style="margin:0;">${escapeHtml(BOOTCAMP_REASON)}</p>`, text: BOOTCAMP_REASON }
+const bootcampHello = (name: string | null) => name?.trim() ? `Здравствуйте, ${name.trim()}!` : 'Здравствуйте!'
+const replyLine = (replyable: boolean) => replyable ? 'Если появятся вопросы, ответьте на это письмо.' : ''
+
+type BootcampAdmittedEmailInput = {
+  name: string | null
+  program: string
+  amount: string
+  dueDate: string
+  url: string
+  offerUrl: string
+  comment: string | null
+  resend: boolean
+  replyable: boolean
+}
+
+/** Кандидату после допуска (или повторно с новым сроком): личная ссылка на оплату. */
+export function bootcampAdmittedEmail({ name, program, amount, dueDate, url, offerUrl, comment, resend, replyable }: BootcampAdmittedEmailInput): EmailContent {
+  const intro = resend
+    ? `Присылаем ссылку на оплату буткемпа ${program} ещё раз. Оплатить можно до ${dueDate} включительно.`
+    : `Мы посмотрели ваше входное задание и рады пригласить вас на буткемп ${program}. Чтобы занять место в потоке, оплатите участие до ${dueDate} включительно.`
+  const terms = `Сумма: ${amount}. Оплата проходит на странице платёжного сервиса Робокасса: картой, через СБП или в рассрочку от банка-партнёра без переплаты. Перед оплатой прочитайте договор-оферту: оплата означает, что вы принимаете её условия. Ссылка личная, пожалуйста, не пересылайте её.`
+  const after = 'Сразу после оплаты придут два письма: приглашение в учебный кабинет MentorCareer и ссылка для пароля в GitLab курса. Чек об оплате придёт отдельно из приложения «Мой налог».'
+  const note = comment?.trim() ? `Комментарий наставника: ${comment.trim()}` : ''
+  const reply = replyLine(replyable)
+  return email(
+    resend ? `Ссылка на оплату буткемпа ${program}` : `Вы допущены на буткемп ${program}`,
+    `Оплата ${amount} до ${dueDate} по личной ссылке.`,
+    resend ? 'Ссылка на оплату' : 'Вы допущены на буткемп',
+    `${paragraph(escapeHtml(bootcampHello(name)))}
+    ${paragraph(escapeHtml(intro))}
+    ${note ? paragraph(escapeHtml(note)) : ''}
+    ${button('Перейти к оплате', url)}
+    ${fallbackLink(url)}
+    ${notice(escapeHtml(terms))}
+    ${paragraph(`${escapeHtml('Договор-оферта: ')}${link(offerUrl, offerUrl)}`)}
+    ${paragraph(escapeHtml(after))}
+    ${reply ? paragraph(escapeHtml(reply)) : ''}`,
+    `${bootcampHello(name)}\n\n${intro}${note ? `\n\n${note}` : ''}\n\nПерейти к оплате: ${url}\n\n${terms}\n\nДоговор-оферта: ${offerUrl}\n\n${after}${reply ? `\n\n${reply}` : ''}`,
+    bootcampFooter,
+  )
+}
+
+type BootcampPaymentReminderEmailInput = { name: string | null, program: string, amount: string, dueDate: string, url: string, replyable: boolean }
+
+/** Кандидату за два дня до конца срока оплаты, один раз. */
+export function bootcampPaymentReminderEmail({ name, program, amount, dueDate, url, replyable }: BootcampPaymentReminderEmailInput): EmailContent {
+  const intro = `Напоминаем: место на буткемпе ${program} за вами до ${dueDate} включительно. Оплатить ${amount} можно по личной ссылке.`
+  const later = 'Если вы передумали или нужно больше времени, просто ответьте на это письмо, мы поймём.'
+  const reply = replyable ? later : ''
+  return email(
+    `Напоминание об оплате буткемпа ${program}`,
+    `Оплата до ${dueDate}.`,
+    'Напоминание об оплате',
+    `${paragraph(escapeHtml(bootcampHello(name)))}
+    ${paragraph(escapeHtml(intro))}
+    ${button('Перейти к оплате', url)}
+    ${fallbackLink(url)}
+    ${reply ? paragraph(escapeHtml(reply)) : ''}`,
+    `${bootcampHello(name)}\n\n${intro}\n\nПерейти к оплате: ${url}${reply ? `\n\n${reply}` : ''}`,
+    bootcampFooter,
+  )
+}
+
+type BootcampPaymentReceivedEmailInput = { name: string | null, program: string, amount: string, invoice: number, replyable: boolean }
+
+/** Кандидату: оплата пришла, доступы будут через несколько минут. */
+export function bootcampPaymentReceivedEmail({ name, program, amount, invoice, replyable }: BootcampPaymentReceivedEmailInput): EmailContent {
+  const intro = `Оплата ${amount} за буткемп ${program} получена, номер заказа ${invoice}. Спасибо, вы в потоке!`
+  const next = 'В течение нескольких минут придут ещё два письма: приглашение в учебный кабинет MentorCareer, где лежат методички, и ссылка для пароля в GitLab курса, где будет ваш учебный проект. Начните с методички недели 0: в ней по шагам описано, как подготовить компьютер и сдать первую работу.'
+  const receipt = 'Чек об оплате приходит отдельно из приложения «Мой налог». Если какое-то письмо не пришло за час, проверьте папку «Спам» и напишите нам.'
+  const reply = replyLine(replyable)
+  return email(
+    `Оплата буткемпа ${program} получена`,
+    'Оплата получена, доступы придут в течение нескольких минут.',
+    'Оплата получена',
+    `${paragraph(escapeHtml(bootcampHello(name)))}
+    ${paragraph(escapeHtml(intro))}
+    ${notice(escapeHtml(next))}
+    ${paragraph(escapeHtml(receipt))}
+    ${reply ? paragraph(escapeHtml(reply)) : ''}`,
+    `${bootcampHello(name)}\n\n${intro}\n\n${next}\n\n${receipt}${reply ? `\n\n${reply}` : ''}`,
+    bootcampFooter,
+  )
+}
+
+type BootcampPaymentTeamEmailInput = { id: number | string, address: string, amount: string, invoice: number, method: string, test: boolean }
+
+/** Команде: пришла оплата буткемпа. */
+export function bootcampPaymentTeamEmail({ id, address, amount, invoice, method, test }: BootcampPaymentTeamEmailInput): EmailContent {
+  const url = `${BASE_URL}/admin/collections/bootcamp-leads/${encodeURIComponent(String(id))}`
+  const intro = `${test ? 'Тестовая оплата' : 'Оплата'} ${amount} от ${address}, заказ ${invoice}, способ: ${method}. Зачисление запускается автоматически, его ход виден в заявке.`
+  return email(
+    `${test ? 'Тестовая оплата' : 'Оплата'} буткемпа: ${address}, ${amount}`,
+    intro,
+    'Оплата буткемпа',
+    `${paragraph(escapeHtml(intro))}
+    ${button('Открыть заявку', url)}
+    ${fallbackLink(url)}`,
+    `${intro}\n\nОткрыть заявку: ${url}`,
+  )
+}
+
+type BootcampDecisionEmailInput = { name: string | null, program: string, decision: 'preparation' | 'rejected', message: string | null, replyable: boolean }
+
+/** Кандидату: решение по входному заданию, если это не допуск. */
+export function bootcampDecisionEmail({ name, program, decision, message, replyable }: BootcampDecisionEmailInput): EmailContent {
+  const intro = decision === 'preparation'
+    ? `Спасибо за решение входного задания буткемпа ${program}. Сейчас программа будет для вас слишком тяжёлой: лучше подтянуть основу, а потом прийти в один из следующих потоков.`
+    : `Спасибо за интерес к буткемпу ${program} и за время, которое вы потратили на входное задание. К сожалению, в этот поток мы не можем вас пригласить.`
+  const advice = message?.trim() ? `${decision === 'preparation' ? 'Что советуем подтянуть' : 'Почему'}: ${message.trim()}` : ''
+  const reply = replyLine(replyable)
+  return email(
+    decision === 'preparation' ? `Входное задание буткемпа ${program}: что подтянуть` : `Решение по заявке на буткемп ${program}`,
+    decision === 'preparation' ? 'Что подтянуть перед буткемпом.' : 'Решение по вашей заявке.',
+    decision === 'preparation' ? 'Что подтянуть перед буткемпом' : 'Решение по заявке',
+    `${paragraph(escapeHtml(bootcampHello(name)))}
+    ${paragraph(escapeHtml(intro))}
+    ${advice ? notice(escapeHtml(advice)) : ''}
+    ${reply ? paragraph(escapeHtml(reply)) : ''}`,
+    `${bootcampHello(name)}\n\n${intro}${advice ? `\n\n${advice}` : ''}${reply ? `\n\n${reply}` : ''}`,
+    bootcampFooter,
+  )
+}
+
 export function emailBaseUrl(): string {
   return BASE_URL
 }

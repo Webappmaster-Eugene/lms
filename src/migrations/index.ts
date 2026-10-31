@@ -42,6 +42,7 @@ import * as migration_20261027_202028_roadmap_node_extras from './20261027_20202
 import * as migration_20261028_130757_bootcamp_entry_submission from './20261028_130757_bootcamp_entry_submission';
 import * as migration_20261030_201902_bootcamp_enrollments from './20261030_201902_bootcamp_enrollments';
 import * as migration_20261031_090000_bootcamp_group_rename from './20261031_090000_bootcamp_group_rename';
+import * as migration_20261031_090450_bootcamp_lead_path from './20261031_090450_bootcamp_lead_path';
 
 export const migrations = [
   {
@@ -263,5 +264,10 @@ export const migrations = [
     up: migration_20261031_090000_bootcamp_group_rename.up,
     down: migration_20261031_090000_bootcamp_group_rename.down,
     name: '20261031_090000_bootcamp_group_rename',
+  },
+  {
+    up: migration_20261031_090450_bootcamp_lead_path.up,
+    down: migration_20261031_090450_bootcamp_lead_path.down,
+    name: '20261031_090450_bootcamp_lead_path',
   },
 ];

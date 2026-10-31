@@ -4,6 +4,7 @@ import type { CollectionAfterLoginHook } from 'payload'
 import { relationId } from '@/lib/relation-id'
 import { logger } from '@/lib/telemetry'
 import { adminLink, notifyAdmins } from '@/server/admin-telegram'
+import { journal } from '@/server/bootcamp-lead-events'
 import type { User } from '@/payload-types'
 
 type Db = { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }
@@ -19,6 +20,7 @@ export const noteBootcampFirstLogin: CollectionAfterLoginHook<User> = async ({ u
     const db = (req.payload.db as unknown as { drizzle: Db }).drizzle
     const result = await db.execute(sql`update bootcamp_enrollments set lms_signed_in_at = now(), updated_at = now() where lms_user_id = ${user.id} and lms_signed_in_at is null returning id, email, first_name, last_name, gitlab_username, lead_id`)
     for (const row of (result as { rows?: Record<string, unknown>[] }).rows ?? []) {
+      await journal(req.payload, { lead: relationId(row.lead_id), type: 'lms_signed_in', message: `Первый вход в LMS: ${String(row.email)}` })
       void notifyAdmins({
         title: `Ученик впервые вошёл в LMS: ${String(row.email)}`,
         lines: [`${String(row.first_name)} ${String(row.last_name)}, логин GitLab ${String(row.gitlab_username)}`],

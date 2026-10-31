@@ -36,6 +36,9 @@ const MATRIX: Record<string, Matrix> = {
   'bootcamp-leads': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
   // Зачисление создаёт и ведёт только сервер (кнопка в заявке и исполнитель в VM GitLab); удалить может админ.
   'bootcamp-enrollments': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'admin' },
+  // Оплаты и журнал заявок пишет только сервер; удалить нельзя никому: это учёт денег и история решений.
+  'bootcamp-payments': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
+  'bootcamp-lead-events': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'learning-access-audit': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'learning-access-policies': { create: 'nobody', read: 'own', update: 'nobody', delete: 'nobody' },
   'auth-session-revocations': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
@@ -85,8 +88,11 @@ const PATCH: Record<string, Record<string, unknown>> = {
   guides: { order: 7 },
   'guide-categories': { order: 7 },
   'learning-access-grants': { note: 'Обновлено' },
-  'bootcamp-leads': { status: 'contacted' },
+  // Этап админ через REST не меняет (поле только для кнопок пути заявки), заметки - меняет.
+  'bootcamp-leads': { note: 'Обновлено' },
   'bootcamp-enrollments': { error: 'Обновлено' },
+  'bootcamp-payments': { comment: 'Обновлено' },
+  'bootcamp-lead-events': { message: 'Обновлено' },
   'learning-access-audit': { effect: 'deny' },
   'learning-access-policies': { mode: 'all' },
   'auth-session-revocations': { expiresAt: new Date().toISOString() },

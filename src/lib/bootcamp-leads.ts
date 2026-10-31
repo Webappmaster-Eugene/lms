@@ -7,16 +7,23 @@
 export const BOOTCAMP_PROGRAMS = [{ value: 'nodejs', label: 'Node.js: backend сервиса проката', short: 'Node.js' }] as const
 export type BootcampProgram = (typeof BOOTCAMP_PROGRAMS)[number]['value']
 
+/**
+ * Порядок - порядок в списке CMS. Этап меняют только кнопки в карточке заявки и события
+ * системы (решение владельца 31.10.2026); «Связались» остался от ручного учёта, кнопок к нему нет.
+ */
 export const BOOTCAMP_LEAD_STATUSES = [
   { value: 'new', label: 'Новая' },
   { value: 'contacted', label: 'Связались' },
-  { value: 'diagnostic', label: 'Входное задание' },
-  { value: 'admitted', label: 'Допущен' },
+  { value: 'diagnostic', label: 'Решение на проверке' },
+  { value: 'admitted', label: 'Допущен, ждёт оплаты' },
+  { value: 'paid', label: 'Оплачен' },
   { value: 'enrolled', label: 'Зачислен' },
   { value: 'preparation', label: 'Нужна подготовка' },
   { value: 'rejected', label: 'Отказ' },
   { value: 'withdrawn', label: 'Отозвана' },
 ] as const
+export type BootcampLeadStatus = (typeof BOOTCAMP_LEAD_STATUSES)[number]['value']
+export const leadStatusLabel = (status: string | null | undefined) => BOOTCAMP_LEAD_STATUSES.find((item) => item.value === status)?.label ?? status ?? 'нет'
 
 export const BOOTCAMP_UTM_FIELDS = [
   ['utm_source', 'utmSource'],

@@ -9,7 +9,8 @@ import { TRAINER_LIMITS } from '@/lib/trainer/constants'
 import type { TrainerRunResult } from '@/lib/trainer/types'
 import { pluralize } from '@/lib/utils'
 import { bootcampEntrySubmissionEmail } from '@/payload/emails/templates'
-import { markLeadEntrySubmitted } from '@/server/bootcamp-lead-marks'
+import { journal } from '@/server/bootcamp-lead-events'
+import { markLeadEntrySubmitted, markLeadUnderReview } from '@/server/bootcamp-lead-marks'
 import { adminLink, notifyAdmins } from '@/server/admin-telegram'
 import { adminEmails } from '@/server/bootcamp-leads'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
@@ -117,6 +118,13 @@ export async function submitEntrySolutions(payload: Payload, lead: BootcampLead,
     solutions,
   }, ENTRY_TASK_MAX_SUBMISSIONS)
   if (count === null) throw new EntrySubmissionError(ENTRY_SUBMISSIONS_EXHAUSTED, 409)
+  // Решение уже сохранено: сбой смены этапа не должен превращаться в ошибку для кандидата.
+  try {
+    await markLeadUnderReview(payload, lead.id)
+  } catch (error) {
+    logger.error('Bootcamp lead stage was not moved to review', error, { 'lead.id': lead.id })
+  }
+  await journal(payload, { lead: lead.id, type: 'solution_submitted', message: `Решение входного задания: ${summary.passed} из ${summary.total} тестов, отправка ${count} из ${ENTRY_TASK_MAX_SUBMISSIONS}` })
   void notifyTeam(payload, lead, summary)
   void notifyAdmins({
     title: `Решение входного задания: ${lead.email}, ${summary.passed} из ${summary.total} тестов`,

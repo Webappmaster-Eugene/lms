@@ -45,6 +45,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Оплата буткемпа: личная ссылка из письма о допуске и страницы возврата из Робокассы (/pay/done, /pay/fail).
+  if (/^\/pay\/[^/]+\/?$/.test(pathname)) {
+    return NextResponse.next()
+  }
+
   // Проверяем наличие payload-token cookie
   const token = request.cookies.get('payload-token')
 

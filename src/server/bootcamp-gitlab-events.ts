@@ -4,6 +4,7 @@ import type { Payload } from 'payload'
 
 import { relationId } from '@/lib/relation-id'
 import { adminLink, excerpt, notifyAdmins, type AdminEvent } from '@/server/admin-telegram'
+import { journal } from '@/server/bootcamp-lead-events'
 import type { BootcampEnrollment } from '@/payload-types'
 
 /**
@@ -82,6 +83,7 @@ export async function handleGitlabEvent(payload: Payload, event: string | null, 
       : event === 'Note Hook' ? noteEvent(student, enrollment, data)
         : null
   if (!message) return 'ignored'
+  await journal(payload, { lead: relationId(enrollment.lead), type: 'gitlab_event', message: [message.title, message.lines?.find((line) => typeof line === 'string' && line)].filter(Boolean).join(': '), data: { event } })
   void notifyAdmins({ ...message, link: message.link ?? adminLink(`/admin/collections/bootcamp-leads/${relationId(enrollment.lead)}`) })
   return 'notified'
 }

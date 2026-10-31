@@ -52,12 +52,17 @@ afterAll(() => {
   }
 })
 
-beforeEach(() => { telegram.length = 0 })
+beforeEach(() => {
+  telegram.length = 0
+  // Предел 40 сообщений в минуту общий на процесс: тесты шлют больше, а проверяют каждое.
+  ;(globalThis as unknown as Record<symbol, number[]>)[Symbol.for('lms.adminTelegram.sent')] = []
+})
 
-async function newLead(extra: Partial<Pick<BootcampLead, 'email' | 'status'>> = {}): Promise<BootcampLead> {
+/** Зачисляют только оплаченную заявку: по умолчанию она уже оплачена. */
+async function newLead(extra: Partial<Pick<BootcampLead, 'email' | 'status' | 'paidAt'>> = {}): Promise<BootcampLead> {
   return payload.create({
     collection: 'bootcamp-leads',
-    data: { email: `${uid('cand')}@mail.test`.toLowerCase(), name: 'Иван Петров', program: 'nodejs', status: 'admitted', consentVersion: '2026-10-26', consentAt: new Date().toISOString(), submissionCount: 1, entryTaskToken: uid('entry-token'), ...extra },
+    data: { email: `${uid('cand')}@mail.test`.toLowerCase(), name: 'Иван Петров', program: 'nodejs', status: 'paid', paidAt: new Date().toISOString(), consentVersion: '2026-10-26', consentAt: new Date().toISOString(), submissionCount: 1, entryTaskToken: uid('entry-token'), ...extra },
     overrideAccess: true,
   })
 }
@@ -123,6 +128,10 @@ describe('зачисление из заявки', () => {
     expect((await enroll(lead.id, form('ok-login'), { ...asAdmin(), Origin: 'https://evil.test', 'Sec-Fetch-Site': 'cross-site' })).status).toBe(403)
     expect((await enroll(lead.id, form('Bad Login'))).status).toBe(400)
     expect((await enroll(lead.id, { ...form('ok-login'), accessUntil: '2020-01-01' })).status).toBe(400)
+    const unpaid = await newLead({ status: 'admitted', paidAt: null })
+    const refused = await enroll(unpaid.id, form('ok-login'))
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { error: string }).error).toContain('после оплаты')
     expect((await payload.find({ collection: 'bootcamp-enrollments', where: { lead: { equals: lead.id } }, overrideAccess: true })).totalDocs).toBe(0)
   })
 
@@ -226,10 +235,11 @@ describe('события буткемпа в Telegram', () => {
     await vi.waitFor(() => expect(telegram.find((text) => text.startsWith(`Вопрос к уроку «${tree.lessons[0].title}»`))).toContain('Почему тест падает?'))
   })
 
-  it('смена этапа заявки в CMS пишет, кто и куда перевёл', async () => {
+  // Этап меняют кнопки, у них свои сообщения; хук ловит системные переходы, у которых сообщения нет.
+  it('смена этапа без своего сообщения уходит в Telegram с указанием, кто и куда перевёл', async () => {
     const lead = await newLead({ status: 'new' })
-    await payload.update({ collection: 'bootcamp-leads', id: lead.id, data: { status: 'admitted' }, user: admin, overrideAccess: false })
-    await vi.waitFor(() => expect(telegram.find((text) => text.startsWith(`Этап заявки на буткемп: ${lead.email}`))).toContain('Было: Новая, стало: Допущен'))
+    await payload.update({ collection: 'bootcamp-leads', id: lead.id, data: { status: 'withdrawn' }, user: admin, overrideAccess: true })
+    await vi.waitFor(() => expect(telegram.find((text) => text.startsWith(`Этап заявки на буткемп: ${lead.email}`))).toContain('Было: Новая, стало: Отозвана'))
   })
 
   it('первый вход зачисленного ученика в LMS приходит один раз', async () => {

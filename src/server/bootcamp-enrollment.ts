@@ -24,6 +24,7 @@ import {
 import { BOOTCAMP_LEAD_STATUSES } from '@/lib/bootcamp-leads'
 import { relationId } from '@/lib/relation-id'
 import { adminLink, notifyAdmins } from '@/server/admin-telegram'
+import { actorName, journal } from '@/server/bootcamp-lead-events'
 import { gitlabWebhookToken } from '@/server/bootcamp-worker-auth'
 import type { BootcampEnrollment, BootcampLead, User } from '@/payload-types'
 
@@ -117,12 +118,14 @@ const setStep = (steps: EnrollmentStep[], key: EnrollmentStep['key'], state: Enr
   steps.map((step) => step.key === key ? { key, state, detail, at } : step)
 
 /**
- * Кнопка «Зачислить»: учётка LMS и курс методичек ставятся сразу, в одной транзакции
- * с самим зачислением; приглашение уходит после фиксации. GitLab ждёт исполнителя.
+ * Зачисление: учётка LMS и курс методичек ставятся сразу, в одной транзакции с самим
+ * зачислением; приглашение уходит после фиксации. GitLab ждёт исполнителя. Запускает его
+ * оплата (от имени администратора, который допустил кандидата) или кнопка «Зачислить».
  */
-export async function startEnrollment(payload: Payload, admin: User, leadId: number, input: EnrollmentInput): Promise<EnrollmentView> {
+export async function startEnrollment(payload: Payload, admin: User, leadId: number, input: EnrollmentInput, options: { byPayment?: boolean } = {}): Promise<EnrollmentView> {
   const lead = await findLead(payload, leadId)
   if (!lead) throw new EnrollmentInputError('Заявка не найдена', 404)
+  if (!lead.paidAt) throw new EnrollmentInputError('Зачислить можно только после оплаты: её подтверждает Робокасса или кнопка «Отметить оплату вручную»', 409)
   if (await enrollmentOfLead(payload, leadId)) throw new EnrollmentInputError('По этой заявке уже есть зачисление, его ход виден в панели', 409)
   const taken = await payload.find({ collection: 'bootcamp-enrollments', where: { gitlabUsername: { equals: input.username } }, limit: 1, depth: 0, overrideAccess: true })
   if (taken.docs[0]) throw new EnrollmentInputError(`Логин ${input.username} уже у другого зачисления (${taken.docs[0].email})`, 409)
@@ -199,9 +202,11 @@ export async function startEnrollment(payload: Payload, admin: User, leadId: num
       `${fullName(input)}, логин GitLab ${input.username}, поток ${input.group}`,
       `LMS: учётка ${accountNote}, курс методичек ${steps.find((step) => step.key === 'lms_course')?.detail ?? ''}`,
       'GitLab: ждёт исполнителя в VM GitLab',
+      options.byPayment ? 'Запущено оплатой' : `Запустил: ${actorName(admin)}`,
     ],
     link: leadLink(lead.id),
   })
+  await journal(payload, { lead: lead.id, type: 'enrollment_started', actor: options.byPayment ? null : admin, message: `Зачисление начато: логин GitLab ${input.username}, поток ${input.group}${options.byPayment ? ', запущено оплатой' : ''}` })
   return enrollmentView(enrollment)
 }
 
@@ -318,7 +323,9 @@ export async function reportEnrollment(payload: Payload, id: number, report: Wor
     depth: 0,
   })
   if (report.status === 'done') {
-    await payload.update({ collection: 'bootcamp-leads', id: relationId(updated.lead), data: { status: 'enrolled' }, overrideAccess: true, context: { leadStatusNoticeSent: true } })
+    // Точечно: сохранение заявки целиком затёрло бы отметки оплаты, которые пишутся параллельно.
+    await db(payload).execute(sql`update bootcamp_leads set status = 'enrolled', updated_at = now() where id = ${relationId(updated.lead)}`)
+    await journal(payload, { lead: relationId(updated.lead), type: 'enrolled', message: `Зачислен: проект ${updated.gitlabProjectUrl ?? updated.gitlabUsername}` })
     void notifyAdmins({
       title: `Зачислен: ${updated.email}`,
       lines: [
@@ -336,6 +343,7 @@ export async function reportEnrollment(payload: Payload, id: number, report: Wor
 async function notifyFailure(payload: Payload, id: number): Promise<void> {
   const doc = await payload.findByID({ collection: 'bootcamp-enrollments', id, depth: 0, overrideAccess: true })
   const failed = readSteps(doc.steps).find((step) => step.state === 'failed')
+  await journal(payload, { lead: relationId(doc.lead), type: 'enrollment_failed', message: `Зачисление не удалось${failed ? ` на шаге «${stepLabel(failed.key)}»` : ''}: ${doc.error ?? 'причина не указана'}` })
   void notifyAdmins({
     title: `Зачисление не удалось: ${doc.email}`,
     lines: [failed ? `Шаг: ${stepLabel(failed.key)}` : null, doc.error, 'Исправьте причину и нажмите «Повторить» в заявке'],
@@ -349,5 +357,6 @@ export async function reportGitlabSignIn(payload: Payload, id: number, at: strin
   const updated = rows<{ id: number }>(await db(payload).execute(sql`update bootcamp_enrollments set gitlab_signed_in_at = ${when}, updated_at = now() where id = ${id} and gitlab_signed_in_at is null returning id`))
   if (updated.length === 0) return
   const doc = await payload.findByID({ collection: 'bootcamp-enrollments', id, depth: 0, overrideAccess: true })
+  await journal(payload, { lead: relationId(doc.lead), type: 'gitlab_signed_in', message: `Первый вход в GitLab: ${doc.gitlabUsername}` })
   void notifyAdmins({ title: `Ученик впервые вошёл в GitLab: ${doc.gitlabUsername}`, lines: [fullName(doc), doc.email], link: doc.gitlabProjectUrl ?? leadLink(doc.lead) })
 }

@@ -9,6 +9,7 @@ import { logger } from '@/lib/telemetry'
 import { bootcampLeadEmail } from '@/payload/emails/templates'
 import { adminLink, notifyAdmins } from '@/server/admin-telegram'
 import { entryTaskResendDue, newEntryTaskToken, sendEntryTask } from '@/server/bootcamp-entry-task'
+import { journal } from '@/server/bootcamp-lead-events'
 import { markLeadResubmitted, markLeadTeamNotified } from '@/server/bootcamp-lead-marks'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
 import type { BootcampLead } from '@/payload-types'
@@ -65,7 +66,10 @@ export async function saveBootcampLead(payload: Payload, input: BootcampLeadInpu
       const created = lead
       return {
         outcome: 'created',
-        notification: Promise.all([sendEntryTask(payload, created), notifyTeam(payload, created)]).then(([dueAt]) => notifyAdmins(leadEvent(created, 1, dueAt === null ? 'failed' : dueAt))),
+        notification: Promise.all([sendEntryTask(payload, created), notifyTeam(payload, created)]).then(async ([dueAt]) => {
+          await journal(payload, { lead: created.id, type: 'lead_created', message: dueAt ? `Заявка с лендинга, входное задание отправлено, срок ${formatEntryTaskDate(dueAt)}` : 'Заявка с лендинга, письмо с заданием не ушло' })
+          await notifyAdmins(leadEvent(created, 1, dueAt === null ? 'failed' : dueAt))
+        }),
       }
     } catch (error) {
       if (!isUniqueViolation(error)) throw error

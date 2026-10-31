@@ -51,6 +51,8 @@ import { YandexDiskImports } from '@/payload/collections/YandexDiskImports'
 import { BootcampEntryTasks } from '@/payload/collections/BootcampEntryTasks'
 import { BootcampEnrollments } from '@/payload/collections/BootcampEnrollments'
 import { BootcampLeads } from '@/payload/collections/BootcampLeads'
+import { BootcampLeadEvents } from '@/payload/collections/BootcampLeadEvents'
+import { BootcampPayments } from '@/payload/collections/BootcampPayments'
 import { withLessonSourceGuard } from '@/payload/hooks/denyLessonSourceQueries'
 import { SiteSettings } from '@/payload/globals/SiteSettings'
 
@@ -139,6 +141,8 @@ export default buildConfig({
     BootcampLeads,
     BootcampEntryTasks,
     BootcampEnrollments,
+    BootcampPayments,
+    BootcampLeadEvents,
   ].map(withLessonSourceGuard),
 
   globals: [SiteSettings],
