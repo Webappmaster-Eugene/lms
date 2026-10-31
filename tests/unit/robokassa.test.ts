@@ -176,6 +176,12 @@ describe('робокасса: уведомления', () => {
     expect(verifyResultNotice(config, signedResult(params, 'pass1'))).toEqual({ ok: false, reason: 'signature' })
   })
 
+  it('боевой магазин не принимает уведомление о тестовой операции, тестовый принимает', () => {
+    const signed = { ...signedResult(params), IsTest: '1' }
+    expect(verifyResultNotice(config, signed)).toEqual({ ok: false, reason: 'test' })
+    expect(verifyResultNotice({ ...config, isTest: true }, signed).ok).toBe(true)
+  })
+
   it('нет обязательных полей', () => {
     const signed = signedResult(params)
     for (const key of ['OutSum', 'InvId', 'SignatureValue']) {

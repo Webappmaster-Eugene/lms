@@ -50,7 +50,8 @@ export async function runBootcampSchedule(payload: Payload): Promise<BootcampSch
 async function paymentReminders(payload: Payload): Promise<number> {
   const due = rowsOf<{ id: number, email: string, name: string | null, program: string, payment_token: string, payment_due_at: string, payment_amount_kopecks: string | number }>(await db(payload).execute(sql`
     update bootcamp_leads set payment_reminder_sent_at = now(), updated_at = now()
-    where status = 'admitted' and paid_at is null and payment_reminder_sent_at is null and payment_link_sent_at is not null
+    where status = 'admitted' and paid_at is null and payment_reminder_sent_at is null
+      and payment_link_sent_at < payment_due_at - make_interval(days => ${PAYMENT_REMINDER_BEFORE_DAYS})
       and payment_due_at > now() and payment_due_at <= now() + make_interval(days => ${PAYMENT_REMINDER_BEFORE_DAYS})
     returning id, email, name, program, payment_token, payment_due_at, payment_amount_kopecks`))
   const replyTo = due.length > 0 ? await contactReplyTo(payload) : null
@@ -106,30 +107,33 @@ async function reviewAlerts(payload: Payload): Promise<number> {
 
 /**
  * Уведомление Робокассы могло потеряться: висящие счета сверяем через OpStateExt. Для
- * тестовых платежей метод не работает (документация Робокассы), их не трогаем.
+ * тестовых платежей метод не работает (документация Робокассы), их не трогаем. Отменённые
+ * у нас счета тоже сверяем: ссылка Робокассы на них живёт до своего срока.
  */
 async function reconcile(payload: Payload): Promise<number> {
   const config = robokassaConfig()
   if (!config || config.isTest) return 0
-  const pending = rowsOf<{ id: number }>(await db(payload).execute(sql`
+  const pending = rowsOf<{ id: number, amount_kopecks: string | number }>(await db(payload).execute(sql`
     update bootcamp_payments set checked_at = now(), updated_at = now()
     where id in (
       select id from bootcamp_payments
       where method = 'robokassa' and coalesce(is_test, false) = false and (
-        (status = 'pending' and created_at < now() - make_interval(mins => ${RECONCILE_AFTER_MIN}) and created_at > now() - make_interval(days => ${RECONCILE_WINDOW_DAYS}))
+        (status in ('pending', 'cancelled') and processed_at is null and created_at < now() - make_interval(mins => ${RECONCILE_AFTER_MIN}) and created_at > now() - make_interval(days => ${RECONCILE_WINDOW_DAYS}))
         or (status = 'paid' and op_key is null and checked_at is null)
       ) and (checked_at is null or checked_at < now() - make_interval(mins => ${RECONCILE_EVERY_MIN}))
       order by id limit ${RECONCILE_BATCH}
     )
-    returning id`))
+    returning id, amount_kopecks`))
   let paid = 0
-  for (const { id } of pending) {
+  for (const { id, amount_kopecks: invoiceKopecks } of pending) {
     try {
       const state = await fetchOperationState(config, id)
       if (state.opKey) await db(payload).execute(sql`update bootcamp_payments set op_key = coalesce(op_key, ${state.opKey}) where id = ${id}`)
-      if (state.state === 'paid' && state.amountKopecks) {
-        const { outcome } = await applyPaid(payload, id, { amountKopecks: state.amountKopecks, incCurrLabel: state.incCurrLabel, opKey: state.opKey, source: 'reconcile' })
+      if (state.state === 'paid') {
+        // Сумму счёта задаёт наша подпись в ссылке; в Info/OutSum Робокасса может вернуть сумму за вычетом комиссии.
+        const { outcome } = await applyPaid(payload, id, { amountKopecks: Number(invoiceKopecks), incCurrLabel: state.incCurrLabel, opKey: state.opKey, source: 'reconcile' })
         if (outcome === 'paid') paid += 1
+        else if (outcome !== 'already') logger.warn('Robokassa reconciliation found a payment that did not move the lead', { 'robokassa.inv_id': id, 'robokassa.outcome': outcome })
       } else if (state.state === 'cancelled') {
         await db(payload).execute(sql`update bootcamp_payments set status = 'cancelled', updated_at = now() where id = ${id} and status = 'pending'`)
       }

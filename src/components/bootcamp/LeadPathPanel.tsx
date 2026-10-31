@@ -150,6 +150,9 @@ export function LeadPathPanel() {
 
   const decided = !DECISION.includes(lead.status)
   const paid = Boolean(lead.paidAt)
+  const paidPayments = state.payments.filter((payment) => payment.status === 'paid')
+  // Тестовой картой может «оплатить» кто угодно: такую оплату без зачисления можно снять.
+  const testOnly = paid && !enrollment && paidPayments.length > 0 && paidPayments.every((payment) => payment.isTest)
 
   return (
     <div className="enrollment lead-path" aria-live="polite">
@@ -205,7 +208,8 @@ export function LeadPathPanel() {
             )}
           </>
         )}
-        {paid && <p className="enrollment__hint">Оплачено {at(lead.paidAt ?? '')}.</p>}
+        {paid && <p className="enrollment__hint">Оплачено {at(lead.paidAt ?? '')}{testOnly ? ' в тестовом режиме: деньги не списаны' : ''}.</p>}
+        {testOnly && !form && <div className="enrollment__actions">{button('Отменить допуск', () => open('cancel-admission'))}</div>}
         {!lead.admittedAt && !paid && <p className="enrollment__hint">Ссылка на оплату появится после допуска.</p>}
         {state.payments.length > 0 && (
           <ul className="lead-path__list" aria-label="Попытки оплаты">
@@ -240,7 +244,9 @@ export function LeadPathPanel() {
           </>
         ) : paid ? (
           <>
-            <p className="enrollment__hint">Оплата есть, а зачисления нет: автозачисление не стартовало, причина в истории ниже. Проверьте данные и зачислите.</p>
+            <p className="enrollment__hint">{testOnly
+              ? 'Оплата тестовая: доступы по ней автоматически не выдаются. Если это проверка, зачислите кнопкой, если нет - отмените допуск в шаге «Оплата».'
+              : 'Оплата есть, а зачисления нет: автозачисление не стартовало, причина в истории ниже. Проверьте данные и зачислите.'}</p>
             {!form && <div className="enrollment__actions">{button('Зачислить', () => open('enroll', enrollDefaults()), true)}</div>}
             {shown('enroll')}
           </>

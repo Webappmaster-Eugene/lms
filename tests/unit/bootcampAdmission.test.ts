@@ -40,6 +40,7 @@ describe('письма кандидату о допуске и оплате', ()
     bootcampAdmittedEmail({ name: null, program: 'Node.js', amount: '45 000 ₽', dueDate: '7 ноября 2026 г.', url: 'https://learn.test/pay/abc', offerUrl: 'https://info.test/offer/', comment: null, resend: true, replyable: false }),
     bootcampPaymentReminderEmail({ name: 'Иван', program: 'Node.js', amount: '45 000 ₽', dueDate: '7 ноября 2026 г.', url: 'https://learn.test/pay/abc', replyable: true }),
     bootcampPaymentReceivedEmail({ name: 'Иван', program: 'Node.js', amount: '45 000 ₽', invoice: 12, replyable: true }),
+    bootcampPaymentReceivedEmail({ name: 'Иван', program: 'Node.js', amount: '45 000 ₽', invoice: 12, test: true, replyable: true }),
     bootcampDecisionEmail({ name: 'Иван', program: 'Node.js', decision: 'preparation', message: 'Промисы', replyable: true }),
     bootcampDecisionEmail({ name: 'Иван', program: 'Node.js', decision: 'rejected', message: null, replyable: false }),
   ]

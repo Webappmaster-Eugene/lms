@@ -79,9 +79,9 @@ const claim = (key = workerKey()) => claimRoute(new Request('http://lms.test/api
 const report = (id: number, body: unknown) => call(reportRoute, { id: String(id) }, { headers: { 'Content-Type': 'application/json', 'x-lms-worker-key': workerKey() }, body })
 const form = (username: string) => ({ firstName: 'Иван', lastName: 'Петров', username, group: 'nodejs-bootcamp', accessUntil: '' })
 
-/** Пока в базе нет чужих заданий в очереди, исполнитель берёт именно это. */
+/** Очередь общая для всего прогона: чужие задания (фикстуры, тесты оплаты) исполнитель разбирает по пути к нашему. */
 async function claimJob(id: number) {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
     const body = await (await claim()).json() as { job: { id: number } | null }
     if (!body.job || body.job.id === id) return body
   }

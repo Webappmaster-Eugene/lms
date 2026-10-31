@@ -429,18 +429,22 @@ export function bootcampPaymentReminderEmail({ name, program, amount, dueDate, u
   )
 }
 
-type BootcampPaymentReceivedEmailInput = { name: string | null, program: string, amount: string, invoice: number, replyable: boolean }
+type BootcampPaymentReceivedEmailInput = { name: string | null, program: string, amount: string, invoice: number, test?: boolean, replyable: boolean }
 
 /** Кандидату: оплата пришла, доступы будут через несколько минут. */
-export function bootcampPaymentReceivedEmail({ name, program, amount, invoice, replyable }: BootcampPaymentReceivedEmailInput): EmailContent {
-  const intro = `Оплата ${amount} за буткемп ${program} получена, номер заказа ${invoice}. Спасибо, вы в потоке!`
-  const next = 'В течение нескольких минут придут ещё два письма: приглашение в учебный кабинет MentorCareer, где лежат методички, и ссылка для пароля в GitLab курса, где будет ваш учебный проект. Начните с методички недели 0: в ней по шагам описано, как подготовить компьютер и сдать первую работу.'
+export function bootcampPaymentReceivedEmail({ name, program, amount, invoice, test = false, replyable }: BootcampPaymentReceivedEmailInput): EmailContent {
+  const intro = test
+    ? `Тестовая оплата ${amount} за буткемп ${program} прошла, номер заказа ${invoice}. Деньги не списаны: магазин работает в тестовом режиме.`
+    : `Оплата ${amount} за буткемп ${program} получена, номер заказа ${invoice}. Спасибо, вы в потоке!`
+  const next = test
+    ? 'Доступы по тестовой оплате выдаёт наставник вручную после проверки.'
+    : 'В течение нескольких минут придут ещё два письма: приглашение в учебный кабинет MentorCareer, где лежат методички, и ссылка для пароля в GitLab курса, где будет ваш учебный проект. Начните с методички недели 0: в ней по шагам описано, как подготовить компьютер и сдать первую работу.'
   const receipt = 'Чек об оплате приходит отдельно из приложения «Мой налог». Если какое-то письмо не пришло за час, проверьте папку «Спам» и напишите нам.'
   const reply = replyLine(replyable)
   return email(
-    `Оплата буткемпа ${program} получена`,
-    'Оплата получена, доступы придут в течение нескольких минут.',
-    'Оплата получена',
+    test ? `Тестовая оплата буткемпа ${program}` : `Оплата буткемпа ${program} получена`,
+    test ? 'Тестовая оплата прошла, деньги не списаны.' : 'Оплата получена, доступы придут в течение нескольких минут.',
+    test ? 'Тестовая оплата' : 'Оплата получена',
     `${paragraph(escapeHtml(bootcampHello(name)))}
     ${paragraph(escapeHtml(intro))}
     ${notice(escapeHtml(next))}
@@ -456,7 +460,9 @@ type BootcampPaymentTeamEmailInput = { id: number | string, address: string, amo
 /** Команде: пришла оплата буткемпа. */
 export function bootcampPaymentTeamEmail({ id, address, amount, invoice, method, test }: BootcampPaymentTeamEmailInput): EmailContent {
   const url = `${BASE_URL}/admin/collections/bootcamp-leads/${encodeURIComponent(String(id))}`
-  const intro = `${test ? 'Тестовая оплата' : 'Оплата'} ${amount} от ${address}, заказ ${invoice}, способ: ${method}. Зачисление запускается автоматически, его ход виден в заявке.`
+  const intro = test
+    ? `Тестовая оплата ${amount} от ${address}, заказ ${invoice}, способ: ${method}. Доступы по тестовой оплате автоматически не выдаются: если это проверка, нажмите «Зачислить» в заявке.`
+    : `Оплата ${amount} от ${address}, заказ ${invoice}, способ: ${method}. Зачисление запускается автоматически, его ход виден в заявке.`
   return email(
     `${test ? 'Тестовая оплата' : 'Оплата'} буткемпа: ${address}, ${amount}`,
     intro,

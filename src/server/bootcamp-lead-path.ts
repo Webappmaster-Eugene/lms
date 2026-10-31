@@ -269,14 +269,22 @@ export async function resendPaymentLink(payload: Payload, admin: User, leadId: n
   return leadPathState(payload, leadId)
 }
 
-/** «Отменить допуск»: ссылка на оплату перестаёт работать, заявка возвращается к решению. */
+/**
+ * «Отменить допуск»: ссылка на оплату перестаёт работать, заявка возвращается к решению.
+ * После тестовой оплаты без зачисления тоже можно: так снимают «оплату» тестовой картой.
+ */
 export async function cancelAdmission(payload: Payload, admin: User, leadId: number): Promise<LeadPathState> {
   const lead = await findLead(payload, leadId)
-  requireStage(lead, ['admitted'], 'Отменить допуск')
+  requireStage(lead, ['admitted', 'paid'], 'Отменить допуск')
+  if (lead.status === 'paid') {
+    const enrolled = await payload.count({ collection: 'bootcamp-enrollments', where: { lead: { equals: leadId } }, overrideAccess: true })
+    const real = await payload.count({ collection: 'bootcamp-payments', where: { and: [{ lead: { equals: leadId } }, { status: { equals: 'paid' } }, { isTest: { not_equals: true } }] }, overrideAccess: true })
+    if (enrolled.totalDocs > 0 || real.totalDocs > 0) throw new EnrollmentInputError('Оплата настоящая или зачисление уже начато: отменить допуск нельзя. Деньги возвращают в кабинете Робокассы.', 409)
+  }
   const back = lead.entrySubmittedAt ? 'diagnostic' : 'new'
   await inTransaction(payload, admin, async (req) => {
     const tx = await txDb(req)
-    changed(await tx.execute(sql`update bootcamp_leads set status = ${back}, updated_at = now() where id = ${leadId} and status = 'admitted' returning id`))
+    changed(await tx.execute(sql`update bootcamp_leads set status = ${back}, paid_at = null, updated_at = now() where id = ${leadId} and status = ${lead.status} returning id`))
     await tx.execute(sql`update bootcamp_payments set status = 'cancelled', updated_at = now() where lead_id = ${leadId} and status = 'pending'`)
     await recordLeadEvent(payload, req, {
       lead: leadId,

@@ -17,7 +17,8 @@ let payload: Payload
 let admin: TestUser
 let adminToken: string
 const telegram: string[] = []
-const ROBOKASSA = { ROBOKASSA_MERCHANT_LOGIN: 'bootcamp-test', ROBOKASSA_TEST_PASSWORD1: 'test-one', ROBOKASSA_TEST_PASSWORD2: 'test-two', ROBOKASSA_IS_TEST: '1', ROBOKASSA_HASH: 'sha256' }
+// По умолчанию боевой режим: автозачисление идёт только по настоящей оплате. Тестовый включает свой тест.
+const ROBOKASSA = { ROBOKASSA_MERCHANT_LOGIN: 'bootcamp-test', ROBOKASSA_PASSWORD1: 'live-one', ROBOKASSA_PASSWORD2: 'live-two', ROBOKASSA_TEST_PASSWORD1: 'test-one', ROBOKASSA_TEST_PASSWORD2: 'test-two', ROBOKASSA_IS_TEST: '0', ROBOKASSA_HASH: 'sha256' }
 const TELEGRAM = { TELEGRAM_BOT_TOKEN: `123456:${'a'.repeat(32)}`, TELEGRAM_ADMIN_CHAT_ID: '42', TELEGRAM_PROXY_URL: undefined }
 const saved = Object.fromEntries([...Object.keys(ROBOKASSA), ...Object.keys(TELEGRAM)].map((key) => [key, process.env[key]]))
 
@@ -71,7 +72,7 @@ const reload = (id: number) => payload.findByID({ collection: 'bootcamp-leads', 
 const newUsername = () => uid('st').toLowerCase().replace(/[^a-z0-9-]/g, '-')
 const admitBody = (username = newUsername()) => ({ action: 'admit', firstName: 'Иван', lastName: 'Петров', username, group: 'nodejs-bootcamp', accessUntil: '', amount: '45000', dueDays: '7', comment: 'Ждём на потоке' })
 
-function notice(invId: number, outSum: string, password = ROBOKASSA.ROBOKASSA_TEST_PASSWORD2) {
+function notice(invId: number, outSum: string, password = ROBOKASSA.ROBOKASSA_PASSWORD2) {
   const params: Record<string, string> = { OutSum: outSum, InvId: String(invId), IncCurrLabel: 'BankCardPSR', PaymentMethod: 'BankCard' }
   params.SignatureValue = signatureHash('sha256', noticeSignatureBase(outSum, String(invId), password, params)).toUpperCase()
   return resultRoute(new Request('http://lms.test/api/bootcamp/robokassa/result', { method: 'POST', body: new URLSearchParams(params) }))
@@ -90,7 +91,7 @@ async function checkout(token: string): Promise<number> {
   const { url } = await response.json() as { url: string }
   const params = new URL(url).searchParams
   expect(params.get('MerchantLogin')).toBe('bootcamp-test')
-  expect(params.get('IsTest')).toBe('1')
+  expect(params.get('IsTest')).toBe(process.env.ROBOKASSA_IS_TEST === '1' ? '1' : null)
   return Number(params.get('InvId'))
 }
 
@@ -101,6 +102,21 @@ describe('путь заявки: этап только кнопками', () => 
     const fresh = await reload(lead.id)
     expect(fresh.status).toBe('diagnostic')
     expect(fresh.note).toBe('заметка')
+  })
+
+  it('сохранение карточки, открытой до допуска, не затирает ссылку, сумму и данные зачисления', async () => {
+    const { lead } = await admitted()
+    // Так форма Payload отправляет поля, которые были пустыми при открытии карточки.
+    await payload.update({ collection: 'bootcamp-leads', id: lead.id, data: { note: 'после допуска', paymentToken: null, paymentAmountKopecks: null, paymentDueAt: null, admission: null, paidAt: new Date().toISOString(), entrySubmittedAt: null }, overrideAccess: false, user: admin })
+    const fresh = await reload(lead.id)
+    expect(fresh).toMatchObject({ note: 'после допуска', paymentToken: lead.paymentToken, paymentAmountKopecks: 4_500_000, paymentDueAt: lead.paymentDueAt, admission: lead.admission, paidAt: null, entrySubmittedAt: lead.entrySubmittedAt })
+  })
+
+  it('заявку со счетами удалить нельзя', async () => {
+    const { lead, token } = await admitted()
+    await checkout(token)
+    await expect(payload.delete({ collection: 'bootcamp-leads', id: lead.id, overrideAccess: false, user: admin })).rejects.toThrow('счета оплаты')
+    expect((await reload(lead.id)).id).toBe(lead.id)
   })
 
   it('«Допустить»: письмо со ссылкой, Telegram, журнал; повтор и чужой логин - 409', async () => {
@@ -161,7 +177,7 @@ describe('оплата через Робокассу', () => {
     await checkout(token)
     const payments = await payload.find({ collection: 'bootcamp-payments', where: { lead: { equals: lead.id } }, overrideAccess: true })
     expect(payments.docs).toHaveLength(1)
-    expect(payments.docs[0]).toMatchObject({ status: 'pending', isTest: true, offerVersion: '2026-10-31', amountKopecks: 4_500_000 })
+    expect(payments.docs[0]).toMatchObject({ status: 'pending', isTest: false, offerVersion: '2026-10-31', amountKopecks: 4_500_000 })
     expect((await reload(lead.id)).paymentStartedAt).toBeTruthy()
   })
 
@@ -178,7 +194,7 @@ describe('оплата через Робокассу', () => {
       expect(fresh.lead.paidAt).toBeTruthy()
       expect(fresh.enrollment?.status).toBe('queued')
       expect(mail.sent.find((message) => message.to === lead.email && message.subject.includes('получена'))).toBeTruthy()
-      await vi.waitFor(() => expect(telegram.find((text) => text.startsWith(`Тестовая оплата: ${lead.email}`))).toBeTruthy())
+      await vi.waitFor(() => expect(telegram.find((text) => text.startsWith(`Оплата получена: ${lead.email}`))).toBeTruthy())
 
       const again = await notice(invId, '45000.000000')
       expect(await again.text()).toBe(`OK${invId}`)
@@ -221,6 +237,58 @@ describe('оплата через Робокассу', () => {
     expect((await start(token)).status).toBe(409)
   })
 
+  it('счёт, выставленный до отмены допуска, не зачисляет, даже если оплачен', async () => {
+    const { lead, token } = await admitted()
+    const stale = await checkout(token)
+    expect((await act(lead.id, { action: 'cancel-admission' })).status).toBe(200)
+    expect((await act(lead.id, { ...admitBody(), amount: '50000' })).status).toBe(200)
+    const response = await notice(stale, '45000.000000')
+    expect(await response.text()).toBe(`OK${stale}`)
+    const fresh = await state(lead.id)
+    expect(fresh.lead.status).toBe('admitted')
+    expect(fresh.lead.paidAt).toBeNull()
+    expect(fresh.enrollment).toBeNull()
+    expect((await payload.findByID({ collection: 'bootcamp-payments', id: stale, overrideAccess: true })).status).toBe('paid')
+    await vi.waitFor(() => expect(telegram.find((text) => text.startsWith(`Оплата по недействующему счёту: ${lead.email}`))).toBeTruthy())
+  })
+
+  it('тестовая оплата не выдаёт доступы сама, её можно снять отменой допуска', async () => {
+    process.env.ROBOKASSA_IS_TEST = '1'
+    const mail = captureEmails(payload)
+    try {
+      const { lead, token } = await admitted()
+      const invId = await checkout(token)
+      // Боевой Пароль #2 тестовую операцию не подписывает.
+      expect((await notice(invId, '45000.000000')).status).toBe(400)
+      expect(await (await notice(invId, '45000.000000', ROBOKASSA.ROBOKASSA_TEST_PASSWORD2)).text()).toBe(`OK${invId}`)
+      const fresh = await state(lead.id)
+      expect(fresh.lead.status).toBe('paid')
+      expect(fresh.enrollment).toBeNull()
+      expect(mail.sent.find((message) => message.to === lead.email && message.subject.startsWith('Тестовая оплата'))?.text).toContain('Деньги не списаны')
+      await vi.waitFor(() => expect(telegram.find((text) => text.startsWith(`Тестовая оплата: ${lead.email}`))).toContain('автоматически не выдаются'))
+
+      expect((await act(lead.id, { action: 'cancel-admission' })).status).toBe(200)
+      expect(await reload(lead.id)).toMatchObject({ status: 'diagnostic', paidAt: null })
+    } finally {
+      mail.restore()
+      process.env.ROBOKASSA_IS_TEST = '0'
+    }
+  })
+
+  it('настоящую оплату отменой допуска не снять', async () => {
+    const { lead, token } = await admitted()
+    await notice(await checkout(token), '45000.000000')
+    const refused = await act(lead.id, { action: 'cancel-admission' })
+    expect(refused.status).toBe(409)
+    expect((await reload(lead.id)).status).toBe('paid')
+  })
+
+  it('кривой токен и слишком большое уведомление отклоняются до работы с базой', async () => {
+    expect((await start('../../etc')).status).toBe(404)
+    const big = await resultRoute(new Request('http://lms.test/api/bootcamp/robokassa/result', { method: 'POST', body: new URLSearchParams({ OutSum: '1', InvId: '1', SignatureValue: 'a'.repeat(20_000) }) }))
+    expect(big.status).toBe(400)
+  })
+
   it('ручная отметка оплаты запускает тот же путь', async () => {
     const { lead } = await admitted()
     expect((await act(lead.id, { action: 'mark-paid', amount: '45000', comment: '' })).status).toBe(400)
@@ -260,7 +328,10 @@ describe('планировщик буткемпа', () => {
     const mail = captureEmails(payload)
     try {
       const soon = (await admitted()).lead
-      await db().execute(sql`update bootcamp_leads set payment_due_at = now() + interval '1 day' where id = ${soon.id}`)
+      await db().execute(sql`update bootcamp_leads set payment_due_at = now() + interval '1 day', payment_link_sent_at = now() - interval '6 days' where id = ${soon.id}`)
+      // Ссылка ушла уже внутри окна напоминания: второе письмо следом не нужно.
+      const fresh = (await admitted()).lead
+      await db().execute(sql`update bootcamp_leads set payment_due_at = now() + interval '1 day' where id = ${fresh.id}`)
       const late = (await admitted()).lead
       await db().execute(sql`update bootcamp_leads set payment_due_at = now() - interval '1 minute' where id = ${late.id}`)
       const waiting = await newLead({ entrySubmittedAt: new Date(Date.now() - 5 * 86_400_000).toISOString() })
@@ -268,6 +339,7 @@ describe('планировщик буткемпа', () => {
       await runBootcampSchedule(payload)
       await runBootcampSchedule(payload)
       expect(mail.sent.filter((message) => message.to === soon.email && message.subject.includes('Напоминание'))).toHaveLength(1)
+      expect(mail.sent.filter((message) => message.to === fresh.email && message.subject.includes('Напоминание'))).toHaveLength(0)
       expect((await reload(late.id)).paymentExpiredNoticeAt).toBeTruthy()
       expect((await reload(waiting.id)).reviewAlertAt).toBeTruthy()
       await vi.waitFor(() => expect(telegram.filter((text) => text.startsWith(`Срок оплаты истёк: ${late.email}`))).toHaveLength(1))

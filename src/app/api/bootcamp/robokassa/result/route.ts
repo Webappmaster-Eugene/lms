@@ -17,12 +17,36 @@ async function respond(params: Record<string, string>): Promise<Response> {
   }
 }
 
-/** ResultURL магазина (метод POST в настройках Робокассы). */
+// Уведомление Робокассы - десяток коротких полей; адрес открыт без входа, поэтому тело ограничено.
+const MAX_NOTICE_BYTES = 16 * 1024
+
+async function readForm(request: Request): Promise<Record<string, string> | null> {
+  if (Number(request.headers.get('content-length')) > MAX_NOTICE_BYTES) return null
+  const reader = request.body?.getReader()
+  if (!reader) return {}
+  const chunks: Uint8Array[] = []
+  let size = 0
+  try {
+    for (;;) {
+      const chunk = await reader.read()
+      if (chunk.done) break
+      size += chunk.value.byteLength
+      if (size > MAX_NOTICE_BYTES) {
+        await reader.cancel()
+        return null
+      }
+      chunks.push(chunk.value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  return Object.fromEntries(new URLSearchParams(Buffer.concat(chunks).toString('utf8')).entries())
+}
+
+/** ResultURL магазина (метод POST в настройках Робокассы, тело application/x-www-form-urlencoded). */
 export async function POST(request: Request) {
-  const form = await request.formData().catch(() => null)
-  if (!form) return plain('bad request', 400)
-  const params: Record<string, string> = {}
-  for (const [key, value] of form.entries()) if (typeof value === 'string') params[key] = value
+  const params = await readForm(request).catch(() => null)
+  if (!params) return plain('bad request', 400)
   return respond(params)
 }
 

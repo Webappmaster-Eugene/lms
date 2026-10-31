@@ -173,7 +173,7 @@ export type RobokassaNotice = {
 
 export type NoticeResult =
   | { ok: true, notice: RobokassaNotice }
-  | { ok: false, reason: 'missing' | 'signature' | 'amount' | 'inv_id' }
+  | { ok: false, reason: 'missing' | 'signature' | 'amount' | 'inv_id' | 'test' }
 
 /** Строка подписи уведомления: OutSum как пришла, затем все Shp_* по алфавиту. */
 export function noticeSignatureBase(outSum: string, invId: string, password: string, params: Record<string, string>): string {
@@ -192,6 +192,8 @@ function verifyNotice(config: RobokassaConfig, params: Record<string, string>, p
   const invIdText = params.InvId
   const received = params.SignatureValue
   if (!outSum || !invIdText || !received) return { ok: false, reason: 'missing' }
+  // IsTest не входит в подпись ссылки: боевой магазин тестовую операцию не принимает, даже если пароли совпали.
+  if (!config.isTest && params.IsTest === '1') return { ok: false, reason: 'test' }
   const expected = signatureHash(config.hash, noticeSignatureBase(outSum, invIdText, password, params))
   if (!sameHex(expected, received)) return { ok: false, reason: 'signature' }
   const amountKopecks = parseOutSum(outSum)

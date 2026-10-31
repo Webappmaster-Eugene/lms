@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import { APIError, type CollectionBeforeDeleteHook, type CollectionConfig } from 'payload'
 
 import { ENTRY_TASK_MAX_SUBMISSIONS } from '@/lib/bootcamp-entry-task'
 import { BOOTCAMP_LEAD_STATUSES, BOOTCAMP_PROGRAMS } from '@/lib/bootcamp-leads'
@@ -7,7 +7,17 @@ import { notifyLeadStatusChange } from '@/payload/hooks/bootcampLeadNotices'
 
 const readOnly = { readOnly: true }
 const time = { ...readOnly, date: { pickerAppearance: 'dayAndTime' as const } }
-const sourceField = (name: string, label: string) => ({ name, type: 'text' as const, maxLength: 100, label, admin: readOnly })
+// Форма карточки отправляет при сохранении все поля в том виде, в каком они были при открытии.
+// Поля, которые пишут сервер, кнопки «Пути заявки» и кандидат, закрыты для изменения через Payload,
+// иначе сохранение заметки затёрло бы ссылку на оплату, отметку оплаты или решение кандидата.
+const serverOnly = { update: () => false }
+const sourceField = (name: string, label: string) => ({ name, type: 'text' as const, maxLength: 100, label, access: serverOnly, admin: readOnly })
+
+/** Счета - учёт денег: заявку с ними не удаляют, иначе платежи остались бы без владельца. */
+const keepPaidLeads: CollectionBeforeDeleteHook = async ({ id, req }) => {
+  const payments = await req.payload.count({ collection: 'bootcamp-payments', where: { lead: { equals: id } }, overrideAccess: true, req })
+  if (payments.totalDocs > 0) throw new APIError('По заявке есть счета оплаты, удалить её нельзя. Закройте заявку кнопками «Пути заявки».', 409, null, true)
+}
 
 /**
  * Предзапись с лендинга. Публичная форма пишет сюда только через
@@ -29,7 +39,7 @@ export const BootcampLeads: CollectionConfig = {
     update: isAdmin,
     delete: isAdmin,
   },
-  hooks: { afterChange: [notifyLeadStatusChange] },
+  hooks: { afterChange: [notifyLeadStatusChange], beforeDelete: [keepPaidLeads] },
   // Одна заявка на адрес в программе: параллельные отправки не плодят дубли.
   indexes: [{ fields: ['program', 'email'], unique: true }],
   fields: [
@@ -45,7 +55,7 @@ export const BootcampLeads: CollectionConfig = {
       label: 'Этап',
       options: BOOTCAMP_LEAD_STATUSES.map(({ value, label }) => ({ value, label })),
       // Этап меняют только кнопки «Пути заявки» и события системы: у каждого перехода свои письма и проверки.
-      access: { update: () => false },
+      access: serverOnly,
       admin: { ...readOnly, position: 'sidebar', description: 'Меняется кнопками в блоке «Путь заявки» вверху карточки.' },
     },
     { name: 'assignee', type: 'relationship', relationTo: 'users', label: 'Ответственный', filterOptions: { role: { equals: 'admin' } }, admin: { position: 'sidebar' } },
@@ -62,36 +72,37 @@ export const BootcampLeads: CollectionConfig = {
         sourceField('utmCampaign', 'utm_campaign'),
         sourceField('utmContent', 'utm_content'),
         sourceField('utmTerm', 'utm_term'),
-        { name: 'referrerHost', type: 'text', maxLength: 255, label: 'Сайт перехода', admin: readOnly },
+        { name: 'referrerHost', type: 'text', maxLength: 255, label: 'Сайт перехода', access: serverOnly, admin: readOnly },
       ],
     },
-    { name: 'consentVersion', type: 'text', required: true, maxLength: 40, label: 'Версия согласия и политики', admin: readOnly },
-    { name: 'consentAt', type: 'date', required: true, label: 'Согласие дано', admin: readOnly },
-    { name: 'submissionCount', type: 'number', required: true, defaultValue: 1, min: 1, label: 'Отправок формы', admin: readOnly },
-    { name: 'lastSubmittedAt', type: 'date', label: 'Последняя отправка', admin: readOnly },
-    { name: 'notifiedAt', type: 'date', label: 'Письмо команде', admin: { ...readOnly, description: 'Пусто - письмо администраторам не ушло: заявка видна только в этом списке.' } },
+    { name: 'consentVersion', type: 'text', required: true, maxLength: 40, label: 'Версия согласия и политики', access: serverOnly, admin: readOnly },
+    { name: 'consentAt', type: 'date', required: true, label: 'Согласие дано', access: serverOnly, admin: readOnly },
+    { name: 'submissionCount', type: 'number', required: true, defaultValue: 1, min: 1, label: 'Отправок формы', access: serverOnly, admin: readOnly },
+    { name: 'lastSubmittedAt', type: 'date', label: 'Последняя отправка', access: serverOnly, admin: readOnly },
+    { name: 'notifiedAt', type: 'date', label: 'Письмо команде', access: serverOnly, admin: { ...readOnly, description: 'Пусто - письмо администраторам не ушло: заявка видна только в этом списке.' } },
     {
       name: 'entryTaskToken',
       type: 'text',
       unique: true,
       label: 'Личная ссылка на входное задание',
+      access: serverOnly,
       admin: { ...readOnly, description: 'Страница задания на платформе: /entry-task/<эта строка>. Кто знает ссылку, тот видит задание, поэтому её не пересылают.' },
     },
-    { name: 'entryTaskSentAt', type: 'date', label: 'Письмо с заданием', admin: { ...readOnly, description: 'Пусто - письмо кандидату не ушло. Повторная заявка с того же адреса отправит его снова.' } },
-    { name: 'entryTaskDueAt', type: 'date', label: 'Срок входного задания', admin: readOnly },
+    { name: 'entryTaskSentAt', type: 'date', label: 'Письмо с заданием', access: serverOnly, admin: { ...readOnly, description: 'Пусто - письмо кандидату не ушло. Повторная заявка с того же адреса отправит его снова.' } },
+    { name: 'entryTaskDueAt', type: 'date', label: 'Срок входного задания', access: serverOnly, admin: readOnly },
     {
       type: 'collapsible',
       label: 'Решение входного задания',
       admin: { description: 'Кандидат решает задачи на странице задания и нажимает «Отправить решение». Тесты прогоняет сервер, здесь последняя отправка.' },
       fields: [
-        { name: 'entrySubmittedAt', type: 'date', label: 'Решение отправлено', admin: { ...readOnly, date: { pickerAppearance: 'dayAndTime' } } },
-        { name: 'entrySubmissionCount', type: 'number', label: 'Отправок решения', admin: { ...readOnly, description: `Не больше ${ENTRY_TASK_MAX_SUBMISSIONS}: после этого страница задания решение не принимает.` } },
-        { name: 'entryPassed', type: 'number', label: 'Тестов пройдено', admin: readOnly },
-        { name: 'entryTotal', type: 'number', label: 'Тестов всего', admin: readOnly },
-        { name: 'entryResult', type: 'textarea', label: 'Итог по задачам', admin: readOnly },
-        { name: 'entrySolution', type: 'code', label: 'Код кандидата', admin: { readOnly: true, language: 'javascript' } },
+        { name: 'entrySubmittedAt', type: 'date', label: 'Решение отправлено', access: serverOnly, admin: { ...readOnly, date: { pickerAppearance: 'dayAndTime' } } },
+        { name: 'entrySubmissionCount', type: 'number', label: 'Отправок решения', access: serverOnly, admin: { ...readOnly, description: `Не больше ${ENTRY_TASK_MAX_SUBMISSIONS}: после этого страница задания решение не принимает.` } },
+        { name: 'entryPassed', type: 'number', label: 'Тестов пройдено', access: serverOnly, admin: readOnly },
+        { name: 'entryTotal', type: 'number', label: 'Тестов всего', access: serverOnly, admin: readOnly },
+        { name: 'entryResult', type: 'textarea', label: 'Итог по задачам', access: serverOnly, admin: readOnly },
+        { name: 'entrySolution', type: 'code', label: 'Код кандидата', access: serverOnly, admin: { readOnly: true, language: 'javascript' } },
         // Тот же код по задачам: страница задания подставляет его в редакторы при повторном визите.
-        { name: 'entrySolutions', type: 'json', admin: { hidden: true } },
+        { name: 'entrySolutions', type: 'json', access: serverOnly, admin: { hidden: true } },
       ],
     },
     {
@@ -99,27 +110,28 @@ export const BootcampLeads: CollectionConfig = {
       label: 'Допуск и оплата',
       admin: { description: 'Заполняется кнопками «Пути заявки», страницей оплаты и уведомлениями Робокассы.' },
       fields: [
-        { name: 'admittedAt', type: 'date', label: 'Допущен', admin: time },
-        { name: 'admittedBy', type: 'relationship', relationTo: 'users', label: 'Допустил', admin: readOnly },
-        { name: 'paymentAmountKopecks', type: 'number', min: 1, label: 'Сумма к оплате, копеек', admin: readOnly },
-        { name: 'paymentDueAt', type: 'date', label: 'Оплатить до', admin: time },
+        { name: 'admittedAt', type: 'date', label: 'Допущен', access: serverOnly, admin: time },
+        { name: 'admittedBy', type: 'relationship', relationTo: 'users', label: 'Допустил', access: serverOnly, admin: readOnly },
+        { name: 'paymentAmountKopecks', type: 'number', min: 1, label: 'Сумма к оплате, копеек', access: serverOnly, admin: readOnly },
+        { name: 'paymentDueAt', type: 'date', label: 'Оплатить до', access: serverOnly, admin: time },
         {
           name: 'paymentToken',
           type: 'text',
           unique: true,
           label: 'Личная ссылка на оплату',
+          access: serverOnly,
           admin: { ...readOnly, description: 'Страница оплаты на платформе: /pay/<эта строка>.' },
         },
-        { name: 'paymentLinkSentAt', type: 'date', label: 'Письмо со ссылкой на оплату', admin: time },
-        { name: 'paymentPageOpenedAt', type: 'date', label: 'Страница оплаты открыта', admin: time },
-        { name: 'paymentStartedAt', type: 'date', label: 'Первый переход к оплате', admin: time },
-        { name: 'paymentReminderSentAt', type: 'date', label: 'Напоминание об оплате', admin: time },
-        { name: 'paymentExpiredNoticeAt', type: 'date', label: 'Срок оплаты истёк', admin: time },
-        { name: 'paidAt', type: 'date', label: 'Оплачено', admin: time },
-        { name: 'decisionMessage', type: 'textarea', maxLength: 4000, label: 'Текст последнего решения в письме', admin: readOnly },
-        { name: 'reviewAlertAt', type: 'date', label: 'Тревога: решение ждёт ответа', admin: time },
+        { name: 'paymentLinkSentAt', type: 'date', label: 'Письмо со ссылкой на оплату', access: serverOnly, admin: time },
+        { name: 'paymentPageOpenedAt', type: 'date', label: 'Страница оплаты открыта', access: serverOnly, admin: time },
+        { name: 'paymentStartedAt', type: 'date', label: 'Первый переход к оплате', access: serverOnly, admin: time },
+        { name: 'paymentReminderSentAt', type: 'date', label: 'Напоминание об оплате', access: serverOnly, admin: time },
+        { name: 'paymentExpiredNoticeAt', type: 'date', label: 'Срок оплаты истёк', access: serverOnly, admin: time },
+        { name: 'paidAt', type: 'date', label: 'Оплачено', access: serverOnly, admin: time },
+        { name: 'decisionMessage', type: 'textarea', maxLength: 4000, label: 'Текст последнего решения в письме', access: serverOnly, admin: readOnly },
+        { name: 'reviewAlertAt', type: 'date', label: 'Тревога: решение ждёт ответа', access: serverOnly, admin: time },
         // Данные для зачисления, введённые при допуске: после оплаты зачисление запускается с ними само.
-        { name: 'admission', type: 'json', admin: { hidden: true } },
+        { name: 'admission', type: 'json', access: serverOnly, admin: { hidden: true } },
       ],
     },
   ],

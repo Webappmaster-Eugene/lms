@@ -28,9 +28,11 @@ import type { BootcampLead, User } from '@/payload-types'
 type Db = { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }
 const db = (payload: Payload) => (payload.db as unknown as { drizzle: Db }).drizzle
 
-// Тревоги о чужих уведомлениях не должны превращаться в поток сообщений.
-const alerts = createRateLimiter('bootcamp-payment-alerts', 10, 60 * 60_000)
-// Страница ошибки открыта без подписи: перебор номеров счетов не должен засыпать журнал и Telegram.
+// Тревоги не должны превращаться в поток сообщений. Неверную подпись может прислать кто угодно,
+// поэтому у неё свой счётчик: иначе мусор заглушил бы тревоги о настоящих уведомлениях.
+const signatureAlerts = createRateLimiter('bootcamp-payment-signature-alerts', 10, 60 * 60_000)
+const mismatchAlerts = createRateLimiter('bootcamp-payment-mismatch-alerts', 10, 60 * 60_000)
+// Страница ошибки открыта без подписи: перебор номеров счетов не должен засыпать журнал.
 const failReturns = createRateLimiter('bootcamp-payment-fail-returns', 30, 60 * 60_000)
 
 const programName = (lead: Pick<BootcampLead, 'program'>) => BOOTCAMP_PROGRAMS.find((item) => item.value === lead.program)?.short ?? lead.program
@@ -93,6 +95,12 @@ export async function startCheckout(payload: Payload, token: string, acceptOffer
   if (!amountKopecks || !lead.paymentDueAt) throw new EnrollmentInputError('В заявке нет суммы или срока оплаты. Напишите нам на support@mentorcareer.ru.', 409)
 
   const payment = await inTransaction(payload, null, async (req) => {
+    // Заявка блокируется до создания счёта: отмена допуска в ту же секунду не оставит висящий счёт со старой суммой.
+    const [locked] = rowsOf<{ status: string, paid_at: string | null, payment_due_at: string | null, payment_amount_kopecks: string | number | null }>(
+      await (await txDb(req)).execute(sql`select status, paid_at, payment_due_at, payment_amount_kopecks from bootcamp_leads where id = ${lead.id} for update`))
+    const stillOpen = locked && locked.status === 'admitted' && !locked.paid_at && Number(locked.payment_amount_kopecks) === amountKopecks
+      && locked.payment_due_at !== null && Date.parse(String(locked.payment_due_at)) >= Date.now()
+    if (!stillOpen) throw new EnrollmentInputError('Условия оплаты только что изменились. Обновите страницу.', 409)
     const created = await payload.create({
       collection: 'bootcamp-payments',
       data: { lead: lead.id, amountKopecks, status: 'pending', method: 'robokassa', isTest: config.isTest, offerVersion: OFFER_VERSION, offerAcceptedAt: new Date().toISOString() },
@@ -121,7 +129,7 @@ export async function startCheckout(payload: Payload, token: string, acceptOffer
   })
 }
 
-export type PaidOutcome = 'paid' | 'already' | 'unknown' | 'amount_mismatch' | 'double' | 'unexpected'
+export type PaidOutcome = 'paid' | 'already' | 'unknown' | 'amount_mismatch' | 'double' | 'stale'
 
 type PaidDetails = { amountKopecks: number, paymentMethod?: string, incCurrLabel?: string, fee?: string, opKey?: string, source: 'robokassa' | 'reconcile' }
 
@@ -132,15 +140,20 @@ type PaidDetails = { amountKopecks: number, paymentMethod?: string, incCurrLabel
 export async function applyPaid(payload: Payload, invId: number, details: PaidDetails): Promise<{ outcome: PaidOutcome, leadId: number | null }> {
   const result = await inTransaction(payload, null, async (req) => {
     const tx = await txDb(req)
-    const [payment] = rowsOf<{ id: number, lead_id: number, amount_kopecks: string | number, processed_at: string | null, is_test: boolean | null }>(
-      await tx.execute(sql`select id, lead_id, amount_kopecks, processed_at, is_test from bootcamp_payments where id = ${invId} for update`))
-    if (!payment) return { outcome: 'unknown' as const, leadId: null, lead: null }
+    const [ref] = rowsOf<{ lead_id: number }>(await tx.execute(sql`select lead_id from bootcamp_payments where id = ${invId}`))
+    if (!ref) return { outcome: 'unknown' as const, leadId: null, test: false }
+    // Сначала заявка, потом счёт, как у кнопок и отмены допуска: иначе два уведомления по счетам
+    // одной заявки или уведомление вместе с кнопкой сцепятся во взаимной блокировке.
+    const [lead] = rowsOf<{ id: number, email: string, status: string, paid_at: string | null, admitted_at: string | null, payment_amount_kopecks: string | number | null }>(
+      await tx.execute(sql`select id, email, status, paid_at, admitted_at, payment_amount_kopecks from bootcamp_leads where id = ${ref.lead_id} for update`))
+    const [payment] = rowsOf<{ id: number, lead_id: number, amount_kopecks: string | number, status: string, processed_at: string | null, is_test: boolean | null, created_at: string }>(
+      await tx.execute(sql`select id, lead_id, amount_kopecks, status, processed_at, is_test, created_at from bootcamp_payments where id = ${invId} for update`))
     // Колонка numeric: драйвер отдаёт её строкой.
-    if (Number(payment.amount_kopecks) !== details.amountKopecks) return { outcome: 'amount_mismatch' as const, leadId: payment.lead_id, lead: null }
-    if (payment.processed_at) return { outcome: 'already' as const, leadId: payment.lead_id, lead: null }
+    if (Number(payment.amount_kopecks) !== details.amountKopecks) return { outcome: 'amount_mismatch' as const, leadId: payment.lead_id, test: false }
+    if (payment.processed_at) return { outcome: 'already' as const, leadId: payment.lead_id, test: false }
+    // Деньги пришли в любом случае: счёт отмечается оплаченным, даже если заявку он уже не двигает.
     await tx.execute(sql`update bootcamp_payments set status = 'paid', paid_at = now(), processed_at = now(), payment_method = ${details.paymentMethod ?? null},
       inc_curr_label = ${details.incCurrLabel ?? null}, fee = ${details.fee ?? null}, op_key = coalesce(${details.opKey ?? null}, op_key), updated_at = now() where id = ${invId}`)
-    const [lead] = rowsOf<{ id: number, email: string, status: string, paid_at: string | null }>(await tx.execute(sql`select id, email, status, paid_at from bootcamp_leads where id = ${payment.lead_id} for update`))
     const amount = formatRubles(details.amountKopecks)
     const test = payment.is_test === true
     const via = details.source === 'reconcile' ? ', найдено сверкой с Робокассой' : ''
@@ -149,45 +162,59 @@ export async function applyPaid(payload: Payload, invId: number, details: PaidDe
         lead: lead.id, type: 'payment_alert', message: `Вторая оплата: счёт ${invId}, ${amount}`, data: { invId },
         telegram: { title: `Двойная оплата: ${lead.email}`, lines: [`Счёт ${invId}, ${amount}${via}`, 'Заявка уже оплачена. Верните деньги в кабинете Робокассы и аннулируйте чек в «Мой налог».'], link: leadAdminLink(lead.id) },
       })
-      return { outcome: 'double' as const, leadId: lead.id, lead }
+      return { outcome: 'double' as const, leadId: lead.id, test }
     }
-    if (lead.status !== 'admitted') {
-      await tx.execute(sql`update bootcamp_leads set paid_at = now(), updated_at = now() where id = ${lead.id}`)
+    // Ссылка Робокассы живёт до своего срока и после отмены допуска: такой счёт не должен зачислять,
+    // особенно если при новом допуске сумма другая.
+    const current = payment.status === 'pending' && lead.status === 'admitted' && Number(lead.payment_amount_kopecks) === details.amountKopecks
+      && lead.admitted_at !== null && Date.parse(String(payment.created_at)) >= Date.parse(String(lead.admitted_at))
+    if (!current) {
       await recordLeadEvent(payload, req, {
-        lead: lead.id, type: 'payment_alert', message: `Оплата ${amount} пришла на этапе «${leadStatusLabel(lead.status)}», счёт ${invId}`, data: { invId },
-        telegram: { title: `Оплата без допуска: ${lead.email}`, lines: [`${amount}, счёт ${invId}${via}`, `Этап заявки «${leadStatusLabel(lead.status)}»: решите, зачислить вручную или вернуть деньги.`], link: leadAdminLink(lead.id) },
+        lead: lead.id, type: 'payment_alert', message: `Оплачен недействующий счёт ${invId}, ${amount}: заявка на этапе «${leadStatusLabel(lead.status)}» не изменилась`, data: { invId },
+        telegram: { title: `Оплата по недействующему счёту: ${lead.email}`, lines: [`${amount}, счёт ${invId}${via}`, `Счёт выставлен до отмены или смены допуска, этап заявки «${leadStatusLabel(lead.status)}». Верните деньги или, если они засчитываются, допустите кандидата и отметьте оплату вручную.`], link: leadAdminLink(lead.id) },
       })
-      return { outcome: 'unexpected' as const, leadId: lead.id, lead }
+      return { outcome: 'stale' as const, leadId: lead.id, test }
     }
     await tx.execute(sql`update bootcamp_leads set status = 'paid', paid_at = now(), updated_at = now() where id = ${lead.id}`)
     await tx.execute(sql`update bootcamp_payments set status = 'cancelled', updated_at = now() where lead_id = ${lead.id} and status = 'pending' and id <> ${invId}`)
     await recordLeadEvent(payload, req, {
       lead: lead.id, type: 'paid', message: `Оплата ${amount}, счёт ${invId}${test ? ' (тестовый режим)' : ''}${via}`, data: { invId, amountKopecks: details.amountKopecks, method: details.incCurrLabel ?? details.paymentMethod ?? null, test },
-      telegram: { title: `${test ? 'Тестовая оплата' : 'Оплата получена'}: ${lead.email}`, lines: [`${amount}, счёт ${invId}${details.incCurrLabel ? `, ${details.incCurrLabel}` : ''}${via}`, 'Зачисление запускается автоматически'], link: leadAdminLink(lead.id) },
+      telegram: {
+        title: `${test ? 'Тестовая оплата' : 'Оплата получена'}: ${lead.email}`,
+        lines: [`${amount}, счёт ${invId}${details.incCurrLabel ? `, ${details.incCurrLabel}` : ''}${via}`, test ? TEST_PAYMENT_NOTE : 'Зачисление запускается автоматически'],
+        link: leadAdminLink(lead.id),
+      },
     })
-    return { outcome: 'paid' as const, leadId: lead.id, lead }
+    return { outcome: 'paid' as const, leadId: lead.id, test }
   })
   if (result.outcome === 'paid' && result.leadId) await afterPaid(payload, result.leadId, invId)
   return { outcome: result.outcome, leadId: result.leadId }
 }
+
+// Тестовой картой платит кто угодно: доступы по тестовой оплате выдаёт наставник, а не автоматика.
+const TEST_PAYMENT_NOTE = 'Тестовая оплата: доступы автоматически не выдаются. Если это проверка, нажмите «Зачислить» в заявке, если нет - «Отменить допуск».'
 
 /** После фиксации оплаты: письма и автозачисление. Сбой любого шага виден в Telegram, оплата остаётся. */
 export async function afterPaid(payload: Payload, leadId: number, invId: number): Promise<void> {
   const lead = await payload.findByID({ collection: 'bootcamp-leads', id: leadId, depth: 0, overrideAccess: true })
   const payment = await payload.findByID({ collection: 'bootcamp-payments', id: invId, depth: 0, overrideAccess: true })
   const amount = formatRubles(payment.amountKopecks)
+  const test = payment.method === 'robokassa' && payment.isTest === true
   try {
     const replyTo = await contactReplyTo(payload)
-    await payload.sendEmail({ to: lead.email, ...bootcampPaymentReceivedEmail({ name: lead.name ?? null, program: programName(lead), amount, invoice: invId, replyable: Boolean(replyTo) }), ...(replyTo ? { replyTo } : {}) })
+    await payload.sendEmail({ to: lead.email, ...bootcampPaymentReceivedEmail({ name: lead.name ?? null, program: programName(lead), amount, invoice: invId, test, replyable: Boolean(replyTo) }), ...(replyTo ? { replyTo } : {}) })
   } catch (error) {
     logger.error('Bootcamp payment receipt email failed', error, { 'lead.id': leadId })
+    await journal(payload, { lead: leadId, type: 'payment_alert', message: 'Письмо «Оплата получена» кандидату не ушло', telegram: { title: `Письмо об оплате не ушло: ${lead.email}`, lines: ['Подробности в журнале приложения. Напишите кандидату вручную.'], link: leadAdminLink(leadId) } })
   }
   try {
-    const content = bootcampPaymentTeamEmail({ id: leadId, address: lead.email, amount, invoice: invId, method: payment.method === 'manual' ? 'отмечено вручную' : payment.incCurrLabel ?? payment.paymentMethod ?? 'Робокасса', test: payment.isTest === true })
+    const content = bootcampPaymentTeamEmail({ id: leadId, address: lead.email, amount, invoice: invId, method: payment.method === 'manual' ? 'отмечено вручную' : payment.incCurrLabel ?? payment.paymentMethod ?? 'Робокасса', test })
     for (const to of await adminEmails(payload)) await payload.sendEmail({ to, ...content })
   } catch (error) {
     logger.error('Bootcamp payment team email failed', error, { 'lead.id': leadId })
+    await journal(payload, { lead: leadId, type: 'payment_alert', message: 'Письмо команде об оплате не ушло' })
   }
+  if (test) return
   const draft = readAdmissionDraft(lead.admission)
   try {
     if (!draft) throw new EnrollmentInputError('в заявке нет данных для зачисления из формы «Допустить»')
@@ -250,7 +277,7 @@ export async function handleResultNotice(payload: Payload, params: Record<string
   const checked = verifyResultNotice(config, params)
   if (!checked.ok) {
     logger.warn('Robokassa notice rejected', { 'robokassa.reason': checked.reason, 'robokassa.inv_id': String(params.InvId ?? '').slice(0, 20) })
-    if (checked.reason === 'signature' && alerts.take('all')) {
+    if (checked.reason === 'signature' && signatureAlerts.take('all')) {
       await journal(payload, { lead: null, type: 'payment_alert', message: `Уведомление Робокассы с неверной подписью, счёт ${String(params.InvId ?? '').slice(0, 20)}`, telegram: { title: 'Робокасса: уведомление с неверной подписью', lines: [`Счёт ${String(params.InvId ?? '').slice(0, 20)}. Проверьте пароли ROBOKASSA_* и режим IsTest в Dokploy.`], link: leadAdminLink(null) } })
     }
     return { status: 400, body: 'bad request' }
@@ -262,7 +289,7 @@ async function paidResponse(payload: Payload, notice: RobokassaNotice, source: P
   const { outcome, leadId } = await applyPaid(payload, notice.invId, { amountKopecks: notice.amountKopecks, paymentMethod: notice.paymentMethod, incCurrLabel: notice.incCurrLabel, fee: notice.fee, opKey: notice.opKey, source })
   if (outcome === 'unknown' || outcome === 'amount_mismatch') {
     logger.warn('Robokassa notice does not match a payment', { 'robokassa.outcome': outcome, 'robokassa.inv_id': notice.invId })
-    if (alerts.take('all')) {
+    if (mismatchAlerts.take('all')) {
       await journal(payload, { lead: leadId, type: 'payment_alert', message: outcome === 'unknown' ? `Уведомление об оплате несуществующего счёта ${notice.invId}` : `Сумма в уведомлении не совпала со счётом ${notice.invId}`, telegram: { title: 'Робокасса: уведомление не совпало со счётом', lines: [`Счёт ${notice.invId}, ${formatRubles(notice.amountKopecks)}: ${outcome === 'unknown' ? 'такого счёта нет' : 'сумма другая'}`], link: leadAdminLink(leadId) } })
     }
     return { status: 400, body: 'bad request' }
@@ -282,15 +309,14 @@ export async function successReturnState(payload: Payload, params: Record<string
   return { kind: payment.status === 'paid' ? 'paid' : 'pending', amount: formatRubles(payment.amountKopecks), invId: payment.id, test: payment.isTest === true }
 }
 
-/** FailURL: подписи нет, поэтому только отметка один раз на счёт, без раскрытия данных заявки. */
+/**
+ * FailURL: подписи нет, номер счёта может подставить кто угодно. Поэтому только отметка в журнале
+ * один раз на счёт, без Telegram и без раскрытия данных заявки.
+ */
 export async function noteFailReturn(payload: Payload, rawInvId: string | undefined): Promise<void> {
   const invId = /^\d{1,10}$/.test(rawInvId ?? '') ? Number(rawInvId) : NaN
   if (!Number.isSafeInteger(invId) || invId <= 0 || !failReturns.take('all')) return
   const [row] = rowsOf<{ lead_id: number }>(await db(payload).execute(sql`update bootcamp_payments set fail_return_at = now(), updated_at = now() where id = ${invId} and status = 'pending' and fail_return_at is null returning lead_id`))
   if (!row) return
-  const lead = await payload.findByID({ collection: 'bootcamp-leads', id: row.lead_id, depth: 0, overrideAccess: true, disableErrors: true })
-  await journal(payload, {
-    lead: row.lead_id, type: 'payment_failed_return', message: `Оплата по счёту ${invId} не прошла или прервана`,
-    telegram: { title: `Оплата не прошла: ${lead?.email ?? `заявка ${row.lead_id}`}`, lines: [`Счёт ${invId}. Кандидат вернулся со страницы ошибки Робокассы, деньги не списаны.`], link: leadAdminLink(row.lead_id) },
-  })
+  await journal(payload, { lead: row.lead_id, type: 'payment_failed_return', message: `Возврат со страницы ошибки Робокассы по счёту ${invId}: оплата не прошла или прервана` })
 }
