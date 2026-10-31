@@ -48,10 +48,10 @@ describe('лендинг буткемпа: форма предзаписи', () 
 describe('лендинг буткемпа: тексты и путь недели', () => {
   // Правило владельца 27.10.2026: в текстах страницы только короткий дефис.
   it('в текстах страницы, политики и формы нет длинного тире', () => {
-    const pages = ['src/pages/bootcamp/nodejs.astro', 'src/pages/bootcamp/nodejs/payment.astro', 'src/pages/bootcamp/nodejs/quality.astro', 'src/pages/privacy.astro', 'src/pages/consent.astro', 'src/components/BootcampFooter.astro']
+    const pages = ['src/pages/bootcamp/nodejs.astro', 'src/pages/bootcamp/nodejs/payment.astro', 'src/pages/bootcamp/nodejs/offer.astro', 'src/pages/bootcamp/nodejs/quality.astro', 'src/pages/privacy.astro', 'src/pages/consent.astro', 'src/components/BootcampFooter.astro']
     const markup = pages.map((path) => readFileSync(landing(path), 'utf8').split('---').slice(2).join('---'))
     // Во фронтматтере страниц оплаты и ИИ-файла тексты тоже публичные: вопросы, описания, llms.txt.
-    const frontmatter = ['src/pages/bootcamp/nodejs/payment.astro', 'src/pages/llms.txt.ts'].map((path) => (readFileSync(landing(path), 'utf8').match(/'[^'\n]*'|`[^`]*`/g) ?? []).join(''))
+    const frontmatter = ['src/pages/bootcamp/nodejs/payment.astro', 'src/pages/bootcamp/nodejs/offer.astro', 'src/pages/llms.txt.ts'].map((path) => (readFileSync(landing(path), 'utf8').match(/'[^'\n]*'|`[^`]*`/g) ?? []).join(''))
     markup.push(...frontmatter)
     const messages = readFileSync(landing('src/scripts/bootcamp-form.ts'), 'utf8').match(/'[^'\n]*'/g) ?? []
     expect(`${JSON.stringify({ AUDIENCE, FACTS, FAQ, LOG, PAINS, PATH, PROGRAM, SAMPLE_QUESTIONS })}${markup.join('')}${messages.join('')}`).not.toMatch(/[—–]/)
@@ -77,7 +77,7 @@ describe('лендинг буткемпа: тексты и путь недели
   it('каждая страница из карты сайта перенаправляется со слешем и в nginx, и в тестовом сервере', () => {
     const sitemap = readFileSync(landing('src/pages/sitemap.xml.ts'), 'utf8')
     const pages = [...(sitemap.match(/const PAGES = \[([^\]]*)\]/)?.[1] ?? '').matchAll(/'\/([^']+)\/'/g)].map((match) => match[1] ?? '')
-    expect(pages).toEqual(expect.arrayContaining(['bootcamp/nodejs', 'bootcamp/nodejs/payment', 'bootcamp/nodejs/quality', 'privacy', 'consent']))
+    expect(pages).toEqual(expect.arrayContaining(['bootcamp/nodejs', 'bootcamp/nodejs/payment', 'bootcamp/nodejs/offer', 'bootcamp/nodejs/quality', 'privacy', 'consent']))
     const nginxPages = nginx.match(/location ~ \^\/\(([^)]*)\)\$/)?.[1]?.split('|') ?? []
     const serverPages = readFileSync(new URL('../../scripts/landing-server.mjs', import.meta.url), 'utf8').match(/url\.match\(\/\^\\\/\(([^)]*)\)/)?.[1]?.replaceAll('\\/', '/').split('|') ?? []
     expect(nginxPages.sort()).toEqual([...pages].sort())

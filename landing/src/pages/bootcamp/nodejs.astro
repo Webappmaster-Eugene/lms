@@ -6,7 +6,7 @@ import GuideScreen from '../../components/GuideScreen.astro'
 import screens from '../../data/screens.json'
 import { AUTHOR_URL, SITE_URL } from '../../config'
 import {
-  AUDIENCE, BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, ENTRY_TASK_DAYS, ENTRY_TASK_MINUTES, FACTS, FAQ, LOG, MENTOR_EXPERIENCE, PAINS, PATH, PAYMENT_PATH, PREP_START, PRICE,
+  AUDIENCE, BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, ENTRY_TASK_DAYS, ENTRY_TASK_MINUTES, FACTS, FAQ, LOG, MENTOR_EXPERIENCE, OFFER_PATH, PAINS, PATH, PAYMENT_PATH, PREP_START, PRICE,
   PRIVACY_PATH, PROGRAM, QUALITY_PATH, RENTAL_FLOW, REVIEW_DAYS, SAMPLE_MANUAL, SAMPLE_QUESTIONS, START, START_ISO,
 } from '../../data/bootcamp'
 
@@ -241,8 +241,8 @@ const extraSize = (screen: string) => {
     <section class="bc-section" id="payment" aria-labelledby="payment-title">
       <h2 id="payment-title">Как устроена оплата</h2>
       <div class="bc-two bc-two-tight">
-        <p>Сейчас идёт предзапись, платить ничего не нужно. Стоимость буткемпа {PRICE.text} за весь поток. Деньги мы берём только после входного задания и решения о допуске. До оплаты вы получаете договор-оферту: программа, сроки, цена и порядок возврата.</p>
-        <p>Заплатить можно одним платежом картой или через СБП либо в рассрочку от банка-партнёра платёжного сервиса. Рассрочку предлагаем только без переплаты для вас, кредит с процентами не предлагаем. Отказаться от обучения можно в любой момент: вернём деньги за оставшиеся недели. Карьерный трек в стоимость не входит, его условия обсуждаются отдельно.</p>
+        <p>Стоимость буткемпа {PRICE.text} за весь поток. Деньги мы берём только после входного задания и решения о допуске: в письме о допуске будет личная ссылка на оплату. Условия описаны в <a href={OFFER_PATH}>договоре-оферте</a>: программа, сроки, цена и порядок возврата.</p>
+        <p>Оплата проходит через Робокассу: одним платежом картой или через СБП либо в рассрочку от банка-партнёра. Рассрочку предлагаем только без переплаты для вас, кредит с процентами не предлагаем. Отказаться от обучения можно в любой момент: вернём деньги за оставшиеся недели. Карьерный трек в стоимость не входит, его условия обсуждаются отдельно.</p>
       </div>
       <a class="bc-link" href={PAYMENT_PATH}>Подробно об оплате, договоре и возврате</a>
     </section>
@@ -255,7 +255,7 @@ const extraSize = (screen: string) => {
     <section class="bc-section bc-apply" id="apply" aria-labelledby="apply-title">
       <div class="bc-apply-copy">
         <h2 id="apply-title">Оставьте заявку, и входное задание сразу придёт на email</h2>
-        <p>Точное время занятий и договор-оферту пришлём, когда откроется набор в январе 2027 года. Сейчас идёт предзапись: заявка ни к чему не обязывает, оплаты на этой странице нет.</p>
+        <p>Точное время занятий сообщим до начала недели подготовки. Заявка ни к чему не обязывает, а оплаты на этой странице нет: платить нужно только после допуска, по личной ссылке из письма.</p>
       </div>
       <form class="bc-form" data-lead-form data-consent-version={CONSENT_VERSION} novalidate>
         <div class="bc-field">

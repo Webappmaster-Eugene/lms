@@ -142,7 +142,7 @@ test('sitemap.xml — валидный XML со страницами ленди�
     }
   }, xml)
   expect(parsed.error).toBe(false)
-  expect(parsed.locs).toEqual(['/', '/bootcamp/nodejs/', '/bootcamp/nodejs/payment/', '/bootcamp/nodejs/quality/', '/privacy/', '/consent/'].map((path) => `${SITE}${path}`))
+  expect(parsed.locs).toEqual(['/', '/bootcamp/nodejs/', '/bootcamp/nodejs/payment/', '/bootcamp/nodejs/offer/', '/bootcamp/nodejs/quality/', '/privacy/', '/consent/'].map((path) => `${SITE}${path}`))
   expect(parsed.lastmod[0]).toMatch(/^\d{4}-\d{2}-\d{2}$/)
 })
 

@@ -113,7 +113,7 @@ test.describe('лендинг', () => {
     })
   }
 
-  for (const [name, path] of [['политика обработки персональных данных', '/privacy/'], ['согласие на обработку данных', '/consent/'], ['оплата буткемпа', '/bootcamp/nodejs/payment/'], ['качество буткемпа', '/bootcamp/nodejs/quality/']]) {
+  for (const [name, path] of [['политика обработки персональных данных', '/privacy/'], ['согласие на обработку данных', '/consent/'], ['оплата буткемпа', '/bootcamp/nodejs/payment/'], ['договор-оферта буткемпа', '/bootcamp/nodejs/offer/'], ['качество буткемпа', '/bootcamp/nodejs/quality/']]) {
     test(name, async ({ page }) => {
       await page.goto(path)
       expect(await audit(page, `landing${path.replaceAll('/', '-').replace(/-$/, '')}`)).toEqual([])

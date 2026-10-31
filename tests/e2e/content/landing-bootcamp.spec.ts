@@ -192,13 +192,13 @@ test('путь недели на телефоне: снимок крупно у 
   expect(await page.locator('body').innerText()).not.toMatch(/[—–]/)
 })
 
-test('оплата, качество, политика и согласие: свои адреса в карте сайта, ссылки со страницы буткемпа, реквизиты', async ({ page, request }) => {
+test('оплата, оферта, качество, политика и согласие: свои адреса в карте сайта, ссылки со страницы буткемпа, реквизиты', async ({ page, request }) => {
   await page.goto(PAGE)
   await expect(page.locator('#lead-consent + label a')).toHaveAttribute('href', '/consent/')
-  for (const path of ['/bootcamp/nodejs/payment/', '/bootcamp/nodejs/quality/']) await expect(page.locator(`main a[href="${path}"]`)).toHaveCount(1)
+  for (const path of ['/bootcamp/nodejs/payment/', '/bootcamp/nodejs/offer/', '/bootcamp/nodejs/quality/']) await expect(page.locator(`main a[href="${path}"]`)).toHaveCount(1)
   const origin = new URL(LANDING_URL).origin
   const sitemap = await (await request.get(`${origin}/sitemap.xml`)).text()
-  for (const path of ['/bootcamp/nodejs/payment/', '/bootcamp/nodejs/quality/', '/privacy/', '/consent/']) {
+  for (const path of ['/bootcamp/nodejs/payment/', '/bootcamp/nodejs/offer/', '/bootcamp/nodejs/quality/', '/privacy/', '/consent/']) {
     const response = await page.goto(path)
     expect(response?.status(), path).toBe(200)
     await expect(page.locator('h1')).toHaveCount(1)
@@ -216,6 +216,7 @@ test('оплата, качество, политика и согласие: св
   }
   const llms = await (await request.get(`${origin}/llms.txt`)).text()
   expect(llms).toContain(`${SITE}/bootcamp/nodejs/payment/`)
+  expect(llms).toContain(`${SITE}/bootcamp/nodejs/offer/`)
   const sample = await request.get(`${origin}/bootcamp/samples/nodejs-week-01-node-runtime.pdf`)
   expect(sample.status()).toBe(200)
   expect(sample.headers()['content-type']).toBe('application/pdf')
