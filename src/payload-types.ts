@@ -1981,7 +1981,8 @@ export interface BootcampLeadEvent {
     | 'enrolled'
     | 'lms_signed_in'
     | 'gitlab_signed_in'
-    | 'gitlab_event';
+    | 'gitlab_event'
+    | 'weekly_summary';
   message: string;
   /**
    * Пусто - событие системы или кандидата.

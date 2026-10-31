@@ -35,6 +35,7 @@ import { RoadmapEditorNavLink as RoadmapEditorNavLink_f543dd02c2a139dbdd43078f7b
 import { AdminActivityProvider as AdminActivityProvider_51efc6cd3b75e18d34a4901e7d4dc858 } from '../../../components/analytics/AdminActivityProvider'
 import { StudentAnalyticsView as StudentAnalyticsView_11a6f208e64acffcd4c11171f3d5bde8 } from '../../../components/student-analytics/StudentAnalyticsView'
 import { LearningAccessView as LearningAccessView_32d6e9d9289175ae877220009edf96ef } from '../../../components/learning-access/LearningAccessView'
+import { BootcampFunnelView as BootcampFunnelView_08784ce14008c5b77bd059f3b8bbfa57 } from '../../../components/bootcamp/BootcampFunnelView'
 import { default as default_cc2a8468c40f2307839da27cb613e1b4 } from '../../../components/roadmap-editor/RoadmapEditorView'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
@@ -77,6 +78,7 @@ export const importMap = {
   "/components/analytics/AdminActivityProvider#AdminActivityProvider": AdminActivityProvider_51efc6cd3b75e18d34a4901e7d4dc858,
   "/components/student-analytics/StudentAnalyticsView#StudentAnalyticsView": StudentAnalyticsView_11a6f208e64acffcd4c11171f3d5bde8,
   "/components/learning-access/LearningAccessView#LearningAccessView": LearningAccessView_32d6e9d9289175ae877220009edf96ef,
+  "/components/bootcamp/BootcampFunnelView#BootcampFunnelView": BootcampFunnelView_08784ce14008c5b77bd059f3b8bbfa57,
   "/components/roadmap-editor/RoadmapEditorView#default": default_cc2a8468c40f2307839da27cb613e1b4,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }

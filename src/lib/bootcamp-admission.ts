@@ -140,6 +140,7 @@ export const LEAD_EVENT_TYPES = [
   { value: 'lms_signed_in', label: 'Первый вход в LMS' },
   { value: 'gitlab_signed_in', label: 'Первый вход в GitLab' },
   { value: 'gitlab_event', label: 'GitLab' },
+  { value: 'weekly_summary', label: 'Итоги недели в Telegram' },
 ] as const
 export type LeadEventType = (typeof LEAD_EVENT_TYPES)[number]['value']
 export const leadEventLabel = (type: string) => LEAD_EVENT_TYPES.find((item) => item.value === type)?.label ?? type

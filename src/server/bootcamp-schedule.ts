@@ -6,6 +6,7 @@ import type { Payload } from 'payload'
 import { formatRubles, paymentPath, PAYMENT_REMINDER_BEFORE_DAYS, REVIEW_ALERT_AFTER_DAYS } from '@/lib/bootcamp-admission'
 import { formatEntryTaskDate } from '@/lib/bootcamp-entry-task'
 import { BOOTCAMP_PROGRAMS } from '@/lib/bootcamp-leads'
+import { sendWeeklySummary } from '@/server/bootcamp-funnel'
 import { logger } from '@/lib/telemetry'
 import { bootcampPaymentReminderEmail, emailBaseUrl } from '@/payload/emails/templates'
 import { journal, leadAdminLink, rowsOf } from '@/server/bootcamp-lead-events'
@@ -30,10 +31,10 @@ const RECONCILE_BATCH = 20
 
 let running = false
 
-export type BootcampScheduleResult = { reminders: number, expired: number, reviewAlerts: number, reconciled: number }
+export type BootcampScheduleResult = { reminders: number, expired: number, reviewAlerts: number, reconciled: number, weeklySummary: boolean }
 
 export async function runBootcampSchedule(payload: Payload): Promise<BootcampScheduleResult> {
-  const result: BootcampScheduleResult = { reminders: 0, expired: 0, reviewAlerts: 0, reconciled: 0 }
+  const result: BootcampScheduleResult = { reminders: 0, expired: 0, reviewAlerts: 0, reconciled: 0, weeklySummary: false }
   if (running) return result
   running = true
   try {
@@ -41,6 +42,7 @@ export async function runBootcampSchedule(payload: Payload): Promise<BootcampSch
     result.expired = await paymentExpiry(payload)
     result.reviewAlerts = await reviewAlerts(payload)
     result.reconciled = await reconcile(payload)
+    result.weeklySummary = await sendWeeklySummary(payload)
   } finally {
     running = false
   }

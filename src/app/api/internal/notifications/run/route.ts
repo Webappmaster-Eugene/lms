@@ -37,11 +37,11 @@ export async function POST(request: Request) {
     logger.error('Notification scheduler failed', error)
   }
 
-  // Буткемп: напоминания об оплате, истечение срока, сверка с Робокассой. Сбой не мешает остальному.
+  // Буткемп: напоминания об оплате, истечение срока, сверка с Робокассой, итоги недели. Сбой не мешает остальному.
   try {
     const bootcamp = await runBootcampSchedule(payload)
-    if (bootcamp.reminders || bootcamp.expired || bootcamp.reviewAlerts || bootcamp.reconciled) {
-      logger.info('Bootcamp schedule completed', { 'bootcamp.reminders': bootcamp.reminders, 'bootcamp.expired': bootcamp.expired, 'bootcamp.review_alerts': bootcamp.reviewAlerts, 'bootcamp.reconciled': bootcamp.reconciled })
+    if (bootcamp.reminders || bootcamp.expired || bootcamp.reviewAlerts || bootcamp.reconciled || bootcamp.weeklySummary) {
+      logger.info('Bootcamp schedule completed', { 'bootcamp.reminders': bootcamp.reminders, 'bootcamp.expired': bootcamp.expired, 'bootcamp.review_alerts': bootcamp.reviewAlerts, 'bootcamp.reconciled': bootcamp.reconciled, 'bootcamp.weekly_summary': bootcamp.weeklySummary })
     }
   } catch (error) {
     logger.error('Bootcamp schedule failed', error)

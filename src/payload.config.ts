@@ -85,6 +85,10 @@ export default buildConfig({
           Component: '/components/learning-access/LearningAccessView#LearningAccessView',
           path: '/learning-access',
         },
+        bootcampFunnel: {
+          Component: '/components/bootcamp/BootcampFunnelView#BootcampFunnelView',
+          path: '/bootcamp-funnel',
+        },
         roadmapEditor: {
           Component: '/components/roadmap-editor/RoadmapEditorView',
           path: '/roadmap-editor/:segments*',
