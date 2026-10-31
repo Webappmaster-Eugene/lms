@@ -32,6 +32,9 @@ vi.mock('@/components/trainer/useCodeRunner', () => ({
 const { TrainerWorkspace } = await import('@/components/trainer/TrainerWorkspace')
 const { monacoCommands, MONACO_KEYS } = await import('../helpers/component-mocks')
 const { TaskSidePanel } = await import('@/components/trainer/TaskSidePanel')
+// Редактор подгружает Monaco лениво, а findByTestId ждёт секунду: на занятом раннере CI
+// первая загрузка модуля внутри теста в неё не укладывалась. Грузим его при сборе тестов.
+await import('@/components/trainer/MonacoCodeEditor')
 
 import type { ClientProgress, ClientTaskSpec } from '@/lib/trainer/api'
 
