@@ -57,6 +57,24 @@ function renderMermaid(id: string, code: string): Promise<string> {
   return job
 }
 
+/**
+ * mermaid задаёт SVG ширину 100% и max-width в стиле: внутри <img> такая ширина не
+ * определяется, и схема сжимается до мелкого шрифта. Размеры из viewBox дают натуральную
+ * величину, а не шире колонки её делает уже рамка просмотра.
+ */
+export function sizedSvg(svg: string): string {
+  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml')
+  const root = doc.documentElement
+  if (root.nodeName !== 'svg' || doc.getElementsByTagName('parsererror').length) return svg
+  const box = (root.getAttribute('viewBox') ?? '').trim().split(/[\s,]+/).map(Number)
+  if (box.length !== 4 || !box.every(Number.isFinite) || box[2] <= 0 || box[3] <= 0) return svg
+  root.setAttribute('width', String(Math.ceil(box[2])))
+  root.setAttribute('height', String(Math.ceil(box[3])))
+  root.style.removeProperty('max-width')
+  if (!root.getAttribute('style')?.trim()) root.removeAttribute('style')
+  return new XMLSerializer().serializeToString(root)
+}
+
 function svgDataUri(svg: string): string {
   const bytes = new TextEncoder().encode(svg)
   let binary = ''
@@ -82,7 +100,7 @@ export function MermaidDiagram({ code }: { code: string }) {
   useEffect(() => {
     let cancelled = false
     renderMermaid(id, code).then(
-      (svg) => { if (!cancelled) setResult({ code, src: svgDataUri(svg) }) },
+      (svg) => { if (!cancelled) setResult({ code, src: svgDataUri(sizedSvg(svg)) }) },
       (error: unknown) => {
         console.warn('Не удалось нарисовать схему урока', error)
         if (!cancelled) setResult({ code, src: null })

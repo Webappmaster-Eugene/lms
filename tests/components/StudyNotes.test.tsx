@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 const { mermaidRender, mermaidParse } = vi.hoisted(() => ({
-  mermaidRender: vi.fn(async () => ({ svg: '<svg xmlns="http://www.w3.org/2000/svg"><text>Клиент</text></svg>' })),
+  mermaidRender: vi.fn(async () => ({ svg: '<svg xmlns="http://www.w3.org/2000/svg" width="100%" style="max-width: 320.5px;" viewBox="-8 -8 320.5 140"><text>Клиент</text></svg>' })),
   mermaidParse: vi.fn(async () => ({ diagramType: 'flowchart-v2' })),
 }))
 // Сборка mermaid приходит отдельным скриптом и кладёт себя в window: подменяем её там.
@@ -61,7 +61,12 @@ describe('конспект урока', () => {
 
     const image = await screen.findByRole('img', { name: 'Запрос к серверу' })
     expect(image.getAttribute('src')).toMatch(/^data:image\/svg\+xml;base64,/)
-    expect(Buffer.from(String(image.getAttribute('src')).split(',')[1], 'base64').toString('utf8')).toContain('Клиент')
+    const svg = Buffer.from(String(image.getAttribute('src')).split(',')[1], 'base64').toString('utf8')
+    expect(svg).toContain('Клиент')
+    // Внутри <img> ширина 100% не определяется: схема получает натуральный размер из viewBox.
+    expect(svg).toMatch(/width="321"/)
+    expect(svg).toMatch(/height="140"/)
+    expect(svg).not.toContain('max-width')
     expect(mermaidRender).toHaveBeenCalledWith(expect.stringMatching(/^mermaid-/), code)
     expect(getMarkdownHighlighter).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Запрос к серверу - открыть во весь экран' }))
