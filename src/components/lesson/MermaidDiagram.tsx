@@ -8,12 +8,34 @@ import { MarkdownImage } from './MarkdownImage'
 
 type Mermaid = typeof import('mermaid').default
 
+declare global {
+  interface Window { mermaid?: Mermaid }
+}
+
+/** Готовая сборка mermaid со своего домена (scripts/copy-mermaid.mjs): через webpack она не влезала в память сборки. */
+export const MERMAID_SCRIPT = '/mermaid/mermaid.min.js'
+
 let loader: Promise<Mermaid> | undefined
 // Рендер mermaid держит общее состояние: две схемы, нарисованные одновременно, мешают друг другу.
 let queue: Promise<unknown> = Promise.resolve()
 
+function mermaidScript(): Promise<Mermaid> {
+  return new Promise((resolve, reject) => {
+    if (window.mermaid) { resolve(window.mermaid); return }
+    const script = document.createElement('script')
+    script.src = MERMAID_SCRIPT
+    script.async = true
+    script.onload = () => (window.mermaid ? resolve(window.mermaid) : reject(new Error('mermaid не определился после загрузки')))
+    script.onerror = () => {
+      script.remove()
+      reject(new Error(`Не удалось загрузить ${MERMAID_SCRIPT}`))
+    }
+    document.head.appendChild(script)
+  })
+}
+
 function loadMermaid(): Promise<Mermaid> {
-  loader ??= import('mermaid').then(({ default: mermaid }) => {
+  loader ??= mermaidScript().then((mermaid) => {
     // Без HTML-подписей SVG рисуется и внутри <img>: просмотр схем показывает её картинкой.
     mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'default', htmlLabels: false, flowchart: { htmlLabels: false } })
     return mermaid

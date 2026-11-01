@@ -22,6 +22,8 @@ export default tseslint.config(
       'src/app/(payload)/admin/importMap.js',
       // Сборка Monaco, копируется скриптом scripts/copy-monaco.mjs
       'public/monaco/**',
+      // Сборка mermaid, копируется скриптом scripts/copy-mermaid.mjs
+      'public/mermaid/**',
       // Харнесс тренажёра вшивается строкой; генерируется build-harness.mjs
       'src/lib/trainer/harness-source.generated.ts',
       // Отчёты и артефакты Playwright

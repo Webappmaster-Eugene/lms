@@ -167,6 +167,7 @@ describe('статика и служебные пути остаются дос�
     '/_next/static/chunks/main.js',
     '/images/logo.png',
     '/monaco/vs/loader.js',
+    '/mermaid/mermaid.min.js',
     '/favicon.ico',
     '/icon.svg',
     '/images/og.png',

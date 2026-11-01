@@ -57,10 +57,11 @@ COPY . .
 # Ensure public dir exists even if git doesn't track it (no files inside)
 RUN mkdir -p public
 
-# Ассеты Monaco (public/monaco/vs) и вшитый харнесс тренажёра генерируются
-# скриптами. Запускаются явно: `npx next build` ниже идёт мимо npm-скриптов,
-# поэтому хук prebuild не сработает.
+# Ассеты Monaco (public/monaco/vs), сборка mermaid (public/mermaid) и вшитый
+# харнесс тренажёра генерируются скриптами. Запускаются явно: `npx next build`
+# ниже идёт мимо npm-скриптов, поэтому хук prebuild не сработает.
 RUN node scripts/copy-monaco.mjs \
+    && node scripts/copy-mermaid.mjs \
     && node scripts/build-harness.mjs
 
 # Payload reads PAYLOAD_SECRET during next build (type generation / import map).
@@ -150,6 +151,7 @@ require('typescript'); \
 require('node:fs').accessSync('/app/src/server/trainer/runner-child.mjs'); \
 require('node:fs').accessSync('/app/src/server/trainer/typescript-service.mjs'); \
 require('node:fs').accessSync('/app/public/monaco/vs'); \
+require('node:fs').accessSync('/app/public/mermaid/mermaid.min.js'); \
 console.log('Песочница тренажёра и ассеты Monaco на месте')"
 
 # Динамический import SDK не виден трассировке Next. Проверяем его именно

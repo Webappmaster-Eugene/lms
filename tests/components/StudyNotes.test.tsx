@@ -5,7 +5,8 @@ const { mermaidRender, mermaidParse } = vi.hoisted(() => ({
   mermaidRender: vi.fn(async () => ({ svg: '<svg xmlns="http://www.w3.org/2000/svg"><text>Клиент</text></svg>' })),
   mermaidParse: vi.fn(async () => ({ diagramType: 'flowchart-v2' })),
 }))
-vi.mock('mermaid', () => ({ default: { initialize: vi.fn(), parse: mermaidParse, render: mermaidRender } }))
+// Сборка mermaid приходит отдельным скриптом и кладёт себя в window: подменяем её там.
+window.mermaid = { initialize: vi.fn(), parse: mermaidParse, render: mermaidRender } as unknown as NonNullable<Window['mermaid']>
 vi.mock('@/lib/markdown-highlighter', () => ({
   markdownLanguage: (language: string) => language,
   getMarkdownHighlighter: vi.fn(async () => ({ getLoadedLanguages: () => [], codeToHtml: () => '' })),

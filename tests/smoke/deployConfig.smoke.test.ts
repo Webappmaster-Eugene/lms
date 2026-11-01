@@ -174,7 +174,7 @@ describe('контекст сборки', () => {
       ...DOCKERFILE.matchAll(/&& node (scripts\/[\w.-]+)/g),
       ...DOCKERFILE.matchAll(/^COPY --chown=\S+ (\S+) /gm),
     ].map((m) => m[1])
-    expect(used).toEqual(expect.arrayContaining(['scripts/copy-monaco.mjs', 'scripts/build-harness.mjs', 'scripts/trainer-app-start.mjs']))
+    expect(used).toEqual(expect.arrayContaining(['scripts/copy-monaco.mjs', 'scripts/copy-mermaid.mjs', 'scripts/build-harness.mjs', 'scripts/trainer-app-start.mjs']))
     for (const file of used) {
       const prefixes = file.split('/').map((_, i, parts) => parts.slice(0, i + 1).join('/'))
       expect(prefixes.filter((prefix) => ignored.has(prefix)), `${file} исключён из контекста`).toEqual([])
