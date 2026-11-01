@@ -5,15 +5,16 @@ import type { ReactNode } from 'react'
 import { BootcampFunnelReport } from '@/components/bootcamp/BootcampFunnelReport'
 import { BootcampFunnelView } from '@/components/bootcamp/BootcampFunnelView'
 import { FUNNEL_STEPS, parseFunnelFilter } from '@/lib/bootcamp-funnel'
-import type { FunnelReport } from '@/server/bootcamp-funnel'
+import type { FunnelProgram, FunnelReport } from '@/server/bootcamp-funnel'
 
-const { getLearningAccess, bootcampFunnel, logError } = vi.hoisted(() => ({
+const { getLearningAccess, bootcampFunnel, funnelPrograms, logError } = vi.hoisted(() => ({
   getLearningAccess: vi.fn(async () => ({ admin: true })),
   bootcampFunnel: vi.fn(),
+  funnelPrograms: vi.fn(),
   logError: vi.fn(),
 }))
 vi.mock('@/server/learning-access', () => ({ getLearningAccess }))
-vi.mock('@/server/bootcamp-funnel', () => ({ bootcampFunnel, FUNNEL_ADMIN_PATH: '/admin/bootcamp-funnel' }))
+vi.mock('@/server/bootcamp-funnel', () => ({ bootcampFunnel, funnelPrograms, FUNNEL_ADMIN_PATH: '/admin/bootcamp-funnel' }))
 vi.mock('@/lib/telemetry', () => ({ logger: { error: logError, warn: vi.fn(), info: vi.fn() } }))
 vi.mock('@payloadcms/next/templates', () => ({ DefaultTemplate: ({ children }: { children: ReactNode }) => <div data-testid="payload-template">{children}</div> }))
 vi.mock('next/navigation', () => ({ redirect: (href: string) => { throw new Error(`redirect:${href}`) } }))
@@ -36,17 +37,21 @@ const report: FunnelReport = {
     { key: 'direct', label: 'прямой заход', leads: 3, submitted: 2, admitted: 1, paid: 0, enrolled: 0 },
   ],
   queue: [
-    { id: 41, email: 'ivan@mail.test', name: 'Иван', reason: 'review', since: '2026-10-28T09:00:00.000Z', test: false },
-    { id: 42, email: 'check@mail.test', name: null, reason: 'not_enrolled', since: '2026-10-29T09:00:00.000Z', test: true },
+    { id: 41, email: 'ivan@mail.test', name: 'Иван', program: 'nodejs', reason: 'review', since: '2026-10-28T09:00:00.000Z', test: false },
+    { id: 42, email: 'check@mail.test', name: null, program: 'nodejs', reason: 'not_enrolled', since: '2026-10-29T09:00:00.000Z', test: true },
   ],
   queueTotal: 51,
+  queueElsewhere: 0,
 }
-const filter = parseFunnelFilter({ period: '30', source: 'utm:telegram' }, new Date('2026-10-31T12:00:00Z'))
+const programs: FunnelProgram[] = [{ key: 'nodejs', shortTitle: 'Node.js', isActive: true }, { key: 'python', shortTitle: 'Python', isActive: true }]
+const programKeys = programs.map((item) => item.key)
+const filter = parseFunnelFilter({ period: '30', source: 'utm:telegram' }, new Date('2026-10-31T12:00:00Z'), programKeys)
 const props = { params: { segments: ['bootcamp-funnel'] }, searchParams: { period: '30' }, initPageResult: { req: { user: { id: 1, role: 'admin' }, payload: {}, i18n: {} }, permissions: {}, visibleEntities: { collections: [], globals: [] } } } as unknown as Parameters<typeof BootcampFunnelView>[0]
 
 beforeEach(() => {
   getLearningAccess.mockReset().mockResolvedValue({ admin: true })
   bootcampFunnel.mockReset().mockResolvedValue(report)
+  funnelPrograms.mockReset().mockResolvedValue(programs)
   logError.mockReset()
 })
 
@@ -55,7 +60,16 @@ describe('страница воронки в админке', () => {
     render(await BootcampFunnelView(props))
     expect(screen.getByTestId('payload-template')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Воронка буткемпа' })).toBeInTheDocument()
-    expect(bootcampFunnel).toHaveBeenCalledWith(props.initPageResult.req.payload, expect.objectContaining({ period: '30', source: null }))
+    expect(bootcampFunnel).toHaveBeenCalledWith(props.initPageResult.req.payload, expect.objectContaining({ period: '30', source: null, program: 'nodejs' }))
+    expect(screen.getByRole('combobox', { name: 'Программа' })).toHaveValue('nodejs')
+  })
+
+  it('программа из адреса открывается, пустой параметр даёт все программы', async () => {
+    render(await BootcampFunnelView({ ...props, searchParams: { program: 'python' } }))
+    expect(bootcampFunnel).toHaveBeenLastCalledWith(props.initPageResult.req.payload, expect.objectContaining({ program: 'python' }))
+    expect(screen.getByRole('combobox', { name: 'Программа' })).toHaveValue('python')
+    render(await BootcampFunnelView({ ...props, searchParams: { program: '' } }))
+    expect(bootcampFunnel).toHaveBeenLastCalledWith(props.initPageResult.req.payload, expect.objectContaining({ program: null }))
   })
 
   it('не открывается без пользователя и не-админу', async () => {
@@ -63,6 +77,13 @@ describe('страница воронки в админке', () => {
     await expect(BootcampFunnelView(anonymous)).rejects.toThrow('redirect:/')
     getLearningAccess.mockResolvedValue({ admin: false })
     await expect(BootcampFunnelView(props)).rejects.toThrow('redirect:/')
+    expect(bootcampFunnel).not.toHaveBeenCalled()
+  })
+
+  it('сбой списка программ - то же сообщение, а не падение страницы', async () => {
+    funnelPrograms.mockRejectedValue(new Error('db down'))
+    render(await BootcampFunnelView(props))
+    expect(screen.getByRole('alert')).toHaveTextContent('Не удалось посчитать воронку')
     expect(bootcampFunnel).not.toHaveBeenCalled()
   })
 
@@ -76,7 +97,7 @@ describe('страница воронки в админке', () => {
 
 describe('отчёт воронки', () => {
   it('шаги с долями, временем и итогами', () => {
-    render(<BootcampFunnelReport report={report} filter={filter} action="/admin/bootcamp-funnel" />)
+    render(<BootcampFunnelReport report={report} filter={filter} programs={programs} action="/admin/bootcamp-funnel" />)
     const steps = within(screen.getByRole('region', { name: 'Шаги' }))
     const paidRow = steps.getByRole('row', { name: /Оплатили/ })
     expect(within(paidRow).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['2', '50 %', '20 %', 'нет данных'])
@@ -88,7 +109,7 @@ describe('отчёт воронки', () => {
   })
 
   it('фильтр - обычная форма GET с выбранными значениями', () => {
-    const { container } = render(<BootcampFunnelReport report={report} filter={filter} action="/admin/bootcamp-funnel" />)
+    const { container } = render(<BootcampFunnelReport report={report} filter={filter} programs={programs} action="/admin/bootcamp-funnel" />)
     const form = container.querySelector('form')
     expect(form).toHaveAttribute('method', 'get')
     expect(form).toHaveAttribute('action', '/admin/bootcamp-funnel')
@@ -96,8 +117,21 @@ describe('отчёт воронки', () => {
     expect(screen.getByRole('combobox', { name: 'Источник' })).toHaveValue('utm:telegram')
   })
 
+  it('дела других программ не теряются за фильтром, а в общем списке у заявки названа программа', () => {
+    const { unmount } = render(<BootcampFunnelReport report={{ ...report, queueElsewhere: 3 }} filter={filter} programs={programs} action="/admin/bootcamp-funnel" />)
+    expect(screen.getByText('В других программах ждут действия ещё заявок: 3.')).toBeInTheDocument()
+    expect(screen.queryByText(/^Node\.js\. Решение ждёт ответа/)).not.toBeInTheDocument()
+    unmount()
+    const everything = parseFunnelFilter({ program: '' }, new Date('2026-10-31T12:00:00Z'), programKeys)
+    render(<BootcampFunnelReport report={report} filter={everything} programs={programs} action="/admin/bootcamp-funnel" />)
+    expect(screen.getByRole('combobox', { name: 'Программа' })).toHaveValue('')
+    expect(screen.queryByText(/В других программах/)).not.toBeInTheDocument()
+    expect(screen.getByText(/^Node\.js\. Решение ждёт ответа, с 28 октября/)).toBeInTheDocument()
+    expect(screen.getByText(/^Node\.js\. Тестовая заявка\. Оплачен/)).toBeInTheDocument()
+  })
+
   it('источники и список дел со ссылкой на заявку', () => {
-    render(<BootcampFunnelReport report={report} filter={filter} action="/admin/bootcamp-funnel" />)
+    render(<BootcampFunnelReport report={report} filter={filter} programs={programs} action="/admin/bootcamp-funnel" />)
     const sources = within(screen.getByRole('region', { name: 'Откуда пришли' }))
     expect(sources.getByRole('row', { name: /прямой заход/ })).toHaveTextContent('прямой заход32100')
     const queue = within(screen.getByRole('region', { name: 'Ждут вашего действия' }))
@@ -110,14 +144,14 @@ describe('отчёт воронки', () => {
 
   it('пустой период - подсказка вместо таблицы, тексты без длинного тире', () => {
     const empty: FunnelReport = { ...report, steps: report.steps.map((step) => ({ ...step, count: 0, fromPrevious: null, fromLeads: null })), sources: [], queue: [], queueTotal: 0 }
-    const { container } = render(<BootcampFunnelReport report={empty} filter={{ ...filter, source: null }} action="/admin/bootcamp-funnel" />)
+    const { container } = render(<BootcampFunnelReport report={empty} filter={{ ...filter, source: null }} programs={programs} action="/admin/bootcamp-funnel" />)
     expect(screen.getByText(/За этот период заявок нет/)).toBeInTheDocument()
     expect(screen.getByText('Сейчас таких заявок нет.')).toBeInTheDocument()
     expect(container.textContent).not.toMatch(/[—–]/)
   })
 
   it('источник из адреса, которого нет в периоде, остаётся выбранным', () => {
-    render(<BootcampFunnelReport report={{ ...report, sources: [] }} filter={{ ...filter, source: 'utm:vk' }} action="/admin/bootcamp-funnel" />)
+    render(<BootcampFunnelReport report={{ ...report, sources: [] }} filter={{ ...filter, source: 'utm:vk' }} programs={programs} action="/admin/bootcamp-funnel" />)
     expect(screen.getByRole('combobox', { name: 'Источник' })).toHaveValue('utm:vk')
   })
 })

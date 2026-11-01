@@ -6,7 +6,7 @@ const now = new Date('2026-10-31T12:00:00Z')
 
 describe('воронка: фильтр страницы', () => {
   it('период по умолчанию 90 дней, «всё время» без нижней границы', () => {
-    expect(parseFunnelFilter(undefined, now)).toEqual({ period: '90', from: new Date('2026-08-02T12:00:00Z'), to: now, source: null })
+    expect(parseFunnelFilter(undefined, now)).toEqual({ period: '90', from: new Date('2026-08-02T12:00:00Z'), to: now, source: null, program: null })
     expect(parseFunnelFilter({ period: 'all' }, now)).toMatchObject({ period: 'all', from: null })
     expect(parseFunnelFilter({ period: ['7', '30'] }, now)).toMatchObject({ period: '7', from: new Date('2026-10-24T12:00:00Z') })
   })
@@ -17,6 +17,17 @@ describe('воронка: фильтр страницы', () => {
     expect(parseFunnelFilter({ source: 'ref:habr.com' }, now).source).toBe('ref:habr.com')
     expect(parseFunnelFilter({ source: 'direct' }, now).source).toBe('direct')
     for (const source of ['', 'telegram', 'utm:', `utm:${'x'.repeat(101)}`, "'; drop table"]) expect(parseFunnelFilter({ source }, now).source).toBeNull()
+  })
+
+  it('программа: без параметра первая из списка, пустой параметр - все вместе, чужой ключ не проходит', () => {
+    const programs = ['nodejs', 'python']
+    expect(parseFunnelFilter(undefined, now, programs).program).toBe('nodejs')
+    expect(parseFunnelFilter({ program: 'python' }, now, programs).program).toBe('python')
+    expect(parseFunnelFilter({ program: ['python', 'nodejs'] }, now, programs).program).toBe('python')
+    expect(parseFunnelFilter({ program: '' }, now, programs).program).toBeNull()
+    expect(parseFunnelFilter({ program: 'go' }, now, programs).program).toBe('nodejs')
+    expect(parseFunnelFilter({ program: "'; drop table" }, now, programs).program).toBe('nodejs')
+    expect(parseFunnelFilter({ program: 'nodejs' }, now, []).program).toBeNull()
   })
 
   it('источник для людей', () => {

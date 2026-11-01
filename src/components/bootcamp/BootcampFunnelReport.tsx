@@ -2,18 +2,19 @@ import Link from 'next/link'
 
 import { formatRubles } from '@/lib/bootcamp-admission'
 import { actionReasonLabel, FUNNEL_PERIODS, formatDuration, type FunnelFilter } from '@/lib/bootcamp-funnel'
-import type { FunnelReport } from '@/server/bootcamp-funnel'
+import type { FunnelProgram, FunnelReport } from '@/server/bootcamp-funnel'
 import './bootcamp-funnel.scss'
 
 const dateTime = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' })
 const at = (value: string | null) => value ? dateTime.format(new Date(value)) : 'без даты'
 const share = (value: number | null) => value === null ? 'нет данных' : `${value} %`
 
-type Props = { report: FunnelReport, filter: FunnelFilter, action: string }
+type Props = { report: FunnelReport, filter: FunnelFilter, programs: FunnelProgram[], action: string }
 
-export function BootcampFunnelReport({ report, filter, action }: Props) {
+export function BootcampFunnelReport({ report, filter, programs, action }: Props) {
   const [leads, ...rest] = report.steps
   const paid = report.steps.find((step) => step.key === 'paid')
+  const programTitle = (key: string) => programs.find((item) => item.key === key)?.shortTitle ?? key
   const sourceOptions = report.sources.some((item) => item.key === filter.source) || !filter.source
     ? report.sources
     : [...report.sources, { key: filter.source, label: filter.source, leads: 0, submitted: 0, admitted: 0, paid: 0, enrolled: 0 }]
@@ -21,10 +22,16 @@ export function BootcampFunnelReport({ report, filter, action }: Props) {
     <div className="bootcamp-funnel">
       <header>
         <h1>Воронка буткемпа</h1>
-        <p>Заявки, пришедшие за выбранный период, и сколько из них дошло до каждого шага. Деньги считаются по дате оплаты. Заявки с отметкой «Тестовая заявка» и тестовые оплаты Робокассы не учитываются.</p>
+        <p>Заявки программы, пришедшие за выбранный период, и сколько из них дошло до каждого шага. Деньги считаются по дате оплаты. Заявки с отметкой «Тестовая заявка» и тестовые оплаты Робокассы не учитываются.</p>
       </header>
 
       <form className="bootcamp-funnel__filter" method="get" action={action}>
+        <label>Программа
+          <select name="program" defaultValue={filter.program ?? ''}>
+            {programs.map((item) => <option key={item.key} value={item.key}>{item.shortTitle}</option>)}
+            <option value="">Все программы</option>
+          </select>
+        </label>
         <label>Период
           <select name="period" defaultValue={filter.period}>
             {FUNNEL_PERIODS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
@@ -91,14 +98,15 @@ export function BootcampFunnelReport({ report, filter, action }: Props) {
               {report.queue.map((item) => (
                 <li key={item.id}>
                   <Link href={`/admin/collections/bootcamp-leads/${item.id}`}>{item.name ? `${item.name}, ${item.email}` : item.email}</Link>
-                  <span>{item.test ? 'Тестовая заявка. ' : ''}{actionReasonLabel(item.reason)}, с {at(item.since)}</span>
+                  <span>{filter.program === null ? `${programTitle(item.program)}. ` : ''}{item.test ? 'Тестовая заявка. ' : ''}{actionReasonLabel(item.reason)}, с {at(item.since)}</span>
                 </li>
               ))}
             </ul>
             {report.queueTotal > report.queue.length && <p className="bootcamp-funnel__notice">Всего таких заявок {report.queueTotal}, здесь самые давние {report.queue.length}.</p>}
           </>
         )}
-        <p className="bootcamp-funnel__notice">Список не зависит от периода и источника: в нём все заявки, где следующий шаг за командой, и тестовые тоже.</p>
+        {report.queueElsewhere > 0 && <p className="bootcamp-funnel__notice">В других программах ждут действия ещё заявок: {report.queueElsewhere}.</p>}
+        <p className="bootcamp-funnel__notice">Список не зависит от периода и источника: в нём все заявки программы, где следующий шаг за командой, и тестовые тоже.</p>
       </section>
     </div>
   )

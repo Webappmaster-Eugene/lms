@@ -38,7 +38,8 @@ export const ACTION_REASONS = [
 export type ActionReason = (typeof ACTION_REASONS)[number]['value']
 export const actionReasonLabel = (reason: string) => ACTION_REASONS.find((item) => item.value === reason)?.label ?? reason
 
-export type FunnelFilter = { period: FunnelPeriod, from: Date | null, to: Date, source: string | null }
+// program: ключ программы, null - все вместе.
+export type FunnelFilter = { period: FunnelPeriod, from: Date | null, to: Date, source: string | null, program: string | null }
 
 type SearchParams = Record<string, string | string[] | undefined> | undefined
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value) ?? ''
@@ -49,15 +50,21 @@ const first = (value: string | string[] | undefined) => (Array.isArray(value) ? 
  */
 const SOURCE_KEY = /^(?:utm:.{1,100}|ref:.{1,255}|direct)$/su
 
-export function parseFunnelFilter(params: SearchParams, now: Date): FunnelFilter {
+/**
+ * Программы считаются отдельно, поэтому без параметра открывается первая из списка, а не сумма:
+ * сумма - осознанный выбор (`program=` пустой). Ключ не из списка равен отсутствию параметра.
+ */
+export function parseFunnelFilter(params: SearchParams, now: Date, programs: readonly string[] = []): FunnelFilter {
   const raw = first(params?.period)
   const period = FUNNEL_PERIODS.find((item) => item.value === raw) ?? DEFAULT_PERIOD
   const source = first(params?.source)
+  const program = params?.program === undefined ? undefined : first(params.program)
   return {
     period: period.value,
     from: period.days === null ? null : new Date(now.getTime() - period.days * DAY_MS),
     to: now,
     source: SOURCE_KEY.test(source) ? source : null,
+    program: program === '' ? null : program && programs.includes(program) ? program : programs[0] ?? null,
   }
 }
 

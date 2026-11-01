@@ -4,8 +4,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 import { parseFunnelFilter } from '@/lib/bootcamp-funnel'
 import { adminTelegramTransport } from '@/server/admin-telegram'
-import { actionQueue, bootcampFunnel, sendWeeklySummary } from '@/server/bootcamp-funnel'
+import { rowsOf } from '@/server/bootcamp-lead-events'
+import { actionQueue, bootcampFunnel, funnelPrograms, sendWeeklySummary } from '@/server/bootcamp-funnel'
 import type { BootcampLead } from '@/payload-types'
+import { createProgram } from '../helpers/bootcamp'
 import { createAdmin, getTestPayload, uid } from '../helpers/payload'
 
 let payload: Payload
@@ -16,6 +18,9 @@ const saved = Object.fromEntries(Object.keys(TELEGRAM).map((key) => [key, proces
 type Db = { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }
 const db = () => (payload.db as unknown as { drizzle: Db }).drizzle
 const DAY = 86_400_000
+// В базе бывают программы других файлов тестов: сводки сверяем только по своим.
+const summaries = (title: string) => telegram.filter((text) => text.startsWith(`Буткемп ${title}:`))
+const NODEJS = 'Node.js'
 
 beforeAll(async () => {
   payload = await getTestPayload()
@@ -39,10 +44,10 @@ beforeEach(() => {
   ;(globalThis as unknown as Record<symbol, number[]>)[Symbol.for('lms.adminTelegram.sent')] = []
 })
 
-async function lead(utmSource: string): Promise<BootcampLead> {
+async function lead(utmSource: string, program = 'nodejs'): Promise<BootcampLead> {
   return payload.create({
     collection: 'bootcamp-leads',
-    data: { email: `${uid('funnel')}@mail.test`.toLowerCase(), program: 'nodejs', status: 'new', consentVersion: '2026-10-31', consentAt: new Date().toISOString(), submissionCount: 1, entryTaskToken: uid('entry-token'), source: { utmSource } },
+    data: { email: `${uid('funnel')}@mail.test`.toLowerCase(), program, status: 'new', consentVersion: '2026-10-31', consentAt: new Date().toISOString(), submissionCount: 1, entryTaskToken: uid('entry-token'), source: { utmSource } },
     overrideAccess: true,
   })
 }
@@ -179,9 +184,9 @@ describe('тестовые заявки', () => {
     const payment = await payload.create({ collection: 'bootcamp-payments', data: { lead: check.id, amountKopecks: 4_500_000, status: 'pending', method: 'manual' }, overrideAccess: true })
     await db().execute(sql`update bootcamp_payments set status = 'paid', paid_at = ${inWeek} where id = ${payment.id}`)
 
-    expect(await sendWeeklySummary(payload, new Date('2020-03-16T08:00:00Z'))).toBe(true)
-    await vi.waitFor(() => expect(telegram).toHaveLength(1))
-    expect(telegram[0].split('\n').slice(1, 6)).toEqual(['Новых заявок: 1', 'Прислали решение: 0', 'Допущены: 0', 'Оплат не было', 'Зачислены: 0'])
+    expect(await sendWeeklySummary(payload, new Date('2020-03-16T08:00:00Z'))).toBeGreaterThan(0)
+    await vi.waitFor(() => expect(summaries(NODEJS)).toHaveLength(1))
+    expect(summaries(NODEJS)[0].split('\n').slice(1, 6)).toEqual(['Новых заявок: 1', 'Прислали решение: 0', 'Допущены: 0', 'Оплат не было', 'Зачислены: 0'])
   })
 })
 
@@ -205,12 +210,12 @@ describe('итоги недели в Telegram', () => {
     const next = await lead('summary')
     await db().execute(sql`update bootcamp_leads set created_at = ${at('2020-03-01T21:00:00Z')} where id = ${next.id}`)
 
-    expect(await sendWeeklySummary(payload, monday)).toBe(true)
-    expect(await sendWeeklySummary(payload, new Date(monday.getTime() + 60_000))).toBe(false)
-    await vi.waitFor(() => expect(telegram).toHaveLength(1))
-    const [text] = telegram
+    expect(await sendWeeklySummary(payload, monday)).toBeGreaterThan(0)
+    expect(await sendWeeklySummary(payload, new Date(monday.getTime() + 60_000))).toBe(0)
+    await vi.waitFor(() => expect(summaries(NODEJS)).toHaveLength(1))
+    const [text] = summaries(NODEJS)
     expect(text.split('\n').slice(0, 6)).toEqual([
-      'Буткемп: итоги недели 24 февраля - 1 марта',
+      'Буткемп Node.js: итоги недели 24 февраля - 1 марта',
       'Новых заявок: 2',
       'Прислали решение: 1',
       'Допущены: 1',
@@ -218,21 +223,133 @@ describe('итоги недели в Telegram', () => {
       'Зачислены: 0',
     ])
     expect(text).toMatch(/Ждут вашего действия сейчас: \d+|Заявок, которые ждут вашего действия, нет/)
-    expect(text).toContain('/admin/bootcamp-funnel')
+    expect(text).toContain('/admin/bootcamp-funnel?program=nodejs')
     expect(text).not.toMatch(/[—–]/)
     const marks = await payload.find({ collection: 'bootcamp-lead-events', where: { type: { equals: 'weekly_summary' } }, limit: 100, depth: 0, overrideAccess: true })
-    expect(marks.docs.filter((doc) => (doc.data as { week?: string } | null)?.week === '2020-02-24')).toHaveLength(1)
+    expect(marks.docs.filter((doc) => { const data = doc.data as { week?: string, program?: string } | null; return data?.week === '2020-02-24' && data.program === 'nodejs' })).toHaveLength(1)
   })
 
   it('два запуска одновременно шлют одну сводку; не в понедельник и до 10:00 - ничего', async () => {
     const nextMonday = new Date('2020-03-09T08:00:00Z')
     await db().execute(sql`delete from bootcamp_lead_events where type = 'weekly_summary' and data->>'week' = '2020-03-02'`)
     const results = await Promise.all([sendWeeklySummary(payload, nextMonday), sendWeeklySummary(payload, nextMonday)])
-    expect(results.filter(Boolean)).toHaveLength(1)
-    await vi.waitFor(() => expect(telegram).toHaveLength(1))
-    expect(telegram[0]).toContain('Оплат не было')
-    expect(await sendWeeklySummary(payload, new Date('2020-03-10T08:00:00Z'))).toBe(false)
-    expect(await sendWeeklySummary(payload, new Date('2020-03-16T06:59:00Z'))).toBe(false)
-    expect(telegram).toHaveLength(1)
+    await vi.waitFor(() => expect(telegram).toHaveLength(results[0] + results[1]))
+    expect(summaries(NODEJS)).toHaveLength(1)
+    expect(summaries(NODEJS)[0]).toContain('Оплат не было')
+    expect(await sendWeeklySummary(payload, new Date('2020-03-10T08:00:00Z'))).toBe(0)
+    expect(await sendWeeklySummary(payload, new Date('2020-03-16T06:59:00Z'))).toBe(0)
+    expect(summaries(NODEJS)).toHaveLength(1)
+  })
+})
+
+describe('программы ведутся отдельно', () => {
+  const program = async (shortTitle: string, data: { isActive?: boolean } = {}) => (await createProgram(payload, { shortTitle, ...data })).key
+
+  it('шаги, деньги, источники и список дел считаются по выбранной программе', async () => {
+    const source = uid('utm').toLowerCase()
+    const key = await program('Python')
+    const mine = await lead(source, key)
+    const other = await lead(source)
+    await db().execute(sql`update bootcamp_leads set created_at = ${ago(3)}, status = 'paid', paid_at = ${ago(2)} where id in (${mine.id}, ${other.id})`)
+    for (const [leadId, amount] of [[mine.id, 7_000_000], [other.id, 4_500_000]]) {
+      const payment = await payload.create({ collection: 'bootcamp-payments', data: { lead: leadId, amountKopecks: amount, status: 'pending', method: 'manual' }, overrideAccess: true })
+      await db().execute(sql`update bootcamp_payments set status = 'paid', paid_at = ${ago(2)} where id = ${payment.id}`)
+    }
+    const report = (params: Record<string, string>) => bootcampFunnel(payload, parseFunnelFilter({ period: '7', source: `utm:${source}`, ...params }, new Date(), [key, 'nodejs']))
+
+    const python = await report({ program: key })
+    expect(python.steps.find((item) => item.key === 'leads')?.count).toBe(1)
+    expect(python.steps.find((item) => item.key === 'paid')?.count).toBe(1)
+    expect(python.revenue).toEqual({ kopecks: 7_000_000, payments: 1 })
+    expect(python.sources.find((item) => item.key === `utm:${source}`)?.leads).toBe(1)
+    expect(python.queue.map((item) => item.id)).toEqual([mine.id])
+    expect(python.queueTotal).toBe(1)
+    expect(python.queueElsewhere).toBeGreaterThanOrEqual(1)
+
+    const nodejs = await report({ program: 'nodejs' })
+    expect(nodejs.revenue).toEqual({ kopecks: 4_500_000, payments: 1 })
+    expect(nodejs.queue.some((item) => item.id === mine.id)).toBe(false)
+    expect(nodejs.queue.find((item) => item.id === other.id)?.program).toBe('nodejs')
+
+    const all = await report({ program: '' })
+    expect(all.revenue).toEqual({ kopecks: 11_500_000, payments: 2 })
+    expect(all.queue.filter((item) => [mine.id, other.id].includes(item.id))).toHaveLength(2)
+    expect(all.queueElsewhere).toBe(0)
+  })
+
+  it('открытые программы идут в списке раньше закрытых', async () => {
+    const closed = await program('Закрытая', { isActive: false })
+    const open = await program('Открытая')
+    const keys = (await funnelPrograms(payload)).map((item) => item.key)
+    expect(keys).toContain(closed)
+    expect(keys.indexOf(open)).toBeLessThan(keys.indexOf(closed))
+  })
+
+  it('итоги недели: своё сообщение и своя отметка у каждой программы, числа не смешиваются', async () => {
+    // 6 апреля 2020 - понедельник: неделя с 30 марта, в других тестах её нет.
+    const monday = new Date('2020-04-06T08:00:00Z')
+    const inWeek = sql`${'2020-04-01T10:00:00Z'}::timestamptz`
+    await db().execute(sql`delete from bootcamp_lead_events where type = 'weekly_summary' and data->>'week' = '2020-03-30'`)
+    const key = await program('Rust')
+    const mine = await lead('summary-split', key)
+    const other = await lead('summary-split')
+    const another = await lead('summary-split', key)
+    await db().execute(sql`update bootcamp_leads set created_at = ${inWeek} where id in (${mine.id}, ${other.id}, ${another.id})`)
+
+    expect(await sendWeeklySummary(payload, monday)).toBeGreaterThanOrEqual(2)
+    await vi.waitFor(() => expect(summaries('Rust')).toHaveLength(1))
+    await vi.waitFor(() => expect(summaries(NODEJS)).toHaveLength(1))
+    expect(summaries('Rust')[0].split('\n').slice(0, 2)).toEqual(['Буткемп Rust: итоги недели 30 марта - 5 апреля', 'Новых заявок: 2'])
+    expect(summaries('Rust')[0]).toContain(`/admin/bootcamp-funnel?program=${key}`)
+    expect(summaries(NODEJS)[0].split('\n')[1]).toBe('Новых заявок: 1')
+
+    expect(await sendWeeklySummary(payload, new Date(monday.getTime() + 60_000))).toBe(0)
+    expect(summaries('Rust')).toHaveLength(1)
+    const marks = rowsOf<{ program: string }>(await db().execute(sql`select data->>'program' as program from bootcamp_lead_events where type = 'weekly_summary' and data->>'week' = '2020-03-30'`))
+    expect(marks.map((row) => row.program)).toEqual(expect.arrayContaining(['nodejs', key]))
+    expect(new Set(marks.map((row) => row.program)).size).toBe(marks.length)
+  })
+
+  it('закрытая программа без событий молчит, а с событием за неделю присылает итоги', async () => {
+    const quietMonday = new Date('2020-04-20T08:00:00Z')
+    const busyMonday = new Date('2020-04-27T08:00:00Z')
+    await db().execute(sql`delete from bootcamp_lead_events where type = 'weekly_summary' and data->>'week' in ('2020-04-13', '2020-04-20')`)
+    const key = await program('Архив', { isActive: false })
+    await sendWeeklySummary(payload, quietMonday)
+    await vi.waitFor(() => expect(summaries(NODEJS)).toHaveLength(1))
+    expect(summaries('Архив')).toHaveLength(0)
+    const late = await lead('summary-closed', key)
+    await db().execute(sql`update bootcamp_leads set created_at = ${'2020-04-22T10:00:00Z'}::timestamptz where id = ${late.id}`)
+    await sendWeeklySummary(payload, busyMonday)
+    await vi.waitFor(() => expect(summaries('Архив')).toHaveLength(1))
+    expect(summaries('Архив')[0].split('\n')[1]).toBe('Новых заявок: 1')
+  })
+
+  it('отметка без программы, сделанная до разделения, закрывает неделю для всех', async () => {
+    const monday = new Date('2020-05-04T08:00:00Z')
+    await db().execute(sql`delete from bootcamp_lead_events where type = 'weekly_summary' and data->>'week' = '2020-04-27'`)
+    await db().execute(sql`insert into bootcamp_lead_events (type, message, data, created_at, updated_at) values ('weekly_summary', 'фикстура', ${'{"week":"2020-04-27"}'}::jsonb, now(), now())`)
+    expect(await sendWeeklySummary(payload, monday)).toBe(0)
+    expect(telegram).toHaveLength(0)
+  })
+
+  it('сбой одной программы не мешает другим, следующий запуск повторяет только её', async () => {
+    const monday = new Date('2020-05-11T08:00:00Z')
+    await db().execute(sql`delete from bootcamp_lead_events where type = 'weekly_summary' and data->>'week' = '2020-05-04'`)
+    const key = await program('Сбой')
+    const create = payload.create.bind(payload)
+    const failing = vi.spyOn(payload, 'create').mockImplementation(((args: Parameters<typeof payload.create>[0]) => {
+      const data = (args.data as { data?: { program?: string } }).data
+      if (args.collection === 'bootcamp-lead-events' && data?.program === key) return Promise.reject(new Error('журнал недоступен'))
+      return create(args)
+    }) as typeof payload.create)
+    await sendWeeklySummary(payload, monday)
+    failing.mockRestore()
+    await vi.waitFor(() => expect(summaries(NODEJS)).toHaveLength(1))
+    expect(summaries('Сбой')).toHaveLength(0)
+
+    await sendWeeklySummary(payload, new Date(monday.getTime() + 60_000))
+    await vi.waitFor(() => expect(summaries('Сбой')).toHaveLength(1))
+    expect(summaries(NODEJS)).toHaveLength(1)
   })
 })

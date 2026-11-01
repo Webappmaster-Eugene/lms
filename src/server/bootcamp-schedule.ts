@@ -31,10 +31,10 @@ const RECONCILE_BATCH = 20
 
 let running = false
 
-export type BootcampScheduleResult = { reminders: number, expired: number, reviewAlerts: number, reconciled: number, weeklySummary: boolean }
+export type BootcampScheduleResult = { reminders: number, expired: number, reviewAlerts: number, reconciled: number, weeklySummary: number }
 
 export async function runBootcampSchedule(payload: Payload): Promise<BootcampScheduleResult> {
-  const result: BootcampScheduleResult = { reminders: 0, expired: 0, reviewAlerts: 0, reconciled: 0, weeklySummary: false }
+  const result: BootcampScheduleResult = { reminders: 0, expired: 0, reviewAlerts: 0, reconciled: 0, weeklySummary: 0 }
   if (running) return result
   running = true
   try {
