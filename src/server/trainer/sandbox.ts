@@ -3,7 +3,7 @@ import 'server-only'
 import { composeScript } from '@/lib/trainer/compose'
 import { TRAINER_LIMITS } from '@/lib/trainer/constants'
 import { failureResult, normalizeRunResult } from '@/lib/trainer/result'
-import { isRuntimeLanguage, isProgramLanguage, parseFrontendFiles, runtimeCases } from '@/lib/trainer/runtime-spec'
+import { isRuntimeLanguage, isProgramLanguage, parseFrontendFiles, runtimeCases, sqlRuntimeOptions } from '@/lib/trainer/runtime-spec'
 import { runRuntime } from './runtime'
 import { TrainerSpecError } from '@/lib/trainer/spec'
 import { buildExecSpec, type TrainerTaskLike } from '@/lib/trainer/spec'
@@ -138,7 +138,7 @@ export async function runSolution(
     if (!cases.length || cases.some((item) => isProgramLanguage(language) ? item.expected === undefined : !item.checks?.some((check) => check.text !== undefined || check.count !== undefined || check.visible !== undefined || check.css !== undefined || check.attribute !== undefined))) {
       throw new TrainerSpecError('Для задачи нужны проверки с ожидаемым результатом')
     }
-    return runRuntime({ language, code, cases, timeLimitMs: Math.min(Math.max(task.timeLimitMs ?? 5000, 500), TRAINER_LIMITS.maxTimeLimitMs) })
+    return runRuntime({ language, code, cases, timeLimitMs: Math.min(Math.max(task.timeLimitMs ?? 5000, 500), TRAINER_LIMITS.maxTimeLimitMs), ...sqlRuntimeOptions(language, task) })
   }
 
   const checkMode = task.checkMode === 'unit' || task.checkMode === 'types' ? task.checkMode : 'stdout'

@@ -1,0 +1,243 @@
+import { shop } from '../datasets'
+import type { SqlFixture } from '../fixture'
+import { sqlTask, sqlTopic } from '../task'
+
+/*
+ * Структура набора от скрытого варианта не меняется, а ответ обязан меняться.
+ * Поэтому задачи о метаданных просят ещё и число строк или число пустых значений:
+ * их считает сам запрос, обходя таблицы по информации из каталога.
+ * Внешние ключи этого набора объявлены на уровне таблицы: тест порядка строк
+ * убирает только ключи, записанные в столбце.
+ */
+const clinic: SqlFixture = {
+  slug: 'meta-clinic',
+  title: 'Клиника: врачи, пациенты и приёмы',
+  tables: [
+    { name: 'doctors', columns: [['id', 'integer PRIMARY KEY'], ['full_name', 'text NOT NULL'], ['specialty', 'text']] },
+    { name: 'patients', columns: [['id', 'integer PRIMARY KEY'], ['full_name', 'text NOT NULL'], ['email', 'text'], ['city', 'text'], ['birth_date', 'date NOT NULL']] },
+    {
+      name: 'visits',
+      columns: [['id', 'integer PRIMARY KEY'], ['patient_id', 'integer NOT NULL'], ['doctor_id', 'integer NOT NULL'], ['visit_date', 'date NOT NULL'], ['status', 'text NOT NULL'], ['price', 'numeric(8, 2)'], ['note', 'text']],
+      constraints: ['FOREIGN KEY (patient_id) REFERENCES patients (id)', 'FOREIGN KEY (doctor_id) REFERENCES doctors (id)', 'CHECK (price >= 0)'],
+    },
+  ],
+  rows: {
+    doctors: [[1, 'Ирина Власова', 'терапевт'], [2, 'Олег Громов', 'хирург'], [3, 'Марина Ким', null]],
+    patients: [
+      [1, 'Антон Беляев', 'anton@mail.example', 'Москва', '1985-03-14'],
+      [2, 'Диана Орлова', null, 'Казань', '1992-11-02'],
+      [3, 'Глеб Минин', 'gleb@mail.example', null, '1978-07-21'],
+      [4, 'Софья Лукина', 'sofia@mail.example', 'Москва', '2001-01-30'],
+    ],
+    visits: [
+      [1, 1, 1, '2026-02-03', 'done', 2500, null],
+      [2, 1, 2, '2026-02-17', 'done', 4000, 'повторный'],
+      [3, 2, 1, '2026-03-05', 'planned', null, null],
+      [4, 3, 3, '2026-03-12', 'cancelled', null, 'отмена пациентом'],
+      [5, 4, 1, '2026-03-20', 'planned', 2500, null],
+      [6, 2, 2, '2026-04-01', 'done', 4000, null],
+    ],
+  },
+  hidden: [{
+    doctors: [[1, 'Павел Ершов', 'терапевт'], [2, 'Елена Сорокина', 'невролог']],
+    patients: [
+      [1, 'Марк Дьяков', null, 'Самара', '1999-05-05'],
+      [2, 'Алла Пестова', 'alla@mail.example', null, '1960-12-12'],
+      [3, 'Тихон Рябов', null, null, '2010-08-19'],
+      [4, 'Лидия Горина', 'lidia@mail.example', 'Пермь', '1988-04-04'],
+      [5, 'Роман Исаев', 'roman@mail.example', 'Самара', '1975-09-30'],
+    ],
+    visits: [
+      [1, 1, 1, '2025-12-10', 'done', 3000, 'первичный'],
+      [2, 2, 2, '2026-01-14', 'done', null, 'первичный'],
+      [3, 3, 1, '2026-01-15', 'planned', 0, null],
+      [4, 4, 2, '2026-02-20', 'planned', 3500, 'направление'],
+      [5, 5, 1, '2026-02-21', 'cancelled', null, null],
+      [6, 1, 2, '2026-03-30', 'planned', 3500, null],
+      [7, 5, 2, '2026-04-02', 'done', 3500, 'повторный'],
+    ],
+  }],
+  after: 'CREATE INDEX visits_patient_idx ON visits (patient_id);\nCREATE UNIQUE INDEX patients_email_idx ON patients (email);\nCREATE INDEX visits_date_idx ON visits (visit_date);',
+}
+
+/** Определение индекса без имени: имя ученик вправе выбрать сам. */
+const indexesCheck = (table: string) => `SELECT regexp_replace(indexdef, '^CREATE (UNIQUE )?INDEX \\S+ ON ', 'CREATE \\1INDEX ON ') AS definition,
+  (SELECT count(*) FROM ${table}) AS rows_count
+FROM pg_indexes
+WHERE schemaname = 'public' AND tablename = '${table}'
+ORDER BY definition`
+
+export const sqlMeta = sqlTopic({
+  slug: 'sql-meta',
+  title: 'SQL: метаданные и планы',
+  description: 'information_schema, pg_catalog и планы запросов EXPLAIN',
+  order: 37,
+  tasks: [
+    // information_schema
+    sqlTask({
+      slug: 'sql-meta-table-rows',
+      title: 'Сколько строк в каждой таблице',
+      difficulty: 'medium',
+      fixture: clinic,
+      tables: ['doctors', 'patients', 'visits'],
+      task: 'Выведите все обычные таблицы схемы `public`: имя таблицы (`table_name`) и число строк в ней (`rows_count`). Результат отсортируйте по имени таблицы. Список таблиц берите из `information_schema.tables`, а строки считайте запросом, который строится по имени таблицы (например, через `query_to_xml`).',
+      solution: "SELECT table_name,\n  (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM %I.%I', table_schema, table_name), false, true, '')))[1]::text::integer AS rows_count\nFROM information_schema.tables\nWHERE table_schema = 'public' AND table_type = 'BASE TABLE'\nORDER BY table_name",
+      ordered: true,
+      hints: ['query_to_xml(запрос, false, true, \'\') выполняет текст запроса и возвращает результат как XML, а xpath достаёт из него число.'],
+      notes: 'Число строк нельзя получить обычным SELECT по списку имён: имя таблицы в FROM не подставить из столбца. query_to_xml выполняет запрос из строки. Имя берётся через format с %I, чтобы оно было записано как идентификатор. Не забудьте отфильтровать table_type: иначе в список попадут представления.',
+      tags: ['sql-ddl'],
+    }),
+    sqlTask({
+      slug: 'sql-meta-null-columns',
+      title: 'Столбцы, где есть пустые значения',
+      difficulty: 'hard',
+      fixture: clinic,
+      tables: ['visits'],
+      task: 'Найдите в таблице `visits` все столбцы, в которых есть хотя бы одно значение NULL. Выведите имя столбца (`column_name`) и число пустых значений (`nulls_count`), отсортируйте по имени столбца. Столбцы без NULL в результат не входят.',
+      solution: "SELECT column_name, nulls_count\nFROM (\n  SELECT column_name,\n    (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM %I WHERE %I IS NULL', table_name, column_name), false, true, '')))[1]::text::integer AS nulls_count\n  FROM information_schema.columns\n  WHERE table_schema = 'public' AND table_name = 'visits' AND is_nullable = 'YES'\n) t\nWHERE nulls_count > 0\nORDER BY column_name",
+      ordered: true,
+      hints: ['Проверять на NULL имеет смысл только столбцы с is_nullable = \'YES\'.'],
+      notes: 'is_nullable говорит, может ли столбец содержать NULL, а не содержит ли он его сейчас. Поэтому для каждого допускающего NULL столбца считается отдельный запрос, а фильтр nulls_count > 0 стоит снаружи, в обёртке: в WHERE псевдоним из SELECT использовать нельзя.',
+      tags: ['sql-ddl'],
+    }),
+    sqlTask({
+      slug: 'sql-meta-primary-keys',
+      title: 'Первичные ключи таблиц магазина',
+      difficulty: 'medium',
+      fixture: shop,
+      tables: ['categories', 'products', 'customers', 'orders', 'order_items'],
+      task: 'Для каждой таблицы схемы `public` с первичным ключом выведите имя таблицы (`table_name`), столбцы ключа в порядке их следования в ключе, одной строкой через запятую и пробел, например `order_id, product_id` (`key_columns`) и число строк таблицы (`rows_count`). Сортировка по имени таблицы. Используйте `information_schema.table_constraints` и `information_schema.key_column_usage`.',
+      solution: "SELECT tc.table_name,\n  string_agg(kcu.column_name, ', ' ORDER BY kcu.ordinal_position) AS key_columns,\n  (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM %I', tc.table_name), false, true, '')))[1]::text::integer AS rows_count\nFROM information_schema.table_constraints tc\nJOIN information_schema.key_column_usage kcu\n  ON kcu.constraint_name = tc.constraint_name\n  AND kcu.table_schema = tc.table_schema\n  AND kcu.table_name = tc.table_name\nWHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_schema = 'public'\nGROUP BY tc.table_name\nORDER BY tc.table_name",
+      ordered: true,
+      notes: 'constraint_name уникально только внутри таблицы, поэтому при соединении сравнивают ещё схему и таблицу. ordinal_position в key_column_usage даёт порядок столбцов в составном ключе: у order_items это order_id, product_id.',
+      tags: ['sql-ddl'],
+    }),
+    sqlTask({
+      slug: 'sql-meta-foreign-keys',
+      title: 'Внешние ключи клиники',
+      difficulty: 'hard',
+      fixture: clinic,
+      tables: ['doctors', 'patients', 'visits'],
+      task: 'Выведите все внешние ключи схемы `public`: таблицу, где ключ объявлен (`child_table`), его столбец (`child_column`), таблицу, на которую он ссылается (`parent_table`), и число строк в дочерней таблице (`child_rows`). Сортировка по `child_table`, затем по `child_column`. Все ключи здесь состоят из одного столбца.',
+      solution: "SELECT c.conrelid::regclass::text AS child_table,\n  a.attname AS child_column,\n  c.confrelid::regclass::text AS parent_table,\n  (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM %s', c.conrelid::regclass), false, true, '')))[1]::text::integer AS child_rows\nFROM pg_constraint c\nJOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]\nWHERE c.contype = 'f' AND c.connamespace = 'public'::regnamespace\nORDER BY child_table, child_column",
+      ordered: true,
+      hints: ['В pg_constraint тип f означает внешний ключ, conrelid - таблица ключа, confrelid - таблица, на которую он ссылается.'],
+      notes: 'Номер столбца ключа лежит в массиве conkey, а имя столбца - в pg_attribute. Приведение regclass к тексту даёт имя таблицы, как оно записано в запросах. Можно получить то же из information_schema, но для связи «ключ - родитель» там нужны три представления.',
+      tags: ['sql-ddl'],
+    }),
+    sqlTask({
+      slug: 'sql-meta-date-columns',
+      title: 'Самые ранние даты в столбцах date',
+      difficulty: 'hard',
+      fixture: clinic,
+      tables: ['patients', 'visits'],
+      task: 'Найдите все столбцы типа `date` в таблицах схемы `public` и выведите для каждого имя таблицы (`table_name`), имя столбца (`column_name`) и самую раннюю дату в нём (`earliest`). Сортировка по имени таблицы и столбца.',
+      solution: "SELECT table_name, column_name,\n  (xpath('/row/c/text()', query_to_xml(format('SELECT min(%I)::text AS c FROM %I', column_name, table_name), false, true, '')))[1]::text::date AS earliest\nFROM information_schema.columns\nWHERE table_schema = 'public' AND data_type = 'date'\nORDER BY table_name, column_name",
+      ordered: true,
+      notes: 'Тип столбца хранится в data_type, поэтому отбирать нужные столбцы можно прямо из каталога. Значение min приводится к тексту внутри внутреннего запроса, а снаружи обратно к date: через XML все значения приходят текстом.',
+      tags: ['sql-ddl'],
+    }),
+    sqlTask({
+      slug: 'sql-meta-all-indexes',
+      title: 'Все индексы базы',
+      difficulty: 'medium',
+      fixture: clinic,
+      tables: ['doctors', 'patients', 'visits'],
+      task: 'Выведите все индексы схемы `public`: имя индекса (`index_name`), таблицу (`table_name`) и число строк в этой таблице (`table_rows`). Сортировка по имени индекса. Используйте представление `pg_indexes`.',
+      solution: "SELECT indexname AS index_name, tablename AS table_name,\n  (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM %I', tablename), false, true, '')))[1]::text::integer AS table_rows\nFROM pg_indexes\nWHERE schemaname = 'public'\nORDER BY indexname",
+      ordered: true,
+      notes: 'pg_indexes показывает все индексы, в том числе созданные автоматически для первичных ключей и UNIQUE. Это аналог SHOW INDEX из MySQL; команда psql \\d имя_таблицы показывает индексы вместе со структурой.',
+      tags: ['sql-ddl'],
+    }),
+    // EXPLAIN и статистика
+    sqlTask({
+      slug: 'sql-meta-estimated-rows',
+      title: 'Оценка числа строк после ANALYZE',
+      difficulty: 'medium',
+      fixture: clinic,
+      tables: ['patients', 'visits'],
+      task: 'Обновите статистику таблиц `patients` и `visits` командой ANALYZE. Затем из `pg_class` выведите имя таблицы (`table_name`) и оценку числа строк, приведённую к integer (`estimated_rows`), только для этих двух таблиц. Сортировка по имени таблицы.',
+      solution: 'ANALYZE patients;\nANALYZE visits;\nSELECT relname AS table_name, reltuples::integer AS estimated_rows\nFROM pg_class\nWHERE relname IN (\'patients\', \'visits\')\nORDER BY relname',
+      ordered: true,
+      notes: 'Планировщик не считает строки при каждом запросе, а берёт оценку reltuples из статистики. Её обновляет ANALYZE (и автоочистка). До ANALYZE у только что заполненной таблицы оценка может быть неточной или равной -1.',
+      tags: ['sql-ddl'],
+    }),
+    sqlTask({
+      slug: 'sql-meta-null-fraction',
+      title: 'Доля пустых значений по статистике',
+      difficulty: 'medium',
+      fixture: clinic,
+      tables: ['visits'],
+      task: 'Обновите статистику таблицы `visits` командой ANALYZE и выведите из представления `pg_stats` имя столбца (`column_name`) и долю пустых значений (`null_frac`) для столбцов этой таблицы, где доля больше нуля. Сортировка по имени столбца.',
+      solution: "ANALYZE visits;\nSELECT attname AS column_name, null_frac\nFROM pg_stats\nWHERE schemaname = 'public' AND tablename = 'visits' AND null_frac > 0\nORDER BY attname",
+      ordered: true,
+      notes: 'pg_stats - читаемый вид статистики, по которой строятся планы. Для такой маленькой таблицы ANALYZE просматривает все строки, поэтому доли точные. На больших таблицах он берёт выборку, и числа приблизительные.',
+      tags: ['sql-ddl'],
+    }),
+    sqlTask({
+      slug: 'sql-meta-distinct-values',
+      title: 'Разных значений в столбцах приёмов',
+      difficulty: 'medium',
+      fixture: clinic,
+      tables: ['visits'],
+      task: 'Обновите статистику таблицы `visits` и выведите из `pg_stats` имя столбца (`column_name`) и оценку числа различных значений `n_distinct` для столбцов `doctor_id`, `patient_id` и `status`. Значение `n_distinct` выведите как есть, без пересчёта. Сортировка по имени столбца.',
+      solution: "ANALYZE visits;\nSELECT attname AS column_name, n_distinct\nFROM pg_stats\nWHERE schemaname = 'public' AND tablename = 'visits' AND attname IN ('doctor_id', 'patient_id', 'status')\nORDER BY attname",
+      ordered: true,
+      notes: 'Положительный n_distinct - число различных значений, отрицательный - доля от числа строк со знаком минус (-1 значит, что все значения разные). Эта оценка влияет на то, насколько избирательным планировщик считает условие по столбцу.',
+      tags: ['sql-ddl'],
+    }),
+    // Индексы и планы
+    sqlTask({
+      slug: 'sql-meta-index-lower-email',
+      title: 'Индекс для поиска пациента по почте',
+      difficulty: 'medium',
+      fixture: clinic,
+      tables: ['patients'],
+      task: 'Регистратура ищет пациентов запросом `WHERE lower(email) = ...`. Существующий уникальный индекс по `email` такой запрос не ускоряет. Создайте индекс, который его обслуживает. Имя выберите сами.',
+      solution: 'CREATE INDEX patients_email_lower_idx ON patients (lower(email))',
+      check: indexesCheck('patients'),
+      ordered: true,
+      notes: 'Индекс по столбцу не используется, если в условии к столбцу применена функция. Нужен индекс по самому выражению lower(email). Проверка смотрит на определения индексов в pg_indexes, а не на текст плана.',
+      tags: ['sql-ddl'],
+    }),
+    sqlTask({
+      slug: 'sql-meta-index-composite',
+      title: 'Индекс под фильтр по статусу и дате',
+      difficulty: 'medium',
+      fixture: clinic,
+      tables: ['visits'],
+      task: 'Частый запрос: `WHERE status = \'planned\' AND visit_date BETWEEN ... AND ...`. Создайте один составной индекс на `visits`, который подходит под него: сначала столбец с условием равенства, потом столбец с диапазоном.',
+      solution: 'CREATE INDEX visits_status_date_idx ON visits (status, visit_date)',
+      check: indexesCheck('visits'),
+      ordered: true,
+      notes: 'Равенство ставят первым столбцом, диапазон вторым: тогда PostgreSQL сначала находит все строки нужного статуса, а внутри них уже отсортированные даты. Если поменять порядок, индекс окажется почти бесполезным для этого запроса.',
+      tags: ['sql-ddl'],
+    }),
+    sqlTask({
+      slug: 'sql-meta-index-partial',
+      title: 'Частичный индекс по запланированным приёмам',
+      difficulty: 'medium',
+      fixture: clinic,
+      tables: ['visits'],
+      task: 'Расписание показывает только запланированные приёмы (`status = \'planned\'`), отсортированные по дате. Создайте частичный индекс по `visit_date`, в который попадают только такие приёмы.',
+      solution: "CREATE INDEX visits_planned_idx ON visits (visit_date) WHERE status = 'planned'",
+      check: indexesCheck('visits'),
+      ordered: true,
+      notes: 'Частичный индекс хранит только нужные строки, поэтому он маленький и дешёвый в обновлении. Он работает, когда запрос содержит то же условие status = \'planned\'.',
+      tags: ['sql-ddl'],
+    }),
+    sqlTask({
+      slug: 'sql-meta-index-redundant',
+      title: 'Заменить индекс составным',
+      difficulty: 'medium',
+      fixture: clinic,
+      tables: ['visits'],
+      task: 'На `visits` есть индекс `visits_patient_idx` по `patient_id`. Нужен новый индекс по паре (`patient_id`, `visit_date`). Создайте его и удалите `visits_patient_idx`: составной индекс с таким началом покрывает все его запросы, и старый стал лишним.',
+      solution: 'CREATE INDEX visits_patient_date_idx ON visits (patient_id, visit_date);\nDROP INDEX visits_patient_idx',
+      check: indexesCheck('visits'),
+      ordered: true,
+      notes: 'Индекс по (patient_id, visit_date) годится и для запросов только по patient_id: он начинается с этого столбца. Каждый лишний индекс замедляет вставку и занимает место, поэтому дубли убирают.',
+      tags: ['sql-ddl'],
+    }),
+  ],
+})

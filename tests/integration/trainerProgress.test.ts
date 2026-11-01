@@ -49,4 +49,21 @@ describe('обычные конкурентные отправки: прогре
     const transactions = await payload.find({ collection: 'points-transactions', where: { user: { equals: user.id } }, depth: 0 })
     expect(transactions.docs).toHaveLength(3)
   })
+
+  it('засчитывает SQL-задачу: язык sql сохраняется в прогрессе и XP начисляется один раз', async () => {
+    const user = await createStudent(payload)
+    const task = await createSumTask(payload, {
+      checkMode: 'program', languages: ['sql'], entryName: null, testCases: [], starterCode: '-- запрос\n', starterCodeTs: null,
+      solutionCode: 'SELECT 1 AS x', solutionCodeTs: null, sqlOrdered: true, sqlCheck: 'SELECT 1 AS x',
+      runtimeCases: [{ name: 'Данные из условия', hidden: false, input: '', expected: ' x\n---\n 1\n(1 строка)' }, { name: 'Скрытый набор 1', hidden: true, input: '', expected: ' x\n---\n 1\n(1 строка)' }],
+      pointsReward: 12,
+    })
+    expect(task).toMatchObject({ sqlOrdered: true, sqlCheck: 'SELECT 1 AS x' })
+    const first = await saveTrainerProgress({ payload, user, task, language: 'sql', code: 'SELECT 1 AS x', result: result(true) })
+    expect(first).toMatchObject({ completed: true, awardedPoints: 12 })
+    const again = await saveTrainerProgress({ payload, user, task, language: 'sql', code: 'SELECT 1 AS x', result: result(true) })
+    expect(again.awardedPoints).toBeNull()
+    const progress = await payload.find({ collection: 'user-trainer-progress', depth: 0, where: { user: { equals: user.id }, task: { equals: task.id } } })
+    expect(progress.docs[0]).toMatchObject({ language: 'sql', isCompleted: true, userCode: 'SELECT 1 AS x' })
+  })
 })

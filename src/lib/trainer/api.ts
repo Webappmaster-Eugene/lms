@@ -36,6 +36,9 @@ export type ClientTaskSpec = {
   timeLimitMs: number
   starters: Partial<Record<TrainerLanguage, string>>
   runtimeCases?: RuntimeCase[]
+  /** SQL: запрос, по которому проверяются изменения данных, и важен ли порядок строк. */
+  sqlCheck?: string
+  sqlOrdered?: boolean
   pointsReward: number
 }
 

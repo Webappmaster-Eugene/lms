@@ -135,6 +135,19 @@ describe('POST /api/trainer/run: публичный прогон новых яз
     expect(update).not.toHaveBeenCalled()
   })
 
+  it('SQL: передаёт проверочный запрос и порядок, отказывает в своих проверках и задаче без открытого примера', async () => {
+    task = { ...task, languages: ['sql'], sqlCheck: 'SELECT 1', sqlOrdered: true }
+    expect((await request({ taskId: 42, language: 'sql', code: 'SELECT 1' })).status).toBe(200)
+    expect(runRuntime).toHaveBeenCalledWith(expect.objectContaining({ language: 'sql', check: 'SELECT 1', ordered: true, allowNoTests: false, cases: [expect.objectContaining({ name: 'Публичный' })] }))
+    runRuntime.mockClear()
+    expect((await request({ taskId: 42, language: 'sql', code: 'SELECT 1', customCases: [] })).status).toBe(400)
+    task = { ...task, runtimeCases: [{ name: 'SECRET_TEST', input: 'SECRET_INPUT', expected: 'SECRET_EXPECTED', hidden: true }] }
+    const hiddenOnly = await request({ taskId: 42, language: 'sql', code: 'SELECT 1' })
+    expect(hiddenOnly.status).toBe(400)
+    expect(JSON.stringify(await hiddenOnly.json())).toContain('нет открытого примера')
+    expect(runRuntime).not.toHaveBeenCalled()
+  })
+
   it('ограничивает время и частоту выполнения, отдаёт инфраструктурную ошибку без записи', async () => {
     task.timeLimitMs = 100_000
     expect((await request()).status).toBe(200)

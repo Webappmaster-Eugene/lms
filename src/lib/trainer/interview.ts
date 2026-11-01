@@ -53,6 +53,8 @@ export function interviewVersion(input: unknown): number {
 
 export function interviewLanguage(input: unknown): TrainerLanguage {
   if (!isTrainerLanguage(input)) throw new InterviewError('Выберите язык из списка доступных языков')
+  // Запросу нужен набор данных задачи, а в комнате его нет.
+  if (input === 'sql') throw new InterviewError('SQL пока недоступен в комнатах собеседования')
   return input
 }
 

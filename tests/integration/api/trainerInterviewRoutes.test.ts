@@ -163,7 +163,7 @@ describe('комната собеседования: runtime', () => {
     const room = await createRoom(ownerToken, { language: 'go' })
     const before = await payload.count({ collection: 'user-trainer-progress' })
     const response = await json(await runPOST(request('POST', `/${room}/run`, { token: ownerToken, body: { language: 'go', code: interviewStarter('go') } }), ctx(room)))
-    expect(response).toEqual({ status: 503, body: { error: 'Runtime Go, Python и frontend не настроен. Обратитесь к администратору' } })
+    expect(response).toEqual({ status: 503, body: { error: 'Runtime Go, Python, SQL и frontend не настроен. Обратитесь к администратору' } })
     expect((await payload.count({ collection: 'user-trainer-progress' })).totalDocs).toBe(before.totalDocs)
   })
 })

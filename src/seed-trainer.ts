@@ -37,6 +37,8 @@ async function upsertTopic(payload: Payload, topic: TrainerTopicSeed): Promise<n
     category: topic.category,
     icon: topic.icon ?? null,
     order: topic.order,
+    // Флажок пишется, только если его задаёт каталог: закрытую в админке тему сидер не открывает.
+    ...(topic.assignedOnly === undefined ? {} : { assignedOnly: topic.assignedOnly }),
     isPublished: true,
   }
 

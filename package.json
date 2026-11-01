@@ -17,6 +17,10 @@
     "seed": "cross-env NODE_OPTIONS=--no-deprecation payload run src/seed.ts",
     "seed:trainer": "cross-env NODE_OPTIONS=--no-deprecation payload run src/seed-trainer.ts",
     "guide:publish": "node scripts/guide-publish.mjs",
+    "trainer:sql-expected": "tsx scripts/build-sql-expected.ts",
+    "sql:check": "tsx scripts/sql-check.ts",
+    "sql:publish-trainer": "tsx scripts/sql-trainer-publish.ts",
+    "sql:publish-course": "tsx scripts/sql-course-publish.ts",
     "guide:check-links": "node scripts/guide-check-links.mjs",
     "lint:fix": "eslint . --fix",
     "typecheck": "sh scripts/heavy.sh tsc --noEmit",
@@ -112,6 +116,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
+    "@electric-sql/pglite": "0.5.10",
     "@eslint/js": "^9.39.5",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@next/eslint-plugin-next": "15.3.9",

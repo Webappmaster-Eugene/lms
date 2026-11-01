@@ -457,7 +457,7 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
 
       {isFrontendLanguage(language) && preview && previewSource !== code && <p className="text-xs text-muted-foreground">Код изменён. Нажмите «Запустить», чтобы обновить предпросмотр.</p>}
       {language === 'next' && preview?.previewPath && <p className="text-xs text-muted-foreground">Предпросмотр действует недолго. Если он перестал отвечать, нажмите «Запустить» снова.</p>}
-      {isRuntimeLanguage(language) && <p className="text-xs text-muted-foreground">Первый запуск компилирует проект и может занять больше времени. «Запустить» не сохраняет прогресс; «Отправить» проверяет все тесты и засчитывает решение.</p>}
+      {isRuntimeLanguage(language) && <p className="text-xs text-muted-foreground">{language === 'sql' ? 'Каждый запуск поднимает чистую базу с данными задачи, поэтому ответ приходит за несколько секунд.' : 'Первый запуск компилирует проект и может занять больше времени.'} «Запустить» не сохраняет прогресс; «Отправить» проверяет все тесты и засчитывает решение.</p>}
 
       {code.length > TRAINER_LIMITS.maxCodeLength * 0.9 && (
         <p className="text-xs text-warning">
@@ -470,6 +470,7 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
         isRunning={busy}
         origin={origin}
         onSelectLine={setFocusLine}
+        queryOutput={language === 'sql'}
       />
 
       {hiddenNote && <p className="text-xs text-muted-foreground">{hiddenNote}</p>}

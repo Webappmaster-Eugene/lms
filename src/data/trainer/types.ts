@@ -58,6 +58,10 @@ export type TrainerTaskSeed = {
   starterFiles?: Record<string, string>
   solutionFiles?: Record<string, string>
   runtimeCases?: RuntimeCase[]
+  /** SQL: запрос после решения для задач на изменение данных и структуры. */
+  sqlCheck?: string
+  /** SQL: строки сравниваются в порядке выдачи. */
+  sqlOrdered?: boolean
   solutionCode: string
   solutionCodeTs?: string
   solutionCodePython?: string
@@ -92,6 +96,8 @@ export type TrainerTopicSeed = {
   category: TrainerTopicCategory
   icon?: string
   order: number
+  /** Тема видна только ученикам с явным назначением. */
+  assignedOnly?: boolean
   tasks: TrainerTaskSeed[]
 }
 

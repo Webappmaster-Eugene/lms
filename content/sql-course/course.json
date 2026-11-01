@@ -1,0 +1,197 @@
+{
+  "slug": "sql-postgresql",
+  "title": "SQL и PostgreSQL с нуля",
+  "roadmap": "backend-nodejs",
+  "roadmapNode": "be-sql",
+  "order": 900,
+  "estimatedHours": 40,
+  "description": [
+    "Текстовый курс по SQL на PostgreSQL: от первого SELECT до соединений, подзапросов, изменения данных, структуры таблиц, транзакций и планов запросов.",
+    "В каждом уроке примеры с настоящими результатами и задачи в тренажёре, которые проверяются на открытых и скрытых данных."
+  ],
+  "sections": [
+    {
+      "slug": "sql-intro",
+      "title": "1. Введение",
+      "description": "Что такое реляционная база данных, зачем нужен SQL и как устроены учебные данные и задачи курса.",
+      "lessons": [
+        "01-intro/01-databases.md",
+        "01-intro/02-practice-data.md"
+      ]
+    },
+    {
+      "slug": "sql-select",
+      "title": "2. Выборка данных",
+      "description": "SELECT, псевдонимы, уникальные значения, сортировка и постраничный вывод.",
+      "lessons": [
+        "02-select/01-select-columns.md",
+        "02-select/02-aliases.md",
+        "02-select/03-distinct.md",
+        "02-select/04-order-by.md",
+        "02-select/05-limit-offset.md"
+      ]
+    },
+    {
+      "slug": "sql-where",
+      "title": "3. Условия отбора",
+      "description": "WHERE, сравнения, логические операторы, IN, BETWEEN, поиск по шаблону, NULL и регулярные выражения.",
+      "lessons": [
+        "03-where/01-comparison.md",
+        "03-where/02-logic.md",
+        "03-where/03-in.md",
+        "03-where/04-between.md",
+        "03-where/05-like.md",
+        "03-where/06-null.md",
+        "03-where/07-regex.md"
+      ]
+    },
+    {
+      "slug": "sql-expressions",
+      "title": "4. Выражения и числа",
+      "description": "Арифметика, округление, математические функции, CASE, COALESCE и приведение типов.",
+      "lessons": [
+        "04-expressions/01-arithmetic.md",
+        "04-expressions/02-rounding.md",
+        "04-expressions/03-math.md",
+        "04-expressions/04-case.md",
+        "04-expressions/05-coalesce.md",
+        "04-expressions/06-cast.md"
+      ]
+    },
+    {
+      "slug": "sql-strings",
+      "title": "5. Строки",
+      "description": "Длина и регистр, склейка, части строки, поиск, обрезка, замена и регулярные выражения в функциях.",
+      "lessons": [
+        "05-strings/01-length-case.md",
+        "05-strings/02-concat.md",
+        "05-strings/03-substring.md",
+        "05-strings/04-position.md",
+        "05-strings/05-trim-pad.md",
+        "05-strings/06-replace.md",
+        "05-strings/07-regexp-functions.md"
+      ]
+    },
+    {
+      "slug": "sql-dates",
+      "title": "6. Даты и время",
+      "description": "Типы дат, части даты, усечение, форматирование, арифметика с интервалами и текущее время.",
+      "lessons": [
+        "06-dates/01-date-types.md",
+        "06-dates/02-extract.md",
+        "06-dates/03-date-trunc.md",
+        "06-dates/04-to-char.md",
+        "06-dates/05-intervals.md",
+        "06-dates/06-current-time.md"
+      ]
+    },
+    {
+      "slug": "sql-grouping",
+      "title": "7. Группировка и агрегаты",
+      "description": "Агрегатные функции, GROUP BY, HAVING и сбор значений группы в строку и массив.",
+      "lessons": [
+        "07-grouping/01-aggregates.md",
+        "07-grouping/02-count.md",
+        "07-grouping/03-group-by.md",
+        "07-grouping/04-having.md",
+        "07-grouping/05-string-agg.md",
+        "07-grouping/06-group-expressions.md"
+      ]
+    },
+    {
+      "slug": "sql-subqueries",
+      "title": "8. Подзапросы",
+      "description": "Подзапросы в условиях, IN и EXISTS, ANY и ALL, подзапросы в SELECT и FROM, коррелированные подзапросы и WITH.",
+      "lessons": [
+        "08-subqueries/01-scalar.md",
+        "08-subqueries/02-in-exists.md",
+        "08-subqueries/03-any-all.md",
+        "08-subqueries/04-select-from.md",
+        "08-subqueries/05-correlated.md",
+        "08-subqueries/06-with.md"
+      ]
+    },
+    {
+      "slug": "sql-joins",
+      "title": "9. Соединения таблиц",
+      "description": "Связи между таблицами, INNER, LEFT, RIGHT, FULL и CROSS JOIN, несколько соединений, соединение таблицы с собой.",
+      "lessons": [
+        "09-joins/01-relations.md",
+        "09-joins/02-inner-join.md",
+        "09-joins/03-left-right.md",
+        "09-joins/04-full-cross.md",
+        "09-joins/05-many-joins.md",
+        "09-joins/06-self-join.md",
+        "09-joins/07-join-group.md"
+      ]
+    },
+    {
+      "slug": "sql-union",
+      "title": "10. Объединение результатов",
+      "description": "UNION и UNION ALL, INTERSECT и EXCEPT.",
+      "lessons": [
+        "10-union/01-union.md",
+        "10-union/02-intersect-except.md"
+      ]
+    },
+    {
+      "slug": "sql-dml",
+      "title": "11. Изменение данных",
+      "description": "INSERT, INSERT из SELECT, RETURNING, UPDATE, DELETE, TRUNCATE и вставка с обработкой конфликтов.",
+      "lessons": [
+        "11-dml/01-insert.md",
+        "11-dml/02-insert-select.md",
+        "11-dml/03-update.md",
+        "11-dml/04-delete.md",
+        "11-dml/05-upsert.md"
+      ]
+    },
+    {
+      "slug": "sql-ddl",
+      "title": "12. Структура таблиц",
+      "description": "Базы данных и схемы, CREATE TABLE, типы, ограничения, внешние ключи, ALTER TABLE, автоинкремент, индексы и удаление таблиц.",
+      "lessons": [
+        "12-ddl/01-databases-schemas.md",
+        "12-ddl/02-create-table.md",
+        "12-ddl/03-constraints.md",
+        "12-ddl/04-foreign-keys.md",
+        "12-ddl/05-alter-table.md",
+        "12-ddl/06-identity.md",
+        "12-ddl/07-indexes.md",
+        "12-ddl/08-drop-rename.md"
+      ]
+    },
+    {
+      "slug": "sql-transactions",
+      "title": "13. Транзакции и блокировки",
+      "description": "BEGIN, COMMIT и ROLLBACK, точки сохранения, уровни изоляции и блокировки строк.",
+      "lessons": [
+        "13-transactions/01-transactions.md",
+        "13-transactions/02-savepoints.md",
+        "13-transactions/03-isolation.md",
+        "13-transactions/04-locks.md"
+      ]
+    },
+    {
+      "slug": "sql-meta",
+      "title": "14. Структура базы и планы запросов",
+      "description": "Метаданные в information_schema и pg_catalog, EXPLAIN и влияние индексов на план.",
+      "lessons": [
+        "14-meta/01-information-schema.md",
+        "14-meta/02-explain.md",
+        "14-meta/03-index-plans.md"
+      ]
+    },
+    {
+      "slug": "sql-practice",
+      "title": "15. Сборные задачи",
+      "description": "Задачи, где нужно соединить несколько тем: отчёты по магазину, компании и библиотеке, а также оконные функции для рейтингов, сравнения с соседними строками и процентилей.",
+      "lessons": [
+        "15-practice/01-shop-reports.md",
+        "15-practice/02-company-reports.md",
+        "15-practice/03-library-reports.md",
+        "15-practice/04-window-functions.md"
+      ]
+    }
+  ]
+}

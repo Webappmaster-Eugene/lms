@@ -76,3 +76,63 @@ describe('персональные права тренажёра', () => {
     expect(buildTrainerAccess({ ...student, role: 'admin', trainerAccessMode: 'disabled' }, [], metadata).canAccessTask(3)).toBe(true)
   })
 })
+
+describe('темы тренажёра только по назначению', () => {
+  // 10 - обычная тема, 30 - закрытая (SQL), 31 - закрытая и снятая с публикации.
+  const restricted = {
+    topics: [{ id: 10, isPublished: true }, { id: 30, isPublished: true, assignedOnly: true }, { id: 31, isPublished: false, assignedOnly: true }],
+    tasks: [{ id: 1, topic: 10, isPublished: true }, { id: 7, topic: 30, isPublished: true }, { id: 8, topic: 30, isPublished: true }, { id: 9, topic: 31, isPublished: true }],
+  }
+  const everyone: TrainerAccessUser = { ...student, trainerAccessMode: 'all', learningCatalogVisibility: 'catalog' }
+
+  it('режим «весь тренажёр» и витрина каталога не открывают и не показывают закрытую тему', () => {
+    const scope = buildTrainerAccess(everyone, [], restricted)
+    expect(scope.accessibleTaskIds).toEqual([1])
+    expect(scope.browseTaskIds).toEqual([1])
+    expect(scope.browseTopicIds).toEqual([10])
+    expect(scope.canAccessTask(7)).toBe(false)
+    expect(scope.canBrowseTask(7)).toBe(false)
+    expect(scope.taskWhere).toEqual({ id: { in: [1] } })
+  })
+
+  it('назначение на тему открывает все её задачи при любом режиме, кроме отключённого тренажёра', () => {
+    for (const user of [everyone, student, { ...student, learningCatalogVisibility: 'catalog' as const }]) {
+      const scope = buildTrainerAccess(user, [rule('trainer-topics', 30)], restricted)
+      expect(scope.accessibleTaskIds).toEqual(expect.arrayContaining([7, 8]))
+      expect(scope.browseTopicIds).toContain(30)
+      expect(scope.hasAccess).toBe(true)
+    }
+    const disabled = buildTrainerAccess({ ...everyone, trainerAccessMode: 'disabled' }, [rule('trainer-topics', 30)], restricted)
+    expect(disabled.accessibleTaskIds).toEqual([])
+    expect(disabled.browseTopicIds).toEqual([])
+  })
+
+  it('назначение одной задачи показывает тему только с этой задачей', () => {
+    const scope = buildTrainerAccess(everyone, [rule('trainer-tasks', 8)], restricted)
+    expect(scope.accessibleTaskIds).toEqual([1, 8])
+    expect(scope.browseTaskIds).toEqual([1, 8])
+    expect(scope.browseTopicIds).toEqual(expect.arrayContaining([10, 30]))
+    expect(scope.canAccessTask(7)).toBe(false)
+  })
+
+  it('запрет задачи внутри назначенной темы и снятие темы с публикации сильнее назначения', () => {
+    const scope = buildTrainerAccess(everyone, [rule('trainer-topics', 30), rule('trainer-tasks', 7, 'deny'), rule('trainer-topics', 31)], restricted)
+    expect(scope.accessibleTaskIds).toEqual([1, 8])
+    expect(scope.canAccessTask(9)).toBe(false)
+    expect(scope.browseTopicIds).not.toContain(31)
+  })
+
+  it('назначение с истёкшим сроком закрытую тему не открывает', () => {
+    const now = Date.parse('2026-11-01T00:00:00Z')
+    const expired = rule('trainer-topics', 30, 'allow', { expiresAt: new Date(now - 1000).toISOString() })
+    const scope = buildTrainerAccess(everyone, [expired], restricted, now)
+    expect(scope.accessibleTaskIds).toEqual([1])
+    expect(scope.browseTopicIds).toEqual([10])
+  })
+
+  it('админ видит закрытые темы без назначений', () => {
+    const scope = buildTrainerAccess({ ...everyone, role: 'admin' }, [], restricted)
+    expect(scope.canAccessTask(7)).toBe(true)
+    expect(scope.browseTopicIds).toContain(30)
+  })
+})

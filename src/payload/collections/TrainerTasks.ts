@@ -29,8 +29,12 @@ const showForModes =
  * Данные скрытого кейса (аргументы и ожидаемое значение) видит только админ: иначе студент
  * подсматривает их через REST и подгоняет решение под проверку. Сервер берёт кейсы с overrideAccess.
  */
+const showForSql = (data: Partial<{ languages: unknown }>): boolean =>
+  Array.isArray(data?.languages) && data.languages.includes('sql')
+
+// Без строки массива Payload спрашивает права для where и sort: иначе скрытые данные подбирались бы фильтром по totalDocs.
 const readUnlessHiddenCase: FieldAccess = ({ req, siblingData }) =>
-  req.user?.role === 'admin' || !(siblingData as { hidden?: boolean } | undefined)?.hidden
+  req.user?.role === 'admin' || (siblingData !== undefined && !(siblingData as { hidden?: boolean }).hidden)
 
 export const TrainerTasks: CollectionConfig = {
   slug: 'trainer-tasks',
@@ -181,8 +185,8 @@ export const TrainerTasks: CollectionConfig = {
       access: { read: ({ req }) => req.user?.role === 'admin' },
     },
     {
-      name: 'runtimeCases', type: 'array', label: 'Проверки Go и frontend', maxRows: 50,
-      admin: { condition: showForModes('program', 'dom'), description: 'Go: stdin и stdout. Frontend: последовательность действий и проверок DOM/CSS. Скрытые данные видны только администратору.' },
+      name: 'runtimeCases', type: 'array', label: 'Проверки Go, Python, SQL и frontend', maxRows: 50,
+      admin: { condition: showForModes('program', 'dom'), description: 'Go и Python: stdin и stdout. SQL: во вводе SQL подготовки данных, в выводе каноническая таблица результата. Frontend: последовательность действий и проверок DOM/CSS. Скрытые данные видны только администратору.' },
       fields: [
         { name: 'name', type: 'text', required: true, label: 'Название проверки' },
         { name: 'hidden', type: 'checkbox', defaultValue: false, label: 'Скрытая проверка' },
@@ -194,6 +198,14 @@ export const TrainerTasks: CollectionConfig = {
           admin: { description: 'Объект {width,height} для проверки адаптивной вёрстки.' } },
         { name: 'path', type: 'text', label: 'Путь страницы Next.js', access: { read: readUnlessHiddenCase } },
       ],
+    },
+    {
+      name: 'sqlCheck', type: 'textarea', label: 'Проверочный запрос SQL',
+      admin: { condition: showForSql, description: 'Для задач на изменение данных и структуры: выполняется после решения, сравнивается его результат. Пусто - сравнивается последний запрос решения.' },
+    },
+    {
+      name: 'sqlOrdered', type: 'checkbox', defaultValue: false, label: 'Порядок строк важен',
+      admin: { condition: showForSql, description: 'Включайте, только если условие требует сортировки. Иначе строки сравниваются без учёта порядка.' },
     },
     {
       name: 'setupCode',

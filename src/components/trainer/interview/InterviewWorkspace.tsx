@@ -227,7 +227,7 @@ export function InterviewWorkspace({ token }: { token: string }) {
         {room.descriptionMd && <aside className="max-h-[70vh] overflow-auto rounded-lg border p-4"><h2 className="mb-4 font-semibold">Условие</h2><div className="prose prose-sm dark:prose-invert max-w-none"><ReactMarkdown>{room.descriptionMd}</ReactMarkdown></div></aside>}
         <section className="min-w-0 overflow-hidden rounded-lg border" aria-label="Общий редактор">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-secondary/40 px-3 py-2">
-            <label className="flex items-center gap-2 text-sm">Язык<select aria-label="Язык решения" className="rounded border bg-background px-2 py-1" value={draft.language} disabled={!!room.endedAt || !!state.conflict || state.blocked} onChange={(event) => changeLanguage(event.target.value)}>{LANGUAGE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+            <label className="flex items-center gap-2 text-sm">Язык<select aria-label="Язык решения" className="rounded border bg-background px-2 py-1" value={draft.language} disabled={!!room.endedAt || !!state.conflict || state.blocked} onChange={(event) => changeLanguage(event.target.value)}>{LANGUAGE_OPTIONS.filter((option) => option.value !== 'sql').map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
             <span role="status" className="text-xs text-muted-foreground">{state.saving ? 'Сохраняем…' : state.conflict ? 'Нужно выбрать версию' : state.dirty ? 'Есть несохранённые изменения' : 'Код сохранён'}</span>
           </div>
           {isFrontendLanguage(draft.language)

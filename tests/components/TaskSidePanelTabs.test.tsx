@@ -128,6 +128,35 @@ describe('вкладка «Тесты»', () => {
     expect(screen.getByText(/не показываются/)).toBeInTheDocument()
   })
 
+  it('SQL показывает подготовку данных, проверочный запрос и ожидаемую таблицу, скрытые наборы только числом', async () => {
+    renderPanel({
+      checkMode: 'program',
+      languages: ['sql'],
+      sqlCheck: 'SELECT id, name FROM departments ORDER BY id',
+      sqlOrdered: true,
+      runtimeCases: [
+        { name: 'Данные из условия', hidden: false, input: 'CREATE TABLE departments (id integer);', expected: ' id\n----\n 1\n(1 строка)' },
+        { name: 'Скрытый набор', hidden: true, input: 'секретные строки', expected: 'секретный ответ' },
+      ],
+      hiddenCaseCount: 1,
+    })
+    await openTab('Тесты')
+
+    expect(screen.getByText(/на отдельной свежей базе/)).toHaveTextContent('в указанном порядке')
+    expect(screen.queryByText(/stdin/)).not.toBeInTheDocument()
+    const first = screen.getByRole('heading', { name: 'Данные из условия' }).closest('li') as HTMLElement
+    expect(within(first).getByText('CREATE TABLE departments (id integer);')).toBeInTheDocument()
+    expect(within(first).getByText('SELECT id, name FROM departments ORDER BY id')).toBeInTheDocument()
+    expect(screen.queryByText(/секретн/)).not.toBeInTheDocument()
+  })
+
+  it('SQL без требования к порядку так и говорит', async () => {
+    renderPanel({ checkMode: 'program', languages: ['sql'], runtimeCases: [], hiddenCaseCount: 1 })
+    await openTab('Тесты')
+
+    expect(screen.getByText(/на отдельной свежей базе/)).toHaveTextContent('порядок строк не важен')
+  })
+
   it('проверки в браузере расписаны по шагам: действие, ожидание, стиль и атрибут', async () => {
     renderPanel({
       checkMode: 'dom',
@@ -247,6 +276,14 @@ describe('вкладка «Разбор»', () => {
     expect(code.closest('code')).toHaveClass('language-go')
     await userEvent.click(screen.getByRole('button', { name: 'Python' }))
     expect(screen.getByText('Эталонное решение для этого языка не задано.')).toBeInTheDocument()
+  })
+
+  it('эталон SQL подсвечивается как SQL', async () => {
+    vi.mocked(fetch).mockResolvedValue(solutionResponse({ solutionCode: 'SELECT name FROM departments' }))
+    renderPanel({ languages: ['sql'], checkMode: 'program' })
+    await openTab('Разбор')
+
+    expect((await screen.findByText('SELECT name FROM departments')).closest('code')).toHaveClass('language-sql')
   })
 
   it('эталон Python подписан своим языком', async () => {

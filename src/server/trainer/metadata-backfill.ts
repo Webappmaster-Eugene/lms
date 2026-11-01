@@ -2,7 +2,7 @@ import 'server-only'
 
 import { sql } from '@payloadcms/db-postgres'
 import { APIError, commitTransaction, initTransaction, killTransaction, type PayloadRequest } from 'payload'
-import { TRAINER_CATALOG } from '@/data/trainer'
+import { TRAINER_CORE_CATALOG } from '@/data/trainer/core'
 import { enrichTrainerMetadata } from '@/data/trainer/enrich-metadata'
 import type { TrainerTaskSeed, TrainerTopicSeed } from '@/data/trainer/types'
 import { TRAINER_TAGS, type TrainerCompany, type TrainerTag } from '@/lib/trainer/constants'
@@ -11,7 +11,8 @@ import { collectAllPages } from '@/lib/paginate'
 import { relationId } from '@/lib/relation-id'
 import type { TrainerTask, TrainerTopic } from '@/payload-types'
 
-const seeds = new Map(TRAINER_CATALOG.flatMap((topic) => topic.tasks.map((task) => [task.slug, { topic, task }] as const)))
+// У SQL-задач нет компаний и источников, их теги уже в базе: сверять с каталогом нечего.
+const seeds = new Map(TRAINER_CORE_CATALOG.flatMap((topic) => topic.tasks.map((task) => [task.slug, { topic, task }] as const)))
 const selection = {
   slug: true, title: true, topic: true, difficulty: true, checkMode: true, languages: true,
   tags: true, companies: true, companyEvidence: true, interviewFormat: true, recommendedMinutes: true, sourceUrl: true,

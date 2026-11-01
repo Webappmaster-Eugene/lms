@@ -24,6 +24,7 @@ try {
     await run('docker', ['build', '--target', 'go-job', '-t', process.env.TRAINER_GO_JOB_IMAGE || 'lms-trainer-go:local', 'trainer-runtime'], env)
     await run('docker', ['build', '--target', 'python-job', '-t', process.env.TRAINER_PYTHON_JOB_IMAGE || 'lms-trainer-python:local', 'trainer-runtime'], env)
     await run('docker', ['build', '--target', 'frontend-job', '-t', process.env.TRAINER_FRONTEND_JOB_IMAGE || 'lms-trainer-frontend:local', 'trainer-runtime'], env)
+    await run('docker', ['build', '--target', 'sql-job', '-t', process.env.TRAINER_SQL_JOB_IMAGE || 'lms-trainer-sql:local', 'trainer-runtime'], env)
     await run('docker', ['build', '-f', 'trainer-runtime/Dockerfile.next', '-t', process.env.TRAINER_NEXT_JOB_IMAGE || 'lms-trainer-next:local', 'trainer-runtime'], env)
   }
   const checks = (await readdir('trainer-runtime/tests')).filter((name) => name.endsWith('.test.mjs')).map((name) => `trainer-runtime/tests/${name}`)

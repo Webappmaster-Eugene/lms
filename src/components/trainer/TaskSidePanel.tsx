@@ -30,6 +30,8 @@ type TaskSidePanelProps = {
   entryName: string
   languages: TrainerLanguage[]
   checkMode: string
+  sqlCheck?: string
+  sqlOrdered?: boolean
 }
 
 type Tab = 'description' | 'tests' | 'hints' | 'solution'
@@ -45,6 +47,8 @@ export function TaskSidePanel({
   entryName,
   languages,
   checkMode,
+  sqlCheck,
+  sqlOrdered,
 }: TaskSidePanelProps) {
   const [tab, setTab] = useState<Tab>('description')
   const [solution, setSolution] = useState<SolutionResponse | null>(null)
@@ -116,6 +120,7 @@ export function TaskSidePanel({
             testCode={testCode}
             entryName={entryName}
             checkMode={checkMode}
+            sql={languages.includes('sql') ? { check: sqlCheck, ordered: sqlOrdered === true } : undefined}
           />
         )}
 
@@ -147,6 +152,7 @@ function TestsTab({
   testCode,
   entryName,
   checkMode,
+  sql,
 }: {
   publicCases: TrainerCaseSpec[]
   runtimeCases?: RuntimeCase[]
@@ -154,6 +160,7 @@ function TestsTab({
   testCode: string
   entryName: string
   checkMode: string
+  sql?: { check?: string; ordered: boolean }
 }) {
   if (checkMode === 'types') {
     return (
@@ -178,7 +185,9 @@ function TestsTab({
     return (
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          {checkMode === 'program'
+          {sql
+            ? `Запрос выполняется на отдельной свежей базе для каждого набора данных. Сравниваются названия столбцов и строки результата${sql.ordered ? ' в указанном порядке' : ', порядок строк не важен'}.`
+            : checkMode === 'program'
             ? 'Программа читает входные данные из stdin и печатает ответ в stdout. Каждый пример запускается отдельно; вывод сравнивается с ожидаемым.'
             : 'Проверки выполняются в браузере: находят элементы по CSS-селектору, выполняют действия и проверяют состояние страницы. Шаги каждого примера идут по порядку.'}
         </p>
@@ -189,7 +198,13 @@ function TestsTab({
               {visibleCases.map((testCase, index) => (
                 <li key={index} className="space-y-2 rounded-lg border border-border bg-background p-3">
                   <h4 className="text-sm font-medium text-foreground">{testCase.name}</h4>
-                  {checkMode === 'program' ? (
+                  {sql ? (
+                    <>
+                      <RuntimeText label="Подготовка данных" value={testCase.input ?? ''} />
+                      {sql.check && <RuntimeText label="После решения выполняется проверочный запрос" value={sql.check} />}
+                      <RuntimeText label="Ожидаемый результат" value={testCase.expected ?? ''} />
+                    </>
+                  ) : checkMode === 'program' ? (
                     <>
                       <RuntimeText label="Входные данные (stdin)" value={testCase.input ?? ''} />
                       <RuntimeText label="Ожидаемый вывод (stdout)" value={testCase.expected ?? ''} />
@@ -390,7 +405,7 @@ function SolutionTab({
         </div>
       ) : code ? (
         <div className="prose prose-sm dark:prose-invert min-w-0 max-w-none">
-          <MarkdownRenderer content={codeMarkdown(code, language === 'python' ? 'python' : language === 'go' ? 'go' : language === 'ts' ? 'typescript' : 'javascript')} />
+          <MarkdownRenderer content={codeMarkdown(code, language === 'python' ? 'python' : language === 'go' ? 'go' : language === 'sql' ? 'sql' : language === 'ts' ? 'typescript' : 'javascript')} />
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">Эталонное решение для этого языка не задано.</p>

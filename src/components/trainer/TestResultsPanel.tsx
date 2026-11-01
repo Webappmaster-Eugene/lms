@@ -20,6 +20,8 @@ type TestResultsPanelProps = {
   /** Подпись источника: браузер или сервер. */
   origin: 'client' | 'server' | null
   onSelectLine?: (line: number) => void
+  /** SQL: вывод - это таблица результата, ради неё и нажимают «Запустить». */
+  queryOutput?: boolean
 }
 
 const STATUS_TEXT: Record<TrainerRunResult['status'], string> = {
@@ -141,8 +143,9 @@ export function TestResultsPanel({
   isRunning,
   origin,
   onSelectLine,
+  queryOutput = false,
 }: TestResultsPanelProps) {
-  const [tab, setTab] = useState<'tests' | 'console'>('tests')
+  const [tab, setTab] = useState<'tests' | 'console'>(queryOutput ? 'console' : 'tests')
 
   if (isRunning) {
     return (
@@ -229,7 +232,7 @@ export function TestResultsPanel({
               Тесты{result.tests.length > 0 ? ` (${result.tests.length})` : ''}
             </TabButton>
             <TabButton active={tab === 'console'} onClick={() => setTab('console')}>
-              Консоль{hasConsole ? ` (${result.consoleOutput.length})` : ''}
+              {queryOutput ? 'Результат запроса' : `Консоль${hasConsole ? ` (${result.consoleOutput.length})` : ''}`}
             </TabButton>
           </div>
 
@@ -246,7 +249,7 @@ export function TestResultsPanel({
             </ul>
           ) : (
             <pre className="max-h-80 overflow-auto px-3 py-2 font-mono text-xs text-foreground">
-              {hasConsole ? result.consoleOutput.join('\n') : 'Вывода не было'}
+              {hasConsole ? result.consoleOutput.join('\n') : queryOutput ? 'Запрос не вернул таблицу' : 'Вывода не было'}
             </pre>
           )}
         </>

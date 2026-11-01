@@ -3,7 +3,7 @@ import { TrainerSpecError } from './spec'
 import type { TrainerLanguage } from './types'
 
 export type FrontendLanguage = 'html' | 'react' | 'next'
-export type RuntimeLanguage = 'go' | 'python' | FrontendLanguage
+export type RuntimeLanguage = 'go' | 'python' | 'sql' | FrontendLanguage
 export type BrowserCheck = {
   selector: string
   action?: 'click' | 'fill' | 'press'
@@ -32,8 +32,14 @@ export function isFrontendLanguage(value: unknown): value is FrontendLanguage {
   return value === 'html' || value === 'react' || value === 'next'
 }
 
-export function isProgramLanguage(value: unknown): value is 'go' | 'python' {
-  return value === 'go' || value === 'python'
+export function isProgramLanguage(value: unknown): value is 'go' | 'python' | 'sql' {
+  return value === 'go' || value === 'python' || value === 'sql'
+}
+
+/** Проверочный запрос и порядок строк уходят в gateway только для SQL. */
+export function sqlRuntimeOptions(language: string, task: { sqlCheck?: string | null; sqlOrdered?: boolean | null }): { check?: string; ordered?: boolean } {
+  if (language !== 'sql') return {}
+  return { ...(task.sqlCheck?.trim() ? { check: task.sqlCheck } : {}), ordered: task.sqlOrdered === true }
 }
 
 export function isRuntimeLanguage(value: unknown): value is RuntimeLanguage {

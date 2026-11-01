@@ -27,6 +27,8 @@ export type TrainerTaskLike = {
   starterFiles?: unknown
   solutionFiles?: unknown
   runtimeCases?: unknown
+  sqlCheck?: string | null
+  sqlOrdered?: boolean | null
   solutionCode?: string | null
   solutionCodeTs?: string | null
   solutionCodePython?: string | null
@@ -63,7 +65,7 @@ export function taskLanguages(task: TrainerTaskLike): TrainerLanguage[] {
     : task.languages
       ? [task.languages]
       : []
-  const languages = raw.filter((item): item is TrainerLanguage => item === 'js' || item === 'ts' || item === 'go' || item === 'python' || item === 'html' || item === 'react' || item === 'next')
+  const languages = raw.filter((item): item is TrainerLanguage => item === 'js' || item === 'ts' || item === 'go' || item === 'python' || item === 'sql' || item === 'html' || item === 'react' || item === 'next')
   return languages.length > 0 ? languages : ['js']
 }
 
@@ -138,7 +140,7 @@ export function buildExecSpec(
   language: TrainerLanguage,
   userCode: string,
 ): TrainerExecSpec {
-  if (task.checkMode === 'program' || task.checkMode === 'dom') throw new TrainerSpecError('Эта задача выполняется в отдельной среде Go/Python/frontend')
+  if (task.checkMode === 'program' || task.checkMode === 'dom') throw new TrainerSpecError('Эта задача выполняется в отдельной среде Go/Python/SQL/frontend')
   const checkMode =
     task.checkMode === 'unit' || task.checkMode === 'types' ? task.checkMode : 'stdout'
 

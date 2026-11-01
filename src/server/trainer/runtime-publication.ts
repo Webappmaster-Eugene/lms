@@ -2,12 +2,13 @@ import 'server-only'
 
 import { sql } from '@payloadcms/db-postgres'
 import { APIError, commitTransaction, initTransaction, killTransaction, type PayloadRequest } from 'payload'
-import { TRAINER_CATALOG } from '@/data/trainer'
+import { TRAINER_CORE_CATALOG } from '@/data/trainer/core'
 import { collectAllPages } from '@/lib/paginate'
 import { relationId } from '@/lib/relation-id'
 import type { TrainerTask } from '@/payload-types'
 
-const runtimeSeeds = TRAINER_CATALOG.flatMap((topic) => topic.tasks).filter((task) => task.checkMode === 'program' || task.checkMode === 'dom')
+// SQL-темы публикуются своим скриптом и только по назначению, поэтому каталог здесь без них.
+const runtimeSeeds = TRAINER_CORE_CATALOG.flatMap((topic) => topic.tasks).filter((task) => task.checkMode === 'program' || task.checkMode === 'dom')
 const runtimeSlugs = runtimeSeeds.map((task) => task.slug)
 const runtimeModes = new Map(runtimeSeeds.map((task) => [task.slug, task.checkMode]))
 

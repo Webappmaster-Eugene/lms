@@ -82,6 +82,16 @@ export const TrainerTopics: CollectionConfig = {
       },
     },
     {
+      name: 'assignedOnly',
+      type: 'checkbox',
+      defaultValue: false,
+      label: 'Только по назначению',
+      admin: {
+        position: 'sidebar',
+        description: 'Тему видят только ученики с явным назначением на неё или её задачи. Режим «весь тренажёр» её не открывает.',
+      },
+    },
+    {
       name: 'isPublished',
       type: 'checkbox',
       defaultValue: false,

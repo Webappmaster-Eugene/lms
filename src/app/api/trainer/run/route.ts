@@ -4,7 +4,7 @@ import config from '@payload-config'
 
 import { readTrainerBody, TrainerInputError } from '@/lib/trainer/request-body'
 import { TRAINER_LIMITS } from '@/lib/trainer/constants'
-import { isRuntimeLanguage, isProgramLanguage, isFrontendLanguage, parseFrontendFiles, runtimeCases } from '@/lib/trainer/runtime-spec'
+import { isRuntimeLanguage, isProgramLanguage, isFrontendLanguage, parseFrontendFiles, runtimeCases, sqlRuntimeOptions } from '@/lib/trainer/runtime-spec'
 import { parseTaskId } from '@/lib/trainer/task-id'
 import { supportsLanguage, TrainerSpecError } from '@/lib/trainer/spec'
 import { getTrainerAccess } from '@/server/trainer-access'
@@ -38,6 +38,9 @@ export async function POST(request: Request): Promise<Response> {
   try {
     if (isFrontendLanguage(language)) parseFrontendFiles(body.code)
     const cases = runtimeCases(task, true)
+    // У SQL свой ввод - это целая база; пары «stdin/stdout» к нему не применимы.
+    if (language === 'sql' && body.customCases !== undefined) throw new TrainerSpecError('Для SQL-задач собственные проверки не поддерживаются')
+    if (language === 'sql' && cases.length === 0) throw new TrainerSpecError('У задачи нет открытого примера: проверьте решение кнопкой «Отправить»')
     if (isProgramLanguage(language) && body.customCases !== undefined) {
       const custom = runtimeCases({ runtimeCases: body.customCases }, true)
       if (custom.length > 10 || custom.some((item) => item.expected === undefined || item.checks || item.path || item.viewport || (item.input?.length ?? 0) + (item.expected?.length ?? 0) > 2000)) throw new TrainerSpecError('Добавьте до 10 собственных проверок: ввод и ожидаемый вывод до 2000 символов')
@@ -47,7 +50,7 @@ export async function POST(request: Request): Promise<Response> {
     const timeLimitMs = Math.min(Math.max(task.timeLimitMs ?? 5000, 500), TRAINER_LIMITS.maxTimeLimitMs)
     const output = isFrontendLanguage(language)
       ? await runRuntimePreview({ language, code: body.code, cases, timeLimitMs })
-      : { result: await runRuntime({ language, code: body.code, cases, timeLimitMs, allowNoTests: true }) }
+      : { result: await runRuntime({ language, code: body.code, cases, timeLimitMs, allowNoTests: language !== 'sql', ...sqlRuntimeOptions(language, task) }) }
     return NextResponse.json(output, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     if (error instanceof TrainerSpecError) return NextResponse.json({ error: error.message }, { status: 400 })

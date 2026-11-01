@@ -3,7 +3,8 @@ import { createLocalReq, type Payload } from 'payload'
 
 import { POST as run } from '@/app/api/trainer/run/route'
 import { POST as submit } from '@/app/api/trainer/submit/route'
-import { createAdmin, createStudent, createSumTask, getTestPayload, login } from '../integration/helpers/payload'
+import { createAdmin, createStudent, createSumTask, createTopic, getTestPayload, login } from '../integration/helpers/payload'
+import { canonicalTable } from '../../trainer-runtime/sql-result.mjs'
 import type { TrainerTask } from '@/payload-types'
 import type { SubmitResponse } from '@/lib/trainer/api'
 import type { TrainerLanguage, TrainerRunResult } from '@/lib/trainer/types'
@@ -13,10 +14,17 @@ let go: TrainerTask
 let html: TrainerTask
 let react: TrainerTask
 let python: TrainerTask
+let sqlTask: TrainerTask
+let closedSql: TrainerTask
 
 const sum = 'package main\nimport "fmt"\nfunc main(){var a,b int;fmt.Scan(&a,&b);fmt.Println(a+b)}'
 const fixed = 'package main\nimport "fmt"\nfunc main(){fmt.Println(3)}'
 const pythonSum = 'import sys\na, b, *_ = sys.stdin.read().split()\nprint(int(a) + int(b))'
+const sqlTotal = 'SELECT sum(n) AS total FROM numbers'
+const sqlCases = [
+  { name: 'Данные из условия', hidden: false, input: 'CREATE TABLE numbers (n integer); INSERT INTO numbers VALUES (1), (2);', expected: canonicalTable({ columns: ['total'], types: [20], rows: [['3']] }) },
+  { name: 'PRIVATE_SQL_CASE', hidden: true, input: "CREATE TABLE numbers (n integer); INSERT INTO numbers VALUES (40), (2); COMMENT ON TABLE numbers IS 'PRIVATE_SQL_DATA';", expected: canonicalTable({ columns: ['total'], types: [20], rows: [['42']] }) },
+]
 const htmlCode = JSON.stringify({ 'index.html': '<main><h1>Команда</h1><style>main {display:flex}</style></main>' })
 const reactCode = JSON.stringify({ 'App.jsx': 'import {useState} from "react"; export default function App(){const[n,setN]=useState(0);return <main><output>{n}</output><button onClick={()=>setN(n+1)}>Плюс</button></main>}' })
 
@@ -56,6 +64,8 @@ beforeAll(async () => {
     { name: 'Пример Python', hidden: false, input: '1 2', expected: '3' },
     { name: 'PRIVATE_PYTHON_CASE', hidden: true, input: '931399 57853 PRIVATE_PYTHON_INPUT', expected: '989252' },
   ] })
+  sqlTask = await createSumTask(payload, { checkMode: 'program', languages: ['sql'], pointsReward: 31, entryName: null, testCases: [], starterCode: '-- запрос\n', solutionCode: sqlTotal, runtimeCases: sqlCases })
+  closedSql = await createSumTask(payload, { topic: (await createTopic(payload, { category: 'sql', assignedOnly: true })).id, checkMode: 'program', languages: ['sql'], entryName: null, testCases: [], starterCode: '-- запрос\n', solutionCode: sqlTotal, runtimeCases: sqlCases })
 })
 afterAll(async () => {
   vi.unstubAllEnvs()
@@ -187,6 +197,41 @@ describe('route handlers → HTTP gateway → изолят → настояща�
     expect((await progress(user.id, html.id)).totalDocs).toBe(0)
     expect((await ledger(user.id, go.id)).totalDocs).toBe(0)
     expect((await payload.findByID({ collection: 'users', id: user.id })).totalPoints).toBe(0)
+  })
+
+  it('SQL: «Запустить» показывает таблицу и не пишет прогресс, собственные проверки не принимаются', async () => {
+    const { user, token } = await student()
+    const response = await run(request(token, sqlTask, 'sql', sqlTotal))
+    expect(response.status).toBe(200)
+    const body = await response.json() as { result: TrainerRunResult }
+    expect(body.result.status).toBe('passed')
+    expect(body.result.tests).toHaveLength(1)
+    expect(body.result.consoleOutput).toEqual([' total', '-------', ' 3', '(1 строка)'])
+    expect((await run(request(token, sqlTask, 'sql', sqlTotal, { customCases: [{ name: 'Мой', input: '', expected: '' }] }))).status).toBe(400)
+    expect((await progress(user.id, sqlTask.id)).totalDocs).toBe(0)
+  })
+
+  it('SQL: подгонка под пример не проходит скрытый набор, верный запрос засчитывается однократно', async () => {
+    const { user, token } = await student()
+    const forged = await submit(request(token, sqlTask, 'sql', 'SELECT 3 AS total', { result: { status: 'passed' } }))
+    const failed = await forged.json() as SubmitResponse
+    expect(failed.result.status).toBe('failed')
+    expect(failed.completed).toBe(false)
+    for (const secret of ['PRIVATE_SQL_CASE', 'PRIVATE_SQL_DATA']) expect(JSON.stringify(failed).includes(secret)).toBe(false)
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const response = await submit(request(token, sqlTask, 'sql', sqlTotal))
+      expect(response.status).toBe(200)
+      expect(((await response.json()) as SubmitResponse).result.status).toBe('passed')
+    }
+    expect((await progress(user.id, sqlTask.id)).docs[0]).toMatchObject({ language: 'sql', verifiedBy: 'server', isCompleted: true, attempts: 3, failedAttempts: 1 })
+    expect((await ledger(user.id, sqlTask.id)).docs).toEqual([expect.objectContaining({ amount: 31 })])
+  })
+
+  it('SQL: тема по назначению закрыта для режима «весь тренажёр» до выполнения запроса', async () => {
+    const { user, token } = await student()
+    expect((await run(request(token, closedSql, 'sql', sqlTotal))).status).toBe(403)
+    expect((await submit(request(token, closedSql, 'sql', sqlTotal))).status).toBe(403)
+    expect((await progress(user.id, closedSql.id)).totalDocs).toBe(0)
   })
 
   it('auth, закрытые задачи и несовместимые языки отклоняются до выполнения', async () => {

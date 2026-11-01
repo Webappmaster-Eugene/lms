@@ -19,6 +19,7 @@ export const LANGUAGE_OPTIONS: ReadonlyArray<SelectOption<TrainerLanguage>> = [
   { label: 'TypeScript', value: 'ts' },
   { label: 'Go', value: 'go' },
   { label: 'Python', value: 'python' },
+  { label: 'SQL (PostgreSQL)', value: 'sql' },
   { label: 'HTML / CSS', value: 'html' },
   { label: 'React', value: 'react' },
   { label: 'Next.js', value: 'next' },
@@ -29,6 +30,7 @@ export const LANGUAGE_LABELS: Readonly<Record<TrainerLanguage, string>> = {
   ts: 'TypeScript',
   go: 'Go',
   python: 'Python',
+  sql: 'SQL',
   html: 'HTML / CSS',
   react: 'React',
   next: 'Next.js',
@@ -40,6 +42,7 @@ export const MONACO_LANGUAGE: Readonly<Record<TrainerLanguage, string>> = {
   ts: 'typescript',
   go: 'go',
   python: 'python',
+  sql: 'sql',
   html: 'html',
   react: 'typescript',
   next: 'typescript',
@@ -49,7 +52,7 @@ export const CHECK_MODE_OPTIONS: ReadonlyArray<SelectOption<TrainerCheckMode>> =
   { label: 'Сравнение вывода (легаси)', value: 'stdout' },
   { label: 'Юнит-тесты', value: 'unit' },
   { label: 'Проверка типов TypeScript', value: 'types' },
-  { label: 'Go / Python: ввод и вывод программы', value: 'program' },
+  { label: 'Go / Python / SQL: программа или запрос на данных', value: 'program' },
   { label: 'Frontend: проверки в браузере', value: 'dom' },
 ] as const
 
@@ -122,6 +125,15 @@ export const TRAINER_TAGS = [
   'backtracking',
   'livecoding',
   'cancelation',
+  'sql',
+  'sql-select',
+  'sql-functions',
+  'sql-aggregates',
+  'sql-joins',
+  'sql-subqueries',
+  'sql-dml',
+  'sql-ddl',
+  'sql-transactions',
 ] as const
 
 export type TrainerTag = (typeof TRAINER_TAGS)[number]
@@ -175,6 +187,15 @@ export const TAG_LABELS: Readonly<Record<TrainerTag, string>> = {
   'backtracking': 'Поиск с возвратом',
   'livecoding': 'Лайвкодинг',
   'cancelation': 'Отмена операций',
+  'sql': 'SQL',
+  'sql-select': 'Выборка и условия',
+  'sql-functions': 'Функции SQL',
+  'sql-aggregates': 'Группировка и агрегаты',
+  'sql-joins': 'Соединения таблиц',
+  'sql-subqueries': 'Подзапросы',
+  'sql-dml': 'Изменение данных',
+  'sql-ddl': 'Структура таблиц',
+  'sql-transactions': 'Транзакции',
 }
 
 export const TAG_OPTIONS: ReadonlyArray<SelectOption<TrainerTag>> = TRAINER_TAGS.map((tag) => ({
@@ -235,6 +256,7 @@ export const TOPIC_CATEGORIES = [
   'go',
   'frontend',
   'python',
+  'sql',
 ] as const
 
 export type TrainerTopicCategory = (typeof TOPIC_CATEGORIES)[number]
@@ -249,6 +271,7 @@ export const TOPIC_CATEGORY_LABELS: Readonly<Record<TrainerTopicCategory, string
   webapi: 'Web API',
   go: 'Go',
   python: 'Python',
+  sql: 'SQL и PostgreSQL',
   frontend: 'HTML, CSS, React и Next.js',
 }
 

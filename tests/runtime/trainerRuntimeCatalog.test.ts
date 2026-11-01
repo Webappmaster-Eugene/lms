@@ -2,11 +2,19 @@ import { beforeAll, describe, expect, it } from 'vitest'
 
 import { TRAINER_CATALOG } from '@/data/trainer'
 import { flattenCatalog, type TrainerTaskSeed } from '@/data/trainer/types'
-import { isRuntimeLanguage, runtimeCases, type RuntimeLanguage } from '@/lib/trainer/runtime-spec'
+import { isRuntimeLanguage, runtimeCases, sqlRuntimeOptions, type RuntimeLanguage } from '@/lib/trainer/runtime-spec'
 import type { TrainerRunResult } from '@/lib/trainer/types'
 
+// Весь SQL-каталог проверяет tests/unit/trainer/sqlCatalog.test.ts тем же движком внутри процесса.
+// Здесь из каждой темы берутся первая задача и первая задача с проверочным запросом:
+// этого хватает, чтобы поймать расхождение настоящей среды, а прогон укладывается во время CI.
+const sqlSample = new Set(TRAINER_CATALOG.filter((topic) => topic.category === 'sql').flatMap((topic) => [
+  topic.tasks[0]?.slug,
+  topic.tasks.find((task) => task.sqlCheck)?.slug,
+]).filter((slug): slug is string => Boolean(slug)))
+
 const entries = flattenCatalog(TRAINER_CATALOG).flatMap(({ topic, task }) =>
-  task.languages.filter(isRuntimeLanguage).map(language => ({ topic, task, language })),
+  task.languages.filter(isRuntimeLanguage).filter((language) => language !== 'sql' || sqlSample.has(task.slug)).map(language => ({ topic, task, language })),
 )
 
 let runtimeUrl: string
@@ -23,6 +31,7 @@ function source(task: TrainerTaskSeed, language: RuntimeLanguage, solution: bool
     if (!code) throw new Error(`У ${task.slug} отсутствует ${solution ? 'эталон' : 'шаблон'} Python`)
     return code
   }
+  if (language === 'sql') return solution ? task.solutionCode : task.starterCode
   const files = solution ? task.solutionFiles : task.starterFiles
   if (!files) throw new Error(`У ${task.slug} отсутствуют ${solution ? 'эталонные' : 'стартовые'} файлы`)
   return JSON.stringify(files)
@@ -40,6 +49,7 @@ async function run(task: TrainerTaskSeed, language: RuntimeLanguage, code: strin
       code,
       cases: runtimeCases(task),
       timeLimitMs: task.timeLimitMs ?? 5000,
+      ...sqlRuntimeOptions(language, task),
     }),
     signal: AbortSignal.timeout(240000),
   })
@@ -69,7 +79,7 @@ describe('каталог программ и frontend в настоящей ср
   })
 
   it('новые задачи подключены к основному каталогу', () => {
-    expect(new Set(entries.map(entry => entry.language))).toEqual(new Set(['go', 'python', 'html', 'react', 'next']))
+    expect(new Set(entries.map(entry => entry.language))).toEqual(new Set(['go', 'python', 'sql', 'html', 'react', 'next']))
     expect(new Set(entries.map(entry => `${entry.task.slug}:${entry.language}`)).size).toBe(entries.length)
   })
 

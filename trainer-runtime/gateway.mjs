@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import { explainMismatch, previewTable } from './sql-result.mjs'
 
 export class InfrastructureError extends Error {}
 
@@ -7,6 +8,7 @@ const images = {
   go: process.env.TRAINER_GO_JOB_IMAGE || 'lms-trainer-go:local',
   python: process.env.TRAINER_PYTHON_JOB_IMAGE || 'lms-trainer-python:local',
   frontend: process.env.TRAINER_FRONTEND_JOB_IMAGE || 'lms-trainer-frontend:local',
+  sql: process.env.TRAINER_SQL_JOB_IMAGE || 'lms-trainer-sql:local',
 }
 
 export function sandboxArgs(name, image, memory = '512m') {
@@ -121,7 +123,47 @@ async function runPython(job) {
   return result(tests.every((test) => test.passed) ? 'passed' : 'failed', tests, started)
 }
 
+const SQL_MESSAGES = {
+  timeout: 'Превышен лимит времени',
+  memory: 'Превышен лимит памяти: запрос строит слишком большой результат',
+  empty: 'Решение не вернуло таблицу: последним должен идти запрос, который возвращает строки',
+}
+
+function sqlFailure(item, outcome) {
+  if (outcome.status === 'error') return `Ошибка SQL. ${outcome.error ?? ''}`.trim()
+  return SQL_MESSAGES[outcome.status] ?? explainMismatch(item.expected, outcome.table ?? '')
+}
+
+async function runSql(job) {
+  const started = performance.now()
+  // Один контейнер на весь прогон: старт PGlite дороже самого запроса.
+  const input = { code: job.code, check: job.check, ordered: job.ordered, timeLimitMs: job.timeLimitMs, cases: job.cases.map((item) => ({ setup: item.input ?? '' })) }
+  const executed = await dockerJob(images.sql, input, { timeoutMs: Math.min(115000, 15000 + job.cases.length * (job.timeLimitMs + 4000)), maxBytes: 2 * 1024 * 1024, memory: '768m' })
+  if (executed.timedOut || executed.exitCode === 124) return result('timeout', [], started, 'Превышен общий лимит времени проверки')
+  if (executed.outputLimit) return result('error', [], started, 'Результат запроса слишком большой')
+  if (executed.exitCode === 137) return result('error', [], started, SQL_MESSAGES.memory)
+  if (executed.exitCode !== 0) throw new InfrastructureError('SQL runtime завершился некорректно')
+  let outcomes
+  try { outcomes = JSON.parse(executed.stdout).results } catch { throw new InfrastructureError('SQL runtime вернул некорректный ответ') }
+  if (!Array.isArray(outcomes) || outcomes.length !== job.cases.length) throw new InfrastructureError('SQL runtime вернул не все кейсы')
+  const tests = job.cases.map((item, index) => {
+    const outcome = outcomes[index] ?? {}
+    const passed = outcome.status === 'ok' && typeof outcome.table === 'string' && outcome.table.trimEnd() === item.expected.trimEnd()
+    return {
+      name: item.hidden ? `Скрытый тест ${index + 1}` : item.name, hidden: item.hidden, passed, durationMs: 0,
+      ...(!item.hidden ? { expected: previewTable(item.expected), ...(typeof outcome.table === 'string' ? { actual: previewTable(outcome.table) } : {}), ...(Number.isInteger(outcome.line) ? { line: outcome.line } : {}) } : {}),
+      ...(!passed ? { message: item.hidden ? 'Скрытая проверка не пройдена' : sqlFailure(item, outcome) } : {}),
+    }
+  })
+  // Полный результат первой открытой проверки уходит в вывод: поля теста обрезаются интерфейсом.
+  const firstPublic = job.cases.findIndex((item) => !item.hidden)
+  const shown = firstPublic >= 0 ? outcomes[firstPublic] : undefined
+  const consoleOutput = shown?.status === 'ok' ? shown.table.split('\n').slice(0, 120) : shown ? [sqlFailure(job.cases[firstPublic], shown)] : []
+  return result(tests.every((test) => test.passed) ? 'passed' : 'failed', tests, started, undefined, consoleOutput)
+}
+
 export async function runJob(job, preview = false) {
+  if (job.language === 'sql') return runSql(job)
   if (job.language === 'next') {
     const next = await import('./next-runtime.mjs')
     return preview ? next.previewNext(job, dockerJob) : next.runNext(job, dockerJob)

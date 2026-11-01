@@ -29,6 +29,7 @@ function formatFor(topic: TrainerTopicSeed, task: TrainerTaskSeed): InterviewFor
 }
 
 function defaultTags(topic: TrainerTopicSeed, task: TrainerTaskSeed): TrainerTag[] {
+  if (task.languages.includes('sql')) return ['sql']
   if (task.languages.includes('python')) return ['python', 'algorithms']
   if (task.languages.includes('go')) return ['go', 'arrays']
   if (task.languages.includes('react')) return ['react', 'state']

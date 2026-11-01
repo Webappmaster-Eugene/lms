@@ -167,7 +167,7 @@ async function executeInterviewRequest(request: Request, action: Action, token?:
         if (!topics.docs.length) throw new InterviewError('Задача не найдена', 404)
         title = task.title
         descriptionMd = task.descriptionMd ?? (task.description ? lexicalToMarkdown(task.description) : '')
-        language = taskLanguages(task)[0] ?? 'js'
+        language = interviewLanguage(taskLanguages(task)[0] ?? 'js')
         code = starterCodeFor(task, language)
         setupCode = task.setupCode ?? ''
         setupTypes = task.setupTypes ?? ''

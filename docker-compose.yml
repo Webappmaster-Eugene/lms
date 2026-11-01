@@ -175,6 +175,13 @@ services:
       context: ./trainer-runtime
       target: frontend-job
 
+  lms-mentor-trainer-sql-image:
+    <<: *trainer-image
+    image: ${TRAINER_SQL_JOB_IMAGE:-lms-trainer-sql:local}
+    build:
+      context: ./trainer-runtime
+      target: sql-job
+
   lms-mentor-trainer-next-image:
     <<: *trainer-image
     image: ${TRAINER_NEXT_JOB_IMAGE:-lms-trainer-next:local}
@@ -223,6 +230,8 @@ services:
         condition: service_started
       lms-mentor-trainer-frontend-image:
         condition: service_started
+      lms-mentor-trainer-sql-image:
+        condition: service_started
       lms-mentor-trainer-next-image:
         condition: service_started
     environment:
@@ -232,6 +241,7 @@ services:
       - TRAINER_PYTHON_JOB_IMAGE=${TRAINER_PYTHON_JOB_IMAGE:-lms-trainer-python:local}
       - TRAINER_FRONTEND_JOB_IMAGE=${TRAINER_FRONTEND_JOB_IMAGE:-lms-trainer-frontend:local}
       - TRAINER_NEXT_JOB_IMAGE=${TRAINER_NEXT_JOB_IMAGE:-lms-trainer-next:local}
+      - TRAINER_SQL_JOB_IMAGE=${TRAINER_SQL_JOB_IMAGE:-lms-trainer-sql:local}
       - TRAINER_MAX_CONCURRENT=${TRAINER_MAX_CONCURRENT:-1}
     # Docker socket доступен только доверенному gateway, не LMS и не решениям.
     volumes:

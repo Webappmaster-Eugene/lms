@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { TRAINER_CATALOG } from '@/data/trainer'
+import { TRAINER_CORE_CATALOG } from '@/data/trainer/core'
 import { flattenCatalog, POINTS_BY_DIFFICULTY } from '@/data/trainer/types'
 import {
   COMPANY_LABELS,
@@ -116,6 +117,22 @@ describe('каталог тренажёра: инварианты', () => {
     expect(entries.length).toBeGreaterThanOrEqual(130)
     expect(entries.filter(({ task }) => task.languages.includes('ts')).length)
       .toBeGreaterThanOrEqual(50)
+  })
+
+  it('код приложения не импортирует SQL-каталог: он не должен попасть в next build', async () => {
+    // Сборка на проде идёт с source maps и лимитом кучи 2048 МБ, запас меньше 12%.
+    const { globSync, readFileSync } = await import('node:fs')
+    const full = /from '(@\/data\/trainer|@\/data\/trainer\/sql[^']*)'/
+    const offenders = globSync('src/**/*.{ts,tsx}')
+      .filter((file) => !file.startsWith('src/data/trainer/') && file !== 'src/seed-trainer.ts')
+      .filter((file) => full.test(readFileSync(file, 'utf8')))
+    expect(offenders).toEqual([])
+  })
+
+  it('основной каталог не содержит SQL, полный содержит', () => {
+    expect(TRAINER_CORE_CATALOG.some((topic) => topic.category === 'sql')).toBe(false)
+    expect(TRAINER_CATALOG.length).toBe(TRAINER_CORE_CATALOG.length + TRAINER_CATALOG.filter((topic) => topic.category === 'sql').length)
+    expect(TRAINER_CATALOG.some((topic) => topic.category === 'sql')).toBe(true)
   })
 
   it('страница «Все задачи» выбирает каталог без фиксированного лимита', async () => {

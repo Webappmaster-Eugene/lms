@@ -135,6 +135,7 @@ export default async function TaskPage({ params }: Props) {
     hiddenCaseCount: usesRuntime ? (task.runtimeCases ?? []).filter((item) => item.hidden).length : allCases.length - visibleCases.length,
     timeLimitMs: task.timeLimitMs ?? 5000,
     starters,
+    ...(languages.includes('sql') ? { sqlCheck: task.sqlCheck?.trim() || undefined, sqlOrdered: task.sqlOrdered === true } : {}),
     pointsReward: task.pointsReward ?? 10,
   }
 
@@ -224,6 +225,8 @@ export default async function TaskPage({ params }: Props) {
             entryName={clientTask.entryName}
             languages={languages}
             checkMode={clientTask.checkMode}
+            sqlCheck={clientTask.sqlCheck}
+            sqlOrdered={clientTask.sqlOrdered}
           />
         </div>
 

@@ -4,7 +4,7 @@ import { learningGrantIsActive, learningRelationId, type LearningGrant } from '@
 
 export type TrainerAccessMode = 'all' | 'assigned' | 'disabled'
 export type TrainerAccessUser = { id: number; role?: string | null; trainerAccessMode?: TrainerAccessMode | null; learningCatalogVisibility?: 'catalog' | 'assigned' | null; isActive?: boolean | null }
-export type TrainerTopicMetadata = { id: number; isPublished?: boolean | null }
+export type TrainerTopicMetadata = { id: number; isPublished?: boolean | null; assignedOnly?: boolean | null }
 export type TrainerTaskMetadata = { id: number; topic: unknown; isPublished?: boolean | null }
 export type TrainerAccessSnapshot = {
   admin: boolean
@@ -24,6 +24,8 @@ export function buildTrainerAccess(user: TrainerAccessUser | null | undefined, g
   const mode = user?.trainerAccessMode ?? 'all'
   const catalogVisibility = user?.learningCatalogVisibility === 'assigned' ? 'assigned' : 'catalog'
   const topics = new Set(metadata.topics.filter(topic => topic.isPublished).map(topic => topic.id))
+  // Как у курсов: режим «весь тренажёр» и витрина каталога такую тему не открывают, только явное назначение.
+  const restricted = new Set(metadata.topics.filter(topic => topic.isPublished && topic.assignedOnly === true).map(topic => topic.id))
   const rules = new Map<string, 'allow' | 'deny'>()
   for (const grant of grants) {
     const id = learningRelationId(grant.target?.value)
@@ -38,18 +40,19 @@ export function buildTrainerAccess(user: TrainerAccessUser | null | undefined, g
   if (admin || (user && user.isActive !== false && mode !== 'disabled')) {
     for (const topicId of topics) {
       const decision = rules.get(`trainer-topics:${topicId}`)
-      const allowed = admin || (decision ? decision === 'allow' : mode === 'all')
+      const allowed = admin || (decision ? decision === 'allow' : mode === 'all' && !restricted.has(topicId))
       hasTopicAccess ||= allowed
-      if (allowed || catalogVisibility === 'catalog') browseTopics.add(topicId)
+      if (allowed || (catalogVisibility === 'catalog' && !restricted.has(topicId))) browseTopics.add(topicId)
     }
   }
   for (const task of metadata.tasks) {
     const topicId = learningRelationId(task.topic)
     if (!admin && (!user || user.isActive === false || mode === 'disabled' || !task.isPublished || topicId === null || !topics.has(topicId))) continue
     const decision = rules.get(`trainer-tasks:${task.id}`) ?? rules.get(`trainer-topics:${topicId}`)
-    const allowed = admin || (decision ? decision === 'allow' : mode === 'all')
+    const closed = topicId !== null && restricted.has(topicId)
+    const allowed = admin || (decision ? decision === 'allow' : mode === 'all' && !closed)
     if (allowed) accessible.add(task.id)
-    if (allowed || catalogVisibility === 'catalog') {
+    if (allowed || (catalogVisibility === 'catalog' && !closed)) {
       browse.add(task.id)
       if (topicId !== null) browseTopics.add(topicId)
     }

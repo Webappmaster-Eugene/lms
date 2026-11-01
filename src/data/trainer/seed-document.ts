@@ -57,6 +57,8 @@ export function buildTaskData(
     solutionCodePython: task.solutionCodePython ?? null,
     solutionCodeGo: task.solutionCodeGo ?? null,
     runtimeCases: task.runtimeCases ?? [],
+    sqlCheck: task.sqlCheck ?? null,
+    sqlOrdered: task.sqlOrdered === true,
     solutionCode: task.solutionCode,
     solutionCodeTs: task.solutionCodeTs ?? null,
     solutionNotes: task.solutionNotes ?? null,

@@ -94,11 +94,15 @@ describe('собеседования Go, Python и frontend', () => {
     expect(runRuntime).toHaveBeenCalledTimes(10)
   })
 
-  it('принимает все языки справочника и не допускает небезопасные файлы проекта', () => {
-    for (const { value } of LANGUAGE_OPTIONS) {
+  it('принимает все языки справочника, кроме SQL, и не допускает небезопасные файлы проекта', () => {
+    for (const { value } of LANGUAGE_OPTIONS.filter((option) => option.value !== 'sql')) {
       expect(interviewLanguage(value)).toBe(value)
       expect(interviewCode(interviewStarter(value), value)).toBeTruthy()
     }
     expect(() => interviewCode('{"../app.tsx":"bad"}', 'react')).toThrow(InterviewError)
+  })
+
+  it('не открывает SQL в комнате: запросу нужен набор данных задачи, которого в комнате нет', () => {
+    expect(() => interviewLanguage('sql')).toThrow(InterviewError)
   })
 })

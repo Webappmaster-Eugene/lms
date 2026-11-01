@@ -8,7 +8,9 @@ import { publishTrainerRuntime } from '@/server/trainer/runtime-publication'
 import type { TrainerTask, TrainerTopic, User } from '@/payload-types'
 import { createAdmin, createStudent, createSumTask, createTopic, getTestPayload, login, rest, uid } from './helpers/payload'
 
-const runtimeTopics = TRAINER_CATALOG.filter((topic) => topic.tasks.some((task) => task.checkMode === 'program' || task.checkMode === 'dom'))
+// SQL-темы публикует свой скрипт и только по назначению: эта публикация их не трогает.
+const runtimeTopics = TRAINER_CATALOG.filter((topic) => topic.category !== 'sql' && topic.tasks.some((task) => task.checkMode === 'program' || task.checkMode === 'dom'))
+const sqlSeed = TRAINER_CATALOG.find((topic) => topic.category === 'sql')?.tasks[0]
 const healthToken = 'local-runtime-publication-test-token-00000001'
 type HealthMode = 'ok' | 'unavailable' | 'invalid' | 'large' | 'redirect'
 let payload: Payload
@@ -25,6 +27,7 @@ const tasks: TrainerTask[] = []
 let progressId: number
 let outsider: TrainerTask
 let outsiderTopic: TrainerTopic
+let sqlDraft: TrainerTask
 
 function legacyChecks(task: TrainerTask) {
   return task.runtimeCases?.map((row) => ({
@@ -72,6 +75,7 @@ async function snapshot() {
     progress: await payload.findByID({ collection: 'user-trainer-progress', id: progressId, depth: 0 }),
     outsider: await payload.findByID({ collection: 'trainer-tasks', id: outsider.id, depth: 0 }),
     outsiderTopic: await payload.findByID({ collection: 'trainer-topics', id: outsiderTopic.id, depth: 0 }),
+    sqlDraft: await payload.findByID({ collection: 'trainer-tasks', id: sqlDraft.id, depth: 0 }),
   }
 }
 
@@ -107,6 +111,8 @@ beforeAll(async () => {
     }
   }
   outsiderTopic = await createTopic(payload, { slug: uid('runtime-outside'), isPublished: false })
+  if (!sqlSeed) throw new Error('В каталоге нет SQL-задачи')
+  sqlDraft = await payload.create({ collection: 'trainer-tasks', data: { ...buildTaskData(sqlSeed, outsiderTopic.id, 1), isPublished: false } })
   outsider = await createSumTask(payload, { topic: outsiderTopic.id, slug: uid('cms-runtime'), checkMode: 'program', languages: ['python'], isPublished: false, runtimeCases: [{ name: 'Собственная CMS-проверка', input: 'kept', expected: 'kept', hidden: true }] })
   const progress = await payload.create({ collection: 'user-trainer-progress', data: { user: student.id, task: tasks[0].id, language: 'go', userCode: 'PRESERVE_STUDENT_CODE', attempts: 6, isCompleted: false } })
   progressId = progress.id
@@ -141,6 +147,7 @@ afterAll(async () => {
   if (progressId) await payload.delete({ collection: 'user-trainer-progress', id: progressId })
   for (const task of tasks) await payload.delete({ collection: 'trainer-tasks', id: task.id })
   if (outsider) await payload.delete({ collection: 'trainer-tasks', id: outsider.id })
+  if (sqlDraft) await payload.delete({ collection: 'trainer-tasks', id: sqlDraft.id })
   for (const topic of topics) await payload.delete({ collection: 'trainer-topics', id: topic.id })
   if (outsiderTopic) await payload.delete({ collection: 'trainer-topics', id: outsiderTopic.id })
   if (student) await payload.delete({ collection: 'users', id: student.id })
@@ -198,6 +205,7 @@ describe('Публикация runtime: настоящий HTTP health, Payload 
     expect(after.progress).toEqual(before.progress)
     expect(after.outsider).toEqual(before.outsider)
     expect(after.outsiderTopic).toEqual(before.outsiderTopic)
+    expect(after.sqlDraft).toEqual(before.sqlDraft)
     for (const [index, task] of after.tasks.entries()) {
       const previous = before.tasks[index]
       const { updatedAt: _updatedAt, isPublished: _published, runtimeCases: _cases, ...immutable } = task

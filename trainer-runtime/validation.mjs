@@ -1,4 +1,4 @@
-export const LANGUAGES = ['go', 'python', 'html', 'react', 'next']
+export const LANGUAGES = ['go', 'python', 'sql', 'html', 'react', 'next']
 export const MAX_CODE_LENGTH = 20_000
 const PRESS_KEYS = ['Enter', 'Escape', 'Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Tab']
 
@@ -38,7 +38,11 @@ export function validateRequest(raw, preview = false) {
   if (!raw || typeof raw !== 'object' || !LANGUAGES.includes(raw.language)) throw new InputError('Неизвестный язык')
   if (typeof raw.code !== 'string' || raw.code.length > MAX_CODE_LENGTH) throw new InputError('Код превышает 20 000 символов')
   const timeLimitMs = raw.timeLimitMs ?? 2000
-  const isProgram = raw.language === 'go' || raw.language === 'python'
+  const isProgram = raw.language === 'go' || raw.language === 'python' || raw.language === 'sql'
+  const isSql = raw.language === 'sql'
+  if (isSql && raw.check !== undefined && raw.check !== null && (typeof raw.check !== 'string' || raw.check.length > 4000)) throw new InputError('Проверочный запрос SQL до 4000 символов')
+  if (isSql && raw.ordered !== undefined && typeof raw.ordered !== 'boolean') throw new InputError('Порядок строк SQL задаётся флагом')
+  if (isSql && !preview && (!Array.isArray(raw.cases) || raw.cases.length === 0)) throw new InputError('Для SQL нужен хотя бы один набор данных')
   if (!Number.isInteger(timeLimitMs) || timeLimitMs < 100 || timeLimitMs > 10000) throw new InputError('Лимит времени должен быть от 100 до 10000 мс')
   if (preview && isProgram) throw new InputError('Предпросмотр доступен для frontend')
   if (!isProgram) parseFiles(raw.code)
@@ -55,5 +59,5 @@ export function validateRequest(raw, preview = false) {
       }
     }
   }
-  return { language: raw.language, code: raw.code, timeLimitMs, cases: preview ? [] : raw.cases, allowNoTests: raw.allowNoTests === true, includePreview: raw.includePreview === true }
+  return { language: raw.language, code: raw.code, timeLimitMs, cases: preview ? [] : raw.cases, allowNoTests: raw.allowNoTests === true, includePreview: raw.includePreview === true, ...(isSql ? { check: typeof raw.check === 'string' && raw.check.trim() ? raw.check : undefined, ordered: raw.ordered === true } : {}) }
 }

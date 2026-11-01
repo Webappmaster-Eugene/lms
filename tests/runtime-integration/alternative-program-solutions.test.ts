@@ -10,7 +10,8 @@ import { runSolution } from '@/server/trainer/sandbox'
 
 const tasks = flattenCatalog(TRAINER_CATALOG)
   .map(({ task }) => task)
-  .filter(task => task.checkMode === 'program')
+  // Эталоны SQL проверяет sqlCatalog.test.ts тем же движком, выборку через gateway - trainerRuntimeCatalog.
+  .filter(task => task.checkMode === 'program' && !task.languages.includes('sql'))
 
 function taskBySlug(slug: string): TrainerTaskSeed {
   const task = tasks.find(candidate => candidate.slug === slug)

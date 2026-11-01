@@ -31,11 +31,26 @@ describe('сохранение образов сред тренажёра', () =
     expect(keeper).toMatch(/read_only:\s*true/)
   })
 
-  it('gateway ждёт старта четырёх держателей, сохраняя ожидание инициализации авторизации', () => {
+  it('gateway ждёт старта пяти держателей, сохраняя ожидание инициализации авторизации', () => {
     const gateway = compose.match(/^ {2}lms-mentor-trainer-runtime:[\s\S]*?(?=^ {2}[a-z]|^volumes:)/m)?.[0] ?? ''
-    for (const name of ['go', 'python', 'frontend', 'next']) {
+    for (const name of ['go', 'python', 'frontend', 'sql', 'next']) {
       expect(gateway).toMatch(new RegExp(`lms-mentor-trainer-${name}-image:\\s*\\n\\s*condition:\\s*service_started`))
     }
     expect(gateway).toMatch(/lms-mentor-trainer-auth:\s*\n\s*condition:\s*service_completed_successfully/)
+  })
+
+  it('образ SQL-задач собирается из своей стадии, и gateway знает его имя по умолчанию', () => {
+    const holder = compose.match(/^ {2}lms-mentor-trainer-sql-image:[\s\S]*?(?=^ {2}[a-z])/m)?.[0] ?? ''
+    expect(holder).toContain('image: ${TRAINER_SQL_JOB_IMAGE:-lms-trainer-sql:local}')
+    expect(holder).toMatch(/target:\s*sql-job/)
+    expect(compose).toContain('- TRAINER_SQL_JOB_IMAGE=${TRAINER_SQL_JOB_IMAGE:-lms-trainer-sql:local}')
+    expect(readFileSync(new URL('../../trainer-runtime/gateway.mjs', import.meta.url), 'utf8')).toContain("sql: process.env.TRAINER_SQL_JOB_IMAGE || 'lms-trainer-sql:local'")
+  })
+
+  it('PGlite в среде задач и в тестах каталога одной версии: иначе эталоны считаются другим движком', () => {
+    const runtime = JSON.parse(readFileSync(new URL('../../trainer-runtime/sql/package.json', import.meta.url), 'utf8')) as { dependencies: Record<string, string> }
+    const app = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { devDependencies: Record<string, string> }
+    expect(runtime.dependencies['@electric-sql/pglite']).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(app.devDependencies['@electric-sql/pglite']).toBe(runtime.dependencies['@electric-sql/pglite'])
   })
 })

@@ -177,4 +177,34 @@ describe('персональный тренажёр: PostgreSQL, REST, марш�
     expect(custom.status).toBe(201)
     expect((await roomCall('read', token, (await custom.json()).room.token)).status).toBe(200)
   })
+
+  it('скрытые кейсы нельзя подобрать фильтром или сортировкой REST: у ученика такие запросы отклоняются', async () => {
+    const user = await createStudent(payload, { trainerAccessMode: 'all', learningCatalogVisibility: 'catalog' })
+    const token = await login(payload, user)
+    const task = await createSumTask(payload, {
+      checkMode: 'program', languages: ['sql'], entryName: null, testCases: [{ name: 'скрытый unit', argsCode: 'PRIVATE_ARGS', expectedCode: 'PRIVATE_UNIT', compare: 'deep', hidden: true }],
+      runtimeCases: [
+        { name: 'Данные из условия', hidden: false, input: 'CREATE TABLE t (n integer);', expected: 'PUBLIC_TABLE' },
+        { name: 'Скрытый набор 1', hidden: true, input: 'PRIVATE_SETUP', expected: 'PRIVATE_TABLE' },
+      ],
+    })
+    // Открытые строки по-прежнему читаются, скрытые вырезаны.
+    const read = await rest('GET', `/trainer-tasks/${task.id}`, { token })
+    expect(read.status).toBe(200)
+    expect(JSON.stringify(read.json)).toContain('PUBLIC_TABLE')
+    expect(JSON.stringify(read.json)).not.toMatch(/PRIVATE_/)
+    for (const query of [
+      'where[runtimeCases.expected][contains]=PRIVATE', 'where[runtimeCases.input][contains]=PRIVATE', 'where[runtimeCases.expected][like]=PRIVATE_TABLE',
+      'where[testCases.expectedCode][contains]=PRIVATE', 'where[testCases.argsCode][contains]=PRIVATE', 'sort=runtimeCases.expected',
+    ]) {
+      const hit = await rest('GET', `/trainer-tasks?where[id][equals]=${task.id}&${query}`, { token })
+      const count = await rest('GET', `/trainer-tasks/count?where[id][equals]=${task.id}&${query}`, { token })
+      expect(hit.status, query).toBe(400)
+      expect(JSON.stringify(hit.json), query).not.toMatch(/PRIVATE_/)
+      if (!query.startsWith('sort')) expect(count.status, `count ${query}`).toBe(400)
+    }
+    const adminToken = await login(payload, admin)
+    expect((await rest('GET', `/trainer-tasks?where[id][equals]=${task.id}&where[runtimeCases.expected][contains]=PRIVATE`, { token: adminToken })).json.totalDocs).toBe(1)
+  })
 })
+

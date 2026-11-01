@@ -24,7 +24,7 @@ async function load(payload: Payload, user: TrainerAccessUser | null | undefined
   if (resolved.trainerAccessMode === 'disabled') return buildTrainerAccess(resolved, [], empty)
   const [grants, topics, tasks] = await Promise.all([
     collectAllPages(({ page, limit }) => payload.find({ collection: 'learning-access-grants', where: { user: { equals: user.id } }, select: { target: true, effect: true, startsAt: true, expiresAt: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'назначения тренажёра' }),
-    collectAllPages(({ page, limit }) => payload.find({ collection: 'trainer-topics', select: { isPublished: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'публикация тем тренажёра' }),
+    collectAllPages(({ page, limit }) => payload.find({ collection: 'trainer-topics', select: { isPublished: true, assignedOnly: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'публикация тем тренажёра' }),
     collectAllPages(({ page, limit }) => payload.find({ collection: 'trainer-tasks', select: { topic: true, isPublished: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'метаданные прав задач тренажёра' }),
   ])
   return buildTrainerAccess(resolved, grants as LearningGrant[], { topics, tasks })

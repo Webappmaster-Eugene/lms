@@ -351,6 +351,25 @@ describe('рабочее место тренажёра', () => {
       expect(await screen.findByText('Решено')).toBeInTheDocument()
     })
 
+    it('SQL запускается на сервере без своих проверок и показывает таблицу результата', async () => {
+      const user = userEvent.setup()
+      const sqlTask: ClientTaskSpec = { ...task, id: '44', languages: ['sql'], checkMode: 'program', entryName: '', testCode: '',
+        starters: { sql: '-- Напишите запрос\n' }, runtimeCases: [{ name: 'Данные из условия', hidden: false, input: 'CREATE TABLE t (n integer);', expected: ' n\n---\n 1\n(1 строка)' }] }
+      const query = 'SELECT 1 AS n'
+      global.fetch = vi.fn(async () => Response.json({ result: { ...passed, consoleOutput: [' n', '---', ' 1', '(1 строка)'] } })) as unknown as typeof fetch
+      render(<TrainerWorkspace task={sqlTask} progress={progress} />)
+      const editor = await screen.findByTestId('monaco')
+      fireEvent.change(editor, { target: { value: query } })
+      expect(screen.queryByText(/Свои проверки/)).not.toBeInTheDocument()
+      expect(screen.getByText(/поднимает чистую базу с данными задачи/)).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Запустить' }))
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/trainer/run', expect.objectContaining({ body: JSON.stringify({ taskId: '44', language: 'sql', code: query }) })))
+      expect(await screen.findByRole('button', { name: 'Результат запроса' })).toBeInTheDocument()
+      expect(screen.getByText(/\(1 строка\)/).textContent).toBe(' n\n---\n 1\n(1 строка)')
+      expect(run).not.toHaveBeenCalled()
+      expect(refresh).not.toHaveBeenCalled()
+    })
+
     it('получает React-предпросмотр через runtime и просит обновить его после изменения файлов', async () => {
       const user = userEvent.setup()
       global.fetch = vi.fn(async () => Response.json({ result: passed, preview: { html: '<h1>Hello</h1>' } })) as unknown as typeof fetch

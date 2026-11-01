@@ -846,12 +846,17 @@ export interface TrainerTopic {
     | 'webapi'
     | 'go'
     | 'frontend'
-    | 'python';
+    | 'python'
+    | 'sql';
   /**
    * Emoji или имя иконки lucide (например: "code", "braces", "terminal")
    */
   icon?: string | null;
   order?: number | null;
+  /**
+   * Тему видят только ученики с явным назначением на неё или её задачи. Режим «весь тренажёр» её не открывает.
+   */
+  assignedOnly?: boolean | null;
   isPublished?: boolean | null;
   updatedAt: string;
   createdAt: string;
@@ -874,7 +879,7 @@ export interface TrainerTask {
    * stdout - сравнение вывода; unit - JS/TS; types - типы TS; program - Go/Python; dom - frontend
    */
   checkMode: 'stdout' | 'unit' | 'types' | 'program' | 'dom';
-  languages: ('js' | 'ts' | 'go' | 'python' | 'html' | 'react' | 'next')[];
+  languages: ('js' | 'ts' | 'go' | 'python' | 'sql' | 'html' | 'react' | 'next')[];
   /**
    * Оставлено для старых задач. Для новых заполняйте «Условие (Markdown)».
    */
@@ -941,7 +946,7 @@ export interface TrainerTask {
     | boolean
     | null;
   /**
-   * Go: stdin и stdout. Frontend: последовательность действий и проверок DOM/CSS. Скрытые данные видны только администратору.
+   * Go и Python: stdin и stdout. SQL: во вводе SQL подготовки данных, в выводе каноническая таблица результата. Frontend: последовательность действий и проверок DOM/CSS. Скрытые данные видны только администратору.
    */
   runtimeCases?:
     | {
@@ -977,6 +982,14 @@ export interface TrainerTask {
         id?: string | null;
       }[]
     | null;
+  /**
+   * Для задач на изменение данных и структуры: выполняется после решения, сравнивается его результат. Пусто - сравнивается последний запрос решения.
+   */
+  sqlCheck?: string | null;
+  /**
+   * Включайте, только если условие требует сортировки. Иначе строки сравниваются без учёта порядка.
+   */
+  sqlOrdered?: boolean | null;
   /**
    * Код, который выполняется ПЕРЕД решением: фикстуры, моки, вспомогательные классы. Доступен и решению, и тестам. Только JavaScript - преамбула одна на оба языка и в песочницу попадает без транспиляции.
    */
@@ -1082,6 +1095,15 @@ export interface TrainerTask {
         | 'backtracking'
         | 'livecoding'
         | 'cancelation'
+        | 'sql'
+        | 'sql-select'
+        | 'sql-functions'
+        | 'sql-aggregates'
+        | 'sql-joins'
+        | 'sql-subqueries'
+        | 'sql-dml'
+        | 'sql-ddl'
+        | 'sql-transactions'
       )[]
     | null;
   companies?:
@@ -1563,7 +1585,7 @@ export interface UserTrainerProgress {
   task: number | TrainerTask;
   isCompleted?: boolean | null;
   userCode?: string | null;
-  language?: ('js' | 'ts' | 'go' | 'python' | 'html' | 'react' | 'next') | null;
+  language?: ('js' | 'ts' | 'go' | 'python' | 'sql' | 'html' | 'react' | 'next') | null;
   /**
    * Считаются все отправки, не прошедшие тесты.
    */
@@ -1617,7 +1639,7 @@ export interface InterviewRoom {
   setupCode?: string | null;
   setupTypes?: string | null;
   code?: string | null;
-  language: 'js' | 'ts' | 'go' | 'python' | 'html' | 'react' | 'next';
+  language: 'js' | 'ts' | 'go' | 'python' | 'sql' | 'html' | 'react' | 'next';
   version: number;
   endedAt?: string | null;
   updatedAt: string;
@@ -3031,6 +3053,7 @@ export interface TrainerTopicsSelect<T extends boolean = true> {
   category?: T;
   icon?: T;
   order?: T;
+  assignedOnly?: T;
   isPublished?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3070,6 +3093,8 @@ export interface TrainerTasksSelect<T extends boolean = true> {
         path?: T;
         id?: T;
       };
+  sqlCheck?: T;
+  sqlOrdered?: T;
   setupCode?: T;
   setupTypes?: T;
   expectedOutput?: T;

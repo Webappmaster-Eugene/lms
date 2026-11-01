@@ -158,3 +158,20 @@ describe('вкладки отчёта', () => {
     expect(isActive(tab('Тесты (1)'))).toBe(false)
   })
 })
+
+describe('результат SQL-запроса', () => {
+  it('таблица открыта сразу на вкладке «Результат запроса», без счётчика строк консоли', () => {
+    render(<TestResultsPanel result={result({ status: 'passed', passedCount: 1, consoleOutput: [' n', '---', ' 1', '(1 строка)'] })} isRunning={false} origin="server" queryOutput />)
+    expect(screen.getByRole('button', { name: 'Результат запроса' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Консоль/ })).not.toBeInTheDocument()
+    expect(screen.getByText(/\(1 строка\)/)).toBeInTheDocument()
+  })
+
+  it('запрос без таблицы назван словами', async () => {
+    render(<TestResultsPanel result={result({ tests: [failedTest] })} isRunning={false} origin="server" queryOutput />)
+    expect(screen.getByText('Запрос не вернул таблицу')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Тесты/ }))
+    expect(screen.getByText('Значения не совпали')).toBeInTheDocument()
+  })
+})
+

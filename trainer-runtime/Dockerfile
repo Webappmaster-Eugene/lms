@@ -31,10 +31,21 @@ ENV HOME=/tmp NODE_ENV=production
 USER 10001:10001
 ENTRYPOINT ["/usr/bin/timeout", "--signal=KILL", "180s", "node", "/runtime/frontend-worker.mjs"]
 
+FROM node:22-bookworm-slim AS sql-job
+WORKDIR /runtime
+COPY sql/package.json sql/package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
+COPY sql-worker.mjs sql-case.mjs sql-engine.mjs sql-result.mjs sql-datadir.mjs ./
+# initdb при сборке: внутри задания ему не хватило бы памяти контейнера.
+RUN node sql-datadir.mjs /runtime/pgdata.tar && chmod -R a+rX /runtime
+ENV HOME=/tmp NODE_ENV=production
+USER 10001:10001
+ENTRYPOINT ["/usr/bin/timeout", "--signal=KILL", "180s", "node", "--expose-gc", "/runtime/sql-worker.mjs"]
+
 FROM node:22-alpine AS gateway
 RUN apk add --no-cache docker-cli
 WORKDIR /runtime
-COPY server.mjs gateway.mjs validation.mjs next-runtime.mjs runtime-limits.mjs auth-token.mjs ./
+COPY server.mjs gateway.mjs validation.mjs next-runtime.mjs runtime-limits.mjs auth-token.mjs sql-result.mjs ./
 ENV NODE_ENV=production PORT=3100
 EXPOSE 3100
 CMD ["node", "server.mjs"]
