@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { StrictMode } from 'react'
 
@@ -13,6 +13,7 @@ vi.mock('@/components/lesson/TransportStreamPlayer', () => ({ TransportStreamPla
 ) }))
 
 const { VideoPlayer } = await import('@/components/lesson/VideoPlayer')
+const { StudyNotesProvider } = await import('@/components/lesson/StudyNotes')
 
 const fetchMock = vi.fn()
 /** Два пакета MPEG-TS: синхробайт 0x47 в начале каждого. */
@@ -211,6 +212,18 @@ describe('отказ плеера в уроке', () => {
     await failNative(container)
     expect(screen.getByRole('alert')).toHaveTextContent('Не удалось воспроизвести запись')
     expect(screen.getByRole('link', { name: /Открыть на Яндекс Диске/ })).toHaveAttribute('href', raw)
+  })
+
+  it('урок с конспектом предлагает прочитать его и над видео, и в сообщении об отказе', async () => {
+    const raw = 'https://disk.yandex.ru/d/key/lesson.mkv'
+    fetchMock.mockImplementation(async () => sourceResponse(mp4Head))
+    const { container } = render(<StudyNotesProvider value><VideoPlayer title="Урок" videoUrl={raw} displayMode="embed" /></StudyNotesProvider>)
+    expect(screen.getByRole('link', { name: 'Читать конспект' })).toHaveAttribute('href', '#konspekt')
+    await failNative(container)
+    await wait(2000)
+    await failNative(container)
+    expect(screen.getByRole('alert')).toHaveTextContent('Не удалось воспроизвести запись')
+    expect(within(screen.getByRole('alert')).getByRole('link', { name: 'Читать конспект' })).toHaveAttribute('href', '#konspekt')
   })
 
   it('потоковый плеер различает отказ воспроизведения и подтверждённый обрыв сети', async () => {

@@ -182,6 +182,16 @@ describe('данные, переданные ученику', () => {
     expect(safe.description).toMatch(/^Конспект \(\/api\/learning-assets\?lesson=42&block=description&asset=[a-z\d]+\) и сайт \(https:\/\/nextjs\.org\/docs\)\.$/)
   })
 
+  it('источник конспекта ученику не уходит, ссылки Диска в тексте конспекта закрываются', () => {
+    const notes = { id: 'n1', blockType: 'lessonNotes' as const, markdown: `## Коротко\n\nСлайды: ${ROOT}/course/slides.pdf`, source: 'author' as const, sourceRef: `${ROOT}/[SuperSliv.biz] Курс/1.1 Конспект.txt` }
+    const safe = protectLessonVideoSources({ id: 42, content: [notes] })
+    const block = safe.content?.[0]
+    expect(block).toMatchObject({ id: 'n1', blockType: 'lessonNotes', source: 'author', sourceRef: null })
+    expect(JSON.stringify(safe)).not.toContain('disk.yandex')
+    expect(JSON.stringify(safe)).not.toContain('SuperSliv')
+    expect(block && 'markdown' in block ? block.markdown : '').toMatch(/Слайды: \/api\/learning-assets\?lesson=42&block=n1&asset=[a-z\d]+$/)
+  })
+
   it('повторная защита сохраняет стабильные ID и URL', () => {
     const once = protectLessonVideoSources({ id: 42, content: content() })
     expect(protectLessonVideoSources(once)).toEqual(once)

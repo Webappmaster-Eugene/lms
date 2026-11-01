@@ -1,3 +1,4 @@
+import { isLessonNotesSource, LESSON_NOTES_MAX_LENGTH } from '@/lib/lesson-notes'
 import { slideFolderProblem, slideUrlProblem, SLIDES_LIMIT } from '@/lib/slides'
 
 export type ContentCollection = 'courses' | 'sections' | 'lessons'
@@ -140,6 +141,7 @@ const BLOCK_FIELDS: Record<string, readonly string[]> = {
   miro: ['title', 'embedUrl', 'height'], file: ['title', 'file', 'description'],
   slides: ['title', 'description', 'folderUrl', 'items'],
   markdown: ['markdown', 'source'],
+  lessonNotes: ['markdown', 'source', 'sourceRef'],
 }
 
 function validateSlides(block: Record<string, unknown>): void {
@@ -212,6 +214,11 @@ function validateBlocks(value: unknown, existing: unknown): void {
     }
     if (block.blockType === 'image') contentId(block.image, 'Изображение')
     if (block.blockType === 'file') contentId(block.file, 'Файл')
+    if (block.blockType === 'lessonNotes') {
+      text(block.markdown, 'Текст конспекта', LESSON_NOTES_MAX_LENGTH, true)
+      if (!isLessonNotesSource(block.source)) throw new ContentError('Конспект: выберите источник текста')
+      if (block.sourceRef !== undefined) text(block.sourceRef, 'Откуда текст конспекта', 1000)
+    }
     if (block.blockType === 'markdown') {
       // Текст из репозитория меняет только импорт: правка здесь пропала бы при следующем.
       const prior: unknown = typeof block.id === 'string'

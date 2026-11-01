@@ -106,6 +106,19 @@ describe('Валидация управления учебным контент�
     expect(() => update([{ ...markdown, extra: true }])).toThrow()
   })
 
+  it('конспект правится в редакторе: нужен текст и известный источник', () => {
+    const notes = { id: 'notes-1', blockType: 'lessonNotes', markdown: '## Коротко\n\nТекст', source: 'author', sourceRef: 'Git/1.1. Для чего нужен Git.txt' }
+    const created = validateContentInput('lessons', { title: 'Урок', course: 1, content: [notes] })
+    expect(created.data.content).toEqual([notes])
+    const existing = { content: [notes] }
+    const edited = { ...notes, markdown: '## Коротко\n\nПравка', source: 'topic', sourceRef: null }
+    expect(validateContentInput('lessons', { content: [edited], expectedUpdatedAt: timestamp }, true, { existing }).data.content).toEqual([edited])
+    expect(() => validateContentInput('lessons', { title: 'Урок', course: 1, content: [{ ...notes, markdown: ' \n ' }] })).toThrow('Текст конспекта')
+    expect(() => validateContentInput('lessons', { title: 'Урок', course: 1, content: [{ ...notes, markdown: 'а'.repeat(200_001) }] })).toThrow('Текст конспекта')
+    expect(() => validateContentInput('lessons', { title: 'Урок', course: 1, content: [{ ...notes, source: 'ai' }] })).toThrow('источник')
+    expect(() => validateContentInput('lessons', { title: 'Урок', course: 1, content: [{ ...notes, html: '<b>' }] })).toThrow('нельзя изменять')
+  })
+
   it('презентация без названия не сохраняется', () => {
     expect(() => validateContentInput('lessons', { title: 'Урок', course: 1, content: [{ blockType: 'slides', title: ' ', items: [{ url: '/api/media/file/a.png' }] }] })).toThrow('Название блока')
   })

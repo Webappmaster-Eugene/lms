@@ -9,11 +9,13 @@ import type { Lesson } from '@/payload-types'
 import { emptyRichText, RichTextEditor } from '@/components/content-management/RichTextEditor'
 import { MediaPicker } from '@/components/content-management/MediaPicker'
 import { freshSlides, SlidesEditor } from '@/components/content-management/SlidesEditor'
+import { LessonMarkdown } from '@/components/lesson/LessonMarkdown'
+import { isLessonNotesSource, LESSON_NOTES_MAX_LENGTH, LESSON_NOTES_SOURCE_LABELS, LESSON_NOTES_SOURCES } from '@/lib/lesson-notes'
 
 type Blocks = NonNullable<Lesson['content']>
 type Block = Blocks[number]
 type AddableType = Exclude<Block['blockType'], 'markdown'>
-const addable: Record<AddableType, string> = { text: 'Текст', video: 'Видео', image: 'Изображение', link: 'Ссылка', miro: 'Miro-доска', file: 'Файл', slides: 'Презентация' }
+const addable: Record<AddableType, string> = { text: 'Текст', video: 'Видео', image: 'Изображение', link: 'Ссылка', miro: 'Miro-доска', file: 'Файл', slides: 'Презентация', lessonNotes: 'Конспект' }
 // Текст из репозитория приходит только импортом: добавить его здесь нельзя.
 const names: Record<Block['blockType'], string> = { ...addable, markdown: 'Текст из репозитория' }
 const fieldClass = 'mt-1 min-h-[44px] w-full rounded border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50'
@@ -29,6 +31,7 @@ function freshBlock(type: AddableType): Block {
     case 'miro': return { id, blockType: type, title: '', embedUrl: '', height: 600 }
     case 'file': return { id, blockType: type, title: '', file: 0 }
     case 'slides': return freshSlides()
+    case 'lessonNotes': return { id, blockType: type, markdown: '', source: 'topic' }
   }
 }
 
@@ -47,6 +50,35 @@ function Input({ label, value, onChange, disabled, type = 'text', min, max, requ
 
 function Description({ value, disabled, onChange }: { value: string | null | undefined; disabled: boolean; onChange: (value: string) => void }) {
   return <label className="block text-sm font-medium">Описание<textarea className={fieldClass} rows={3} value={value ?? ''} disabled={disabled} onChange={(event) => onChange(event.target.value)} /></label>
+}
+
+type NotesBlock = Extract<Block, { blockType: 'lessonNotes' }>
+
+function StudyNotesEditor({ id, block, disabled, onChange }: { id: string; block: NotesBlock; disabled: boolean; onChange: (patch: Partial<NotesBlock>) => void }) {
+  const [preview, setPreview] = useState(false)
+  return <>
+    <label className="block text-sm font-medium">Текст конспекта (Markdown) *
+      <textarea
+        id={`${id}-markdown`}
+        className={`${fieldClass} font-mono`}
+        rows={18}
+        maxLength={LESSON_NOTES_MAX_LENGTH}
+        required
+        value={block.markdown}
+        disabled={disabled}
+        onChange={(event) => onChange({ markdown: event.target.value })}
+      />
+    </label>
+    <p className="text-xs text-muted-foreground">Заголовки разделов через ## и ###, код в блоках ``` с языком, схемы в блоке ```mermaid.</p>
+    <label className="block text-sm font-medium">Источник
+      <select className={fieldClass} value={block.source} disabled={disabled} onChange={(event) => { if (isLessonNotesSource(event.target.value)) onChange({ source: event.target.value }) }}>
+        {LESSON_NOTES_SOURCES.map((source) => <option key={source} value={source}>{LESSON_NOTES_SOURCE_LABELS[source]}</option>)}
+      </select>
+    </label>
+    <Input label="Откуда текст (ученикам не показывается)" value={block.sourceRef} disabled={disabled} onChange={(sourceRef) => onChange({ sourceRef })} />
+    <button type="button" className={buttonClass} aria-expanded={preview} onClick={() => setPreview((value) => !value)}>{preview ? 'Скрыть предпросмотр' : 'Показать предпросмотр'}</button>
+    {preview && <div className="rounded border p-4">{block.markdown.trim() ? <LessonMarkdown markdown={block.markdown} anchorPrefix={`${id}-preview`} /> : <p className="text-sm text-muted-foreground">Текст пока пустой.</p>}</div>}
+  </>
 }
 
 export function LessonBlocks({ value, onChange, disabled = false }: { value: Blocks; onChange: (value: Blocks) => void; disabled?: boolean }) {
@@ -109,6 +141,7 @@ export function LessonBlocks({ value, onChange, disabled = false }: { value: Blo
           <Description value={block.description} disabled={disabled} onChange={(description) => update(index, { description })} />
         </>}
         {block.blockType === 'slides' && <SlidesEditor id={id} block={block} disabled={disabled} onChange={(patch) => update(index, patch)} />}
+        {block.blockType === 'lessonNotes' && <StudyNotesEditor id={id} block={block} disabled={disabled} onChange={(patch) => update(index, patch)} />}
         {block.blockType === 'markdown' && <p className="text-sm text-muted-foreground">Текст правится в Git-репозитории и приходит импортом{block.source ? ` (${block.source})` : ''}. Здесь его можно переставить или удалить, но не изменить.</p>}
       </article>
     })}

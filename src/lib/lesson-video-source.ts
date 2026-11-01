@@ -133,9 +133,13 @@ export function protectLessonVideoSources<T extends Pick<Lesson, 'id' | 'content
   collectAssetLinks(lesson.description, 'description')
   for (const [index, block] of (lesson.content ?? []).entries()) {
     // Файлы презентации заменяются ниже по полю, а её папка не должна стать «материалом».
-    if (block.blockType !== 'slides') collectAssetLinks(block, blockVideoId(block, index))
+    // Источник конспекта ученику не уходит вовсе, ссылки в нём собирать незачем.
+    if (block.blockType === 'lessonNotes') collectAssetLinks(block.markdown, blockVideoId(block, index))
+    else if (block.blockType !== 'slides') collectAssetLinks(block, blockVideoId(block, index))
   }
   const blocks = (lesson.content ?? []).map((block, index): ContentBlock => {
+    // Путь к файлу автора на Диске нужен только редактору.
+    if (block.blockType === 'lessonNotes') return { ...block, sourceRef: null }
     if (block.blockType === 'link' && isYandexCatalogUrl(block.url)) {
       return {
         id: block.id,

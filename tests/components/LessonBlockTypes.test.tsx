@@ -38,7 +38,25 @@ describe('поля материалов урока', () => {
 
     expect(screen.getByText('В уроке пока нет материалов. Начните с текста, видео, презентации или файла.')).toBeInTheDocument()
     const add = within(screen.getByRole('group', { name: 'Добавить материал' })).getAllByRole('button').map((button) => button.textContent)
-    expect(add).toEqual(['Текст', 'Видео', 'Изображение', 'Ссылка', 'Miro-доска', 'Файл', 'Презентация'])
+    expect(add).toEqual(['Текст', 'Видео', 'Изображение', 'Ссылка', 'Miro-доска', 'Файл', 'Презентация', 'Конспект'])
+  })
+
+  it('конспект: Markdown, источник и закрытая от учеников пометка; предпросмотр показывает таблицу', () => {
+    render(<Harness initial={[]} />)
+    fireEvent.click(within(screen.getByRole('group', { name: 'Добавить материал' })).getByRole('button', { name: 'Конспект' }))
+    expect(latest[0]).toMatchObject({ blockType: 'lessonNotes', markdown: '', source: 'topic' })
+    const notes = block('1. Конспект')
+
+    const markdown = '## Коротко\n\n| Метод | Смысл |\n|---|---|\n| GET | чтение |'
+    expect(within(notes).getByLabelText('Текст конспекта (Markdown) *')).toBeRequired()
+    type(within(notes).getByLabelText('Текст конспекта (Markdown) *'), markdown)
+    fireEvent.change(within(notes).getByLabelText('Источник'), { target: { value: 'author' } })
+    type(within(notes).getByLabelText('Откуда текст (ученикам не показывается)'), 'Git/1.1. Для чего нужен Git.txt')
+    expect(latest[0]).toMatchObject({ blockType: 'lessonNotes', markdown, source: 'author', sourceRef: 'Git/1.1. Для чего нужен Git.txt' })
+
+    expect(within(notes).queryByRole('table')).toBeNull()
+    fireEvent.click(within(notes).getByRole('button', { name: 'Показать предпросмотр' }))
+    expect(within(notes).getByRole('cell', { name: 'чтение' })).toBeInTheDocument()
   })
 
   it('видео: режим показа, длительность и описание; пустая длительность сохраняется как null', () => {

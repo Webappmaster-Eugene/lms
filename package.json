@@ -84,6 +84,7 @@
     "isolated-vm": "^6.2.0",
     "lucide-react": "0.577.0",
     "maxmind": "^5.0.7",
+    "mermaid": "11.17.2",
     "monaco-editor": "0.55.1",
     "mpegts.js": "^1.8.2",
     "next": "15.3.9",

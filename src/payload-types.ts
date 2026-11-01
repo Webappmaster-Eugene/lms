@@ -568,7 +568,17 @@ export interface Lesson {
   isPublished?: boolean | null;
   estimatedMinutes?: number | null;
   content?:
-    | (TextBlock | VideoBlock | ImageBlock | LinkBlock | MiroBlock | FileBlock | SlidesBlock | MarkdownBlock)[]
+    | (
+        | TextBlock
+        | VideoBlock
+        | ImageBlock
+        | LinkBlock
+        | MiroBlock
+        | FileBlock
+        | SlidesBlock
+        | MarkdownBlock
+        | LessonNotesBlock
+      )[]
     | null;
   updatedAt: string;
   createdAt: string;
@@ -708,6 +718,24 @@ export interface MarkdownBlock {
   id?: string | null;
   blockName?: string | null;
   blockType: 'markdown';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "LessonNotesBlock".
+ */
+export interface LessonNotesBlock {
+  /**
+   * Markdown: заголовки ## и ###, таблицы, блоки кода с языком, схемы в блоке ```mermaid.
+   */
+  markdown: string;
+  source: 'author' | 'transcript' | 'outline' | 'topic';
+  /**
+   * Файл автора, субтитров или слайдов, по которому написан конспект. Ученикам не показывается.
+   */
+  sourceRef?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'lessonNotes';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2423,6 +2451,7 @@ export interface LessonsSelect<T extends boolean = true> {
         file?: T | FileBlockSelect<T>;
         slides?: T | SlidesBlockSelect<T>;
         markdown?: T | MarkdownBlockSelect<T>;
+        lessonNotes?: T | LessonNotesBlockSelect<T>;
       };
   updatedAt?: T;
   createdAt?: T;
@@ -2520,6 +2549,17 @@ export interface SlidesBlockSelect<T extends boolean = true> {
 export interface MarkdownBlockSelect<T extends boolean = true> {
   markdown?: T;
   source?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "LessonNotesBlock_select".
+ */
+export interface LessonNotesBlockSelect<T extends boolean = true> {
+  markdown?: T;
+  source?: T;
+  sourceRef?: T;
   id?: T;
   blockName?: T;
 }

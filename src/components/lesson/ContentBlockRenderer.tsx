@@ -6,6 +6,7 @@ import { ExternalLinkBlock } from './ExternalLink'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { LessonMarkdown } from './LessonMarkdown'
 import { SlidesBlock } from './SlidesBlock'
+import { StudyNotesProvider, StudyNotesSection } from './StudyNotes'
 import { FileDown } from 'lucide-react'
 import type { LearningVideo } from '@/lib/learning-state'
 import type { Lesson } from '@/payload-types'
@@ -39,21 +40,29 @@ export function ContentBlockRenderer({ blocks, learningVideos = [] }: Props) {
     const ordinal = markdownIndexes.indexOf(index)
     return ordinal <= 0 ? 'section' : `part${ordinal + 1}-section`
   }
+  const notesIndexes = blocks.flatMap((block, index) => (studyNotesText(block) === null ? [] : [index]))
   return (
-    <div className="min-w-0 space-y-6 [overflow-wrap:anywhere]">
-      {blocks.map((block, index) => {
-        const memoryId = learningVideos.find((video) => video.index === index)?.id
-        return (
-          <div key={block.id ?? index} id={memoryId ? `video-${memoryId}` : undefined}>
-            {renderBlock({ ...block }, memoryId, anchorPrefix(index))}
-          </div>
-        )
-      })}
-    </div>
+    <StudyNotesProvider value={notesIndexes.length > 0}>
+      <div className="min-w-0 space-y-6 [overflow-wrap:anywhere]">
+        {blocks.map((block, index) => {
+          const memoryId = learningVideos.find((video) => video.index === index)?.id
+          return (
+            <div key={block.id ?? index} id={memoryId ? `video-${memoryId}` : undefined}>
+              {renderBlock({ ...block }, memoryId, anchorPrefix(index), notesIndexes.indexOf(index) + 1)}
+            </div>
+          )
+        })}
+      </div>
+    </StudyNotesProvider>
   )
 }
 
-function renderBlock(block: ContentBlock, memoryId?: string, anchorPrefix?: string) {
+/** Текст конспекта, если блок - непустой конспект: пустой не показывается и не даёт ссылки из плеера. */
+function studyNotesText(block: { blockType: string; markdown?: unknown }): string | null {
+  return block.blockType === 'lessonNotes' && typeof block.markdown === 'string' && block.markdown.trim() !== '' ? block.markdown : null
+}
+
+function renderBlock(block: ContentBlock, memoryId?: string, anchorPrefix?: string, notesOrdinal = 0) {
   switch (block.blockType) {
     case 'text':
       return renderTextBlock(block)
@@ -69,6 +78,10 @@ function renderBlock(block: ContentBlock, memoryId?: string, anchorPrefix?: stri
       return renderFileBlock(block)
     case 'markdown':
       return typeof block.markdown === 'string' ? <LessonMarkdown markdown={block.markdown} anchorPrefix={anchorPrefix} /> : null
+    case 'lessonNotes': {
+      const markdown = studyNotesText(block)
+      return markdown === null ? null : <StudyNotesSection markdown={markdown} ordinal={notesOrdinal} />
+    }
     case 'slides':
       return (
         <SlidesBlock

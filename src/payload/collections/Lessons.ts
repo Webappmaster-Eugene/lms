@@ -16,6 +16,7 @@ import { MiroBlock } from '@/payload/blocks/MiroBlock'
 import { FileBlock } from '@/payload/blocks/FileBlock'
 import { SlidesBlock } from '@/payload/blocks/SlidesBlock'
 import { MarkdownBlock } from '@/payload/blocks/MarkdownBlock'
+import { LessonNotesBlock } from '@/payload/blocks/LessonNotesBlock'
 import { prepareSlides } from '@/payload/hooks/prepareSlides'
 
 export const Lessons: CollectionConfig = {
@@ -111,7 +112,7 @@ export const Lessons: CollectionConfig = {
       name: 'content',
       type: 'blocks',
       label: 'Контент урока',
-      blocks: [TextBlock, VideoBlock, ImageBlock, LinkBlock, MiroBlock, FileBlock, SlidesBlock, MarkdownBlock],
+      blocks: [TextBlock, VideoBlock, ImageBlock, LinkBlock, MiroBlock, FileBlock, SlidesBlock, MarkdownBlock, LessonNotesBlock],
     },
   ],
 }

@@ -4,7 +4,7 @@ import type { Payload } from 'payload'
 import type { Course, Lesson, Section } from '@/payload-types'
 import { POST } from '@/app/api/manage/content/[collection]/route'
 import { PATCH } from '@/app/api/manage/content/[collection]/[id]/route'
-import { createAdmin, createCourseTree, createStudent, getTestPayload, login, uid } from '../helpers/payload'
+import { createAdmin, createCourseTree, createStudent, getTestPayload, login, rest, uid } from '../helpers/payload'
 
 let payload: Payload
 let adminToken: string
@@ -122,6 +122,28 @@ describe('Управление курсами и уроками через LMS A
     expect(lesson.body.doc.course).toBe(first.body.doc.id)
     expect(lesson.body.doc.section).toBe(section.body.doc.id)
     expect(lesson.body.doc.content?.map((block) => block.blockType)).toEqual(['text', 'video', 'miro', 'link'])
+  })
+
+  it('конспект урока создаётся и правится в редакторе, ученик не видит его источник', async () => {
+    const { course } = await createCourseTree(payload)
+    const video = { blockType: 'video', title: 'Видео', videoUrl: 'https://disk.yandex.com/d/notes-key/1.1.mp4', displayMode: 'embed' }
+    const notes = { blockType: 'lessonNotes', markdown: '## Коротко\n\nТекст конспекта', source: 'author', sourceRef: '[SuperSliv.biz] Курс/1.1. Введение.txt' }
+    const created = await write('lessons', { title: 'Урок с конспектом', course: course.id, isPublished: true, content: [video, notes] })
+    expect(created.status).toBe(201)
+    const lesson = created.body.doc
+    const [savedVideo, savedNotes] = lesson.content ?? []
+    expect(savedNotes).toMatchObject({ ...notes, id: expect.any(String) })
+
+    const edited = await write('lessons', { content: [savedVideo, { ...savedNotes, markdown: '## Коротко\n\nПравка', source: 'topic' }], expectedUpdatedAt: lesson.updatedAt }, { id: lesson.id })
+    expect(edited.status).toBe(200)
+    expect(edited.body.doc.content).toMatchObject([{ id: savedVideo.id }, { id: savedNotes.id, blockType: 'lessonNotes', markdown: '## Коротко\n\nПравка', source: 'topic', sourceRef: notes.sourceRef }])
+    expect((await write('lessons', { content: [savedVideo, { ...savedNotes, markdown: ' ' }], expectedUpdatedAt: edited.body.doc.updatedAt }, { id: lesson.id })).status).toBe(400)
+
+    const seen = await rest('GET', `/lessons/${lesson.id}?depth=0`, { token: studentToken })
+    expect(seen.status).toBe(200)
+    expect(seen.json).toMatchObject({ content: [{ blockType: 'video' }, { blockType: 'lessonNotes', markdown: '## Коротко\n\nПравка', source: 'topic', sourceRef: null }] })
+    expect(JSON.stringify(seen.json)).not.toContain('SuperSliv')
+    expect(JSON.stringify(seen.json)).not.toContain('disk.yandex')
   })
 
   it('переименование сохраняет адрес, контент и ID блоков', async () => {

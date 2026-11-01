@@ -9,6 +9,7 @@ import { parsePublicResourceUrl } from '@/lib/yandex-disk-url'
 import { TransportStreamPlayer } from './TransportStreamPlayer'
 import { VideoMemoryBar } from './VideoMemoryBar'
 import { VideoShareButton } from './VideoShareButton'
+import { StudyNotesLink } from './StudyNotes'
 
 type Props = {
   memoryId?: string
@@ -294,6 +295,7 @@ function LessonVideo({ memoryId, title, videoUrl, description, durationMinutes }
         <RotateCw aria-hidden="true" className="h-4 w-4" />
         Попробовать снова
       </button>
+      {!recording && <StudyNotesLink />}
       {!protectedSource && (
         <a
           href={videoUrl}
@@ -470,7 +472,7 @@ function VideoHeading({
 }: Pick<Props, 'title' | 'description' | 'durationMinutes'>) {
   return (
     <>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-x-3">
         <h3 className="font-semibold text-foreground">{title}</h3>
         {durationMinutes && (
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -478,6 +480,8 @@ function VideoHeading({
             {durationMinutes} мин
           </span>
         )}
+        {/* Тем, кому видео не посмотреть, сразу видно, где текст урока. */}
+        <span className="ml-auto"><StudyNotesLink /></span>
       </div>
       {description && <p className="text-sm text-muted-foreground">{description}</p>}
     </>

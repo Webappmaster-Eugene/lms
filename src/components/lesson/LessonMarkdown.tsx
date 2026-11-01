@@ -11,6 +11,7 @@ import { getMarkdownHighlighter, markdownLanguage } from '@/lib/markdown-highlig
 import { CodeBlock } from './CodeBlock'
 import { LessonContents } from './LessonContents'
 import { MarkdownImage } from './MarkdownImage'
+import { MermaidDiagram } from './MermaidDiagram'
 
 /** Длиннее блок кода подсвечивать нет смысла: его копируют, а не читают. */
 const MAX_HIGHLIGHTED = 20_000
@@ -80,6 +81,7 @@ function LessonPre({ node, children, ...props }: ComponentProps<'pre'> & ExtraPr
   const fence = code?.tagName === 'code' ? fenceLanguage(code.properties?.className) : null
   const language = fence ? markdownLanguage(fence) : null
   const text = code ? hastText(code).replace(/\n$/, '') : ''
+  if (fence === 'mermaid') return <MermaidDiagram code={text} />
   if (highlighter && language && highlighter.getLoadedLanguages().includes(language) && text.length <= MAX_HIGHLIGHTED) {
     const html = highlighter.codeToHtml(text, { lang: language, themes: { light: 'github-light', dark: 'github-dark' } })
     return (
@@ -112,7 +114,7 @@ const components: Components = {
 const REMARK_PLUGINS = [remarkGfm]
 
 /**
- * Текст урока из Markdown-репозитория. Сырой HTML не исполняется: rehype-raw здесь
+ * Текст урока в Markdown: методичка из репозитория или конспект. Сырой HTML не исполняется: rehype-raw здесь
  * намеренно не подключён, в отличие от MarkdownRenderer. Код подсвечивается в
  * браузере после загрузки, до неё он читается обычным блоком.
  */
@@ -121,7 +123,8 @@ export function LessonMarkdown({ markdown, anchorPrefix = 'section' }: { markdow
   const outline = useMemo(() => lessonMarkdownOutline(markdown, anchorPrefix), [markdown, anchorPrefix])
   const state = useMemo(() => ({ highlighter, outline }), [highlighter, outline])
   const languageKey = useMemo(
-    () => [...new Set([...markdown.matchAll(/^ {0,3}(?:```|~~~)([\w-]+)/gm)].map((match) => markdownLanguage(match[1].toLowerCase())))].sort().join(','),
+    // Схемам mermaid подсветка не нужна: без кода на странице её движок не грузится.
+    () => [...new Set([...markdown.matchAll(/^ {0,3}(?:```|~~~)([\w-]+)/gm)].map((match) => markdownLanguage(match[1].toLowerCase())).filter((language) => language !== 'mermaid'))].sort().join(','),
     [markdown],
   )
   // Загрузка подсветки не разбирает текст заново: перерисуются только блоки кода.
