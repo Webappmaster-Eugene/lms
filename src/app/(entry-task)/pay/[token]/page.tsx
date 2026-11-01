@@ -57,7 +57,7 @@ export default async function PaymentPage({ params }: Props) {
       )}
       {state.kind === 'expired' && (
         <div className={card}>
-          <p>Срок оплаты прошёл {state.dueDate}. Напишите нам на {support}: если в потоке ещё есть места, мы пришлём новую ссылку.</p>
+          <p>Срок оплаты прошёл {state.dueDate} Напишите нам на {support}: если в потоке ещё есть места, мы пришлём новую ссылку.</p>
         </div>
       )}
       {state.kind === 'closed' && (

@@ -55,7 +55,7 @@ export default async function EntryTaskPage({ params }: Props) {
         <div className="rounded-xl border border-border bg-card px-5 py-4 text-base leading-relaxed">
           {lead.entryTaskDueAt
             ? overdue
-              ? <p>Срок, который мы называли, прошёл {formatEntryTaskDate(lead.entryTaskDueAt)}. Решение всё равно можно отправить, мы его посмотрим.</p>
+              ? <p>Срок, который мы называли, прошёл {formatEntryTaskDate(lead.entryTaskDueAt)} Решение всё равно можно отправить, мы его посмотрим.</p>
               : <p>Отправьте решение до {formatEntryTaskDate(lead.entryTaskDueAt)} включительно. Мы ответим в течение {ENTRY_TASK_REVIEW_DAYS} дней после отправки.</p>
             : <p>На задание {ENTRY_TASK_DUE_DAYS} дней с момента письма. Мы ответим в течение {ENTRY_TASK_REVIEW_DAYS} дней после отправки.</p>}
           <p className="mt-2 text-muted-foreground">Ссылка на эту страницу личная, пожалуйста, не пересылайте её.</p>

@@ -52,6 +52,10 @@ describe('письма кандидату о допуске и оплате', ()
     for (const letter of letters) expect(`${letter.subject}${letter.text}${letter.html}`).not.toMatch(/[—–]/)
   })
 
+  it('дата уже кончается точкой, второй после неё нет', () => {
+    for (const letter of letters) expect(`${letter.subject}${letter.text}${letter.html}`).not.toContain('г..')
+  })
+
   it('в письме о допуске ссылка на оплату, оферта, сумма и срок', () => {
     const [admitted, resend] = letters
     expect(admitted.subject).toBe('Вы допущены на буткемп Node.js')

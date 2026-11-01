@@ -325,7 +325,7 @@ export function bootcampEntryTaskEmail({ name, program, url, dueDate, reviewDays
   const reason = 'Вы получили это письмо, потому что оставили заявку на буткемп на info.mentorcareer.ru. Если заявку оставили не вы, письмо можно удалить.'
   return email(
     `Входное задание буткемпа ${program}`,
-    `Личная ссылка на входное задание, срок до ${dueDate}.`,
+    `Личная ссылка на входное задание, срок до ${dueDate}`,
     'Входное задание буткемпа',
     `${paragraph(escapeHtml(hello))}
     ${paragraph(escapeHtml(intro))}
@@ -419,7 +419,7 @@ export function bootcampPaymentReminderEmail({ name, program, amount, dueDate, u
   const reply = replyable ? later : ''
   return email(
     `Напоминание об оплате буткемпа ${program}`,
-    `Оплата до ${dueDate}.`,
+    `Оплата до ${dueDate}`,
     'Напоминание об оплате',
     `${paragraph(escapeHtml(bootcampHello(name)))}
     ${paragraph(escapeHtml(intro))}

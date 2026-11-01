@@ -27,6 +27,7 @@ describe('письмо с входным заданием', () => {
 
   it('содержит ссылку, срок, срок ответа и обращение по имени', () => {
     const { subject, text, html } = content(true)
+    expect(`${text}${html}`).not.toContain('г..')
     expect(subject).toBe('Входное задание буткемпа Node.js')
     expect(text).toContain('Здравствуйте, Анна!')
     expect(text).toContain('https://learn.test/entry-task/token')
