@@ -15,14 +15,14 @@ import {
   type AdmissionInput,
 } from '@/lib/bootcamp-admission'
 import { EnrollmentInputError, type EnrollmentInput } from '@/lib/bootcamp-enrollment'
-import { formatEntryTaskDate } from '@/lib/bootcamp-entry-task'
+import { ENTRY_TASK_MAX_SUBMISSIONS, formatEntryTaskDate } from '@/lib/bootcamp-entry-task'
 import { leadStatusLabel } from '@/lib/bootcamp-leads'
 import { logger } from '@/lib/telemetry'
 import { bootcampAdmittedEmail, bootcampDecisionEmail, emailBaseUrl } from '@/payload/emails/templates'
 import { leadEnrollmentState, startEnrollment, type EnrollmentView } from '@/server/bootcamp-enrollment'
 import { sendEntryTask } from '@/server/bootcamp-entry-task'
 import { actorName, inTransaction, journal, leadAdminLink, recordLeadEvent, rowsOf, txDb } from '@/server/bootcamp-lead-events'
-import { programNames, requireProgram } from '@/server/bootcamp-programs'
+import { assertKnownStreamGroup, programNames, requireProgram } from '@/server/bootcamp-programs'
 import { contactReplyTo } from '@/server/contact-reply-to'
 import { robokassaConfig } from '@/server/robokassa'
 import type { BootcampLead, User } from '@/payload-types'
@@ -217,6 +217,8 @@ export async function sendPaymentLink(payload: Payload, leadId: number, resend: 
 export async function admitLead(payload: Payload, admin: User, leadId: number, input: AdmissionInput): Promise<LeadPathState> {
   const lead = await findLead(payload, leadId)
   requireStage(lead, DECISION_STAGES, 'Допустить')
+  // Без решения задания допускают только осознанно: кнопка формы говорит об этом прямо.
+  if (!lead.entrySubmittedAt && !input.withoutEntryTask) throw new EnrollmentInputError('Кандидат ещё не прислал решение входного задания. Чтобы допустить его без задания, подтвердите это в форме допуска.', 409)
   const { username } = input.enrollment
   const taken = await payload.find({ collection: 'bootcamp-enrollments', where: { gitlabUsername: { equals: username } }, limit: 1, depth: 0, overrideAccess: true })
   if (taken.docs[0]) throw new EnrollmentInputError(`Логин ${username} уже у зачисленного ученика (${taken.docs[0].email})`, 409)
@@ -225,6 +227,7 @@ export async function admitLead(payload: Payload, admin: User, leadId: number, i
   const program = await requireProgram(payload, lead.program)
   const course = program.manualsCourseId === null ? null : await payload.findByID({ collection: 'courses', id: program.manualsCourseId, depth: 0, overrideAccess: true, disableErrors: true })
   if (!course) throw new EnrollmentInputError(`У программы «${program.shortTitle}» не выбран курс методичек или его нет: после оплаты зачислить будет некуда. Выберите курс в CMS, Буткемпы, Программы буткемпов.`, 409)
+  await assertKnownStreamGroup(payload, program, input.enrollment.group)
 
   const dueAt = paymentDueAt(new Date(), input.dueDays).toISOString()
   const draft: AdmissionDraft = { enrollment: input.enrollment, comment: input.comment }
@@ -240,7 +243,7 @@ export async function admitLead(payload: Payload, admin: User, leadId: number, i
       lead: leadId,
       type: 'admitted',
       actor: admin,
-      message: `Допущен: ${formatRubles(input.amountKopecks)} до ${formatEntryTaskDate(dueAt)}, логин GitLab ${username}`,
+      message: `Допущен${lead.entrySubmittedAt ? '' : ' без решения входного задания'}: ${formatRubles(input.amountKopecks)} до ${formatEntryTaskDate(dueAt)}, логин GitLab ${username}`,
       data: { amountKopecks: input.amountKopecks, dueAt, username, group: input.enrollment.group },
       telegram: {
         title: `Допущен: ${lead.email}`,
@@ -288,8 +291,14 @@ export async function cancelAdmission(payload: Payload, admin: User, leadId: num
   requireStage(lead, ['admitted', 'paid'], 'Отменить допуск')
   if (lead.status === 'paid') {
     const enrolled = await payload.count({ collection: 'bootcamp-enrollments', where: { lead: { equals: leadId } }, overrideAccess: true })
-    const real = await payload.count({ collection: 'bootcamp-payments', where: { and: [{ lead: { equals: leadId } }, { status: { equals: 'paid' } }, { isTest: { not_equals: true } }] }, overrideAccess: true })
-    if (enrolled.totalDocs > 0 || real.totalDocs > 0) throw new EnrollmentInputError('Оплата настоящая или зачисление уже начато: отменить допуск нельзя. Деньги возвращают в кабинете Робокассы.', 409)
+    if (enrolled.totalDocs > 0) throw new EnrollmentInputError('Зачисление уже начато: отменить допуск нельзя. Если ученик уходит, верните деньги и закройте доступы вручную.', 409)
+    const real = await payload.find({ collection: 'bootcamp-payments', where: { and: [{ lead: { equals: leadId } }, { status: { equals: 'paid' } }, { isTest: { not_equals: true } }] }, limit: 1, depth: 0, overrideAccess: true })
+    const [payment] = real.docs
+    if (payment) {
+      throw new EnrollmentInputError(payment.method === 'manual'
+        ? 'Оплата отмечена вручную: отменить допуск нельзя. Деньги возвращают тем же способом, каким они пришли.'
+        : 'Оплата прошла через Робокассу: отменить допуск нельзя. Деньги возвращают в кабинете Робокассы.', 409)
+    }
   }
   const back = lead.entrySubmittedAt ? 'diagnostic' : 'new'
   await inTransaction(payload, admin, async (req) => {
@@ -367,7 +376,9 @@ export async function extendEntryTask(payload: Payload, admin: User, leadId: num
   requireStage(lead, DECISION_STAGES, 'Продлить входное задание')
   const dueAt = await sendEntryTask(payload, { ...lead, entryTaskDueAt: null })
   if (!dueAt) throw new EnrollmentInputError('Письмо с заданием не ушло (сбой почты или предел писем в час). Подробности в журнале приложения.', 502)
-  await journal(payload, { lead: leadId, type: 'entry_task_extended', actor: admin, message: `Задание отправлено ещё раз, новый срок ${formatEntryTaskDate(dueAt)}` })
+  // Новый срок - новые попытки: иначе кандидат, истративший все отправки, получил бы срок, которым не может воспользоваться.
+  await db(payload).execute(sql`update bootcamp_leads set entry_submission_count = 0, updated_at = now() where id = ${leadId}`)
+  await journal(payload, { lead: leadId, type: 'entry_task_extended', actor: admin, message: `Задание отправлено ещё раз, новый срок ${formatEntryTaskDate(dueAt)}, отправок снова ${ENTRY_TASK_MAX_SUBMISSIONS}` })
   return leadPathState(payload, leadId)
 }
 

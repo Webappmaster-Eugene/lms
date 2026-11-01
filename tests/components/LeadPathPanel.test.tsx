@@ -63,6 +63,18 @@ describe('панель «Путь заявки»', () => {
     expect(screen.getByRole('button', { name: 'Отметить оплату вручную' })).toBeInTheDocument()
   })
 
+  it('без решения входного задания допуск подтверждают отдельной кнопкой', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json(state({}, { status: 'new', statusLabel: 'Новая', entrySubmittedAt: null, entrySubmissionCount: 0, entryPassed: null, entryTotal: null })))
+      .mockResolvedValueOnce(Response.json(state()))
+    render(<LeadPathPanel />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Допустить' }))
+    expect(screen.getByText(/Кандидат ещё не прислал решение входного задания/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Да, допустить без входного задания' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    const [, init] = fetchMock.mock.calls[1] as [string, RequestInit]
+    expect(JSON.parse(String(init.body))).toMatchObject({ action: 'admit', withoutEntryTask: 'yes' })
+  })
+
   it('ошибку сервера показывает, форма остаётся открытой', async () => {
     fetchMock.mockResolvedValueOnce(Response.json(state())).mockResolvedValueOnce(Response.json({ error: 'Логин ivan уже у зачисленного ученика' }, { status: 409 }))
     render(<LeadPathPanel />)

@@ -123,6 +123,10 @@ describe('зачисление из заявки', () => {
     expect((await enroll(lead.id, form('ok-login'), { ...asAdmin(), Origin: 'https://evil.test', 'Sec-Fetch-Site': 'cross-site' })).status).toBe(403)
     expect((await enroll(lead.id, form('Bad Login'))).status).toBe(400)
     expect((await enroll(lead.id, { ...form('ok-login'), accessUntil: '2020-01-01' })).status).toBe(400)
+    // Кнопка «Зачислить» вводит группу заново: опечатка отклоняется до создания учёток.
+    const typo = await enroll(lead.id, { ...form('ok-login'), group: 'nodejs-botcamp' })
+    expect(typo.status).toBe(409)
+    expect((await typo.json() as { error: string }).error).toMatch(/Группы «nodejs-botcamp» нет/)
     const unpaid = await newLead({ status: 'admitted', paidAt: null })
     const refused = await enroll(unpaid.id, form('ok-login'))
     expect(refused.status).toBe(409)

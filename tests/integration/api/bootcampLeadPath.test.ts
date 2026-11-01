@@ -140,6 +140,45 @@ describe('путь заявки: этап только кнопками', () => 
     }
   })
 
+  it('без решения входного задания допускают только с явным подтверждением', async () => {
+    const lead = await newLead({ status: 'new', entrySubmittedAt: null })
+    const refused = await act(lead.id, admitBody())
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { error: string }).error).toMatch(/не прислал решение входного задания/)
+    expect((await reload(lead.id)).status).toBe('new')
+    expect((await act(lead.id, { ...admitBody(), withoutEntryTask: 'yes' })).status).toBe(200)
+    expect((await state(lead.id)).events.map((event) => event.type)).toContain('admitted')
+    const [admitted] = (await payload.find({ collection: 'bootcamp-lead-events', where: { and: [{ lead: { equals: lead.id } }, { type: { equals: 'admitted' } }] }, overrideAccess: true })).docs
+    expect(admitted?.message).toMatch(/^Допущен без решения входного задания/)
+  })
+
+  it('группа потока: программы или удачного зачисления, опечатку видно сразу, а не после оплаты', async () => {
+    const typo = await act((await newLead()).id, { ...admitBody(), group: 'nodejs-botcamp' })
+    expect(typo.status).toBe(409)
+    expect((await typo.json() as { error: string }).error).toMatch(/Группы «nodejs-botcamp» нет ни в программе/)
+    // Группа прошлого удачного зачисления этой программы проходит.
+    const earlier = await newLead({ status: 'enrolled', paidAt: new Date().toISOString() })
+    await payload.create({ collection: 'bootcamp-enrollments', data: { lead: earlier.id, email: earlier.email, firstName: 'Иван', lastName: 'Петров', gitlabUsername: newUsername(), streamGroup: 'nodejs-2027-1', program: 'nodejs', status: 'done' }, overrideAccess: true })
+    expect((await act((await newLead()).id, { ...admitBody(), group: 'nodejs-2027-1' })).status).toBe(200)
+  })
+
+  it('«Продлить срок» присылает задание снова и возвращает все попытки отправки', async () => {
+    const mail = captureEmails(payload)
+    try {
+      const lead = await newLead({ entrySubmissionCount: 3, entryTaskSentAt: new Date(Date.now() - 10 * 86_400_000).toISOString(), entryTaskDueAt: new Date(Date.now() - 3 * 86_400_000).toISOString() })
+      const response = await act(lead.id, { action: 'extend-entry-task' })
+      expect(response.status).toBe(200)
+      const fresh = await reload(lead.id)
+      expect(fresh.entrySubmissionCount).toBe(0)
+      expect(Date.parse(fresh.entryTaskDueAt ?? '')).toBeGreaterThan(Date.now() + 6 * 86_400_000)
+      expect(mail.sent.find((message) => message.to === lead.email)?.subject).toContain('Входное задание')
+      const [extended] = (await payload.find({ collection: 'bootcamp-lead-events', where: { and: [{ lead: { equals: lead.id } }, { type: { equals: 'entry_task_extended' } }] }, overrideAccess: true })).docs
+      expect(extended?.message).toMatch(/отправок снова 3/)
+    } finally {
+      mail.restore()
+    }
+  })
+
   it('решения: подготовка требует текст и пишет кандидату, отказ и отзыв, возврат на рассмотрение', async () => {
     const mail = captureEmails(payload)
     try {
@@ -183,7 +222,7 @@ describe('оплата через Робокассу', () => {
       expect(before.defaults).toMatchObject({ amount: '30000', dueDays: 5, group: program.gitlabStreamGroup })
 
       // Пустые сумма и срок в форме - условия программы.
-      expect((await act(lead.id, { ...admitBody(), amount: '', dueDays: '' })).status).toBe(200)
+      expect((await act(lead.id, { ...admitBody(), group: program.gitlabStreamGroup, amount: '', dueDays: '' })).status).toBe(200)
       const fresh = await reload(lead.id)
       expect(fresh.paymentAmountKopecks).toBe(3_000_000)
       const days = (Date.parse(fresh.paymentDueAt ?? '') - Date.now()) / 86_400_000
@@ -324,12 +363,26 @@ describe('оплата через Робокассу', () => {
     }
   })
 
-  it('настоящую оплату отменой допуска не снять', async () => {
+  it('настоящую оплату отменой допуска не снять, причина своя для каждого случая', async () => {
     const { lead, token } = await admitted()
     await notice(await checkout(token), '45000.000000')
     const refused = await act(lead.id, { action: 'cancel-admission' })
     expect(refused.status).toBe(409)
+    // Оплата сразу запускает зачисление: дальше отменять нечего.
+    expect((await refused.json() as { error: string }).error).toMatch(/Зачисление уже начато/)
     expect((await reload(lead.id)).status).toBe('paid')
+
+    // Ручная оплата, после которой зачисление не запустилось (у программы убрали курс).
+    const { course } = await createCourseTree(payload, { lessons: 1 })
+    const program = await createProgram(payload, { manualsCourse: course.id })
+    const manual = await newLead({ program: program.key })
+    expect((await act(manual.id, { ...admitBody(), group: program.gitlabStreamGroup })).status).toBe(200)
+    await payload.update({ collection: 'bootcamp-programs', id: program.id, data: { manualsCourse: null }, overrideAccess: true })
+    expect((await act(manual.id, { action: 'mark-paid', amount: '30000', comment: 'перевод на карту' })).status).toBe(200)
+    expect((await state(manual.id)).enrollment).toBeNull()
+    const manualRefused = await act(manual.id, { action: 'cancel-admission' })
+    expect(manualRefused.status).toBe(409)
+    expect((await manualRefused.json() as { error: string }).error).toMatch(/Оплата отмечена вручную.*тем же способом/)
   })
 
   it('кривой токен и слишком большое уведомление отклоняются до работы с базой', async () => {

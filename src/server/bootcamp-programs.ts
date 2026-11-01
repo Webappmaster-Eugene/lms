@@ -62,3 +62,15 @@ export async function openProgramLinks(payload: Payload): Promise<{ title: strin
     return []
   }
 }
+
+/**
+ * Опечатка в группе потока всплыла бы только после оплаты, на шаге исполнителя: LMS в GitLab
+ * не ходит. Поэтому принимаем только группы, про которые известно, что они есть: группу
+ * программы и группы удачных зачислений этой программы. Новый поток - сначала в программу.
+ */
+export async function assertKnownStreamGroup(payload: Payload, program: BootcampProgramConfig, group: string): Promise<void> {
+  if (group === program.gitlabStreamGroup) return
+  const used = await payload.find({ collection: 'bootcamp-enrollments', where: { and: [{ program: { equals: program.key } }, { status: { equals: 'done' } }, { streamGroup: { equals: group } }] }, limit: 1, depth: 0, overrideAccess: true })
+  if (used.docs[0]) return
+  throw new EnrollmentInputError(`Группы «${group}» нет ни в программе «${program.shortTitle}», ни у прошлых зачислений. Проверьте опечатку. Если это новый поток, заведите группу в GitLab и в GRADER_GROUPS, а затем впишите её в программу (CMS, Буткемпы, Программы буткемпов).`, 409)
+}

@@ -24,7 +24,7 @@ import { BOOTCAMP_LEAD_STATUSES } from '@/lib/bootcamp-leads'
 import { relationId } from '@/lib/relation-id'
 import { adminLink, notifyAdmins } from '@/server/admin-telegram'
 import { actorName, journal } from '@/server/bootcamp-lead-events'
-import { requireProgram } from '@/server/bootcamp-programs'
+import { assertKnownStreamGroup, requireProgram } from '@/server/bootcamp-programs'
 import { gitlabWebhookToken } from '@/server/bootcamp-worker-auth'
 import type { BootcampEnrollment, BootcampLead, User } from '@/payload-types'
 
@@ -133,6 +133,8 @@ export async function startEnrollment(payload: Payload, admin: User, leadId: num
   const program = await requireProgram(payload, lead.program)
   const course = program.manualsCourseId === null ? null : await payload.findByID({ collection: 'courses', id: program.manualsCourseId, depth: 0, overrideAccess: true, disableErrors: true })
   if (!course) throw new EnrollmentInputError(`У программы «${program.shortTitle}» не выбран курс методичек или его нет: CMS, Буткемпы, Программы буткемпов`, 409)
+  // Оплата зачисляет с группой, которую проверил допуск; кнопка «Зачислить» вводит её заново.
+  if (!options.byPayment) await assertKnownStreamGroup(payload, program, input.group)
 
   const req = await createLocalReq({ user: admin }, payload)
   if (!(await initTransaction(req))) throw new Error('Enrollment requires a transaction')

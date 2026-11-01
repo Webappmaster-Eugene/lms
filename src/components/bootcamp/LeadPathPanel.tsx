@@ -115,7 +115,7 @@ export function LeadPathPanel() {
     {input('firstName', 'Имя')}
     {input('lastName', 'Фамилия')}
     {input('username', 'Логин GitLab', 'Станет путём проекта: поток/логин')}
-    {input('group', 'Группа потока в GitLab', 'Должна быть в GitLab и в GRADER_GROUPS грейдера')}
+    {input('group', 'Группа потока в GitLab', 'Группа программы или прошлого зачисления. Новый поток сначала впишите в программу')}
     {input('accessUntil', 'Курс методичек открыт до', 'Пусто - без срока', 'date')}
   </>
   const enrollDefaults = (): Fields => draft
@@ -130,13 +130,16 @@ export function LeadPathPanel() {
         {input('dueDays', 'Срок оплаты, дней', 'До конца этого дня по Москве', 'number')}
       </div>
       {input('comment', 'Комментарий в письмо', 'Необязательно. Увидит кандидат', 'textarea')}
-      {confirm('Да, допустить', state.paymentsEnabled ? `На ${lead.email} уйдёт письмо с личной ссылкой на оплату. После оплаты зачисление с этими данными запустится само.` : 'Робокасса не подключена: письмо со ссылкой не уйдёт, оплату можно будет отметить вручную.')}
+      {confirm(lead.entrySubmittedAt ? 'Да, допустить' : 'Да, допустить без входного задания', [
+        lead.entrySubmittedAt ? null : 'Кандидат ещё не прислал решение входного задания.',
+        state.paymentsEnabled ? `На ${lead.email} уйдёт письмо с личной ссылкой на оплату. После оплаты зачисление с этими данными запустится само.` : 'Робокасса не подключена: письмо со ссылкой не уйдёт, оплату можно будет отметить вручную.',
+      ].filter(Boolean).join(' '))}
     </>,
     prepare: <>{input('message', 'Что подтянуть', 'Уйдёт кандидату в письме', 'textarea')}{confirm('Да, отправить на подготовку', `На ${lead.email} уйдёт письмо с этим текстом.`)}</>,
     reject: <>{input('message', 'Причина', 'Необязательно. Уйдёт кандидату в письме', 'textarea')}{confirm('Да, отказать', `На ${lead.email} уйдёт письмо с решением.`)}</>,
     withdraw: <>{input('message', 'Заметка', 'Необязательно. Кандидату письмо не уходит', 'textarea')}{confirm('Да, кандидат отказался', 'Заявка закроется без письма.')}</>,
     reopen: confirm('Да, вернуть', 'Заявка вернётся к решению, письма не будет.'),
-    'extend-entry-task': confirm('Да, отправить', `На ${lead.email} уйдёт письмо с той же ссылкой и новым сроком, 7 дней. Число отправок решения не обнуляется.`),
+    'extend-entry-task': confirm('Да, отправить', `На ${lead.email} уйдёт письмо с той же ссылкой и новым сроком, 7 дней. Отправок решения снова будет 3.`),
     'resend-payment': <>{input('dueDays', 'Новый срок оплаты, дней', 'От сегодняшнего дня', 'number')}{confirm('Да, отправить', `На ${lead.email} уйдёт письмо с той же ссылкой и новым сроком.`)}</>,
     'cancel-admission': confirm('Да, отменить допуск', 'Ссылка на оплату перестанет работать, заявка вернётся к решению. Кандидату письмо не уходит.'),
     'mark-paid': <>
@@ -173,7 +176,7 @@ export function LeadPathPanel() {
       <Step title="2. Решение о допуске" done={decided && !CLOSED.includes(lead.status)}>
         {DECISION.includes(lead.status) && !form && (
           <div className="enrollment__actions">
-            {button('Допустить', () => open('admit', { ...enrollDefaults(), amount: state.defaults.amount, dueDays: String(state.defaults.dueDays), comment: '' }), true)}
+            {button('Допустить', () => open('admit', { ...enrollDefaults(), amount: state.defaults.amount, dueDays: String(state.defaults.dueDays), comment: '', ...(lead.entrySubmittedAt ? {} : { withoutEntryTask: 'yes' }) }), true)}
             {button('Нужна подготовка', () => open('prepare', { message: '' }))}
             {button('Отказать', () => open('reject', { message: '' }))}
             {button('Кандидат отказался сам', () => open('withdraw', { message: '' }))}

@@ -31,6 +31,8 @@ export type AdmissionInput = {
   amountKopecks: number
   dueDays: number
   comment: string | null
+  /** Наставник подтвердил допуск кандидата, который не прислал решение входного задания. */
+  withoutEntryTask: boolean
 }
 
 const MAX_COMMENT = 2000
@@ -73,6 +75,7 @@ export function parseAdmissionInput(body: unknown, defaults: AdmissionDefaults, 
     amountKopecks: data.amount === undefined || data.amount === '' ? defaults.priceKopecks : parseRubles(data.amount),
     dueDays: parseDays(data.dueDays, defaults.paymentDueDays),
     comment: optionalText(data.comment, 'Комментарий'),
+    withoutEntryTask: data.withoutEntryTask === true || data.withoutEntryTask === 'yes',
   }
 }
 
