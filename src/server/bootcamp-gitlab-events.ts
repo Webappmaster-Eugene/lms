@@ -61,6 +61,15 @@ function pipelineEvent(student: string, body: Json): AdminEvent | null {
   return { title: `${student}: CI MR ${status === 'success' ? 'прошёл' : 'упал'}`, lines: [`!${str(mr.iid)} «${str(mr.title)}», ветка ${str(pipeline.ref)}`], link }
 }
 
+/** Комментарий бота - Markdown со служебной меткой и таблицей. В журнал и Telegram идёт только итог. */
+export function verdictSummary(note: string): string {
+  const text = note.replace(/<!--[\s\S]*?-->/g, '').trim()
+  const headline = /^\*\*Доверенная проверка: (.+)\*\*$/m.exec(text)?.[1]
+  if (!headline) return excerpt(text, 900)
+  const passed = /Прошло проверок: (\d+ из \d+)/.exec(text)?.[1]
+  return `${headline.replace(/[—–]/g, '-')}${passed ? `, прошло ${passed}` : ''}`
+}
+
 function noteEvent(student: string, enrollment: BootcampEnrollment, body: Json): AdminEvent | null {
   const note = obj(body.object_attributes)
   if (str(note.noteable_type) !== 'MergeRequest') return null
@@ -68,7 +77,7 @@ function noteEvent(student: string, enrollment: BootcampEnrollment, body: Json):
   const mr = obj(body.merge_request)
   const ref = `MR !${str(mr.iid)} «${str(mr.title)}»`
   const link = str(note.url) || null
-  if (isBot(author)) return { title: `${student}: вердикт проверки`, lines: [ref, excerpt(str(note.note), 900)], link }
+  if (isBot(author)) return { title: `${student}: вердикт проверки`, lines: [verdictSummary(str(note.note)), ref], link }
   if (str(author.username) === enrollment.gitlabUsername) return { title: `${student}: комментарий в MR`, lines: [ref, excerpt(str(note.note), 900)], link }
   return null
 }
