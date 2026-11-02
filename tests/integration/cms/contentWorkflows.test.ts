@@ -71,6 +71,23 @@ describe('практические операции lms-content через REST 
     expect((await rest('PATCH', `/lessons/${lesson.id}`, { token: studentToken, body: { title: 'Чужая правка' } })).status).toBe(403)
   })
 
+  it('удаляет курс, собранный импортом: запись журнала остаётся без курса', async () => {
+    const roadmap = await create('roadmaps', { title: `Карта ${uid('import')}` })
+    const course = await create('courses', { title: `Курс ${uid('import')}`, roadmap: roadmap.id })
+    const importer = await createAdmin(payload)
+    const record = await create('yandex-disk-imports', {
+      publicUrl: 'https://disk.yandex.ru/d/integration-import', course: course.id, importedBy: importer.id, status: 'completed',
+    })
+
+    expect((await rest('DELETE', `/courses/${course.id}`, { token: adminToken })).status).toBe(200)
+
+    expect((await rest('GET', `/courses/${course.id}`, { token: adminToken })).status).toBe(404)
+    const journal = await rest('GET', `/yandex-disk-imports/${record.id}?depth=0`, { token: adminToken })
+    expect(journal.status).toBe(200)
+    expect(journal.json).toMatchObject({ id: record.id, status: 'completed' })
+    expect(journal.json.course ?? null).toBeNull()
+  })
+
   it('хранит презентацию в уроке: имена файлов вычисляет сервер, ученик не видит ссылок Диска', async () => {
     const folder = 'https://disk.yandex.com/d/integration-key/guide'
     const roadmap = await create('roadmaps', { title: `Карта ${uid('slides')}`, isPublished: true })

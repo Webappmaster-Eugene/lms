@@ -41,8 +41,10 @@ export const YandexDiskImports: CollectionConfig = {
       name: 'course',
       type: 'relationship',
       relationTo: 'courses',
-      required: true,
       label: 'Целевой курс',
+      admin: {
+        description: 'Пусто, если курс удалён: журнал импорта не должен мешать удалению курса.',
+      },
     },
     {
       name: 'sectionsCreated',

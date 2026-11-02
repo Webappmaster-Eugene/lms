@@ -1786,7 +1786,10 @@ export interface YandexDiskImport {
   id: number;
   publicUrl: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
-  course: number | Course;
+  /**
+   * Пусто, если курс удалён: журнал импорта не должен мешать удалению курса.
+   */
+  course?: (number | null) | Course;
   sectionsCreated?: number | null;
   lessonsCreated?: number | null;
   errorLog?: string | null;
