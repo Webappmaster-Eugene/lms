@@ -130,6 +130,15 @@ test('после зачёта на 1440x900 таблица результата 
     await table.scrollIntoViewIfNeeded()
     await expect(table).toBeInViewport({ ratio: 1 })
     await expect(page.getByRole('button', { name: 'Отправить' })).toBeInViewport()
+
+    // На низком экране результат ниже сгиба, а мышь часто стоит над редактором с коротким запросом.
+    await page.setViewportSize({ width: 1024, height: 600 })
+    await page.evaluate(() => window.scrollTo(0, 0))
+    const editor = await page.locator('.monaco-editor').first().boundingBox()
+    if (!editor) throw new Error('Редактор не на экране')
+    await page.mouse.move(editor.x + editor.width / 2, editor.y + 40)
+    await page.mouse.wheel(0, 300)
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
   } finally {
     for (const [collection, id] of created) expect((await admin.request.delete(`${APP_URL}/api/${collection}/${id}`)).status(), `${collection} ${id}`).toBe(200)
     await admin.close()

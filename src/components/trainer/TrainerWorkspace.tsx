@@ -363,8 +363,9 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
     setFocusLine(undefined)
   }, [language, task.starters])
 
-  // Сбой сети или компиляции до скрытых тестов не доходит, поэтому смотрим на сам отчёт, а не на нажатие.
-  const hiddenCasesRan = result?.tests.some((test) => test.hidden) === true
+  // Смотрим на отчёт сервера, а не на нажатие: сбой сети или компиляции до скрытых тестов не доходит.
+  // Отчёт браузера не в счёт: testCode задачи может объявить свой скрытый тест, и он выполнится там.
+  const hiddenCasesRan = origin === 'server' && result?.tests.some((test) => test.hidden) === true
 
   const hiddenNote = useMemo(() => {
     if (task.hiddenCaseCount === 0) return null

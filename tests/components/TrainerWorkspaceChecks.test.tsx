@@ -572,6 +572,17 @@ describe('скрытые тесты', () => {
     expect(screen.getByText(note)).toBeInTheDocument()
   })
 
+  it('скрытый тест из testCode в браузерном прогоне не снимает подпись: скрытые кейсы ещё впереди', async () => {
+    const user = userEvent.setup()
+    run.mockResolvedValue(outcome({ tests: [{ name: 'Аргументы не меняются', hidden: true, passed: true, durationMs: 1 }] }))
+    render(<TrainerWorkspace task={task} progress={progress} />)
+
+    await user.click(screen.getByRole('button', { name: 'Запустить' }))
+
+    expect(await screen.findByText(/локальный прогон/)).toBeInTheDocument()
+    expect(screen.getByText(note)).toBeInTheDocument()
+  })
+
   it.each([
     ['сервер не ответил', () => Response.json({ error: 'Проверка перегружена' }, { status: 503 }), 'Ошибка выполнения'],
     ['решение не скомпилировалось', () => Response.json({ result: outcome({ status: 'compile_error', error: 'Синтаксис', totalCount: 0 }), completed: false, awardedPoints: null, attempts: 1 }), 'Код не компилируется'],

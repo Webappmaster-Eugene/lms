@@ -210,7 +210,8 @@ export function MonacoCodeEditor({
     smoothScrolling: true,
     padding: { top: 12, bottom: 12 },
     bracketPairColorization: { enabled: true },
-    scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
+    // Иначе редактор забирает колесо, даже когда прокручивать нечего, и на низком экране до результата не дойти.
+    scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10, alwaysConsumeMouseWheel: false },
     quickSuggestions: { other: true, comments: false, strings: false },
     suggestOnTriggerCharacters: true,
     wordWrap: 'off',
