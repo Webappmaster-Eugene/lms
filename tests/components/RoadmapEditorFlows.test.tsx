@@ -23,7 +23,7 @@ const ROADMAP_ID = 7
 function editorNode(id: string, data: Partial<EditorNodeData> = {}, position = { x: 120.4, y: 80.6 }): EditorNode {
   return {
     id, type: data.nodeType ?? 'topic', position,
-    data: { label: `Узел ${id}`, nodeType: 'topic', icon: null, description: null, stage: null, color: null, bullets: [], courseId: null, courseName: null, guideIds: [], bootcampIds: [], order: 1, payloadId: 10, nodeId: id, ...data },
+    data: { label: `Узел ${id}`, nodeType: 'topic', icon: null, description: null, stage: null, color: null, bullets: [], courseId: null, courseName: null, guideIds: [], bootcampIds: [], sharedCourseIds: [], order: 1, payloadId: 10, nodeId: id, ...data },
   } as EditorNode
 }
 

@@ -36,6 +36,7 @@ function node(): EditorNode {
       courseName: null,
       guideIds: [],
       bootcampIds: [],
+      sharedCourseIds: [],
       order: 1,
       payloadId: 10,
       nodeId: 'n1',
@@ -84,8 +85,8 @@ describe('панель правки узла', () => {
     const select = screen.getAllByRole('combobox')[0]
     await user.selectOptions(select, 'category')
 
-    // Категория — заголовок этапа: гайды и буткемпы с неё снимаются тем же обновлением.
-    expect(onUpdate).toHaveBeenCalledWith('n1', { nodeType: 'category', guideIds: [], bootcampIds: [] })
+    // Категория — заголовок этапа: гайды, буткемпы и курсы других роадмапов с неё снимаются тем же обновлением.
+    expect(onUpdate).toHaveBeenCalledWith('n1', { nodeType: 'category', guideIds: [], bootcampIds: [], sharedCourseIds: [] })
     await user.selectOptions(select, 'subtopic')
     expect(onUpdate).toHaveBeenLastCalledWith('n1', { nodeType: 'subtopic' })
   })
@@ -112,6 +113,7 @@ describe('панель правки узла', () => {
 
   describe('гайды и буткемпы темы', () => {
     const lists = (url: string) => {
+      if (url.includes('limit=1000')) return Response.json({ docs: [{ id: 61, title: 'Английский', roadmap: 2 }, { id: 62, title: 'Свой курс', roadmap: 7 }, { id: 90, title: 'Буткемп Node.js', roadmap: 2, isBootcamp: true }] })
       if (url.includes('/api/guides')) return Response.json({ docs: [{ id: 1, title: 'LinkedIn', isPublished: true }, { id: 2, title: 'Резюме', isPublished: false }] })
       if (url.includes('[isBootcamp]')) return Response.json({ docs: [{ id: 90, title: 'Буткемп Node.js', isPublished: true }] })
       return Response.json({ docs: [{ id: 51, title: 'Глубокий React' }, { id: 90, title: 'Буткемп Node.js', isBootcamp: true }] })
@@ -144,11 +146,23 @@ describe('панель правки узла', () => {
       expect(within(course).queryByRole('option', { name: 'Буткемп Node.js' })).toBeNull()
     })
 
+    it('курс другого роадмапа выбирается списком, в нём нет своих курсов и буткемпов', async () => {
+      const user = userEvent.setup()
+      renderPanel()
+      const shared = screen.getByRole('group', { name: /Курсы из других роадмапов/ })
+
+      await user.click(await within(shared).findByRole('checkbox', { name: 'Английский' }))
+      expect(onUpdate).toHaveBeenLastCalledWith('n1', { sharedCourseIds: [61] })
+      expect(within(shared).queryByRole('checkbox', { name: 'Свой курс' })).toBeNull()
+      expect(within(shared).queryByRole('checkbox', { name: 'Буткемп Node.js' })).toBeNull()
+    })
+
     it('у категории списков нет', () => {
       renderPanel({ nodeType: 'category' })
 
       expect(screen.queryByRole('group', { name: /Гайды темы/ })).toBeNull()
       expect(screen.queryByRole('group', { name: /Буткемпы темы/ })).toBeNull()
+      expect(screen.queryByRole('group', { name: /Курсы из других роадмапов/ })).toBeNull()
     })
 
     it('сбой загрузки виден, а выбранный id остаётся и снимается', async () => {

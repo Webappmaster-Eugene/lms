@@ -238,21 +238,21 @@ describe('редактор роадмапа', () => {
       expect(node.data.bullets).toEqual(['пункт'])
     })
 
-    it('гайды и буткемпы темы читаются и числами, и объектами, у категории отбрасываются', async () => {
+    it('гайды, буткемпы и курсы других роадмапов читаются и числами, и объектами, у категории отбрасываются', async () => {
       const { result } = await openEditor({
         nodes: [
-          payloadNode('n1', 1, { guides: [3, { id: 1, title: 'Гайд' }], bootcamps: [{ id: 9 }] }),
+          payloadNode('n1', 1, { guides: [3, { id: 1, title: 'Гайд' }], bootcamps: [{ id: 9 }], sharedCourses: [7, { id: 8, title: 'Курс' }] }),
           payloadNode('n2', 2),
-          payloadNode('c1', 3, { nodeType: 'category', guides: [5], bootcamps: [6] }),
+          payloadNode('c1', 3, { nodeType: 'category', guides: [5], bootcamps: [6], sharedCourses: [2] }),
         ],
         edges: [],
       })
       const data = (id: string) => result.current.nodes.find((node) => node.id === id)?.data
 
-      expect(data('n1')).toMatchObject({ guideIds: [3, 1], bootcampIds: [9] })
+      expect(data('n1')).toMatchObject({ guideIds: [3, 1], bootcampIds: [9], sharedCourseIds: [7, 8] })
       // Ученику поля не отдаются вовсе; у админа пустая связь может прийти null.
-      expect(data('n2')).toMatchObject({ guideIds: [], bootcampIds: [] })
-      expect(data('c1')).toMatchObject({ guideIds: [], bootcampIds: [] })
+      expect(data('n2')).toMatchObject({ guideIds: [], bootcampIds: [], sharedCourseIds: [] })
+      expect(data('c1')).toMatchObject({ guideIds: [], bootcampIds: [], sharedCourseIds: [] })
     })
 
     it('пустые пункты списка отбрасываются', async () => {

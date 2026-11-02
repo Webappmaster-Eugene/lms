@@ -10,14 +10,15 @@ export type LearningGrant = {
   startsAt?: string | null
   expiresAt?: string | null
 }
-export type LearningCourseMetadata = { id: number; roadmap: unknown; roadmapNode?: unknown; isPublished?: boolean | null; assignedOnly?: boolean | null }
+export type LearningCourseMetadata = { id: number; roadmap: unknown; roadmapNode?: unknown; isPublished?: boolean | null; assignedOnly?: boolean | null; isBootcamp?: boolean | null }
 export type LearningSectionMetadata = { id: number; course: unknown; isPublished?: boolean | null }
 export type LearningLessonMetadata = { id: number; course: unknown; section?: unknown; isPublished?: boolean | null }
 /**
  * `guides` — только опубликованные гайды темы, `bootcamps` — буткемпы, привязанные к ней полем узла.
  * Гайды и буткемпы показывают тему без курса, но не открывают ни её курсы, ни саму карту.
+ * `sharedCourses` — курсы других роадмапов, которые тема показывает как свои: они входят в программу карты.
  */
-export type LearningNodeMetadata = { id: number; roadmap: unknown; course?: unknown; guides?: number[]; bootcamps?: number[] }
+export type LearningNodeMetadata = { id: number; roadmap: unknown; nodeType?: string | null; course?: unknown; guides?: number[]; bootcamps?: number[]; sharedCourses?: unknown[] | null }
 export type LearningPolicyMetadata = {
   courses: LearningCourseMetadata[]
   sections: LearningSectionMetadata[]
@@ -116,8 +117,24 @@ export function buildLearningAccess(
     effects.push(decision)
     primaryTopicEffects.set(course.id, effects)
   }
+  // Тема другой карты может открыть курс, но не закрыть: запрет там не должен отнимать курс
+  // в его собственном роадмапе. Поэтому ниже из этих тем учитывается только allow.
+  // Категория и курс, ставший буткемпом уже в теме, отсекаются здесь, а не у источников:
+  // каталог, точечная проверка видео и предпросмотр обязаны решать одинаково.
+  const sharedTopics = new Map<number, LearningNodeMetadata[]>()
+  for (const node of nodes.values()) {
+    if (node.nodeType === 'category' || !roadmaps.has(learningRelationId(node.roadmap) ?? -1)) continue
+    for (const raw of node.sharedCourses ?? []) {
+      const course = courses.get(learningRelationId(raw) ?? -1)
+      if (!course || course.isBootcamp) continue
+      const topics = sharedTopics.get(course.id) ?? []
+      topics.push(node)
+      sharedTopics.set(course.id, topics)
+    }
+  }
   const courseEffects = new Map<number, boolean>()
   for (const course of courses.values()) {
+    const shared = sharedTopics.get(course.id) ?? []
     let decision = effect('courses', course.id)
     if (!decision) {
       const topicEffects = [...(primaryTopicEffects.get(course.id) ?? [])]
@@ -125,10 +142,14 @@ export function buildLearningAccess(
       const nodeEffect = nodeId === null ? undefined : effect('roadmap-nodes', nodeId)
       if (nodeEffect) topicEffects.push(nodeEffect)
       decision = topicEffects.includes('deny') ? 'deny' : topicEffects.includes('allow') ? 'allow' : undefined
+      if (!decision && shared.some((node) => effect('roadmap-nodes', node.id) === 'allow')) decision = 'allow'
     }
     // Курс «только по назначению» (платный поток) открывает лишь назначение на него
     // самого или его тему: доступ ко всей карте и режим «все курсы» его не касаются.
-    if (!course.assignedOnly) decision ??= effect('roadmaps', learningRelationId(course.roadmap) ?? -1)
+    if (!course.assignedOnly) {
+      decision ??= effect('roadmaps', learningRelationId(course.roadmap) ?? -1)
+      if (!decision && shared.some((node) => effect('roadmaps', learningRelationId(node.roadmap) ?? -1) === 'allow')) decision = 'allow'
+    }
     courseEffects.set(course.id, Boolean(user) && (decision ? decision === 'allow' : mode === 'all' && !course.assignedOnly))
   }
   const sectionAllowed = (section: LearningSectionMetadata) => {
@@ -194,9 +215,12 @@ export function buildLearningAccess(
   const hidden = new Set(admin ? [] : [...courses.values()].filter((course) => course.assignedOnly && !accessible.has(course.id)).map((course) => course.id))
   const inCatalog = (courseId: number | null) => catalogVisibility === 'catalog' && (courseId === null || !hidden.has(courseId))
   // Тема без своего курса, к которой привязаны через roadmapNode только закрытые курсы, тоже скрыта.
-  const topicOf = (course: LearningCourseMetadata) => learningRelationId(course.roadmapNode)
-  const openTopics = new Set([...courses.values()].filter((course) => !hidden.has(course.id)).map(topicOf))
-  const hiddenTopics = new Set([...courses.values()].filter((course) => hidden.has(course.id)).map(topicOf).filter((id) => id !== null && !openTopics.has(id)))
+  const topicLinks = [
+    ...[...courses.values()].map((course) => [learningRelationId(course.roadmapNode), course.id] as const),
+    ...[...sharedTopics].flatMap(([courseId, topics]) => topics.map((node) => [node.id, courseId] as const)),
+  ]
+  const openTopics = new Set(topicLinks.filter(([, courseId]) => !hidden.has(courseId)).map(([topic]) => topic))
+  const hiddenTopics = new Set(topicLinks.filter(([topic, courseId]) => hidden.has(courseId) && topic !== null && !openTopics.has(topic)).map(([topic]) => topic))
   const browseCourses = new Set(user ? catalogVisibility === 'catalog' ? [...courses.keys()].filter((id) => !hidden.has(id)) : accessible : [])
   const browseSections = new Set<number>()
   for (const section of sections.values()) {
@@ -217,12 +241,21 @@ export function buildLearningAccess(
     if (roadmapId !== null) browseRoadmaps.add(roadmapId)
     if (nodeId !== null) browseNodes.add(nodeId)
   }
+  for (const [courseId, topics] of sharedTopics) {
+    if (!browseCourses.has(courseId)) continue
+    for (const node of topics) {
+      const roadmapId = learningRelationId(node.roadmap)
+      if (roadmapId === null || effect('roadmap-nodes', node.id) === 'deny') continue
+      browseNodes.add(node.id)
+      browseRoadmaps.add(roadmapId)
+    }
+  }
   for (const roadmapId of roadmaps) if (user && effect('roadmaps', roadmapId) === 'allow') browseRoadmaps.add(roadmapId)
   for (const node of nodes.values()) {
     const roadmapId = learningRelationId(node.roadmap)
     if (!user || roadmapId === null || !roadmaps.has(roadmapId)) continue
     const courseId = learningRelationId(node.course)
-    if ((inCatalog(courseId) && !(courseId === null && hiddenTopics.has(node.id))) || (courseId !== null && browseCourses.has(courseId)) || effect('roadmap-nodes', node.id) === 'allow' || (courseId === null && effect('roadmaps', roadmapId) === 'allow' && effect('roadmap-nodes', node.id) !== 'deny')) {
+    if ((inCatalog(courseId) && !(courseId === null && hiddenTopics.has(node.id))) || (courseId !== null && browseCourses.has(courseId)) || effect('roadmap-nodes', node.id) === 'allow' || (courseId === null && effect('roadmaps', roadmapId) === 'allow' && effect('roadmap-nodes', node.id) !== 'deny' && !hiddenTopics.has(node.id))) {
       browseNodes.add(node.id)
       browseRoadmaps.add(roadmapId)
     }
@@ -266,11 +299,19 @@ export function buildLearningAccess(
     const courseId = learningRelationId(node.course)
     if (courseId !== null && courses.has(courseId)) linkCourse(node.id, courseId)
   }
+  for (const [courseId, topics] of sharedTopics) for (const node of topics) linkCourse(node.id, courseId)
   // Текст роадмапа и темы без курсов может упоминать любую часть карты, включая закрытые курсы.
   const partialRoadmaps = new Set<number>()
   for (const course of courses.values()) {
     const roadmapId = learningRelationId(course.roadmap)
     if (roadmapId !== null && !wholeCourses.has(course.id)) partialRoadmaps.add(roadmapId)
+  }
+  for (const [courseId, topics] of sharedTopics) {
+    if (wholeCourses.has(courseId)) continue
+    for (const node of topics) {
+      const roadmapId = learningRelationId(node.roadmap)
+      if (roadmapId !== null) partialRoadmaps.add(roadmapId)
+    }
   }
   for (const node of nodes.values()) {
     const roadmapId = learningRelationId(node.roadmap)

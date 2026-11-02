@@ -85,7 +85,7 @@ type Props = {
 }
 
 type CourseOption = { id: number; title: string; slug: string; isBootcamp?: boolean | null }
-type ExtraOption = { id: number; title: string; isPublished?: boolean | null }
+type ExtraOption = { id: number; title: string; isPublished?: boolean | null; roadmap?: number | null; isBootcamp?: boolean | null }
 type ExtraOptions = { items: ExtraOption[]; failed: boolean }
 
 const NO_OPTIONS: ExtraOptions = { items: [], failed: false }
@@ -109,6 +109,7 @@ function extraOptionsLoader(url: string, what: string) {
 
 const loadGuides = extraOptionsLoader('/api/guides?limit=500&sort=title&depth=0&select[title]=true&select[isPublished]=true', 'гайды')
 const loadBootcamps = extraOptionsLoader('/api/courses?where[isBootcamp][equals]=true&limit=100&depth=0&select[title]=true&select[isPublished]=true', 'буткемпы')
+const loadAllCourses = extraOptionsLoader('/api/courses?limit=1000&sort=title&depth=0&select[title]=true&select[isPublished]=true&select[roadmap]=true&select[isBootcamp]=true', 'курсы других роадмапов')
 
 export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: Props) {
   const data = node.data as EditorNodeData
@@ -127,6 +128,8 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
   const { data: courses, loading: coursesLoading } = useAsyncData<CourseOption[]>(loadCourses, [])
   const { data: guides, loading: guidesLoading } = useAsyncData<ExtraOptions>(loadGuides, NO_OPTIONS)
   const { data: bootcamps, loading: bootcampsLoading } = useAsyncData<ExtraOptions>(loadBootcamps, NO_OPTIONS)
+  const { data: allCourses, loading: allCoursesLoading } = useAsyncData<ExtraOptions>(loadAllCourses, NO_OPTIONS)
+  const sharedCourseOptions = { ...allCourses, items: allCourses.items.filter((course) => course.roadmap !== roadmapId && !course.isBootcamp) }
   // Буткемп привязывается только своим списком; уже выбранный оставляем, чтобы его можно было снять.
   const courseOptions = courses.filter((course) => !course.isBootcamp || course.id === data.courseId)
 
@@ -202,8 +205,8 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
               value={data.nodeType}
               onChange={(e) => {
                 const nodeType = e.target.value as EditorNodeData['nodeType']
-                // Категория — заголовок этапа: гайды и буткемпы на ней не показываются, их снимаем сразу.
-                update(nodeType === 'category' ? { nodeType, guideIds: [], bootcampIds: [] } : { nodeType })
+                // Категория — заголовок этапа: состав темы на ней не показывается, снимаем его сразу.
+                update(nodeType === 'category' ? { nodeType, guideIds: [], bootcampIds: [], sharedCourseIds: [] } : { nodeType })
               }}
               style={selectStyle}
             >
@@ -278,6 +281,16 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
 
         {data.nodeType !== 'category' && (
           <>
+            <ExtraChecklist
+              label="Курсы из других роадмапов"
+              hint="Курс остаётся в своём роадмапе, а здесь входит в тему, прогресс и завершение карты."
+              unknownLabel="Курс"
+              options={sharedCourseOptions}
+              loading={allCoursesLoading}
+              selected={data.sharedCourseIds}
+              max={10}
+              onChange={(sharedCourseIds) => update({ sharedCourseIds })}
+            />
             <ExtraChecklist
               label="Буткемпы темы"
               hint="Видны в теме даже без доступа, с замком. В прогресс не входят."

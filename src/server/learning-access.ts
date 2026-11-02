@@ -58,18 +58,20 @@ async function loadLessonPolicy(payload: Payload, user: LearningAccessUser | nul
   if (!user || user.role === 'admin') return buildLearningAccess(user, [], empty)
   const courseId = learningRelationId(lesson.course)
   if (courseId === null) return buildLearningAccess(user, [], empty)
-  const courseResult = await payload.find({ collection: 'courses', where: { id: { equals: courseId } }, select: { roadmap: true, roadmapNode: true, isPublished: true, assignedOnly: true }, depth: 0, limit: 1, overrideAccess: true, req })
+  const courseResult = await payload.find({ collection: 'courses', where: { id: { equals: courseId } }, select: { roadmap: true, roadmapNode: true, isPublished: true, assignedOnly: true, isBootcamp: true }, depth: 0, limit: 1, overrideAccess: true, req })
   const course = courseResult.docs[0]
   if (!course) return buildLearningAccess(user, [], empty)
   const roadmapId = learningRelationId(course.roadmap)
   const sectionId = learningRelationId(lesson.section)
   const nodeId = learningRelationId(course.roadmapNode)
-  const [grants, roadmaps, sections, nodes] = await Promise.all([
+  const [grants, sections, nodes] = await Promise.all([
     collectAllPages(({ page, limit }) => payload.find({ collection: 'learning-access-grants', where: { user: { equals: user.id } }, select: { target: true, effect: true, startsAt: true, expiresAt: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'назначения учебного доступа' }),
-    roadmapId === null ? Promise.resolve([]) : payload.find({ collection: 'roadmaps', where: { id: { equals: roadmapId } }, select: { isPublished: true }, depth: 0, limit: 1, overrideAccess: true, req }).then((result) => result.docs),
     sectionId === null ? Promise.resolve([]) : payload.find({ collection: 'sections', where: { id: { equals: sectionId } }, select: { course: true, isPublished: true }, depth: 0, limit: 1, overrideAccess: true, req }).then((result) => result.docs),
-    collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmap-nodes', where: { or: [{ course: { equals: courseId } }, ...(nodeId === null ? [] : [{ id: { equals: nodeId } }])] }, select: { roadmap: true, course: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'темы конкретного курса' }),
+    collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmap-nodes', where: { or: [{ course: { equals: courseId } }, ...(nodeId === null ? [] : [{ id: { equals: nodeId } }]), { and: [{ sharedCourses: { equals: courseId } }, { nodeType: { not_equals: 'category' } }] }] }, select: { roadmap: true, nodeType: true, course: true, sharedCourses: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'темы конкретного курса' }),
   ])
+  // Тема другого роадмапа открывает курс, только если её карта опубликована: нужна и она.
+  const roadmapIds = [...new Set([roadmapId, ...nodes.map((node) => learningRelationId(node.roadmap))].flatMap((id) => id ?? []))]
+  const roadmaps = roadmapIds.length ? (await payload.find({ collection: 'roadmaps', where: { id: { in: roadmapIds } }, select: { isPublished: true }, depth: 0, limit: roadmapIds.length, overrideAccess: true, req })).docs : []
   return buildLearningAccess(user, grants as LearningGrant[], { courses: [course], sections, roadmaps, nodes, lessons: [lesson] })
 }
 

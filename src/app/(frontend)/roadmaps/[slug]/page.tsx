@@ -79,11 +79,13 @@ export default async function RoadmapDetailPage({ params }: Props) {
   const nodeRank = new Map(nodeDocs.map((node, index) => [String(node.id), index]))
   const mainCourseRank = new Map(nodeDocs.flatMap((node, index) => {
     const courseId = resolveRelationId(node.course)
-    return courseId ? [[courseId, index] as const] : []
+    return [...(courseId ? [courseId] : []), ...node.sharedCourses.map(String)].map((id) => [id, index] as const)
   }))
   const rankCourse = (course: (typeof content.courses)[number]) =>
     nodeRank.get(resolveRelationId(course.roadmapNode) ?? '') ?? mainCourseRank.get(String(course.id)) ?? Number.MAX_SAFE_INTEGER
-  const visibleCourses = content.courses.filter((course) => course.isPublished && access.canBrowseCourse(course.id))
+  // Курс другого роадмапа держится только на своей теме: без неё он не должен всплыть в «других курсах» карты.
+  const visibleSharedCourses = new Set(nodeDocs.flatMap((node) => node.sharedCourses))
+  const visibleCourses = content.courses.filter((course) => course.isPublished && access.canBrowseCourse(course.id) && (resolveRelationId(course.roadmap) === String(roadmap.id) || visibleSharedCourses.has(course.id)))
     .sort((first, second) => rankCourse(first) - rankCourse(second) || (first.order ?? 0) - (second.order ?? 0) || first.id - second.id)
   const courseIds = visibleCourses.map((c) => String(c.id))
 
@@ -417,7 +419,7 @@ function resolveRelationId(ref: unknown): string | null {
 }
 
 function buildGraphData(
-  rawNodes: Pick<PayloadRoadmapNode, 'id' | 'nodeId' | 'label' | 'nodeType' | 'course' | 'positionX' | 'positionY' | 'description' | 'icon' | 'stage' | 'color' | 'bullets'>[],
+  rawNodes: (Pick<PayloadRoadmapNode, 'id' | 'nodeId' | 'label' | 'nodeType' | 'course' | 'positionX' | 'positionY' | 'description' | 'icon' | 'stage' | 'color' | 'bullets'> & { sharedCourses: number[] })[],
   rawEdges: Pick<PayloadRoadmapEdge, 'id' | 'edgeId' | 'source' | 'target' | 'edgeType' | 'animated'>[],
   coursesWithProgress: CourseWithProgress[],
   nextStepCourseId: string | null,
@@ -442,7 +444,7 @@ function buildGraphData(
     // клик по ней никуда не ведёт, но каркас карты сохраняется.
     const summary = summarizeNode(
       linkedCourse,
-      byNode.get(String(n.id)) ?? [],
+      [...(byNode.get(String(n.id)) ?? []), ...n.sharedCourses.flatMap((id) => courseMap.get(String(id)) ?? [])],
       n.nodeType === 'category',
       extras.length,
     )

@@ -407,7 +407,7 @@ describe('линия перехода между темами', () => {
 describe('канва редактора роадмапа', () => {
   const editorNode = (id: string, nodeType: 'category' | 'topic', y: number): EditorNode => ({
     id, type: nodeType, position: { x: 0, y },
-    data: { label: id, nodeType, icon: null, description: null, stage: null, color: null, bullets: [], courseId: null, courseName: null, guideIds: [], bootcampIds: [], order: 0, payloadId: null, nodeId: id },
+    data: { label: id, nodeType, icon: null, description: null, stage: null, color: null, bullets: [], courseId: null, courseName: null, guideIds: [], bootcampIds: [], sharedCourseIds: [], order: 0, payloadId: null, nodeId: id },
   })
   const nodes = [editorNode('Основы', 'category', 0), editorNode('HTML', 'topic', 100), editorNode('CSS', 'topic', 300)]
   const edges: EditorEdge[] = [

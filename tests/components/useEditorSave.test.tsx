@@ -56,6 +56,7 @@ function node(id: string, overrides: Partial<EditorNodeData> = {}): EditorNode {
       courseName: null,
       guideIds: [],
       bootcampIds: [],
+      sharedCourseIds: [],
       order: 1,
       payloadId: null,
       nodeId: id,
@@ -157,18 +158,18 @@ describe('сохранение правок редактора', () => {
       expect(calls[0].body).toMatchObject({ description: null, icon: null, course: null })
     })
 
-    it('гайды и буткемпы темы уходят полным списком в POST и PATCH, у категории — пустыми', async () => {
+    it('гайды, буткемпы и курсы других роадмапов уходят полным списком в POST и PATCH, у категории — пустыми', async () => {
       await save(
-        [node('n1', { guideIds: [3, 1], bootcampIds: [9] }), node('n2', { guideIds: [4] }), node('c1', { nodeType: 'category', guideIds: [5], bootcampIds: [6] })],
+        [node('n1', { guideIds: [3, 1], bootcampIds: [9], sharedCourseIds: [7] }), node('n2', { guideIds: [4], sharedCourseIds: [8] }), node('c1', { nodeType: 'category', guideIds: [5], bootcampIds: [6], sharedCourseIds: [2] })],
         [],
         pendingWith({ createdNodeIds: new Set(['n2']), updatedNodeIds: new Set(['n1', 'c1']) }),
         new Map([['n1', 42], ['c1', 43]]),
       )
 
-      expect(calls.map((call) => [call.method, call.body?.guides, call.body?.bootcamps])).toEqual([
-        ['POST', [4], []],
-        ['PATCH', [3, 1], [9]],
-        ['PATCH', [], []],
+      expect(calls.map((call) => [call.method, call.body?.guides, call.body?.bootcamps, call.body?.sharedCourses])).toEqual([
+        ['POST', [4], [], [8]],
+        ['PATCH', [3, 1], [9], [7]],
+        ['PATCH', [], [], []],
       ])
     })
 

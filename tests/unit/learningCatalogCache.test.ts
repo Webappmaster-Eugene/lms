@@ -27,12 +27,21 @@ describe('кеш метаданных каталога', () => {
 
   // Тема, открытая только гайдами или буткемпами, пропала бы у ученика, прочитай новый код запись без них.
   it('требует у тем массивы id гайдов и буткемпов', () => {
-    const withNodes = (node: Record<string, unknown>) => ({ ...catalog({ assignedOnly: false }), nodes: [{ id: 5, roadmap: 1, course: null, ...node }] })
+    const withNodes = (node: Record<string, unknown>) => ({ ...catalog({ assignedOnly: false }), nodes: [{ id: 5, roadmap: 1, course: null, sharedCourses: [], ...node }] })
     expect(validCatalog(withNodes({ guides: [3], bootcamps: [] }))).toBe(true)
     expect(validCatalog(withNodes({}))).toBe(false)
     expect(validCatalog(withNodes({ guides: [3] }))).toBe(false)
     expect(validCatalog(withNodes({ guides: null, bootcamps: [] }))).toBe(false)
     expect(validCatalog(withNodes({ guides: [{ id: 3 }], bootcamps: [] }))).toBe(false)
     expect(validCatalog(withNodes({ guides: [], bootcamps: ['9'] }))).toBe(false)
+  })
+
+  // Запись прежнего кода без этого поля оставила бы назначенный через чужую тему курс закрытым.
+  it('требует у тем массив id курсов других роадмапов', () => {
+    const withNodes = (sharedCourses?: unknown) => ({ ...catalog({ assignedOnly: false }), nodes: [{ id: 5, roadmap: 1, course: null, guides: [], bootcamps: [], ...(sharedCourses === undefined ? {} : { sharedCourses }) }] })
+    expect(validCatalog(withNodes([7]))).toBe(true)
+    expect(validCatalog(withNodes())).toBe(false)
+    expect(validCatalog(withNodes(null))).toBe(false)
+    expect(validCatalog(withNodes([{ id: 7 }]))).toBe(false)
   })
 })

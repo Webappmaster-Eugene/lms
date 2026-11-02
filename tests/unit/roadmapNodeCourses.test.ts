@@ -18,6 +18,18 @@ function course(overrides: Partial<NodeCourse> & { id: string }): NodeCourse {
   }
 }
 
+describe('курс, попавший в тему двумя путями', () => {
+  it('считается один раз, основной курс остаётся первым', () => {
+    const primary = course({ id: '1', totalLessons: 4, completedCount: 4 })
+    const shared = course({ id: '2', totalLessons: 6, completedCount: 3 })
+
+    const summary = summarizeNode(primary, [shared, { ...primary }, { ...shared }])
+
+    expect(summary.courses.map((item) => item.id)).toEqual(['1', '2'])
+    expect(summary).toMatchObject({ totalLessons: 10, completedLessons: 7, progressPercent: 70, status: 'in-progress' })
+  })
+})
+
 describe('распределение курсов по темам', () => {
   it('курс без темы на карту не попадает', () => {
     const byNode = groupCoursesByNode([course({ id: '1' }), course({ id: '2', nodeId: '7' })])

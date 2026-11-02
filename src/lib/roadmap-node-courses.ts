@@ -55,7 +55,8 @@ export function summarizeNode(
   isCategory = false,
   extrasCount = 0,
 ): NodeSummary {
-  const courses = [...(primary ? [primary] : []), ...attached.filter((c) => c.id !== primary?.id)]
+  // Курс может попасть в тему двумя путями: привязан к ней и выбран как курс другого роадмапа.
+  const courses = [...new Map([...(primary ? [primary] : []), ...attached].map((c) => [c.id, c])).values()]
 
   const totalLessons = courses.reduce((sum, c) => sum + c.totalLessons, 0)
   const completedLessons = courses.reduce((sum, c) => sum + c.completedCount, 0)

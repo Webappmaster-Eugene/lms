@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
+import { notBootcamp } from '@/lib/course-path'
 import { isAdmin, isAdminField } from '@/payload/access/isAdmin'
 import { learningNodeRead } from '@/payload/access/learningCatalogRead'
 import { cleanupLearningTargetGrants } from '@/payload/hooks/learningAccessCleanup'
@@ -95,6 +96,20 @@ export const RoadmapNodes: CollectionConfig = {
       access: { read: isAdminField },
       admin: {
         description: 'Только курсы с флажком «Буткемп». Название видно всем, кому видна тема, даже без доступа. В прогресс роадмапа не входят. Не привязывайте буткемп полем «Узел роадмапа» и не ставьте основным курсом темы',
+      },
+    },
+    {
+      name: 'sharedCourses',
+      type: 'relationship',
+      relationTo: 'courses',
+      hasMany: true,
+      maxRows: 10,
+      maxDepth: 0,
+      filterOptions: notBootcamp,
+      label: 'Курсы из других роадмапов',
+      access: { read: isAdminField },
+      admin: {
+        description: 'Курс остаётся в своём роадмапе, а здесь показывается как курс темы и входит в прогресс и завершение этой карты. Назначение на тему или карту открывает его, запрет здесь не закрывает. Буткемпы привязываются своим полем',
       },
     },
     {

@@ -409,3 +409,91 @@ describe('гайды и буткемпы темы', () => {
     expect(buildLearningAccess(null, [], extras).browseNodeIds).toEqual([])
   })
 })
+
+describe('курс другого роадмапа в теме', () => {
+  // Курс 10 живёт в карте 1, а тема 200 карты 2 показывает его как свой.
+  const shared: LearningPolicyMetadata = {
+    ...metadata,
+    courses: [...metadata.courses, { id: 12, roadmap: 1, isPublished: true, assignedOnly: true }],
+    nodes: [...metadata.nodes, { id: 200, roadmap: 2, sharedCourses: [10] }, { id: 201, roadmap: 2, sharedCourses: [12] }, { id: 202, roadmap: 2, sharedCourses: [10, 12] }],
+  }
+  const strict = { ...student, learningCatalogVisibility: 'assigned' as const }
+  const everyone = { id: 7, role: 'student', learningAccessMode: 'all' as const }
+
+  it('назначение на чужую тему или карту открывает курс целиком и только его', () => {
+    expect(resolve([], shared).canAccessCourse(10)).toBe(false)
+    for (const grants of [[grant('roadmap-nodes', 200)], [grant('roadmaps', 2)]]) {
+      const policy = resolve(grants, shared)
+      expect(policy.canAccessCourse(10)).toBe(true)
+      expect(policy.canAccessLessonMetadata(metadata.lessons[0])).toBe(true)
+      expect(policy.canAccessCourse(11)).toBe(false)
+    }
+  })
+
+  it('запрет в чужой теме или карте не отнимает курс в его роадмапе', () => {
+    expect(resolve([grant('courses', 10), grant('roadmap-nodes', 200, 'deny')], shared).canAccessCourse(10)).toBe(true)
+    expect(resolve([grant('roadmaps', 1), grant('roadmap-nodes', 200, 'deny')], shared).canAccessCourse(10)).toBe(true)
+    expect(resolve([grant('roadmaps', 1), grant('roadmaps', 2, 'deny')], shared).canAccessCourse(10)).toBe(true)
+    expect(buildLearningAccess(everyone, [grant('roadmap-nodes', 200, 'deny'), grant('roadmaps', 2, 'deny')], shared).canAccessCourse(10)).toBe(true)
+  })
+
+  it('запрет самого курса и его родной темы сильнее назначения в чужой теме', () => {
+    expect(resolve([grant('courses', 10, 'deny'), grant('roadmap-nodes', 200)], shared).canAccessCourse(10)).toBe(false)
+    expect(resolve([grant('roadmap-nodes', 101, 'deny'), grant('roadmap-nodes', 200)], shared).canAccessCourse(10)).toBe(false)
+    expect(resolve([grant('roadmaps', 1, 'deny'), grant('roadmaps', 2)], shared).canAccessCourse(10)).toBe(false)
+  })
+
+  it('курс только по назначению открывает тема, но не вся чужая карта', () => {
+    expect(resolve([grant('roadmaps', 2)], shared).canAccessCourse(12)).toBe(false)
+    expect(resolve([grant('roadmap-nodes', 201)], shared).canAccessCourse(12)).toBe(true)
+  })
+
+  it('неопубликованная чужая карта и чужой курс без каталога ничего не открывают', () => {
+    const draft = { ...shared, roadmaps: [{ id: 1, isPublished: true }, { id: 2, isPublished: false }] }
+    expect(resolve([grant('roadmap-nodes', 200)], draft).canAccessCourse(10)).toBe(false)
+    expect(resolve([grant('roadmaps', 2)], draft).canAccessCourse(10)).toBe(false)
+    const absent = { ...shared, nodes: [{ id: 203, roadmap: 2, sharedCourses: [999] }] }
+    expect(resolve([grant('roadmap-nodes', 203)], absent).canBrowseCourse(999)).toBe(false)
+  })
+
+  it('буткемп и категория ничего не открывают, даже если поле заполнено', () => {
+    const camp = { ...shared, courses: shared.courses.map((course) => course.id === 10 ? { ...course, isBootcamp: true } : course) }
+    expect(resolve([grant('roadmap-nodes', 200)], camp).canAccessCourse(10)).toBe(false)
+    const category = { ...shared, nodes: shared.nodes.filter((node) => node.id !== 202).map((node) => node.id === 200 ? { ...node, nodeType: 'category' } : node) }
+    expect(resolve([grant('roadmap-nodes', 200)], category).canAccessCourse(10)).toBe(false)
+    expect(resolve([grant('roadmaps', 2)], category).canAccessCourse(10)).toBe(false)
+  })
+
+  it('скрытый каталог: назначенный курс показывает чужую тему и карту, запрет темы её убирает', () => {
+    const policy = buildLearningAccess(strict, [grant('courses', 10)], shared)
+    expect(policy.canBrowseNode(200)).toBe(true)
+    expect(policy.canBrowseRoadmap(2)).toBe(true)
+    const denied = buildLearningAccess(strict, [grant('courses', 10), grant('roadmap-nodes', 200, 'deny'), grant('roadmap-nodes', 202, 'deny')], shared)
+    expect(denied.canBrowseNode(200)).toBe(false)
+    expect(denied.canBrowseRoadmap(2)).toBe(false)
+    expect(denied.canAccessCourse(10)).toBe(true)
+  })
+
+  it('тема с одними скрытыми курсами скрыта, с открытым рядом видна', () => {
+    const policy = resolve([], shared)
+    expect(policy.canBrowseCourse(12)).toBe(false)
+    expect(policy.canBrowseNode(201)).toBe(false)
+    expect(policy.canBrowseNode(202)).toBe(true)
+    expect(resolve([grant('courses', 12)], shared).canBrowseNode(201)).toBe(true)
+  })
+
+  it('назначение на карту не показывает тему с одними скрытыми курсами, своими и чужими', () => {
+    expect(resolve([grant('roadmaps', 2)], shared).canBrowseNode(201)).toBe(false)
+    expect(resolve([grant('roadmaps', 2)], shared).canBrowseNode(202)).toBe(true)
+    const own = { ...shared, courses: [...shared.courses, { id: 13, roadmap: 2, roadmapNode: 204, isPublished: true, assignedOnly: true }], nodes: [...shared.nodes, { id: 204, roadmap: 2 }] }
+    expect(resolve([grant('roadmaps', 2)], own).canBrowseNode(204)).toBe(false)
+    expect(resolve([grant('roadmaps', 2), grant('roadmap-nodes', 204)], own).canBrowseNode(204)).toBe(true)
+  })
+
+  it('описание чужой карты открыто, только когда её общие курсы открыты целиком', () => {
+    const map = { ...shared, courses: shared.courses.filter((course) => course.id !== 12), nodes: [...metadata.nodes, { id: 200, roadmap: 2, sharedCourses: [10] }] }
+    expect(buildLearningAccess(strict, [grant('courses', 20)], map).canReadRoadmapDescription(2)).toBe(false)
+    expect(buildLearningAccess(strict, [grant('courses', 20), grant('courses', 10)], map).canReadRoadmapDescription(2)).toBe(true)
+    expect(buildLearningAccess(strict, [grant('courses', 10)], map).canReadNodeDescription(200)).toBe(true)
+  })
+})

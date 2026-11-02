@@ -1,6 +1,7 @@
 import type { PayloadRequest } from 'payload'
 import { collectAllPages } from '@/lib/paginate'
 import { relationKey } from '@/lib/course-lessons'
+import { notBootcamp } from '@/lib/course-path'
 
 /** Full published hierarchy, independent of the student's individual assignments. */
 export async function loadPublishedProgrammeLessons(req: PayloadRequest, courseIds: (string | number)[]) {
@@ -35,14 +36,42 @@ export async function isCourseCompleted(req: PayloadRequest, userId: number, cou
   return lessons.length > 0 && lessons.every(lesson => completed.has(String(lesson.id)))
 }
 
-/** Курс «только по назначению» в общую программу роадмапа не входит: без него её не закончить. */
+/** Роадмапы, чьи темы показывают курс как свой. */
+export async function roadmapsSharingCourse(req: PayloadRequest, courseId: string): Promise<string[]> {
+  const nodes = await collectAllPages(({ page, limit }) => req.payload.find({
+    req, overrideAccess: true, collection: 'roadmap-nodes', depth: 0, select: { roadmap: true }, sort: 'id', page, limit,
+    where: { and: [{ sharedCourses: { equals: courseId } }, { nodeType: { not_equals: 'category' } }, { 'roadmap.isPublished': { equals: true } }] },
+  }), { label: `роадмапы, показывающие курс ${courseId}` })
+  return [...new Set(nodes.flatMap(node => relationKey(node.roadmap) ?? []))]
+}
+
+/**
+ * Курс «только по назначению» в общую программу роадмапа не входит: без него её не закончить.
+ * Курсы других роадмапов входят, но только если их собственная карта опубликована: иначе закрытый
+ * ученику курс сделал бы завершение недостижимым.
+ */
 export async function isRoadmapCompleted(req: PayloadRequest, userId: number, roadmapId: string): Promise<boolean> {
+  const nodes = await collectAllPages(({ page, limit }) => req.payload.find({
+    req, overrideAccess: true, collection: 'roadmap-nodes', depth: 0, select: { sharedCourses: true }, sort: 'id', page, limit,
+    where: { and: [{ roadmap: { equals: roadmapId } }, { nodeType: { not_equals: 'category' } }] },
+  }), { label: `темы программы роадмапа ${roadmapId}` })
+  const sharedIds = [...new Set(nodes.flatMap(node => (node.sharedCourses ?? []).flatMap(course => relationKey(course) ?? [])))]
   const courses = await collectAllPages(({ page, limit }) => req.payload.find({
-    req, overrideAccess: true, collection: 'courses', depth: 0, select: {}, sort: 'id', page, limit,
+    req, overrideAccess: true, collection: 'courses', depth: 0, select: { roadmap: true }, sort: 'id', page, limit,
     // not_equals: true в SQL отбросил бы и курсы с пустым флажком: условие пишется явно.
-    where: { roadmap: { equals: roadmapId }, isPublished: { equals: true }, or: [{ assignedOnly: { equals: false } }, { assignedOnly: { exists: false } }] },
+    where: { and: [
+      { or: [{ roadmap: { equals: roadmapId } }, ...(sharedIds.length ? [{ and: [{ id: { in: sharedIds } }, { 'roadmap.isPublished': { equals: true } }] }] : [])] },
+      { isPublished: { equals: true } },
+      { or: [{ assignedOnly: { equals: false } }, { assignedOnly: { exists: false } }] },
+    ] },
   }), { label: `полная программа роадмапа ${roadmapId}` })
   if (courses.length === 0) return false
+  // Чужие курсы дополняют программу, а не заменяют её: карта из одних курсов «только по назначению»
+  // не завершается общим курсом. Карта совсем без своих курсов завершается: вся её программа общая.
+  if (!courses.some(course => relationKey(course.roadmap) === roadmapId)) {
+    const own = await req.payload.count({ req, overrideAccess: true, collection: 'courses', where: { and: [{ roadmap: { equals: roadmapId } }, { isPublished: { equals: true } }, notBootcamp] } })
+    if (own.totalDocs > 0) return false
+  }
   const courseIds = courses.map(course => course.id)
   const [lessons, progress] = await Promise.all([
     loadPublishedProgrammeLessons(req, courseIds),

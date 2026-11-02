@@ -9,6 +9,7 @@ import { relationId } from '@/lib/relation-id'
 import { pluralize } from '@/lib/utils'
 import { redirect } from 'next/navigation'
 import { getLearningAccess } from '@/server/learning-access'
+import { getLearningCatalog, sharedRoadmapsByCourse } from '@/server/learning-catalog'
 import { notBootcamp } from '@/lib/course-path'
 
 export const metadata: Metadata = {
@@ -56,7 +57,9 @@ export default async function RoadmapsPage() {
           { label: 'курсы роадмапов' },
         )
       : []
-  const roadmapOfCourse = new Map(courseDocs.map((c) => [c.id, relationId(c.roadmap)]))
+  const sharedRoadmaps = sharedRoadmapsByCourse(await getLearningCatalog(payload, req))
+  // Курс считается в своей карте и в каждой, где тема показывает его как свой.
+  const roadmapsOfCourse = new Map(courseDocs.map((c) => [c.id, [...new Set([relationId(c.roadmap), ...(sharedRoadmaps.get(c.id) ?? [])])]]))
 
   const [lessonDocs, progressDocs] = await Promise.all([
     courseDocs.length > 0
@@ -102,14 +105,17 @@ export default async function RoadmapsPage() {
     stats.set(id, current)
     return current
   }
-  for (const course of courseDocs) if (access.canBrowseCourse(course.id)) statsFor(relationId(course.roadmap)).courses += 1
+  for (const course of courseDocs) {
+    if (!access.canBrowseCourse(course.id)) continue
+    for (const roadmapId of roadmapsOfCourse.get(course.id) ?? []) statsFor(roadmapId).courses += 1
+  }
   for (const lesson of lessonDocs) {
     if (!access.canBrowseLessonMetadata(lesson)) continue
-    const roadmapId = roadmapOfCourse.get(relationId(lesson.course))
-    if (roadmapId === undefined) continue
-    const entry = statsFor(roadmapId)
-    entry.lessons += 1
-    if (completed.has(lesson.id)) entry.done += 1
+    for (const roadmapId of roadmapsOfCourse.get(relationId(lesson.course)) ?? []) {
+      const entry = statsFor(roadmapId)
+      entry.lessons += 1
+      if (completed.has(lesson.id)) entry.done += 1
+    }
   }
 
   return (

@@ -52,6 +52,9 @@ describe('статус курса', () => {
 describe('фильтр каталога', () => {
   it('по роадмапу, статусу и названию вместе', () => {
     expect(filterCourses(courses, { roadmap: 'Frontend', status: 'all', query: '' }).map((c) => c.id)).toEqual(['1', '2'])
+    const shared = [...courses, course('4', { title: 'Английский', roadmapTitle: 'Языки', sharedRoadmapTitles: ['Frontend'] })]
+    expect(filterCourses(shared, { roadmap: 'Frontend', status: 'all', query: '' }).map((c) => c.id)).toEqual(['1', '2', '4'])
+    expect(filterCourses(shared, { roadmap: 'Языки', status: 'all', query: '' }).map((c) => c.id)).toEqual(['4'])
     expect(filterCourses(courses, { roadmap: null, status: 'active', query: '' }).map((c) => c.id)).toEqual(['1'])
     expect(filterCourses(courses, { roadmap: null, status: 'all', query: 'nest' }).map((c) => c.id)).toEqual(['3'])
   })

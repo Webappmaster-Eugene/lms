@@ -6,6 +6,7 @@ import { CourseCatalog } from '@/components/course/CourseCatalog'
 import { LockedSection } from '@/components/access/LockedSection'
 import { collectAllPages } from '@/lib/paginate'
 import { getLearningAccess } from '@/server/learning-access'
+import { getLearningCatalog, sharedRoadmapsByCourse } from '@/server/learning-catalog'
 import { notBootcamp } from '@/lib/course-path'
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default async function CoursesListPage() {
   const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login')
   const access = await getLearningAccess(payload, user, req)
+  const sharedRoadmaps = sharedRoadmapsByCourse(await getLearningCatalog(payload, req))
 
   const courseDocs = await collectAllPages(
     ({ page, limit }) =>
@@ -105,6 +107,7 @@ export default async function CoursesListPage() {
 
     const roadmapId = typeof course.roadmap === 'object' ? course.roadmap?.id : course.roadmap
     const roadmap = roadmapDocs.find((item) => item.id === roadmapId)
+    const alsoIn = sharedRoadmaps.get(course.id) ?? []
 
     return {
       id: cId,
@@ -112,6 +115,7 @@ export default async function CoursesListPage() {
       slug: course.slug,
       estimatedHours: access.catalogVisibility === 'catalog' ? course.estimatedHours : null,
       roadmapTitle: roadmap?.title ?? null,
+      sharedRoadmapTitles: roadmapDocs.filter((item) => alsoIn.includes(item.id) && access.canBrowseRoadmap(item.id)).map((item) => item.title),
       totalLessons,
       completedCount,
       progressPercent,

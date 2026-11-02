@@ -36,6 +36,7 @@ function data(overrides: Partial<EditorNodeData> = {}): EditorNodeData {
     courseName: null,
     guideIds: [],
     bootcampIds: [],
+    sharedCourseIds: [],
     order: 0,
     payloadId: null,
     nodeId: 'n1',

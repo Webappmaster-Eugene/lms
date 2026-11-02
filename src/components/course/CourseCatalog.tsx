@@ -16,6 +16,8 @@ export type CatalogCourse = {
   slug: string
   estimatedHours: number | null | undefined
   roadmapTitle: string | null
+  /** Другие роадмапы, чьи темы показывают курс как свой: фильтр находит его и там. */
+  sharedRoadmapTitles?: string[]
   totalLessons: number
   completedCount: number
   progressPercent: number
@@ -46,7 +48,7 @@ export function filterCourses(
   const needle = query.trim().toLowerCase()
   return courses.filter(
     (c) =>
-      (roadmap === null || c.roadmapTitle === roadmap) &&
+      (roadmap === null || c.roadmapTitle === roadmap || c.sharedRoadmapTitles?.includes(roadmap)) &&
       (!assignedOnly || c.accessAllowed !== false) &&
       (status === 'all' || courseStatus(c) === status) &&
       (needle === '' || c.title.toLowerCase().includes(needle)),
@@ -89,7 +91,7 @@ export function CourseCatalog({ courses }: { courses: CatalogCourse[] }) {
   const needle = query.trim()
 
   const roadmaps = useMemo(
-    () => [...new Set(courses.flatMap((c) => (c.roadmapTitle ? [c.roadmapTitle] : [])))],
+    () => [...new Set(courses.flatMap((c) => [...(c.roadmapTitle ? [c.roadmapTitle] : []), ...(c.sharedRoadmapTitles ?? [])]))],
     [courses],
   )
   const counts = useMemo(() => {
