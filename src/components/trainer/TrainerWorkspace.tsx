@@ -55,8 +55,8 @@ const PREVIEW_TEST = `__tr.register({ name: 'Код выполнен без ош
 
 /** На lg высота колонки задана: редактор уступает её результату, чтобы таблица была видна без прокрутки. */
 const EDITOR_FRAME_MIN_HEIGHT = 'min-h-[320px] lg:min-h-[200px]'
-/** Меньше рамки на её границу: иначе у обёртки своя прокрутка в 2 px, и первое движение колеса уходит на неё. */
-const CODE_EDITOR_MIN_HEIGHT = 'min-h-[318px] lg:min-h-[198px]'
+/** На lg меньше рамки на её границу: иначе у обёртки своя прокрутка в 2 px, и первое движение колеса уходит на неё. */
+const CODE_EDITOR_MIN_HEIGHT = 'min-h-[320px] lg:min-h-[198px]'
 
 /** Ключ черновика: решение переживает перезагрузку страницы. */
 function draftKey(taskId: string, language: TrainerLanguage): string {
