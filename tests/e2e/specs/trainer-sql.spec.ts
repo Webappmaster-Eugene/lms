@@ -69,3 +69,69 @@ test('SQL-тема по назначению: без гранта её нет н
     await learner.close()
   }
 })
+
+/**
+ * Колонка решения на lg имеет фиксированную высоту, а раньше внутри неё сжимался только блок
+ * результата: строки таблицы обрезались без прокрутки. Проверяется вёрстка, которой нет в jsdom,
+ * поэтому ответ сервера подставлен, настоящий прогон проверяет pnpm test:integration:runtime.
+ */
+test('после зачёта на 1440x900 таблица результата видна целиком и ничего не обрезано', async ({ browser }) => {
+  const admin = await browser.newContext({ extraHTTPHeaders: { Origin: APP_URL }, storageState: storageStateOf('admin'), viewport: { width: 1440, height: 900 } })
+  const stamp = Date.now()
+  const created: Array<[string, number]> = []
+  try {
+    const post = async (collection: string, data: Record<string, unknown>) => {
+      const response = await admin.request.post(`${APP_URL}/api/${collection}`, { data })
+      expect(response.status(), collection).toBe(201)
+      const id = (await response.json()).doc.id as number
+      created.unshift([collection, id])
+      return id
+    }
+    const topicSlug = `e2e-sql-layout-${stamp}`
+    const taskSlug = `e2e-sql-layout-task-${stamp}`
+    const topic = await post('trainer-topics', { title: `SQL вёрстка ${stamp}`, slug: topicSlug, category: 'sql', order: 99, assignedOnly: true, isPublished: true })
+    await post('trainer-tasks', {
+      title: `Все отделы ${stamp}`, slug: taskSlug, topic, order: 1, difficulty: 'easy', checkMode: 'program', languages: ['sql'],
+      descriptionMd: 'Выведите `name` всех отделов.', starterCode: '-- Напишите запрос\n', solutionCode: 'SELECT name FROM departments', solutionNotes: 'Простая выборка.',
+      sqlOrdered: false,
+      runtimeCases: [
+        { name: 'Данные из условия', hidden: false, input: 'CREATE TABLE departments (name text);', expected: ' name\n------\n(0 строк)' },
+        { name: 'Скрытый набор 1', hidden: true, input: 'CREATE TABLE departments (name text);', expected: ' name\n------\n(0 строк)' },
+      ],
+      timeLimitMs: 3000, pointsReward: 10, isPublished: true,
+    })
+
+    const page = await admin.newPage()
+    const rows = Array.from({ length: 8 }, (_, index) => ` Отдел ${index + 1}`)
+    await page.route('**/api/trainer/submit', (route) => route.fulfill({
+      json: {
+        result: {
+          status: 'passed', passedCount: 2, totalCount: 2, totalMs: 900,
+          tests: [{ name: 'Данные из условия', hidden: false, passed: true, durationMs: 1 }, { name: 'Скрытый тест 2', hidden: true, passed: true, durationMs: 1 }],
+          consoleOutput: [' name', '---------', ...rows, '(8 строк)'],
+        },
+        completed: true, awardedPoints: 10, attempts: 1,
+      },
+    }))
+    await page.goto(`/trainer/${topicSlug}/${taskSlug}`)
+    await page.getByRole('button', { name: 'Отправить' }).click()
+    await expect(page.getByText('Все тесты пройдены')).toBeVisible()
+
+    const table = page.locator('pre', { hasText: '(8 строк)' })
+    await expect(table).toBeVisible()
+    const clipped = await table.evaluate((output) => {
+      const panel = output.parentElement as HTMLElement
+      return { panel: panel.scrollHeight - panel.clientHeight, table: output.scrollHeight - output.clientHeight }
+    })
+    expect(clipped).toEqual({ panel: 0, table: 0 })
+
+    await page.getByText('Все задачи темы решены.').scrollIntoViewIfNeeded()
+    await expect(page.getByText('Все задачи темы решены.')).toBeInViewport()
+    await table.scrollIntoViewIfNeeded()
+    await expect(table).toBeInViewport({ ratio: 1 })
+    await expect(page.getByRole('button', { name: 'Отправить' })).toBeInViewport()
+  } finally {
+    for (const [collection, id] of created) expect((await admin.request.delete(`${APP_URL}/api/${collection}/${id}`)).status(), `${collection} ${id}`).toBe(200)
+    await admin.close()
+  }
+})

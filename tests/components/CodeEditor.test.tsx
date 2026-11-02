@@ -152,6 +152,13 @@ describe('редактор при медленной загрузке Monaco', (
     expect(editor.height).toBe('100%')
   })
 
+  it('свой минимум заменяет обычный, а не спорит с ним', async () => {
+    render(<CodeEditor value="" onChange={vi.fn()} language="sql" minHeightClass="min-h-[320px] lg:min-h-[200px]" />)
+    await waitFor(() => expect(screen.getByTestId('full-editor')).toBeInTheDocument())
+
+    expect(screen.getByTestId('full-editor').parentElement?.parentElement).toHaveClass('min-h-[320px]', 'lg:min-h-[200px]')
+  })
+
   it('вставляет два пробела клавишей Tab и запрещает команды в readOnly', async () => {
     const { rerender } = render(<EditableEditor />)
     const input = screen.getByRole('textbox', { name: 'Код решения' }) as HTMLTextAreaElement

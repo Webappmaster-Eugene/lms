@@ -551,12 +551,57 @@ describe('скрытые тесты', () => {
 
     expect(screen.getByText(/^Ещё 5 скрытых тестов /)).toBeInTheDocument()
   })
+
+  const note = 'Ещё 1 скрытый тест прогонится при отправке'
+  const fullReport = outcome({ passedCount: 2, totalCount: 2, tests: [
+    { name: 'Пример', hidden: false, passed: true, durationMs: 1 },
+    { name: 'Скрытый тест 2', hidden: true, passed: true, durationMs: 1 },
+  ] })
+
+  it('после отправки обещание прогнать скрытый тест снимается, а новый запуск его возвращает', async () => {
+    const user = userEvent.setup()
+    serve({ '/api/trainer/submit': () => Response.json({ result: fullReport, completed: true, awardedPoints: 10, attempts: 1 }) })
+    render(<TrainerWorkspace task={task} progress={progress} />)
+
+    await user.click(screen.getByRole('button', { name: 'Отправить' }))
+    expect(await screen.findByText('Все тесты пройдены')).toBeInTheDocument()
+    expect(screen.queryByText(note)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Запустить' }))
+    expect(await screen.findByText(/локальный прогон/)).toBeInTheDocument()
+    expect(screen.getByText(note)).toBeInTheDocument()
+  })
+
+  it.each([
+    ['сервер не ответил', () => Response.json({ error: 'Проверка перегружена' }, { status: 503 }), 'Ошибка выполнения'],
+    ['решение не скомпилировалось', () => Response.json({ result: outcome({ status: 'compile_error', error: 'Синтаксис', totalCount: 0 }), completed: false, awardedPoints: null, attempts: 1 }), 'Код не компилируется'],
+  ])('%s: до скрытого теста не дошло, подпись остаётся', async (_title, answer, status) => {
+    const user = userEvent.setup()
+    serve({ '/api/trainer/submit': answer })
+    render(<TrainerWorkspace task={task} progress={progress} />)
+
+    await user.click(screen.getByRole('button', { name: 'Отправить' }))
+
+    expect(await screen.findByText(status)).toBeInTheDocument()
+    expect(screen.getByText(note)).toBeInTheDocument()
+  })
 })
 
 describe('Go и предпросмотр frontend', () => {
   const goTask: ClientTaskSpec = { ...task, id: 'go-task', languages: ['go'], checkMode: 'program', entryName: '', starters: { go: 'package main\nfunc main() {}' }, runtimeCases: [] }
   const nextTask: ClientTaskSpec = { ...task, id: 'next-task', languages: ['next'], checkMode: 'dom', entryName: '', starters: { next: '{"app/page.tsx":"export default () => null"}' }, runtimeCases: [] }
   const lease = 'a'.repeat(48)
+
+  it('запуск в среде исполнения идёт на сервере и не называется локальным', async () => {
+    const user = userEvent.setup()
+    serve({ '/api/trainer/run': () => Response.json({ result: outcome() }) })
+    render(<TrainerWorkspace task={goTask} progress={progress} />)
+
+    await user.click(screen.getByRole('button', { name: 'Запустить' }))
+
+    expect(await screen.findByText(/пробный запуск на сервере/)).toBeInTheDocument()
+    expect(screen.queryByText(/локальный прогон/)).not.toBeInTheDocument()
+  })
 
   it('уход со страницы освобождает сессию предпросмотра даже при закрытии вкладки', async () => {
     const user = userEvent.setup()

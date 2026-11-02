@@ -53,6 +53,9 @@ const FrontendEditor = dynamic(() => import('./FrontendEditor').then((module) =>
  */
 const PREVIEW_TEST = `__tr.register({ name: 'Код выполнен без ошибок' }, function () {});`
 
+/** На lg высота колонки задана: редактор уступает её результату, чтобы таблица была видна без прокрутки. */
+const CODE_EDITOR_MIN_HEIGHT = 'min-h-[320px] lg:min-h-[200px]'
+
 /** Ключ черновика: решение переживает перезагрузку страницы. */
 function draftKey(taskId: string, language: TrainerLanguage): string {
   return `lms.trainer.draft.${taskId}.${language}`
@@ -114,7 +117,7 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
   const [programTests, setProgramTests] = useState<{ taskId: string; cases: RuntimeCase[] }>({ taskId: task.id, cases: [] })
   const programCases = useMemo(() => programTests.taskId === task.id ? programTests.cases : [], [programTests, task.id])
   const [result, setResult] = useState<TrainerRunResult | null>(null)
-  const [origin, setOrigin] = useState<'client' | 'server' | null>(null)
+  const [origin, setOrigin] = useState<'client' | 'runtime' | 'server' | null>(null)
   const [diagnostics, setDiagnostics] = useState<TrainerDiagnostic[]>([])
   const [isRunning, setIsRunning] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -204,7 +207,7 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
 
     setIsRunning(true)
     setResult(null)
-    setOrigin('client')
+    setOrigin(isRuntimeLanguage(language) ? 'runtime' : 'client')
     setFocusLine(undefined)
 
     try {
@@ -360,6 +363,9 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
     setFocusLine(undefined)
   }, [language, task.starters])
 
+  // Сбой сети или компиляции до скрытых тестов не доходит, поэтому смотрим на сам отчёт, а не на нажатие.
+  const hiddenCasesRan = result?.tests.some((test) => test.hidden) === true
+
   const hiddenNote = useMemo(() => {
     if (task.hiddenCaseCount === 0) return null
     const count = task.hiddenCaseCount
@@ -437,76 +443,80 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
         </div>
       </div>
 
-      <div className="min-h-[320px] flex-1 overflow-auto rounded-xl border border-border">
-        {isFrontendLanguage(language) ? (
-          <FrontendEditor key={draftSlot} value={code} onChange={setCode} language={language}
-            readOnly={busy || !ready} previewHtml={preview?.html} previewUrl={preview?.previewPath}
-            onRun={handleRun} onSubmit={handleSubmit} />
-        ) : <CodeEditor
-          value={code}
-          onChange={setCode}
-          language={language}
-          readOnly={busy || !ready}
-          diagnostics={diagnostics}
-          errorLine={focusLine}
-          height="100%"
-          onRun={handleRun}
-          onSubmit={handleSubmit}
-        />}
-      </div>
-
-      {isFrontendLanguage(language) && preview && previewSource !== code && <p className="text-xs text-muted-foreground">Код изменён. Нажмите «Запустить», чтобы обновить предпросмотр.</p>}
-      {language === 'next' && preview?.previewPath && <p className="text-xs text-muted-foreground">Предпросмотр действует недолго. Если он перестал отвечать, нажмите «Запустить» снова.</p>}
-      {isRuntimeLanguage(language) && <p className="text-xs text-muted-foreground">{language === 'sql' ? 'Каждый запуск поднимает чистую базу с данными задачи, поэтому ответ приходит за несколько секунд.' : 'Первый запуск компилирует проект и может занять больше времени.'} «Запустить» не сохраняет прогресс; «Отправить» проверяет все тесты и засчитывает решение.</p>}
-
-      {code.length > TRAINER_LIMITS.maxCodeLength * 0.9 && (
-        <p className="text-xs text-warning">
-          Решение приближается к лимиту в {TRAINER_LIMITS.maxCodeLength} символов
-        </p>
-      )}
-
-      <TestResultsPanel
-        result={result}
-        isRunning={busy}
-        origin={origin}
-        onSelectLine={setFocusLine}
-        queryOutput={language === 'sql'}
-      />
-
-      {hiddenNote && <p className="text-xs text-muted-foreground">{hiddenNote}</p>}
-
-      {task.checkMode === 'unit' && task.entryName && (
-        <CustomTestCases exampleCase={task.publicCases.find((item) => !item.hidden)} cases={customCases} disabled={busy || !ready} entryName={task.entryName}
-          onChange={(cases) => setCustomTests({ taskId: task.id, cases })} />
-      )}
-
-      {(language === 'go' || language === 'python') && <CustomProgramCases language={language} exampleCase={task.runtimeCases?.find((item) => !item.hidden)} cases={programCases} disabled={busy || !ready} onChange={(cases) => setProgramTests({ taskId: task.id, cases })} />}
-
-      {/* Решено — следующий шаг сразу под результатом, а не кнопкой «Далее» в шапке. */}
-      {completed && !busy && (nextTask || topicHref) && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-success/40 bg-success/10 p-3">
-          <p className="flex-1 text-sm text-foreground">
-            {nextTask ? 'Задача решена. Следующая нерешённая в теме:' : 'Все задачи темы решены.'}
-          </p>
-          {nextTask ? (
-            <Link
-              href={nextTask.href}
-              className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              <span className="truncate">{nextTask.title}</span>
-              <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-            </Link>
-          ) : topicHref ? (
-            <Link href={topicHref} className="text-sm font-medium text-primary underline-offset-2 hover:underline">
-              К темам тренажёра
-            </Link>
-          ) : null}
+      {/* Кнопки остаются на месте: на lg высота колонки задана, и прокручивается только то, что ниже них. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 lg:overflow-y-auto">
+        <div className={cn('flex-1 overflow-auto rounded-xl border border-border', isFrontendLanguage(language) ? 'min-h-[320px]' : CODE_EDITOR_MIN_HEIGHT)}>
+          {isFrontendLanguage(language) ? (
+            <FrontendEditor key={draftSlot} value={code} onChange={setCode} language={language}
+              readOnly={busy || !ready} previewHtml={preview?.html} previewUrl={preview?.previewPath}
+              onRun={handleRun} onSubmit={handleSubmit} />
+          ) : <CodeEditor
+            value={code}
+            onChange={setCode}
+            language={language}
+            readOnly={busy || !ready}
+            diagnostics={diagnostics}
+            errorLine={focusLine}
+            height="100%"
+            minHeightClass={CODE_EDITOR_MIN_HEIGHT}
+            onRun={handleRun}
+            onSubmit={handleSubmit}
+          />}
         </div>
-      )}
 
-      <p className="hidden text-xs text-muted-foreground lg:block">
-        Ctrl+Enter - запустить, Ctrl+Shift+Enter - отправить (на Mac - ⌘)
-      </p>
+        {isFrontendLanguage(language) && preview && previewSource !== code && <p className="text-xs text-muted-foreground">Код изменён. Нажмите «Запустить», чтобы обновить предпросмотр.</p>}
+        {language === 'next' && preview?.previewPath && <p className="text-xs text-muted-foreground">Предпросмотр действует недолго. Если он перестал отвечать, нажмите «Запустить» снова.</p>}
+        {isRuntimeLanguage(language) && <p className="text-xs text-muted-foreground">{language === 'sql' ? 'Каждый запуск поднимает чистую базу с данными задачи, поэтому ответ приходит за несколько секунд.' : 'Первый запуск компилирует проект и может занять больше времени.'} «Запустить» не сохраняет прогресс; «Отправить» проверяет все тесты и засчитывает решение.</p>}
+
+        {code.length > TRAINER_LIMITS.maxCodeLength * 0.9 && (
+          <p className="text-xs text-warning">
+            Решение приближается к лимиту в {TRAINER_LIMITS.maxCodeLength} символов
+          </p>
+        )}
+
+        <TestResultsPanel
+          result={result}
+          isRunning={busy}
+          origin={origin}
+          onSelectLine={setFocusLine}
+          queryOutput={language === 'sql'}
+        />
+
+        {hiddenNote && !hiddenCasesRan && <p className="text-xs text-muted-foreground">{hiddenNote}</p>}
+
+        {task.checkMode === 'unit' && task.entryName && (
+          <CustomTestCases exampleCase={task.publicCases.find((item) => !item.hidden)} cases={customCases} disabled={busy || !ready} entryName={task.entryName}
+            onChange={(cases) => setCustomTests({ taskId: task.id, cases })} />
+        )}
+
+        {(language === 'go' || language === 'python') && <CustomProgramCases language={language} exampleCase={task.runtimeCases?.find((item) => !item.hidden)} cases={programCases} disabled={busy || !ready} onChange={(cases) => setProgramTests({ taskId: task.id, cases })} />}
+
+        {/* Решено — следующий шаг сразу под результатом, а не кнопкой «Далее» в шапке. */}
+        {completed && !busy && (nextTask || topicHref) && (
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-success/40 bg-success/10 p-3">
+            <p className="flex-1 text-sm text-foreground">
+              {nextTask ? 'Задача решена. Следующая нерешённая в теме:' : 'Все задачи темы решены.'}
+            </p>
+            {nextTask ? (
+              <Link
+                href={nextTask.href}
+                className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                <span className="truncate">{nextTask.title}</span>
+                <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+              </Link>
+            ) : topicHref ? (
+              <Link href={topicHref} className="text-sm font-medium text-primary underline-offset-2 hover:underline">
+                К темам тренажёра
+              </Link>
+            ) : null}
+          </div>
+        )}
+
+        <p className="hidden text-xs text-muted-foreground lg:block">
+          Ctrl+Enter - запустить, Ctrl+Shift+Enter - отправить (на Mac - ⌘)
+        </p>
+      </div>
     </div>
   )
 }

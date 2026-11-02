@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ComponentType, type KeyboardEvent } from 'react'
 import type { editor } from 'monaco-editor'
 
+import { cn } from '@/lib/utils'
 import type { TrainerDiagnostic, TrainerLanguage } from '@/lib/trainer/types'
 
 export type CodeEditorProps = {
@@ -19,6 +20,8 @@ export type CodeEditorProps = {
   /** Строка, к которой относится ошибка прогона. */
   errorLine?: number
   height?: number | string
+  /** Минимальная высота рамки: целый Tailwind-класс, иначе сборка стилей его не увидит. */
+  minHeightClass?: string
   /** Ctrl/⌘+Enter — как «Запустить» в LeetCode и Codewars. */
   onRun?: () => void
   /** Ctrl/⌘+Shift+Enter — отправка на проверку. */
@@ -31,7 +34,7 @@ type FullEditorProps = CodeEditorProps & {
 
 /** Текст доступен сразу: загрузка Monaco и его языкового сервиса не блокирует решение. */
 export function CodeEditor(props: CodeEditorProps) {
-  const { value, onChange, readOnly = false, height = '100%', onRun, onSubmit, ariaLabel = 'Код решения' } = props
+  const { value, onChange, readOnly = false, height = '100%', minHeightClass = 'min-h-[320px]', onRun, onSubmit, ariaLabel = 'Код решения' } = props
   const [FullEditor, setFullEditor] = useState<ComponentType<FullEditorProps> | null>(null)
   const [ready, setReady] = useState(false)
   const [loadingSlow, setLoadingSlow] = useState(false)
@@ -106,7 +109,7 @@ export function CodeEditor(props: CodeEditorProps) {
   }
 
   return (
-    <div className="relative min-h-[320px] w-full" style={{ height }}>
+    <div className={cn('relative w-full', minHeightClass)} style={{ height }}>
       {!ready && (
         <div className="absolute inset-0 flex flex-col bg-background">
           <p className="shrink-0 px-3 py-1.5 text-xs text-muted-foreground" role="status">
@@ -132,7 +135,7 @@ export function CodeEditor(props: CodeEditorProps) {
       )}
       {FullEditor && (
         <div className="absolute inset-0" style={{ visibility: ready ? 'visible' : 'hidden' }} aria-hidden={!ready}>
-          {/* Высоту задаёт рамка (с минимумом 320 px), Monaco её заполняет: с height ниже минимума под ним оставалась пустая полоса. */}
+          {/* Высоту задаёт рамка с её минимумом, Monaco её заполняет: с height ниже минимума под ним оставалась пустая полоса. */}
           <FullEditor {...props} height="100%" onReady={handleReady} />
         </div>
       )}

@@ -17,11 +17,17 @@ import type { TrainerRunResult, TrainerTestOutcome } from '@/lib/trainer/types'
 type TestResultsPanelProps = {
   result: TrainerRunResult | null
   isRunning: boolean
-  /** Подпись источника: браузер или сервер. */
-  origin: 'client' | 'server' | null
+  /** Где шёл прогон: в браузере, на сервере без зачёта или на сервере с зачётом. */
+  origin: keyof typeof ORIGIN_TEXT | null
   onSelectLine?: (line: number) => void
   /** SQL: вывод - это таблица результата, ради неё и нажимают «Запустить». */
   queryOutput?: boolean
+}
+
+const ORIGIN_TEXT = {
+  client: 'локальный прогон',
+  runtime: 'пробный запуск на сервере',
+  server: 'проверено сервером',
 }
 
 const STATUS_TEXT: Record<TrainerRunResult['status'], string> = {
@@ -169,7 +175,7 @@ export function TestResultsPanel({
   const hasConsole = result.consoleOutput.length > 0
 
   return (
-    <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
+    <div className="min-w-0 shrink-0 overflow-hidden rounded-xl border border-border bg-card">
       <div
         className={cn(
           'flex flex-wrap items-center gap-2 px-3 py-2 text-sm font-medium',
@@ -188,7 +194,7 @@ export function TestResultsPanel({
         <span className="ml-auto flex items-center gap-1 text-xs font-normal opacity-70">
           <Clock className="h-3 w-3" />
           {result.totalMs} мс
-          {origin && <span>· {origin === 'server' ? 'проверено сервером' : 'локальный прогон'}</span>}
+          {origin && <span>· {ORIGIN_TEXT[origin]}</span>}
         </span>
       </div>
 
