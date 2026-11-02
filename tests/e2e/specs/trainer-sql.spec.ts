@@ -138,7 +138,8 @@ test('после зачёта на 1440x900 таблица результата 
     if (!editor) throw new Error('Редактор не на экране')
     await page.mouse.move(editor.x + editor.width / 2, editor.y + 40)
     await page.mouse.wheel(0, 300)
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+    const scrolled = () => page.evaluate(() => window.scrollY + (document.querySelector('.lg\\:overflow-y-auto')?.scrollTop ?? 0))
+    await expect.poll(scrolled).toBeGreaterThan(0)
   } finally {
     for (const [collection, id] of created) expect((await admin.request.delete(`${APP_URL}/api/${collection}/${id}`)).status(), `${collection} ${id}`).toBe(200)
     await admin.close()

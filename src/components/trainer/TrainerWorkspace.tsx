@@ -54,7 +54,9 @@ const FrontendEditor = dynamic(() => import('./FrontendEditor').then((module) =>
 const PREVIEW_TEST = `__tr.register({ name: 'Код выполнен без ошибок' }, function () {});`
 
 /** На lg высота колонки задана: редактор уступает её результату, чтобы таблица была видна без прокрутки. */
-const CODE_EDITOR_MIN_HEIGHT = 'min-h-[320px] lg:min-h-[200px]'
+const EDITOR_FRAME_MIN_HEIGHT = 'min-h-[320px] lg:min-h-[200px]'
+/** Меньше рамки на её границу: иначе у обёртки своя прокрутка в 2 px, и первое движение колеса уходит на неё. */
+const CODE_EDITOR_MIN_HEIGHT = 'min-h-[318px] lg:min-h-[198px]'
 
 /** Ключ черновика: решение переживает перезагрузку страницы. */
 function draftKey(taskId: string, language: TrainerLanguage): string {
@@ -446,7 +448,7 @@ function TrainerWorkspaceSession({ task, progress, nextTask = null, topicHref }:
 
       {/* Кнопки остаются на месте: на lg высота колонки задана, и прокручивается только то, что ниже них. */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 lg:overflow-y-auto">
-        <div className={cn('flex-1 overflow-auto rounded-xl border border-border', isFrontendLanguage(language) ? 'min-h-[320px]' : CODE_EDITOR_MIN_HEIGHT)}>
+        <div className={cn('flex-1 overflow-auto rounded-xl border border-border', isFrontendLanguage(language) ? 'min-h-[320px]' : EDITOR_FRAME_MIN_HEIGHT)}>
           {isFrontendLanguage(language) ? (
             <FrontendEditor key={draftSlot} value={code} onChange={setCode} language={language}
               readOnly={busy || !ready} previewHtml={preview?.html} previewUrl={preview?.previewPath}
