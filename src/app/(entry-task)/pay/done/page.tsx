@@ -25,9 +25,12 @@ export default async function PaymentDonePage({ searchParams }: Props) {
   return (
     <CandidateFrame landingUrl={state.landingUrl} program={state.program}>
     <article className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{state.kind === 'paid' ? 'Оплата получена' : 'Проверяем оплату'}</h1>
+      <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{state.kind !== 'paid' ? 'Проверяем оплату' : state.test ? 'Тестовая оплата прошла' : 'Оплата получена'}</h1>
       <div className="rounded-xl border border-border bg-card px-5 py-4 text-base leading-relaxed" aria-live="polite">
-        {state.kind === 'paid' && (
+        {state.kind === 'paid' && state.test && (
+          <p>Тестовая оплата {state.amount} прошла, номер заказа {state.invId}. Деньги не списаны, доступы автоматически не открываются.</p>
+        )}
+        {state.kind === 'paid' && !state.test && (
           <p>Спасибо! Оплата {state.amount} получена, номер заказа {state.invId}. В течение нескольких минут на почту придут письма с доступом к учебному кабинету и GitLab курса. Начните с методички недели 0.</p>
         )}
         {state.kind === 'pending' && (
