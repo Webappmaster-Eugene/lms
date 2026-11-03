@@ -135,7 +135,7 @@ export function VideoPlayer({ memoryId, title, videoUrl, displayMode, descriptio
   return (
     <div className="space-y-3">
       <VideoHeading title={title} description={description} durationMinutes={durationMinutes} />
-      <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-border">
+      <div data-lesson-video="embed" className="relative aspect-video w-full overflow-hidden rounded-xl border border-border">
         <iframe
           src={getEmbedUrl(videoUrl)}
           title={title}
@@ -445,7 +445,7 @@ function NativeVideo({ memoryId, videoUrl, playbackAttempt = 0, direct = false, 
 
   return (
     <>
-      <div className="overflow-hidden rounded-xl border border-border bg-black">
+      <div data-lesson-video="native" className="touch-pan-y touch-pinch-zoom overflow-hidden rounded-xl border border-border bg-black">
         <video
           ref={videoRef}
           src={source}

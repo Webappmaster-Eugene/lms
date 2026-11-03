@@ -213,7 +213,7 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
   return (
     <div className="space-y-3">
       <div className="overflow-hidden rounded-xl border border-border bg-black">
-        <div className="relative">
+        <div data-lesson-video="stream" className="relative touch-pan-y touch-pinch-zoom">
           <video
             ref={videoRef}
             className="aspect-video w-full"

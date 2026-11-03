@@ -11,6 +11,7 @@ import { LessonNotes } from '@/components/lesson/LessonNotes'
 import { LessonComments } from '@/components/lesson/LessonComments'
 import { LessonKeyboardNav } from '@/components/lesson/LessonKeyboardNav'
 import { LessonNavigation } from '@/components/lesson/LessonNavigation'
+import { LessonSwipeNav } from '@/components/lesson/LessonSwipeNav'
 import { CourseSidebar } from '@/components/course/CourseSidebar'
 import { BookmarkButton } from '@/components/bookmarks/BookmarkButton'
 import { findBookmarkId } from '@/lib/bookmarks'
@@ -376,6 +377,7 @@ export default async function LessonPage({ params }: Props) {
           prevHref={prevLesson ? `/lessons/${prevLesson.slug}` : null}
           nextHref={nextLesson ? `/lessons/${nextLesson.slug}` : null}
         />
+        <LessonSwipeNav key={String(lesson.id)} slug={lesson.slug} previous={prevLesson} next={nextLesson} />
         <LessonNavigation previous={prevLesson} next={nextLesson} />
 
         {/* Обсуждение */}
