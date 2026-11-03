@@ -4,6 +4,8 @@ import { USERS } from '../fixtures/data'
 import { APP_URL, LANDING_URL, LANDING_USE } from '../fixtures/env'
 import { zipOf } from '../../fixtures/zip'
 import { ENTRY_TASKS } from '../../../src/data/bootcamp-entry/tasks'
+import { AUTHOR_PROFILES } from '../../../landing/src/config'
+import { GROUP_LIMIT, LAST_CLASS, LAST_CLASS_ISO, START, START_ISO } from '../../../landing/src/data/bootcamp'
 
 /**
  * Страница буткемпа и форма предзаписи: заявка идёт через тот же путь, что в проде
@@ -53,6 +55,29 @@ test('страница: метаданные, CSP без нарушений, а�
   expect(bare.headers()['location']).toBe('/bootcamp/nodejs/?utm_source=tg')
   expect(await (await request.get(`${origin}/sitemap.xml`)).text()).toContain(`<loc>${SITE}${PAGE}</loc>`)
   expect((await request.get(`${origin}/privacy/`)).status()).toBe(200)
+})
+
+test('разметка курса: даты, размер группы и профили наставника совпадают со страницей', async ({ page }) => {
+  await page.goto(PAGE)
+  type Node = Record<string, unknown> & { '@type': string; '@id'?: string }
+  const graph = (await page.locator('script[type="application/ld+json"]').allTextContents()).flatMap((text) => (JSON.parse(text) as { '@graph': Node[] })['@graph'])
+  const byType = <T = Node>(type: string) => graph.find((node) => node['@type'] === type) as T | undefined
+  const instance = byType<{ hasCourseInstance: { startDate: string; endDate: string; maximumAttendeeCapacity: number } }>('Course')!.hasCourseInstance
+  expect(instance).toMatchObject({ startDate: START_ISO, endDate: LAST_CLASS_ISO, maximumAttendeeCapacity: GROUP_LIMIT })
+  // В разметку попадает только то, что посетитель видит на странице.
+  const main = page.locator('main')
+  await expect(main).toContainText(START)
+  await expect(main).toContainText(LAST_CLASS)
+  await expect(main).toContainText(`до ${GROUP_LIMIT} человек`)
+
+  const sameAs = byType<{ sameAs: string[] }>('Person')!.sameAs
+  expect(sameAs).toEqual(AUTHOR_PROFILES)
+  expect(new Set(sameAs).size).toBe(sameAs.length)
+  expect(sameAs).toEqual(expect.arrayContaining(['https://nadtocheev.ru/', 'https://t.me/eugene_galera']))
+
+  const site = byType('WebSite')
+  expect(site?.['@id']).toBe(`${SITE}/#website`)
+  expect(byType('WebPage')?.isPartOf).toEqual({ '@id': site?.['@id'] })
 })
 
 test('форма с клавиатуры: ошибки рядом с полями, заявка сохраняется, повтор не плодит дубль', async ({ page, request }) => {

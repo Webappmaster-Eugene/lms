@@ -4,19 +4,19 @@ import BootcampFooter from '../../components/BootcampFooter.astro'
 import BootcampHeader from '../../components/BootcampHeader.astro'
 import GuideScreen from '../../components/GuideScreen.astro'
 import screens from '../../data/screens.json'
-import { AUTHOR_URL, SITE_URL } from '../../config'
+import { AUTHOR_PROFILES, AUTHOR_URL, SITE_URL } from '../../config'
 import {
-  AUDIENCE, BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, ENTRY_TASK_DAYS, ENTRY_TASK_MINUTES, FACTS, FAQ, LOG, MENTOR_EXPERIENCE, OFFER_PATH, PAINS, PATH, PAYMENT_PATH, PREP_START, PRICE,
-  PRIVACY_PATH, PROGRAM, PROGRAM_KEY, QUALITY_PATH, RENTAL_FLOW, REVIEW_DAYS, SAMPLE_MANUAL, SAMPLE_QUESTIONS, START, START_ISO,
+  AUDIENCE, BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, COURSE_DESCRIPTION, COURSE_NAME, ENTRY_TASK_DAYS, ENTRY_TASK_MINUTES, FACTS, FAQ, GROUP_LIMIT, LAST_CLASS_ISO, LOG, MENTOR_EXPERIENCE, OFFER_PATH, PAINS, PATH, PAYMENT_PATH, PREP_START, PRICE,
+  PRIVACY_PATH, PROGRAM, PROGRAM_KEY, QUALITY_PATH, RENTAL_FLOW, REVIEW_DAYS, SAMPLE_MANUAL, SAMPLE_QUESTIONS, START, START_ISO, WEEKLY_HOURS, WEEKS,
 } from '../../data/bootcamp'
 
 // В заголовке то, что ищут: «буткемп», «Node.js», «курс backend».
 const title = 'Буткемп Node.js: курс backend с ревью наставника - MentorCareer'
-const description = 'Backend на Node.js для frontend- и fullstack-разработчиков, junior и middle: 20 недель, свой проект в GitLab, CI и ревью каждой работы.'
+const description = COURSE_DESCRIPTION
 const pageUrl = new URL(BOOTCAMP_PATH, SITE_URL).href
 const schema = [
   {
-    '@type': 'Course', '@id': `${pageUrl}#course`, name: 'Буткемп Node.js: backend сервиса проката', description, inLanguage: 'ru',
+    '@type': 'Course', '@id': `${pageUrl}#course`, name: COURSE_NAME, description, inLanguage: 'ru',
     audience: { '@type': 'EducationalAudience', audienceType: 'frontend- и fullstack-разработчики, junior и middle backend-разработчики' },
     provider: { '@id': `${SITE_URL}/#organization` },
     offers: { '@type': 'Offer', category: 'Paid', price: PRICE.value, priceCurrency: 'RUB', availability: 'https://schema.org/PreOrder', url: pageUrl },
@@ -25,15 +25,16 @@ const schema = [
     teaches: ['Node.js', 'TypeScript', 'HTTP API на Fastify', 'NestJS', 'PostgreSQL', 'Redis', 'RabbitMQ', 'Kafka', 'ClickHouse', 'Docker', 'OpenTelemetry', 'GitLab CI', 'оплата без двойных списаний', 'восстановление после сбоев'],
     syllabusSections: PROGRAM.map(({ weeks, topic }) => ({ '@type': 'Syllabus', name: `Недели ${weeks}`, description: topic })),
     hasCourseInstance: {
-      '@type': 'CourseInstance', courseMode: 'online', inLanguage: 'ru', startDate: START_ISO,
-      // 20 недель по 15-20 часов: в разметке нижняя граница.
-      courseWorkload: 'PT300H',
-      courseSchedule: { '@type': 'Schedule', repeatFrequency: 'P1W', repeatCount: 20, byDay: ['https://schema.org/Saturday', 'https://schema.org/Sunday'], startDate: START_ISO, scheduleTimezone: 'Europe/Moscow' },
+      '@type': 'CourseInstance', courseMode: 'online', inLanguage: 'ru', startDate: START_ISO, endDate: LAST_CLASS_ISO,
+      maximumAttendeeCapacity: GROUP_LIMIT,
+      // Нагрузка на странице 15-20 часов в неделю: в разметке нижняя граница.
+      courseWorkload: `PT${WEEKS * WEEKLY_HOURS}H`,
+      courseSchedule: { '@type': 'Schedule', repeatFrequency: 'P1W', repeatCount: WEEKS, byDay: ['https://schema.org/Saturday', 'https://schema.org/Sunday'], startDate: START_ISO, endDate: LAST_CLASS_ISO, scheduleTimezone: 'Europe/Moscow' },
       instructor: { '@id': `${pageUrl}#mentor` },
     },
   },
   {
-    '@type': 'Person', '@id': `${pageUrl}#mentor`, name: 'Евгений Надточеев', url: AUTHOR_URL, sameAs: [AUTHOR_URL], jobTitle: 'Fullstack-разработчик, наставник',
+    '@type': 'Person', '@id': `${pageUrl}#mentor`, name: 'Евгений Надточеев', url: AUTHOR_URL, sameAs: AUTHOR_PROFILES, jobTitle: 'Fullstack-разработчик, наставник',
     knowsAbout: ['Node.js', 'Fastify', 'NestJS', 'PostgreSQL', 'Kafka', 'платёжные системы', 'наблюдаемость'],
   },
   { '@type': 'FAQPage', '@id': `${pageUrl}#faq`, mainEntity: FAQ.map(({ question, answer }) => ({ '@type': 'Question', name: question, acceptedAnswer: { '@type': 'Answer', text: answer } })) },

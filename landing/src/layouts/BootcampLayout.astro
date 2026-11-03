@@ -21,7 +21,9 @@ const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': [
     { '@type': 'Organization', '@id': `${SITE_URL}/#organization`, name: 'MentorCareer', url: LMS_URL, logo: { '@type': 'ImageObject', url: new URL('/apple-touch-icon.png', SITE_URL).href, width: 180, height: 180 } },
-    { '@type': 'WebPage', '@id': `${canonicalUrl}#webpage`, name: title, description, url: canonicalUrl, inLanguage: 'ru', dateModified: PAGE_UPDATED.iso, publisher: { '@id': `${SITE_URL}/#organization` } },
+    // Тот же узел, что у главной (Layout.astro): страницы буткемпа - часть сайта info.mentorcareer.ru.
+    { '@type': 'WebSite', '@id': `${SITE_URL}/#website`, name: 'MentorCareer - инструкция', url: SITE_URL, inLanguage: 'ru', publisher: { '@id': `${SITE_URL}/#organization` } },
+    { '@type': 'WebPage', '@id': `${canonicalUrl}#webpage`, name: title, description, url: canonicalUrl, inLanguage: 'ru', dateModified: PAGE_UPDATED.iso, isPartOf: { '@id': `${SITE_URL}/#website` }, publisher: { '@id': `${SITE_URL}/#organization` } },
     ...(crumb ? [{
       '@type': 'BreadcrumbList', '@id': `${canonicalUrl}#breadcrumbs`,
       itemListElement: [

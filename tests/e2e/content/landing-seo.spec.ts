@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { LANDING_URL, LANDING_USE } from '../fixtures/env'
+import { BOOTCAMP_PATH, PRICE, START, START_ISO } from '../../../landing/src/data/bootcamp'
 
 /**
  * Лендинг (landing/, Astro): мета-теги, canonical, Open Graph, JSON-LD,
@@ -144,6 +145,35 @@ test('sitemap.xml — валидный XML со страницами ленди�
   expect(parsed.error).toBe(false)
   expect(parsed.locs).toEqual(['/', '/bootcamp/nodejs/', '/bootcamp/nodejs/payment/', '/bootcamp/nodejs/offer/', '/bootcamp/nodejs/quality/', '/privacy/', '/consent/'].map((path) => `${SITE}${path}`))
   expect(parsed.lastmod[0]).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+})
+
+test('фид курсов Яндекса: XML, цена и дата те же, что на странице буткемпа', async ({ request, page }) => {
+  const response = await request.get('/yandex-courses.xml')
+  expect(response.status()).toBe(200)
+  expect(response.headers()['content-type']).toMatch(/xml/)
+  const feed = await page.evaluate((source) => {
+    const doc = new DOMParser().parseFromString(source, 'application/xml')
+    const param = (name: string) => [...doc.querySelectorAll('offer > param')].filter((node) => node.getAttribute('name') === name)
+    return {
+      error: doc.getElementsByTagName('parsererror').length > 0,
+      url: doc.querySelector('offer > url')?.textContent,
+      price: doc.querySelector('offer > price')?.textContent,
+      start: param('Ближайшая дата')[0]?.textContent,
+      plan: param('План').length,
+    }
+  }, await response.text())
+  expect(feed.error).toBe(false)
+  expect(feed).toMatchObject({ url: `${SITE}${BOOTCAMP_PATH}`, price: String(PRICE.value), start: START_ISO })
+  expect(feed.plan).toBeGreaterThanOrEqual(3)
+
+  // Яндекс сверяет фид с сайтом: та же цена и дата в тексте и в разметке Course.
+  await page.goto(BOOTCAMP_PATH)
+  await expect(page.locator('main')).toContainText(PRICE.text)
+  await expect(page.locator('main')).toContainText(START)
+  const graph = (await page.locator('script[type="application/ld+json"]').allTextContents()).flatMap((text) => (JSON.parse(text) as { '@graph': Record<string, unknown>[] })['@graph'])
+  const course = graph.find((node) => node['@type'] === 'Course') as { offers: { price: number }; hasCourseInstance: { startDate: string } }
+  expect(course.offers.price).toBe(PRICE.value)
+  expect(course.hasCourseInstance.startDate).toBe(START_ISO)
 })
 
 test('favicon.ico, SVG-иконка и apple-touch-icon отдаются картинками', async ({ page, request }) => {
