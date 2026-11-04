@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { ArrowRight, Award, BookOpen, Clock, Flame, GraduationCap, Map as MapIcon, MessagesSquare, Star, Tent, Trophy } from 'lucide-react'
 import { collectAllPages } from '@/lib/paginate'
 import { pluralize } from '@/lib/utils'
-import { restingGreeting, streakView } from '@/lib/streak'
+import { streakView } from '@/lib/streak'
 import { loadCourseLessons, relationKey } from '@/lib/course-lessons'
 import { recentLearningCourses } from '@/server/learning-history'
 import { RecentLearningCourses } from '@/components/learning/LearningHistory'
@@ -217,7 +217,7 @@ export default async function DashboardPage() {
             Сегодня урок уже пройден - серия {pluralize(streak.days, 'день', 'дня', 'дней')} подряд
           </p>
         ) : (
-          <p className="mt-1 text-muted-foreground">{restingGreeting(completedLessons, streakData.docs[0])}</p>
+          <p className="mt-1 text-muted-foreground">Продолжай обучение</p>
         )}
       </div>
 

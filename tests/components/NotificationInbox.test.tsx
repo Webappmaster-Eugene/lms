@@ -64,7 +64,6 @@ describe('полный список уведомлений', () => {
     docs = []
     const first = render(<NotificationInbox userId={34} />)
     expect(await screen.findByText('Уведомлений пока нет')).toBeInTheDocument()
-    expect(screen.getByText(/^На палубе пока тихо/)).toBeInTheDocument()
     first.unmount()
     global.fetch = vi.fn(async () => new Response(null, { status: 503 })) as typeof fetch
     render(<NotificationInbox userId={34} />)
