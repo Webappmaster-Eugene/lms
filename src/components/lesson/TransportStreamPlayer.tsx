@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Maximize2, Pause, Play, Volume2, VolumeX } from 'lucide-react'
+import { Loader2, Maximize2, Minimize2, Pause, Play, Volume2, VolumeX } from 'lucide-react'
 
 import { useVideoMemory } from '@/hooks/use-video-memory'
 import { formatTime } from '@/lib/video-memory'
@@ -55,7 +55,9 @@ function bufferedCovers(video: HTMLVideoElement, seconds: number): boolean {
 export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailure, resumePlaying = false }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const playerRef = useRef<PlayerHandle | null>(null)
+  const shellRef = useRef<HTMLDivElement | null>(null)
 
+  const [fullscreen, setFullscreen] = useState(false)
   const [ready, setReady] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [muted, setMuted] = useState(false)
@@ -210,13 +212,30 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
     [duration, seekTo],
   )
 
+  useEffect(() => {
+    const onChange = () => setFullscreen(document.fullscreenElement === shellRef.current)
+    // Во весь экран фокус не обязан быть на шкале, а стрелки должны перематывать.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || document.fullscreenElement !== shellRef.current || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+      if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
+      event.preventDefault()
+      seekTo((videoRef.current?.currentTime ?? 0) + (event.key === 'ArrowRight' ? 10 : -10))
+    }
+    document.addEventListener('fullscreenchange', onChange)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [seekTo])
+
   return (
     <div className="space-y-3">
-      <div className="overflow-hidden rounded-xl border border-border bg-black">
-        <div data-lesson-video="stream" className="relative touch-pan-y touch-pinch-zoom">
+      <div ref={shellRef} data-lesson-video-shell className="overflow-hidden rounded-xl border border-border bg-black [&:fullscreen]:flex [&:fullscreen]:flex-col [&:fullscreen]:rounded-none [&:fullscreen]:border-0">
+        <div data-lesson-video="stream" className="relative touch-pan-y touch-pinch-zoom [:fullscreen>&]:min-h-0 [:fullscreen>&]:flex-1">
           <video
             ref={videoRef}
-            className="aspect-video w-full"
+            className="aspect-video w-full [:fullscreen_&]:aspect-auto [:fullscreen_&]:h-full"
             playsInline
             disableRemotePlayback
             onContextMenu={(event) => event.preventDefault()}
@@ -252,8 +271,10 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
             tabIndex={0}
             onClick={onScrub}
             onKeyDown={(event) => {
-              if (event.key === 'ArrowRight') seekTo(position + 10)
-              if (event.key === 'ArrowLeft') seekTo(position - 10)
+              if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
+              // Шаг уже сделан: выше стрелка не должна ни перемотать второй раз, ни сменить урок.
+              event.preventDefault()
+              seekTo(position + (event.key === 'ArrowRight' ? 10 : -10))
             }}
             title="Перемотка доступна по загруженной части - она обгоняет просмотр"
             className="relative h-1.5 flex-1 cursor-pointer rounded-full bg-white/20"
@@ -286,11 +307,11 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
 
           <button
             type="button"
-            onClick={() => void videoRef.current?.requestFullscreen?.().catch(() => undefined)}
-            aria-label="Во весь экран"
+            onClick={() => void (fullscreen ? document.exitFullscreen() : shellRef.current?.requestFullscreen?.())?.catch(() => undefined)}
+            aria-label={fullscreen ? 'Свернуть' : 'Во весь экран'}
             className="rounded p-1 transition-colors hover:bg-white/10"
           >
-            <Maximize2 className="h-5 w-5" />
+            {fullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
           </button>
         </div>
       </div>

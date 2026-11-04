@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { swipeDirection, swipeTarget } from '@/lib/lesson-swipe'
+import { swipeDirection, swipeTarget, trackWheel, WHEEL_IDLE } from '@/lib/lesson-swipe'
 
 const previous = { slug: 'a', title: 'Урок A' }
 const next = { slug: 'c', title: 'Урок C' }
@@ -46,5 +46,35 @@ describe('куда ведёт смахивание', () => {
   it('на краях курса идти некуда', () => {
     expect(swipeTarget('prev', 0, 1, null, next)).toBeNull()
     expect(swipeTarget('next', 0, 1, previous, null)).toBeNull()
+  })
+})
+
+describe('trackWheel', () => {
+  it('копит мелкие сдвиги до порога и срабатывает один раз за жест', () => {
+    const first = trackWheel(WHEEL_IDLE, 70, 0)
+    expect(first.direction).toBeNull()
+    const second = trackWheel(first.track, 70, 10)
+    expect(second.direction).toBe('next')
+    const inertia = trackWheel(second.track, 300, 20)
+    expect(inertia.direction).toBeNull()
+  })
+
+  it('палец вправо - назад', () => {
+    expect(trackWheel(WHEEL_IDLE, -130, 0).direction).toBe('prev')
+  })
+
+  it('пауза заканчивает жест: срабатывание сбрасывается, накопленное не переносится', () => {
+    const fired = trackWheel(WHEEL_IDLE, 130, 0)
+    expect(trackWheel(fired.track, 130, 1000).direction).toBe('next')
+    const small = trackWheel(WHEEL_IDLE, 100, 0)
+    expect(trackWheel(small.track, 100, 1000).direction).toBeNull()
+  })
+
+  it('инерция с постоянными сдвигами не становится новым жестом', () => {
+    let step = trackWheel(WHEEL_IDLE, 130, 0)
+    for (let now = 50; now <= 600; now += 50) {
+      step = trackWheel(step.track, 30, now)
+      expect(step.direction).toBeNull()
+    }
   })
 })

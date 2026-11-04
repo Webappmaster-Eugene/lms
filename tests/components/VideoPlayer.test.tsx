@@ -214,11 +214,11 @@ describe('отказ плеера в уроке', () => {
     expect(screen.getByRole('link', { name: /Открыть на Яндекс Диске/ })).toHaveAttribute('href', raw)
   })
 
-  it('урок с конспектом предлагает прочитать его и над видео, и в сообщении об отказе', async () => {
+  it('урок с конспектом предлагает прочитать его только в сообщении об отказе: у частей кнопка не повторяется', async () => {
     const raw = 'https://disk.yandex.ru/d/key/lesson.mkv'
     fetchMock.mockImplementation(async () => sourceResponse(mp4Head))
     const { container } = render(<StudyNotesProvider value><VideoPlayer title="Урок" videoUrl={raw} displayMode="embed" /></StudyNotesProvider>)
-    expect(screen.getByRole('link', { name: 'Читать конспект' })).toHaveAttribute('href', '#konspekt')
+    expect(screen.queryByRole('link', { name: 'Читать конспект' })).toBeNull()
     await failNative(container)
     await wait(2000)
     await failNative(container)
@@ -509,93 +509,191 @@ describe('отказ плеера в уроке', () => {
 })
 
 describe('подготовка видимого видео без конкуренции фоновых записей', () => {
-  const observed: { element: Element; reveal: () => void }[] = []
+  const DWELL_MS = 1500
+  const observed: { element: Element; reveal: () => void; hide: () => void }[] = []
   const disconnect = vi.fn()
+  const urlOf = (block: string) => `/api/yandex-disk/stream?lesson=1&block=${block}`
+  const settle = (index = 0) => act(() => {
+    observed[index].reveal()
+    vi.advanceTimersByTime(DWELL_MS)
+  })
+  const mark = (video: Element, playing: boolean) => {
+    Object.defineProperty(video, 'paused', { value: !playing, configurable: true })
+    act(() => { video.dispatchEvent(new Event(playing ? 'play' : 'pause')) })
+  }
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     observed.length = 0
     disconnect.mockClear()
     vi.stubGlobal('IntersectionObserver', class {
       constructor(private callback: (entries: { isIntersecting: boolean }[]) => void) {}
-      observe(element: Element) { observed.push({ element, reveal: () => this.callback([{ isIntersecting: true }]) }) }
+      observe(element: Element) {
+        observed.push({
+          element,
+          reveal: () => this.callback([{ isIntersecting: true }]),
+          hide: () => this.callback([{ isIntersecting: false }]),
+        })
+      }
       disconnect = disconnect
     })
   })
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
     Reflect.deleteProperty(navigator, 'connection')
   })
 
-  it('подготавливает только видео рядом с экраном; другие записи не качаются в фоне', () => {
+  it('подготавливает только видео, задержавшееся у экрана; другие записи не качаются в фоне', () => {
     const { container, unmount } = render(<>
-      <VideoPlayer title="Первое" videoUrl="/api/yandex-disk/stream?lesson=1&block=a" displayMode="embed" />
-      <VideoPlayer title="Второе" videoUrl="/api/yandex-disk/stream?lesson=1&block=b" displayMode="embed" />
+      <VideoPlayer title="Первое" videoUrl={urlOf('a')} displayMode="embed" />
+      <VideoPlayer title="Второе" videoUrl={urlOf('b')} displayMode="embed" />
     </>)
     const videos = container.querySelectorAll('video')
     expect(videos[0]).toHaveAttribute('preload', 'none')
     expect(videos[1]).toHaveAttribute('preload', 'none')
-    act(() => observed[0].reveal())
+    settle()
     expect(videos[0]).toHaveAttribute('preload', 'auto')
     expect(videos[1]).toHaveAttribute('preload', 'none')
-    expect(disconnect).toHaveBeenCalledOnce()
     unmount()
-    expect(disconnect).toHaveBeenCalledTimes(3)
+    expect(disconnect).toHaveBeenCalledTimes(2)
+  })
+
+  it('прокрутка мимо видео не запускает его загрузку: так к конспекту проходят все части разом', () => {
+    const { container } = render(<>
+      <VideoPlayer title="Первое" videoUrl={urlOf('a')} displayMode="embed" />
+      <VideoPlayer title="Второе" videoUrl={urlOf('b')} displayMode="embed" />
+    </>)
+    const videos = container.querySelectorAll('video')
+    act(() => {
+      observed[0].reveal()
+      vi.advanceTimersByTime(DWELL_MS - 1)
+      observed[0].hide()
+      observed[1].reveal()
+      vi.advanceTimersByTime(DWELL_MS - 1)
+      observed[1].hide()
+      vi.advanceTimersByTime(DWELL_MS * 2)
+    })
+    expect(videos[0]).toHaveAttribute('preload', 'none')
+    expect(videos[1]).toHaveAttribute('preload', 'none')
+  })
+
+  it('у экрана две записи: качается одна, вторая ждёт, пока первая уйдёт с экрана', () => {
+    const { container } = render(<>
+      <VideoPlayer title="Первое" videoUrl={urlOf('a')} displayMode="embed" />
+      <VideoPlayer title="Второе" videoUrl={urlOf('b')} displayMode="embed" />
+    </>)
+    const videos = container.querySelectorAll('video')
+    const load = vi.spyOn(HTMLMediaElement.prototype, 'load')
+    settle(0)
+    settle(1)
+    expect(videos[0]).toHaveAttribute('preload', 'auto')
+    expect(videos[1]).toHaveAttribute('preload', 'none')
+    const source = videos[0].getAttribute('src')
+    load.mockClear()
+    act(() => observed[0].hide())
+    expect(videos[0]).toHaveAttribute('preload', 'none')
+    expect(videos[1]).toHaveAttribute('preload', 'auto')
+    // Смена preload начатую загрузку не прерывает: нужна перезагрузка элемента, адрес остаётся.
+    expect(load.mock.contexts).toEqual([videos[0]])
+    expect(videos[0]).toHaveAttribute('src', source)
+  })
+
+  it('из двух записей у экрана качается та, что ближе к середине, даже если вторая успела раньше', () => {
+    const { container } = render(<>
+      <VideoPlayer title="Первое" videoUrl={urlOf('a')} displayMode="embed" />
+      <VideoPlayer title="Второе" videoUrl={urlOf('b')} displayMode="embed" />
+    </>)
+    const videos = container.querySelectorAll('video')
+    const rect = (top: number) => ({ top, bottom: top + 200, left: 0, right: 360, width: 360, height: 200, x: 0, y: top, toJSON: () => ({}) }) as DOMRect
+    vi.spyOn(videos[0], 'getBoundingClientRect').mockReturnValue(rect(window.innerHeight / 2 - 100))
+    vi.spyOn(videos[1], 'getBoundingClientRect').mockReturnValue(rect(window.innerHeight))
+
+    settle(1)
+    expect(videos[1]).toHaveAttribute('preload', 'auto')
+    settle(0)
+
+    expect(videos[0]).toHaveAttribute('preload', 'auto')
+    expect(videos[1]).toHaveAttribute('preload', 'none')
+  })
+
+  it('пока одно видео играет, остальные не качаются; на паузе подготовка возвращается', () => {
+    const { container } = render(<>
+      <VideoPlayer title="Первое" videoUrl={urlOf('a')} displayMode="embed" />
+      <VideoPlayer title="Второе" videoUrl={urlOf('b')} displayMode="embed" />
+    </>)
+    const videos = container.querySelectorAll('video')
+    settle(1)
+    expect(videos[1]).toHaveAttribute('preload', 'auto')
+    mark(videos[0], true)
+    expect(videos[1]).toHaveAttribute('preload', 'none')
+    mark(videos[0], false)
+    expect(videos[1]).toHaveAttribute('preload', 'auto')
+  })
+
+  it('начатое видео остаётся подготовленным, даже когда ушло с экрана', () => {
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={urlOf('a')} displayMode="embed" />)
+    const video = container.querySelector('video') as HTMLVideoElement
+    settle()
+    mark(video, true)
+    const load = vi.spyOn(HTMLMediaElement.prototype, 'load')
+    act(() => observed[0].hide())
+    expect(video).toHaveAttribute('preload', 'auto')
+    expect(load).not.toHaveBeenCalled()
   })
 
   it.each([{ saveData: true }, { effectiveType: '2g' }, { effectiveType: 'slow-2g' }])('учитывает экономию трафика/медленную сеть %j', (connection) => {
     Object.defineProperty(navigator, 'connection', { configurable: true, value: connection })
-    const { container } = render(<VideoPlayer title="Урок" videoUrl="/api/yandex-disk/stream?lesson=1&block=a" displayMode="embed" />)
-    act(() => observed[0].reveal())
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={urlOf('a')} displayMode="embed" />)
+    settle()
     expect(container.querySelector('video')).toHaveAttribute('preload', 'metadata')
   })
 
   it('без IntersectionObserver сохраняет совместимый metadata preload', () => {
     vi.stubGlobal('IntersectionObserver', undefined)
-    const { container } = render(<VideoPlayer title="Урок" videoUrl="/api/yandex-disk/stream?lesson=1&block=a" displayMode="embed" />)
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={urlOf('a')} displayMode="embed" />)
     expect(container.querySelector('video')).toHaveAttribute('preload', 'metadata')
   })
 
-  it('фоновая вкладка не скачивает даже видимое видео; активация подготавливает его и удаляет подписку', () => {
+  it('фоновая вкладка не скачивает даже видимое видео; активация подготавливает его, а новый уход в фон не прерывает', () => {
     const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
-    const addListener = vi.spyOn(document, 'addEventListener')
-    const removeListener = vi.spyOn(document, 'removeEventListener')
     const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause')
-    const { container, unmount } = render(<VideoPlayer title="Урок" videoUrl="/api/yandex-disk/stream?lesson=1&block=a" displayMode="embed" />)
+    const { container, unmount } = render(<VideoPlayer title="Урок" videoUrl={urlOf('a')} displayMode="embed" />)
     const video = container.querySelector('video')
-    act(() => observed[0].reveal())
+    settle()
     expect(video).toHaveAttribute('preload', 'none')
-    expect(disconnect).not.toHaveBeenCalled()
     visibility.mockReturnValue('visible')
     act(() => document.dispatchEvent(new Event('visibilitychange')))
     expect(video).toHaveAttribute('preload', 'auto')
-    expect(disconnect).toHaveBeenCalledOnce()
-    const subscribed = addListener.mock.calls.find(([event]) => event === 'visibilitychange')
-    expect(removeListener).toHaveBeenCalledWith('visibilitychange', subscribed?.[1])
     visibility.mockReturnValue('hidden')
     act(() => document.dispatchEvent(new Event('visibilitychange')))
     expect(video).toHaveAttribute('preload', 'auto')
     expect(pause).not.toHaveBeenCalled()
     unmount()
-    expect(disconnect).toHaveBeenCalledTimes(2)
+    expect(disconnect).toHaveBeenCalledOnce()
   })
 
-  it('закрытие фоновой вкладки снимает ожидание активации и игнорирует поздний observer callback', () => {
+  it('закрытие страницы снимает подписки и игнорирует поздний сигнал observer', () => {
     const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
     const removeListener = vi.spyOn(document, 'removeEventListener')
-    const { container, unmount } = render(<VideoPlayer title="Урок" videoUrl="/api/yandex-disk/stream?lesson=1&block=a" displayMode="embed" />)
+    const { container, unmount } = render(<VideoPlayer title="Урок" videoUrl={urlOf('a')} displayMode="embed" />)
     const video = container.querySelector('video')
     act(() => observed[0].reveal())
     unmount()
     expect(removeListener.mock.calls.some(([event]) => event === 'visibilitychange')).toBe(true)
     visibility.mockReturnValue('visible')
-    act(() => { document.dispatchEvent(new Event('visibilitychange')); observed[0].reveal() })
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+      observed[0].reveal()
+      vi.advanceTimersByTime(DWELL_MS)
+    })
     expect(video).toHaveAttribute('preload', 'none')
   })
 
   it('без IntersectionObserver тоже ждёт активации вкладки перед metadata preload', () => {
     vi.stubGlobal('IntersectionObserver', undefined)
     const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
-    const { container } = render(<VideoPlayer title="Урок" videoUrl="/api/yandex-disk/stream?lesson=1&block=a" displayMode="embed" />)
+    const { container } = render(<VideoPlayer title="Урок" videoUrl={urlOf('a')} displayMode="embed" />)
     expect(container.querySelector('video')).toHaveAttribute('preload', 'none')
     visibility.mockReturnValue('visible')
     act(() => document.dispatchEvent(new Event('visibilitychange')))

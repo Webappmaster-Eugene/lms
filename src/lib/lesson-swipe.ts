@@ -41,3 +41,19 @@ export function swipeTarget(
   if (!lesson) return null
   return { kind: 'lesson', slug: lesson.slug, title: lesson.title, edge: direction === 'next' ? 'first' : 'last' }
 }
+
+/** Тачпад шлёт поток мелких сдвигов с инерцией: сколько накопить и какая пауза заканчивает жест. */
+const WHEEL_DISTANCE_PX = 120
+const WHEEL_QUIET_MS = 250
+
+export type WheelTrack = { sum: number; at: number; fired: boolean }
+export const WHEEL_IDLE: WheelTrack = { sum: 0, at: Number.NEGATIVE_INFINITY, fired: false }
+
+/** Копит горизонтальный жест тачпада. Один жест листает один раз: инерция после срабатывания не считается. */
+export function trackWheel(track: WheelTrack, deltaX: number, now: number): { track: WheelTrack; direction: SwipeDirection | null } {
+  const fresh = now - track.at > WHEEL_QUIET_MS
+  const sum = (fresh ? 0 : track.sum) + deltaX
+  const fired = fresh ? false : track.fired
+  if (fired || Math.abs(sum) < WHEEL_DISTANCE_PX) return { track: { sum, at: now, fired }, direction: null }
+  return { track: { sum, at: now, fired: true }, direction: sum > 0 ? 'next' : 'prev' }
+}

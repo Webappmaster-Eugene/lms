@@ -60,6 +60,10 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
   const [resumedFrom, setResumedFrom] = useState<number | null>(null)
   const [rate, setRateState] = useState(1)
   const pendingRef = useRef<number | null>(null)
+  /** Последняя позиция, заданная не воспроизведением: восстановленная или выбранная на шкале. */
+  const positionRef = useRef(0)
+  /** Элемент перезагружен и ждёт метаданных: цель в pendingRef пересчитывать нельзя. */
+  const reloadingRef = useRef(false)
   const linkRequestRef = useRef<{ token: string; applied: boolean } | null>(null)
   const restoredRef = useRef(false)
   // «Продолжили с …» — только про возврат к месту остановки, не про переход по метке заметки.
@@ -83,7 +87,7 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
     }
     const fromLink = linkedTime !== null && !linkRequestRef.current?.applied ? linkedTime : null
     const saved = storageKey ? newerPosition(syncPositions?.[key], readLocalLearningPosition(storageKey)) : undefined
-    pendingRef.current = linkedTime !== null ? fromLink : (interactedRef.current || restoredRef.current ? null : storageKey ? (saved && !saved.ended && saved.seconds > 0 ? saved.seconds : null) : resumeTarget(readPosition(key), duration))
+    if (!reloadingRef.current) pendingRef.current = linkedTime !== null ? fromLink : (interactedRef.current || restoredRef.current ? null : storageKey ? (saved && !saved.ended && saved.seconds > 0 ? saved.seconds : null) : resumeTarget(readPosition(key), duration))
     if (saved && !observedRef.current) observedRef.current = saved
     let alive = true
     const persistObserved = (seconds: number, ended = false, keepalive = false) => {
@@ -116,8 +120,10 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
       if (!canSeek(video, target)) { setWaitingFrom(target); return }
       setWaitingFrom(null)
       pendingRef.current = null
+      reloadingRef.current = false
       restoringRef.current = true
       restoredRef.current = true
+      positionRef.current = target
       video.currentTime = target
       if (fromLink !== null && linkRequestRef.current) linkRequestRef.current.applied = true
       if (announceRef.current) setResumedFrom(target)
@@ -155,10 +161,18 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
     const onSeeked = () => {
       if (restoringRef.current) { restoringRef.current = false; return }
       interactedRef.current = true
+      positionRef.current = video.currentTime
       if (pendingRef.current === null) persistObserved(video.currentTime)
     }
     const onPageHide = () => {
       if (!finished && interactedRef.current && pendingRef.current === null) persistObserved(video.currentTime, false, true)
+    }
+    // Прерванная подготовка (lesson-video-warmup) обнуляет позицию: вернём её с новыми метаданными.
+    // Пока цель ждёт в pendingRef, ни пауза, ни уход со страницы не запишут ноль.
+    const onEmptied = () => {
+      if (positionRef.current <= 0) return
+      pendingRef.current = positionRef.current
+      reloadingRef.current = true
     }
     const onOnline = () => {
       if (alive && storageKey) {
@@ -202,6 +216,7 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
     window.addEventListener('pagehide', onPageHide)
     window.addEventListener('online', onOnline)
     video.addEventListener('seeked', onSeeked)
+    video.addEventListener('emptied', onEmptied)
     window.addEventListener(VIDEO_SEEK_EVENT, onSeek)
     video.addEventListener('loadedmetadata', onMetadata)
     video.addEventListener('progress', tryResume)
@@ -220,6 +235,7 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
       window.removeEventListener('pagehide', onPageHide)
       window.removeEventListener('online', onOnline)
       video.removeEventListener('seeked', onSeeked)
+      video.removeEventListener('emptied', onEmptied)
       window.removeEventListener(VIDEO_SEEK_EVENT, onSeek)
       video.removeEventListener('loadedmetadata', onMetadata)
       video.removeEventListener('progress', tryResume)
@@ -255,6 +271,8 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
 
   const restart = useCallback(() => {
     pendingRef.current = null
+    reloadingRef.current = false
+    positionRef.current = 0
     if (linkRequestRef.current) linkRequestRef.current.applied = true
     setWaitingFrom(null)
     clearPosition(key)

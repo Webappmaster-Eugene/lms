@@ -6,6 +6,7 @@ import { ExternalLinkBlock } from './ExternalLink'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { LessonMarkdown } from './LessonMarkdown'
 import { SlidesBlock } from './SlidesBlock'
+import { studyNotesText } from '@/lib/lesson-notes'
 import { StudyNotesProvider, StudyNotesSection } from './StudyNotes'
 import { FileDown } from 'lucide-react'
 import type { LearningVideo } from '@/lib/learning-state'
@@ -55,11 +56,6 @@ export function ContentBlockRenderer({ blocks, learningVideos = [] }: Props) {
       </div>
     </StudyNotesProvider>
   )
-}
-
-/** Текст конспекта, если блок - непустой конспект: пустой не показывается и не даёт ссылки из плеера. */
-function studyNotesText(block: { blockType: string; markdown?: unknown }): string | null {
-  return block.blockType === 'lessonNotes' && typeof block.markdown === 'string' && block.markdown.trim() !== '' ? block.markdown : null
 }
 
 function renderBlock(block: ContentBlock, memoryId?: string, anchorPrefix?: string, notesOrdinal = 0) {

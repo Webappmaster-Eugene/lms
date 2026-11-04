@@ -211,14 +211,50 @@ describe('потоковый плеер MPEG-TS', () => {
     expect(screen.getByText('0:00 / -')).toBeInTheDocument()
   })
 
-  it('разворачивается на весь экран, а отказ браузера не роняет плеер', async () => {
+  it('разворачивает рамку вместе с кнопками, а отказ браузера не роняет плеер', async () => {
     const user = userEvent.setup()
     const { video } = await renderStream()
-    video.requestFullscreen = vi.fn(() => Promise.reject(new TypeError('denied')))
+    const shell = video.closest('[data-lesson-video-shell]') as HTMLElement
+    expect(shell).toContainElement(screen.getByRole('button', { name: 'Во весь экран' }))
+    shell.requestFullscreen = vi.fn(() => Promise.reject(new TypeError('denied')))
 
     await user.click(screen.getByRole('button', { name: 'Во весь экран' }))
 
-    expect(video.requestFullscreen).toHaveBeenCalledOnce()
+    expect(shell.requestFullscreen).toHaveBeenCalledOnce()
+  })
+
+  describe('во весь экран', () => {
+    afterEach(() => { Reflect.deleteProperty(document, 'fullscreenElement') })
+
+    async function enterFullscreen() {
+      const rendered = await renderStream()
+      const shell = rendered.video.closest('[data-lesson-video-shell]') as HTMLElement
+      act(() => buffer(rendered.video, 300))
+      Object.defineProperty(document, 'fullscreenElement', { value: shell, configurable: true })
+      act(() => { document.dispatchEvent(new Event('fullscreenchange')) })
+      return rendered
+    }
+
+    it('кнопка сворачивает обратно', async () => {
+      const user = userEvent.setup()
+      await enterFullscreen()
+      document.exitFullscreen = vi.fn(() => Promise.resolve())
+
+      await user.click(screen.getByRole('button', { name: 'Свернуть' }))
+
+      expect(document.exitFullscreen).toHaveBeenCalledOnce()
+      Reflect.deleteProperty(document, 'exitFullscreen')
+    })
+
+    it('стрелки перематывают без фокуса на шкале и не считаются дважды на ней', async () => {
+      const { video } = await enterFullscreen()
+
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' })
+      expect(video.currentTime).toBe(10)
+
+      fireEvent.keyDown(slider(), { key: 'ArrowRight' })
+      expect(video.currentTime).toBe(20)
+    })
   })
 
   it('контекстное меню с «Сохранить видео» отключено', async () => {

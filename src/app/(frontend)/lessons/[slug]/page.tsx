@@ -12,6 +12,9 @@ import { LessonComments } from '@/components/lesson/LessonComments'
 import { LessonKeyboardNav } from '@/components/lesson/LessonKeyboardNav'
 import { LessonNavigation } from '@/components/lesson/LessonNavigation'
 import { LessonSwipeNav } from '@/components/lesson/LessonSwipeNav'
+import { LessonPlaybackGuard } from '@/components/lesson/LessonPlaybackGuard'
+import { StudyNotesAnchor } from '@/components/lesson/StudyNotes'
+import { studyNotesText } from '@/lib/lesson-notes'
 import { CourseSidebar } from '@/components/course/CourseSidebar'
 import { BookmarkButton } from '@/components/bookmarks/BookmarkButton'
 import { findBookmarkId } from '@/lib/bookmarks'
@@ -287,6 +290,7 @@ export default async function LessonPage({ params }: Props) {
 
   const visibleLesson = user.role === 'admin' ? lesson : protectLessonVideoSources(lesson)
   const blocks = visibleLesson.content ?? []
+  const hasStudyNotes = blocks.some((block) => studyNotesText(block) !== null)
 
   const hasSidebar = sidebarSections.length > 0
   const totalLessons = allCourseLessons.length
@@ -334,8 +338,8 @@ export default async function LessonPage({ params }: Props) {
           {visibleLesson.description && (
             <p className="text-muted-foreground">{visibleLesson.description}</p>
           )}
-          {(position || lesson.estimatedMinutes) && (
-            <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          {(position || lesson.estimatedMinutes || hasStudyNotes) && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
               {position && (
                 <span>
                   {policy.catalogVisibility === 'assigned' ? 'Назначенный урок' : 'Урок'} {position.index} из {position.total}
@@ -346,7 +350,8 @@ export default async function LessonPage({ params }: Props) {
                   <Clock className="h-4 w-4" />~{lesson.estimatedMinutes} мин
                 </span>
               )}
-            </p>
+              {hasStudyNotes && <StudyNotesAnchor />}
+            </div>
           )}
         </div>
 
@@ -378,6 +383,7 @@ export default async function LessonPage({ params }: Props) {
           nextHref={nextLesson ? `/lessons/${nextLesson.slug}` : null}
         />
         <LessonSwipeNav key={String(lesson.id)} slug={lesson.slug} previous={prevLesson} next={nextLesson} />
+        <LessonPlaybackGuard />
         <LessonNavigation previous={prevLesson} next={nextLesson} />
 
         {/* Обсуждение */}

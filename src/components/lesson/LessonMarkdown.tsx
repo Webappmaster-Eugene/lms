@@ -47,7 +47,7 @@ const PROSE = [
   'prose-table:my-0 prose-thead:border-border prose-tr:border-border prose-th:bg-muted/60 prose-th:px-3 prose-th:py-2 prose-td:px-3 prose-td:py-2',
 ].join(' ')
 
-type LessonMarkdownState = { highlighter: HighlighterCore | null; outline: LessonMarkdownOutline }
+type LessonMarkdownState = { highlighter: HighlighterCore | null; outline: LessonMarkdownOutline; deferAssets: boolean }
 
 const EMPTY_OUTLINE: LessonMarkdownOutline = { anchors: new Map(), contents: [], count: 0, aliases: new Map() }
 
@@ -56,7 +56,7 @@ const EMPTY_OUTLINE: LessonMarkdownOutline = { anchors: new Map(), contents: [],
  * подсветки меняла бы типы компонентов, React пересоздавал бы блоки кода и схемы и
  * сбрасывал их состояние («Скопировано», открытый просмотр схемы).
  */
-const LessonMarkdownContext = createContext<LessonMarkdownState>({ highlighter: null, outline: EMPTY_OUTLINE })
+const LessonMarkdownContext = createContext<LessonMarkdownState>({ highlighter: null, outline: EMPTY_OUTLINE, deferAssets: false })
 
 function LessonH2({ node, children, ...props }: ComponentProps<'h2'> & ExtraProps) {
   const { outline } = useContext(LessonMarkdownContext)
@@ -76,12 +76,12 @@ function LessonLink({ node: _node, href, children, ...props }: ComponentProps<'a
 }
 
 function LessonPre({ node, children, ...props }: ComponentProps<'pre'> & ExtraProps) {
-  const { highlighter } = useContext(LessonMarkdownContext)
+  const { highlighter, deferAssets } = useContext(LessonMarkdownContext)
   const code: HastNode | undefined = node?.children[0]
   const fence = code?.tagName === 'code' ? fenceLanguage(code.properties?.className) : null
   const language = fence ? markdownLanguage(fence) : null
   const text = code ? hastText(code).replace(/\n$/, '') : ''
-  if (fence === 'mermaid') return <MermaidDiagram code={text} />
+  if (fence === 'mermaid' && !deferAssets) return <MermaidDiagram code={text} />
   if (highlighter && language && highlighter.getLoadedLanguages().includes(language) && text.length <= MAX_HIGHLIGHTED) {
     const html = highlighter.codeToHtml(text, { lang: language, themes: { light: 'github-light', dark: 'github-dark' } })
     return (
@@ -118,10 +118,10 @@ const REMARK_PLUGINS = [remarkGfm]
  * намеренно не подключён, в отличие от MarkdownRenderer. Код подсвечивается в
  * браузере после загрузки, до неё он читается обычным блоком.
  */
-export function LessonMarkdown({ markdown, anchorPrefix = 'section' }: { markdown: string; anchorPrefix?: string }) {
+export function LessonMarkdown({ markdown, anchorPrefix = 'section', deferAssets = false }: { markdown: string; anchorPrefix?: string; deferAssets?: boolean }) {
   const [highlighter, setHighlighter] = useState<HighlighterCore | null>(null)
   const outline = useMemo(() => lessonMarkdownOutline(markdown, anchorPrefix), [markdown, anchorPrefix])
-  const state = useMemo(() => ({ highlighter, outline }), [highlighter, outline])
+  const state = useMemo(() => ({ highlighter, outline, deferAssets }), [highlighter, outline, deferAssets])
   const languageKey = useMemo(
     // Схемам mermaid подсветка не нужна: без кода на странице её движок не грузится.
     () => [...new Set([...markdown.matchAll(/^ {0,3}(?:```|~~~)([\w-]+)/gm)].map((match) => markdownLanguage(match[1].toLowerCase())).filter((language) => language !== 'mermaid'))].sort().join(','),
@@ -135,7 +135,7 @@ export function LessonMarkdown({ markdown, anchorPrefix = 'section' }: { markdow
   ), [markdown])
 
   useEffect(() => {
-    if (!languageKey) return
+    if (!languageKey || deferAssets) return
     let cancelled = false
     getMarkdownHighlighter(languageKey.split(',')).then(
       (instance) => { if (!cancelled) setHighlighter(instance) },
@@ -145,7 +145,7 @@ export function LessonMarkdown({ markdown, anchorPrefix = 'section' }: { markdow
       },
     )
     return () => { cancelled = true }
-  }, [languageKey])
+  }, [languageKey, deferAssets])
 
   return (
     <LessonMarkdownContext.Provider value={state}>

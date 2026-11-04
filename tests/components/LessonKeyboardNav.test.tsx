@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render } from '@testing-library/react'
 
 const push = vi.fn()
@@ -50,5 +50,52 @@ describe('стрелки между уроками', () => {
     fireEvent.keyDown(document.body, { key: 'ArrowLeft' })
 
     expect(push).not.toHaveBeenCalled()
+  })
+
+  it('при фокусе на видео и шкале стрелки перематывают, а не меняют урок', () => {
+    render(
+      <>
+        <LessonKeyboardNav prevHref="/lessons/a" nextHref="/lessons/c" />
+        <div data-lesson-video="native"><video data-testid="video" /></div>
+        <div role="slider" aria-label="Перемотка" aria-valuenow={0} tabIndex={0} />
+      </>,
+    )
+
+    fireEvent.keyDown(document.querySelector('video') as HTMLElement, { key: 'ArrowRight' })
+    fireEvent.keyDown(document.querySelector('[role="slider"]') as HTMLElement, { key: 'ArrowLeft' })
+
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  describe('во весь экран', () => {
+    afterEach(() => { Reflect.deleteProperty(document, 'fullscreenElement') })
+
+    function fullscreen(element: Element) {
+      Object.defineProperty(document, 'fullscreenElement', { value: element, configurable: true })
+    }
+
+    it('стрелки перематывают развёрнутое видео, не выходя за его края', () => {
+      render(<><LessonKeyboardNav prevHref="/lessons/a" nextHref="/lessons/c" /><video /></>)
+      const video = document.querySelector('video') as HTMLVideoElement
+      Object.defineProperty(video, 'duration', { value: 12, configurable: true })
+      video.currentTime = 3
+      fullscreen(video)
+
+      // fireEvent возвращает false, когда обработчик снял действие браузера: второго шага не будет.
+      expect(fireEvent.keyDown(document.body, { key: 'ArrowLeft' })).toBe(false)
+      expect(video.currentTime).toBe(0)
+      video.currentTime = 10
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' })
+      expect(video.currentTime).toBe(12)
+      expect(push).not.toHaveBeenCalled()
+    })
+
+    it('другой развёрнутый блок стрелки не забирает и урок не меняет', () => {
+      render(<><LessonKeyboardNav prevHref="/lessons/a" nextHref="/lessons/c" /><div data-testid="slides" /></>)
+      fullscreen(document.querySelector('[data-testid="slides"]') as Element)
+
+      expect(fireEvent.keyDown(document.body, { key: 'ArrowRight' })).toBe(true)
+      expect(push).not.toHaveBeenCalled()
+    })
   })
 })

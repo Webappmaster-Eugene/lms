@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ExternalLink, Play, Clock, Loader2, RotateCw } from 'lucide-react'
 
 import { useVideoMemory } from '@/hooks/use-video-memory'
+import { watchVideoWarmup } from '@/lib/lesson-video-warmup'
 import { MEDIA_SOURCE_HEADER } from '@/lib/media-source-status'
 import { parsePublicResourceUrl } from '@/lib/yandex-disk-url'
 import { TransportStreamPlayer } from './TransportStreamPlayer'
@@ -411,36 +412,7 @@ function NativeVideo({ memoryId, videoUrl, playbackAttempt = 0, direct = false, 
 
   useEffect(() => {
     const video = videoRef.current
-    if (!video) return
-    const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection
-    const conserveData = connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType ?? '')
-    const canObserve = typeof IntersectionObserver !== 'undefined'
-    let nearViewport = !canObserve
-    let warmed = false
-    let disposed = false
-    let observer: IntersectionObserver | undefined
-    const warm = () => {
-      if (disposed || warmed || !nearViewport || document.visibilityState === 'hidden') return
-      // A background tab can still intersect its viewport. Only prepare the
-      // active tab, without interrupting playback when it later loses focus.
-      warmed = true
-      video.preload = conserveData || !canObserve ? 'metadata' : 'auto'
-      observer?.disconnect()
-      document.removeEventListener('visibilitychange', warm)
-    }
-    document.addEventListener('visibilitychange', warm)
-    if (canObserve) {
-      observer = new IntersectionObserver((entries) => {
-        nearViewport = entries.at(-1)?.isIntersecting ?? false
-        warm()
-      }, { rootMargin: '200px' })
-      observer.observe(video)
-    } else warm()
-    return () => {
-      disposed = true
-      observer?.disconnect()
-      document.removeEventListener('visibilitychange', warm)
-    }
+    return video ? watchVideoWarmup(video) : undefined
   }, [])
 
   return (
@@ -480,8 +452,6 @@ function VideoHeading({
             {durationMinutes} мин
           </span>
         )}
-        {/* Тем, кому видео не посмотреть, сразу видно, где текст урока. */}
-        <span className="ml-auto"><StudyNotesLink /></span>
       </div>
       {description && <p className="text-sm text-muted-foreground">{description}</p>}
     </>

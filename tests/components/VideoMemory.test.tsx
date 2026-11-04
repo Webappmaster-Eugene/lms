@@ -121,6 +121,74 @@ describe('память видео', () => {
     expect(JSON.parse(window.localStorage.getItem('lms:video-positions') ?? '{}')[URL_A]).toMatchObject({ t: 900 })
   })
 
+  describe('прерванная подготовка перезагружает элемент', () => {
+    const saved = () => JSON.parse(window.localStorage.getItem('lms:video-positions') ?? '{}')[URL_A]?.t
+
+    function interrupt(element: HTMLVideoElement) {
+      fireEvent(element, new Event('emptied'))
+      element.currentTime = 0
+      fireEvent(element, new Event('timeupdate'))
+    }
+
+    it('позиция возвращается с новыми метаданными и не считается перемоткой ученика', () => {
+      window.localStorage.setItem('lms:video-positions', JSON.stringify({ [URL_A]: { t: 300, at: 1 } }))
+      const { container } = renderPlayer()
+      const element = video(container)
+      loadMetadata(element)
+      fireEvent(element, new Event('seeked'))
+      expect(element.currentTime).toBe(300)
+
+      interrupt(element)
+      loadMetadata(element)
+
+      expect(element.currentTime).toBe(300)
+      expect(saved()).toBe(300)
+    })
+
+    it('пока метаданных нет, уход со страницы не записывает ноль', () => {
+      const { container } = renderPlayer()
+      const element = video(container)
+      loadMetadata(element)
+      element.currentTime = 500
+      fireEvent(element, new Event('seeked'))
+      expect(saved()).toBe(500)
+
+      interrupt(element)
+      fireEvent(element, new Event('pause'))
+      fireEvent(window, new Event('pagehide'))
+
+      expect(saved()).toBe(500)
+      loadMetadata(element)
+      expect(element.currentTime).toBe(500)
+    })
+
+    it('видео без сохранённого места перезагрузка не перематывает', () => {
+      const { container } = renderPlayer()
+      const element = video(container)
+      loadMetadata(element)
+
+      interrupt(element)
+      loadMetadata(element)
+
+      expect(element.currentTime).toBe(0)
+      expect(saved()).toBeUndefined()
+    })
+
+    it('«С начала» отменяет возврат', async () => {
+      window.localStorage.setItem('lms:video-positions', JSON.stringify({ [URL_A]: { t: 300, at: 1 } }))
+      const { container } = renderPlayer()
+      const element = video(container)
+      loadMetadata(element)
+      fireEvent(element, new Event('seeked'))
+      interrupt(element)
+
+      await userEvent.click(screen.getByRole('button', { name: /С начала/ }))
+      loadMetadata(element)
+
+      expect(element.currentTime).toBe(0)
+    })
+  })
+
   it('досмотренное видео начинается сначала', () => {
     const first = renderPlayer()
     loadMetadata(video(first.container))
