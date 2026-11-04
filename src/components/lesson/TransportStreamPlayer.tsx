@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, Maximize2, Minimize2, Pause, Play, Volume2, VolumeX } from 'lucide-react'
 
 import { useVideoMemory } from '@/hooks/use-video-memory'
+import { anotherVideoPlaying } from '@/lib/lesson-video-warmup'
 import { formatTime } from '@/lib/video-memory'
 import { VideoMemoryBar } from './VideoMemoryBar'
 import { VideoShareButton } from './VideoShareButton'
@@ -173,7 +174,7 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
     if (!video || !resumePlaying) return
     // Поток перематывается только по загруженному, поэтому играть начинаем после возврата на сохранённую секунду.
     // Отказ автозапуска оставляет видео на паузе на нужном месте.
-    const resume = () => { if (video.paused) void video.play().catch(() => undefined) }
+    const resume = () => { if (video.paused && !anotherVideoPlaying(video)) void video.play().catch(() => undefined) }
     video.addEventListener('seeked', resume, { once: true })
     return () => video.removeEventListener('seeked', resume)
   }, [resumePlaying])

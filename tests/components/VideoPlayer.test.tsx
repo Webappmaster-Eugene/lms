@@ -406,6 +406,22 @@ describe('отказ плеера в уроке', () => {
     play.mockRestore()
   })
 
+  it('автопродолжение после сбоя не перебивает видео, которое ученик успел включить', async () => {
+    fetchMock.mockImplementation(async () => sourceResponse(mp4Head))
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
+    const { container } = render(<><VideoPlayer title="Первое" videoUrl={url} displayMode="embed" /><video data-testid="other" /></>)
+    const watched = container.querySelector('video') as HTMLVideoElement
+    fireEvent.play(watched)
+    Object.defineProperty(watched, 'error', { value: { code: 2 }, configurable: true })
+    fireEvent.error(watched)
+    await flush()
+    Object.defineProperty(screen.getByTestId('other'), 'paused', { value: false, configurable: true })
+    await wait(2000)
+
+    expect(container.querySelector('video')).toHaveAttribute('src', `${url}&playbackAttempt=1`)
+    expect(play).not.toHaveBeenCalled()
+  })
+
   it('сбой после паузы не запускает видео само', async () => {
     fetchMock.mockImplementation(async () => sourceResponse(mp4Head))
     const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)

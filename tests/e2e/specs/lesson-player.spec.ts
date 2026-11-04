@@ -80,6 +80,18 @@ test.describe('плеер урока из нескольких частей', ()
     await context.close()
   })
 
+  test('метка из заметки перематывает нескачанную часть, пока играет другая', async ({ browser }) => {
+    const { context, page, videos } = await openLesson(browser)
+    await videos.nth(1).evaluate((video: HTMLVideoElement) => video.play())
+    await expect.poll(() => framePlaying(page)).toEqual([false, true, false])
+
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('lms:video-seek', { detail: { seconds: 40 } })))
+
+    await expect.poll(() => videos.nth(0).evaluate((video: HTMLVideoElement) => Math.floor(video.currentTime))).toBe(40)
+    await expect.poll(() => framePlaying(page)).toEqual([false, true, false])
+    await context.close()
+  })
+
   test('прокрутка к конспекту не запускает загрузку всех частей', async ({ browser }) => {
     const { context, page, videos } = await openLesson(browser, { viewport: { width: 390, height: 500 } })
     const files = new Set<string>()

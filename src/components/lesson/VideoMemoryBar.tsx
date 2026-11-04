@@ -11,14 +11,16 @@ type Props = {
   restart: () => void
   rate: number
   setRate: (rate: number) => void
+  /** Нативное видео ниже экрана не качается до запуска: обещать загрузку нельзя. */
+  loadsOnPlay?: boolean
 }
 
 /** Под плеером: откуда продолжили и скорость — у встроенного плеера Safari и Firefox её нет. */
-export function VideoMemoryBar({ waitingFrom, resumedFrom, restart, rate, setRate }: Props) {
+export function VideoMemoryBar({ waitingFrom, resumedFrom, restart, rate, setRate, loadsOnPlay = false }: Props) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs text-muted-foreground">
       <div className="flex items-center gap-2" aria-live="polite">
-        {waitingFrom !== null && waitingFrom !== undefined && <span>Подготавливаем продолжение с {formatTime(waitingFrom)} - ожидаем загрузку видео</span>}
+        {waitingFrom !== null && waitingFrom !== undefined && <span>{loadsOnPlay ? `Продолжим с ${formatTime(waitingFrom)}` : `Подготавливаем продолжение с ${formatTime(waitingFrom)} - ожидаем загрузку видео`}</span>}
         {resumedFrom !== null && (
           <>
             <span>Продолжили с {formatTime(resumedFrom)}</span>

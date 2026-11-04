@@ -7,6 +7,11 @@ type Entry = { video: HTMLVideoElement; mode: WarmupMode; settled: boolean; warm
 const entries = new Set<Entry>()
 const PLAYBACK_EVENTS = ['play', 'pause', 'ended'] as const
 
+/** Автопродолжение после сбоя не должно перебивать то, что ученик успел включить сам. */
+export function anotherVideoPlaying(video: HTMLVideoElement): boolean {
+  return Array.from(document.querySelectorAll('video')).some((other) => other !== video && !other.paused && !other.ended)
+}
+
 function started(video: HTMLVideoElement): boolean {
   return video.played.length > 0 || !video.paused
 }

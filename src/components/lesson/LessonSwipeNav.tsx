@@ -33,6 +33,8 @@ const PENDING_HINT_MS = 15_000
 type Arrival = { slug: string; edge: 'first' | 'last'; play: boolean; fullscreen: boolean; expiresAt: number }
 /** Переход клиентский, и модуль переживает смену урока: так новая страница узнаёт, куда прокрутить и запускать ли видео. */
 let arrival: Arrival | null = null
+/** Тоже в модуле: инерция жеста, сменившего урок, не должна пролистать ещё раз уже на новой странице. */
+let wheel = WHEEL_IDLE
 
 /** Откуда листаем: один и тот же переход идёт от пальца, тачпада и клавиш. */
 type Spot = { frame: HTMLElement; frames: HTMLElement[]; index: number; rect: DOMRect }
@@ -147,7 +149,6 @@ export function LessonSwipeNav({ slug, previous, next }: Props) {
   }, [slug])
 
   useEffect(() => {
-    let wheel = WHEEL_IDLE
     const targetOf = (direction: SwipeDirection, current: Spot) =>
       swipeTarget(direction, current.index, current.frames.length, latest.current.previous, latest.current.next)
 

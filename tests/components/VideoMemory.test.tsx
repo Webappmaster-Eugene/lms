@@ -121,6 +121,31 @@ describe('память видео', () => {
     expect(JSON.parse(window.localStorage.getItem('lms:video-positions') ?? '{}')[URL_A]).toMatchObject({ t: 900 })
   })
 
+  it('нативное видео с сохранённым местом не обещает загрузку, которой нет', () => {
+    window.localStorage.setItem('lms:video-positions', JSON.stringify({ [URL_A]: { t: 300, at: 1 } }))
+    const { container } = renderPlayer()
+
+    expect(screen.getByText('Продолжим с 5:00')).toBeInTheDocument()
+    expect(screen.queryByText(/ожидаем загрузку/)).toBeNull()
+
+    loadMetadata(video(container))
+    expect(screen.queryByText('Продолжим с 5:00')).toBeNull()
+    expect(screen.getByText('Продолжили с 5:00')).toBeInTheDocument()
+  })
+
+  it('метка из заметки запускает загрузку видео, которое ещё не качают', () => {
+    const { container } = renderPlayer()
+    const element = video(container)
+    // В jsdom нет IntersectionObserver, и подготовка сразу ставит metadata: возвращаем состояние «не качается».
+    element.preload = 'none'
+
+    act(() => { window.dispatchEvent(new CustomEvent('lms:video-seek', { detail: { seconds: 40 } })) })
+    expect(element.preload).toBe('metadata')
+
+    loadMetadata(element)
+    expect(element.currentTime).toBe(40)
+  })
+
   describe('прерванная подготовка перезагружает элемент', () => {
     const saved = () => JSON.parse(window.localStorage.getItem('lms:video-positions') ?? '{}')[URL_A]?.t
 

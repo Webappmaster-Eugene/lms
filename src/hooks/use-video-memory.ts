@@ -210,6 +210,8 @@ export function useVideoMemory(videoRef: RefObject<HTMLVideoElement | null>, key
       pendingRef.current = seconds
       setResumedFrom(null)
       tryResume()
+      // Метка может вести в часть, которую не качают: очередь подготовки занята другим видео.
+      if (pendingRef.current !== null && video.preload === 'none') video.preload = 'metadata'
       video.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
     }
 

@@ -102,6 +102,8 @@ describe('потоковый плеер MPEG-TS', () => {
     await act(async () => { await video.play() })
     mpegts.handlers.get('error')?.('NetworkError')
     expect(failure).toHaveBeenLastCalledWith('network', true)
+    // Настоящий перезапуск заменяет упавший плеер, а не играет рядом с ним.
+    act(() => { video.pause() })
 
     const view = render(<TransportStreamPlayer src="/api/yandex-disk/proxy?lesson=10&block=rec&playbackAttempt=1" memoryKey="rec:hash" durationMinutes={10} resumePlaying onFailure={vi.fn()} />)
     const resumed = attachMedia(view.container.querySelector('video') as HTMLVideoElement)
@@ -209,6 +211,17 @@ describe('потоковый плеер MPEG-TS', () => {
 
     expect(video.currentTime).toBe(0)
     expect(screen.getByText('0:00 / -')).toBeInTheDocument()
+  })
+
+  it('запуск после сбоя не перебивает видео, которое ученик успел включить', async () => {
+    const { video } = await renderStream()
+    await act(async () => { await video.play() })
+
+    const view = render(<TransportStreamPlayer src="/api/yandex-disk/proxy?lesson=10&block=rec&playbackAttempt=1" memoryKey="rec:hash" durationMinutes={10} resumePlaying onFailure={vi.fn()} />)
+    const resumed = attachMedia(view.container.querySelector('video') as HTMLVideoElement)
+    fireEvent.seeked(resumed)
+
+    expect(resumed.play).not.toHaveBeenCalled()
   })
 
   it('разворачивает рамку вместе с кнопками, а отказ браузера не роняет плеер', async () => {

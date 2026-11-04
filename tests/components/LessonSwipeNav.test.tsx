@@ -340,6 +340,18 @@ describe('тачпад', () => {
     expect(push).toHaveBeenCalledWith('/lessons/c', { scroll: false })
   })
 
+  it('инерция жеста, сменившего урок, не листает ещё раз на новой странице', () => {
+    const page = renderLesson('b', lessonA, lessonC)
+    wheel(screen.getByTestId('video-0'), 130, 0, 0)
+    expect(push).toHaveBeenCalledTimes(1)
+    page.unmount()
+
+    renderLesson('c', lessonC, lessonD)
+    wheel(screen.getByTestId('video-0'), 200, 0, 100)
+
+    expect(push).toHaveBeenCalledTimes(1)
+  })
+
   it('вертикальная прокрутка, масштаб и жест вне видео не перехватываются', () => {
     renderLesson('b', lessonA, lessonC, { count: 2 })
     const video = screen.getByTestId('video-0')

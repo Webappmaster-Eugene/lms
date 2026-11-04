@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ExternalLink, Play, Clock, Loader2, RotateCw } from 'lucide-react'
 
 import { useVideoMemory } from '@/hooks/use-video-memory'
-import { watchVideoWarmup } from '@/lib/lesson-video-warmup'
+import { anotherVideoPlaying, watchVideoWarmup } from '@/lib/lesson-video-warmup'
 import { MEDIA_SOURCE_HEADER } from '@/lib/media-source-status'
 import { parsePublicResourceUrl } from '@/lib/yandex-disk-url'
 import { TransportStreamPlayer } from './TransportStreamPlayer'
@@ -398,7 +398,7 @@ function NativeVideo({ memoryId, videoUrl, playbackAttempt = 0, direct = false, 
     video.addEventListener('ended', stopped)
     // Позицию возвращает useVideoMemory по loadedmetadata, до первого кадра, поэтому play() можно звать сразу.
     // Отказ автозапуска оставляет видео на паузе на нужной секунде: это и есть запасной вариант.
-    if (wantsPlay.current && video.paused) void video.play().catch(() => undefined)
+    if (wantsPlay.current && video.paused && !anotherVideoPlaying(video)) void video.play().catch(() => undefined)
     return () => {
       video.removeEventListener('error', failed)
       video.removeEventListener('play', played)
@@ -431,7 +431,7 @@ function NativeVideo({ memoryId, videoUrl, playbackAttempt = 0, direct = false, 
           onContextMenu={(event) => event.preventDefault()}
         />
       </div>
-      <VideoMemoryBar {...memory} />
+      <VideoMemoryBar {...memory} loadsOnPlay />
       <VideoShareButton videoRef={videoRef} videoId={memoryId ?? videoUrl} />
     </>
   )
