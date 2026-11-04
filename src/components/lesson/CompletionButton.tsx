@@ -185,6 +185,7 @@ export function CompletionButton({
             <PartyPopper className="h-5 w-5 text-success" aria-hidden="true" />
             Курс пройден!
           </p>
+          <p className="text-sm text-muted-foreground">Можно отложить вёсла и выдохнуть</p>
           {courseHref && (
             <Link href={courseHref} className="text-sm text-primary underline-offset-2 hover:underline">
               Вернуться к курсу

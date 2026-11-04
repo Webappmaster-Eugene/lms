@@ -22,6 +22,10 @@ export type StreakView = {
   longest: number
 }
 
+/** Неделя без уроков: чаще здороваться с галерой незачем, шутка быстро приедается. */
+const RETURN_AFTER_DAYS = 7
+const DAY_MS = 24 * 60 * 60 * 1000
+
 export function utcDay(date: Date): string {
   return date.toISOString().slice(0, 10)
 }
@@ -37,4 +41,12 @@ export function streakView(streak: StreakLike, now: Date = new Date()): StreakVi
   if (last === today) return { days: current, status: 'today', longest }
   if (last === yesterday) return { days: current, status: 'at-risk', longest }
   return { days: 0, status: 'none', longest }
+}
+
+/** Подпись под приветствием, когда серии нет. Упоминания галеры только в редкие моменты. */
+export function restingGreeting(completedLessons: number, streak: StreakLike, now: Date = new Date()): string {
+  if (completedLessons === 0) return 'Добро пожаловать на борт'
+  const last = streak?.lastActivityDate?.slice(0, 10)
+  const idleDays = last ? (Date.parse(utcDay(now)) - Date.parse(last)) / DAY_MS : 0
+  return idleDays >= RETURN_AFTER_DAYS ? 'С возвращением на борт - вёсла и курс на месте' : 'Продолжай обучение'
 }

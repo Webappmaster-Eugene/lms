@@ -28,6 +28,7 @@ describe('404 платформы', () => {
     expect(screen.getByText('/courses/react/урок-9', { exact: false })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'На дашборд' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: 'Каталог курсов' })).toHaveAttribute('href', '/courses')
+    expect(screen.getByText(/галера сюда не заходит/)).toBeInTheDocument()
   })
 })
 

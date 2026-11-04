@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { streakView } from '@/lib/streak'
+import { streakView, restingGreeting } from '@/lib/streak'
 
 /**
  * Серия пересчитывается хуком только при прохождении урока — после перерыва
@@ -8,6 +8,26 @@ import { streakView } from '@/lib/streak'
  */
 
 const now = new Date('2026-09-28T12:00:00Z')
+
+describe('подпись под приветствием без серии', () => {
+  const now = new Date('2026-11-04T10:00:00Z')
+
+  it('новому ученику - приветствие на борту', () => {
+    expect(restingGreeting(0, null, now)).toBe('Добро пожаловать на борт')
+  })
+
+  it('короткий перерыв обходится без галеры, иначе шутка увидится при каждом входе', () => {
+    expect(restingGreeting(5, { currentStreak: 2, lastActivityDate: '2026-10-29T08:00:00.000Z' }, now)).toBe('Продолжай обучение')
+  })
+
+  it('через неделю без уроков встречает возвращение', () => {
+    expect(restingGreeting(5, { currentStreak: 2, lastActivityDate: '2026-10-28T23:59:00.000Z' }, now)).toBe('С возвращением на борт - вёсла и курс на месте')
+  })
+
+  it('старый прогресс без записи серии не считается возвращением', () => {
+    expect(restingGreeting(5, null, now)).toBe('Продолжай обучение')
+  })
+})
 
 describe('серия дней', () => {
   it('урок сегодня — серия идёт', () => {

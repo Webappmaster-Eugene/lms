@@ -243,6 +243,7 @@ describe('кнопка завершения урока', () => {
       await userEvent.click(screen.getByRole('button'))
 
       expect(await screen.findByText('Курс пройден!')).toBeInTheDocument()
+      expect(screen.getByText('Можно отложить вёсла и выдохнуть')).toBeInTheDocument()
       expect(screen.getByRole('link', { name: 'Вернуться к курсу' })).toHaveAttribute('href', '/courses/react')
     })
 
