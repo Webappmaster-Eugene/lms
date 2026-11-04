@@ -25,12 +25,12 @@ test('публичные страницы: lang=ru, title, description, viewport
   await expectIcons(page, request)
 })
 
-/** Иконки и превью раньше пропадали молча: поле icons в метаданных layout отключило app/icon.svg. */
+/** Иконки и превью раньше пропадали молча: поле icons в метаданных layout отключило файловую иконку. */
 async function expectIcons(page: Page, request: APIRequestContext) {
   const icons = await page.locator('link[rel="icon"], link[rel="apple-touch-icon"]').evaluateAll((links) =>
     links.map((link) => new URL(link.getAttribute('href') ?? '', location.href).pathname),
   )
-  expect(icons).toEqual(expect.arrayContaining(['/favicon.ico', '/icon.svg', '/images/pwa/apple-touch-icon.png']))
+  expect(icons).toEqual(expect.arrayContaining(['/favicon.ico', '/images/pwa/icon-32.png', '/images/pwa/apple-touch-icon.png']))
   for (const path of new Set(icons)) {
     const response = await request.get(path, { maxRedirects: 0 })
     expect(response.status(), path).toBe(200)

@@ -176,7 +176,7 @@ test('фид курсов Яндекса: XML, цена и дата те же, �
   expect(course.hasCourseInstance.startDate).toBe(START_ISO)
 })
 
-test('favicon.ico, SVG-иконка и apple-touch-icon отдаются картинками', async ({ page, request }) => {
+test('favicon.ico, маленькая иконка и apple-touch-icon отдаются картинками', async ({ page, request }) => {
   await page.goto('/')
   const icons = await page.locator('link[rel="icon"], link[rel="apple-touch-icon"]').evaluateAll((links) =>
     links.map((link) => link.getAttribute('href')),
@@ -187,7 +187,7 @@ test('favicon.ico, SVG-иконка и apple-touch-icon отдаются кар�
     expect(response.status(), href!).toBe(200)
     expect(response.headers()['content-type'], href!).toMatch(/^image\//)
   }
-  expect(icons).toEqual(expect.arrayContaining(['/favicon.svg', '/apple-touch-icon.png']))
+  expect(icons).toEqual(expect.arrayContaining(['/favicon-32.png', '/apple-touch-icon.png']))
 })
 
 test('llms.txt доступен и в UTF-8', async ({ request }) => {

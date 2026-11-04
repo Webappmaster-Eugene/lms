@@ -38,9 +38,9 @@ describe('заголовок с контекстом', () => {
 })
 
 describe('общие метаданные платформы', () => {
-  it('явно перечисляют SVG-иконку: иначе поле icons отключает app/icon.svg', () => {
+  it('дают вкладке маленькую иконку: иначе браузер уменьшит рисунок из манифеста', () => {
     const icons = ROOT_METADATA.icons as { icon: { url: string }[]; apple: { url: string }[] }
-    expect(icons.icon.map((icon) => icon.url)).toContain('/icon.svg')
+    expect(icons.icon.map((icon) => icon.url)).toContain('/images/pwa/icon-32.png')
     expect(icons.apple.map((icon) => icon.url)).toContain('/images/pwa/apple-touch-icon.png')
   })
 

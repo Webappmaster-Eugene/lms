@@ -22,7 +22,7 @@ const dateModified = new Date().toISOString()
 const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': [
-    { '@type': 'Organization', '@id': `${SITE_URL}/#organization`, name: 'MentorCareer', url: LMS_URL, logo: { '@type': 'ImageObject', url: new URL('/apple-touch-icon.png', SITE_URL).href, width: 180, height: 180 } },
+    { '@type': 'Organization', '@id': `${SITE_URL}/#organization`, name: 'MentorCareer', url: LMS_URL, logo: { '@type': 'ImageObject', url: new URL('/logo.png', SITE_URL).href, width: 180, height: 180 } },
     { '@type': 'WebSite', '@id': `${SITE_URL}/#website`, name: 'MentorCareer - инструкция', url: SITE_URL, inLanguage: 'ru', publisher: { '@id': `${SITE_URL}/#organization` } },
     { '@type': 'ImageObject', '@id': `${SITE_URL}/#primaryimage`, url: ogImage, width: 1200, height: 630, caption: ogImageAlt },
     { '@type': 'WebPage', '@id': `${canonicalUrl}#webpage`, name: title, description, url: canonicalUrl, inLanguage: 'ru', dateModified, isPartOf: { '@id': `${SITE_URL}/#website` }, publisher: { '@id': `${SITE_URL}/#organization` }, primaryImageOfPage: { '@id': `${SITE_URL}/#primaryimage` } },
@@ -43,7 +43,7 @@ const jsonLd = {
     <link rel="preload" href="/fonts/golos-text-400-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/golos-text-700-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#ffffff" />
     <meta property="og:title" content={title} />

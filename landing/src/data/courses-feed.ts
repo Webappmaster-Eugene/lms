@@ -75,7 +75,7 @@ export function coursesFeed(now = new Date()): string {
     <name>MentorCareer</name>
     <url>${escape(`${SITE_URL}/`)}</url>
     <email>${escape(OPERATOR.email)}</email>
-    <picture>${escape(new URL('/apple-touch-icon.png', SITE_URL).href)}</picture>
+    <picture>${escape(new URL('/logo.png', SITE_URL).href)}</picture>
     <currencies>
       <currency id="RUR" rate="1"/>
     </currencies>

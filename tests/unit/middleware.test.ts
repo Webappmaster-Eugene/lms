@@ -69,7 +69,7 @@ describe('статика', () => {
   it('не считает любой файл из /fonts публичным по расширению', () => {
     expect(isRedirect(middleware(request('/fonts/inter/private.woff2')))).toBe(true)
   })
-  it.each(['/_next/static/chunk.js', '/images/logo.png', '/images/og.png', '/favicon.ico', '/icon.svg', '/llms.txt'])(
+  it.each(['/_next/static/chunk.js', '/images/logo.png', '/images/og.png', '/favicon.ico', '/images/pwa/icon-32.png', '/llms.txt'])(
     '%s отдаётся без проверки',
     (path) => {
       expect(isRedirect(middleware(request(path)))).toBe(false)

@@ -13,7 +13,6 @@ const STATIC_PREFIXES = ['/_next', '/images', '/monaco', '/mermaid/']
 const STATIC_FILES = new Set([
   ...PUBLIC_FONT_PATHS,
   '/favicon.ico',
-  '/icon.svg',
   '/manifest.webmanifest',
   '/sw.js',
   '/offline.html',

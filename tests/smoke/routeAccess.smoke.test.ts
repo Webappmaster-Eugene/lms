@@ -169,7 +169,6 @@ describe('статика и служебные пути остаются дос�
     '/monaco/vs/loader.js',
     '/mermaid/mermaid.min.js',
     '/favicon.ico',
-    '/icon.svg',
     '/images/og.png',
     '/llms.txt',
     '/manifest.webmanifest',

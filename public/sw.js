@@ -1,5 +1,5 @@
 /* Only the public offline shell is cached. Lessons, APIs and media always use the network. */
-const SHELL_CACHE = 'mentorcareer-shell-v1'
+const SHELL_CACHE = 'mentorcareer-shell-v2'
 const SHELL = ['/offline.html', '/images/pwa/icon-192.png', '/images/pwa/icon-512.png']
 
 self.addEventListener('install', (event) => {

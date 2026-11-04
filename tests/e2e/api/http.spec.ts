@@ -145,7 +145,7 @@ test('GET /api/health — ok', async ({ request }) => {
 })
 
 test('статика из списка middleware отдаётся без входа', async ({ request }) => {
-  for (const path of ['/icon.svg', '/manifest.webmanifest']) {
+  for (const path of ['/favicon.ico', '/manifest.webmanifest']) {
     const response = await request.get(path, { maxRedirects: 0 })
     expect(response.status(), path).toBe(200)
   }

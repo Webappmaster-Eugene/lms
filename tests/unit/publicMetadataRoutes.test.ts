@@ -97,10 +97,8 @@ describe('robots.txt', () => {
 describe('манифест PWA', () => {
   const root = fileURLToPath(new URL('../../', import.meta.url))
 
-  /** Next отдаёт /icon.svg из src/app, остальное — из public. */
   function iconPath(src: string): string {
-    const fromApp = `${root}src/app${src}`
-    return existsSync(fromApp) ? fromApp : `${root}public${src}`
+    return `${root}public${src}`
   }
 
   function pngSize(path: string): string {

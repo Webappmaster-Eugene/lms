@@ -72,7 +72,7 @@ export default buildConfig({
     },
     meta: {
       titleSuffix: ' - MentorCareer LMS',
-      icons: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+      icons: [{ url: '/images/pwa/icon-32.png', sizes: '32x32', type: 'image/png' }],
     },
     components: {
       providers: ['/components/analytics/AdminActivityProvider#AdminActivityProvider'],

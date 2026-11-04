@@ -47,11 +47,11 @@ export const ROOT_METADATA: Metadata = {
   // Next 15 выводит для capable только mobile-web-app-capable, а Safari исторически
   // читает apple-вариант — задаём его явно.
   other: { 'apple-mobile-web-app-capable': 'yes' },
-  // Явный список обязателен: любое поле icons в metadata отключает файловую иконку app/icon.svg.
-  // favicon.ico из app/ Next добавляет сам. Иконка для iOS — 180×180 без прозрачности:
-  // прозрачные углы iOS заливает чёрным.
+  // favicon.ico из app/ Next добавляет сам. Маленькая иконка - отдельным плотным кропом: без неё
+  // вкладка уменьшит рисунок из манифеста до неразличимого. Иконка для iOS — 180×180 без
+  // прозрачности: прозрачные углы iOS заливает чёрным.
   icons: {
-    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+    icon: [{ url: '/images/pwa/icon-32.png', sizes: '32x32', type: 'image/png' }],
     apple: [{ url: '/images/pwa/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
   },
   openGraph: {
