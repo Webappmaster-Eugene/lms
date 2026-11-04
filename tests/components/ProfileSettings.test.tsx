@@ -121,7 +121,8 @@ describe('Настройки профиля', () => {
     await screen.findByRole('status')
     expect(fetchMock.mock.calls.filter(([url]) => url === '/api/media')).toHaveLength(1)
     expect(JSON.parse(String(fetchMock.mock.calls[3]?.[1]?.body))).toMatchObject({ avatar: 12 })
-    expect(revokeUrl).toHaveBeenCalledWith('blob:preview')
+    // Превью освобождает очистка эффекта на следующем рендере, а не тот, что показал статус.
+    await waitFor(() => expect(revokeUrl).toHaveBeenCalledWith('blob:preview'))
   })
 
   it.each([
@@ -136,7 +137,8 @@ describe('Настройки профиля', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить профиль' }))
     await screen.findByRole('status')
     expect(fetchMock.mock.calls.some(([url]) => url === '/api/media')).toBe(false)
-    expect(revokeUrl).toHaveBeenCalledWith('blob:preview')
+    // Превью освобождает очистка эффекта на следующем рендере, а не тот, что показал статус.
+    await waitFor(() => expect(revokeUrl).toHaveBeenCalledWith('blob:preview'))
   })
 
   it('не отправляет несовпадающее подтверждение пароля', async () => {
