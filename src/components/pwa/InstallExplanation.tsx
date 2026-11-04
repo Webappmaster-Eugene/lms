@@ -5,7 +5,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import { BellRing, BookOpen, Download, Smartphone } from 'lucide-react'
 import { MobileSheet } from '@/components/layout/MobileSheet'
 import { InstallInstructions, useInstallGuide } from './InstallInstructions'
-import { currentInstallPrompt, installExplanationSeen, isInstalledPwa, isIosDevice, rememberInstallExplanation, rememberInstallPrompt } from '@/lib/pwa-client'
+import { currentInstallPrompt, installExplanationSeen, isFullscreenNow, isInstalledPwa, isIosDevice, rememberInstallExplanation, rememberInstallPrompt } from '@/lib/pwa-client'
 
 function subscribeToInstallation(callback: () => void) {
   window.addEventListener('lms:install-ready', callback)
@@ -33,9 +33,9 @@ export function InstallExplanation({ paused = false }: { paused?: boolean }) {
     if (!mobile || paused || installed || installExplanationSeen()) return
     let timer: ReturnType<typeof setTimeout>
     const reveal = () => {
-      if (installExplanationSeen()) return
-      // Do not stack onboarding over a menu, search or lesson dialog.
-      if (document.visibilityState === 'hidden' || document.querySelector('dialog[open]')) {
+      if (installExplanationSeen() || isInstalledPwa()) return
+      // Do not stack onboarding over a menu, search, lesson dialog or fullscreen video.
+      if (document.visibilityState === 'hidden' || isFullscreenNow() || document.querySelector('dialog[open]')) {
         timer = setTimeout(reveal, 1500)
         return
       }
