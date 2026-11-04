@@ -156,7 +156,8 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
 
 .bc-mentor { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 32px 56px; }
 .bc-mentor-name { margin: 18px 0 8px; font-size: 22px; font-weight: 700; }
-.bc-mentor .bc-link { margin-top: 10px; }
+.bc-mentor .bc-link { display: flex; width: fit-content; margin-top: 10px; }
+.bc-mentor .bc-link + .bc-link { margin-top: 0; }
 
 .bc-faq { max-width: 860px; margin-top: 20px; border-top: 1px solid var(--line); }
 .bc-faq details { border-bottom: 1px solid var(--line); }

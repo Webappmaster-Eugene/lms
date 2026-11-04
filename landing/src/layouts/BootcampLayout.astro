@@ -1,6 +1,6 @@
 ---
 import '../styles/bootcamp.css'
-import { LMS_URL, SITE_URL } from '../config'
+import { MENTOR_SITE_URL, ORGANIZATION_ID, ORGANIZATION_PROFILES, SITE_URL } from '../config'
 import { BOOTCAMP_PATH, PAGE_UPDATED } from '../data/bootcamp'
 
 interface Props {
@@ -20,10 +20,10 @@ const ogImageAlt = 'Буткемп Node.js: backend сервиса прокат�
 const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': [
-    { '@type': 'Organization', '@id': `${SITE_URL}/#organization`, name: 'MentorCareer', url: LMS_URL, logo: { '@type': 'ImageObject', url: new URL('/logo.png', SITE_URL).href, width: 180, height: 180 } },
+    { '@type': 'Organization', '@id': ORGANIZATION_ID, name: 'MentorCareer', url: `${MENTOR_SITE_URL}/`, sameAs: ORGANIZATION_PROFILES, logo: { '@type': 'ImageObject', url: new URL('/logo.png', SITE_URL).href, width: 180, height: 180 } },
     // Тот же узел, что у главной (Layout.astro): страницы буткемпа - часть сайта info.mentorcareer.ru.
-    { '@type': 'WebSite', '@id': `${SITE_URL}/#website`, name: 'MentorCareer - инструкция', url: SITE_URL, inLanguage: 'ru', publisher: { '@id': `${SITE_URL}/#organization` } },
-    { '@type': 'WebPage', '@id': `${canonicalUrl}#webpage`, name: title, description, url: canonicalUrl, inLanguage: 'ru', dateModified: PAGE_UPDATED.iso, isPartOf: { '@id': `${SITE_URL}/#website` }, publisher: { '@id': `${SITE_URL}/#organization` } },
+    { '@type': 'WebSite', '@id': `${SITE_URL}/#website`, name: 'MentorCareer - инструкция', url: SITE_URL, inLanguage: 'ru', publisher: { '@id': ORGANIZATION_ID } },
+    { '@type': 'WebPage', '@id': `${canonicalUrl}#webpage`, name: title, description, url: canonicalUrl, inLanguage: 'ru', dateModified: PAGE_UPDATED.iso, isPartOf: { '@id': `${SITE_URL}/#website` }, publisher: { '@id': ORGANIZATION_ID } },
     ...(crumb ? [{
       '@type': 'BreadcrumbList', '@id': `${canonicalUrl}#breadcrumbs`,
       itemListElement: [

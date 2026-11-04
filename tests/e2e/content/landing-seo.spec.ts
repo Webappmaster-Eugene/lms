@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 
 import { LANDING_URL, LANDING_USE } from '../fixtures/env'
 import { BOOTCAMP_PATH, PRICE, START, START_ISO } from '../../../landing/src/data/bootcamp'
+import { ORGANIZATION_ID, YANDEX_VERIFICATION } from '../../../landing/src/config'
 
 /**
  * Лендинг (landing/, Astro): мета-теги, canonical, Open Graph, JSON-LD,
@@ -16,6 +17,7 @@ test('title, description, canonical, robots и язык страницы', async
   const response = await page.goto('/')
   expect(response?.status()).toBe(200)
   await expect(page.locator('html')).toHaveAttribute('lang', 'ru')
+  await expect(page.locator('meta[name="yandex-verification"]')).toHaveAttribute('content', YANDEX_VERIFICATION)
   const title = await page.title()
   expect(title.length).toBeGreaterThan(20)
   // Сниппет режется по ширине (~600px): для кириллицы это 65–70 символов.
@@ -103,7 +105,8 @@ test('JSON-LD описывает инструкцию и FAQ совпадает 
   expect(types).not.toContain('Person')
   expect(types).not.toContain('Course')
   for (const node of graph) {
-    if (typeof node['@id'] === 'string') expect(node['@id']).toMatch(new RegExp(`^${SITE}/`))
+    // Организация общая с mentorcareer.ru, остальные узлы принадлежат этому сайту.
+    if (typeof node['@id'] === 'string' && node['@id'] !== ORGANIZATION_ID) expect(node['@id']).toMatch(new RegExp(`^${SITE}/`))
   }
   // Все ссылки @id внутри графа ведут на существующие узлы.
   const ids = new Set(graph.map((node) => node['@id']).filter(Boolean))

@@ -4,7 +4,7 @@ import { USERS } from '../fixtures/data'
 import { APP_URL, LANDING_URL, LANDING_USE } from '../fixtures/env'
 import { zipOf } from '../../fixtures/zip'
 import { ENTRY_TASKS } from '../../../src/data/bootcamp-entry/tasks'
-import { AUTHOR_PROFILES } from '../../../landing/src/config'
+import { AUTHOR_PROFILES, ORGANIZATION_ID, ORGANIZATION_PROFILES } from '../../../landing/src/config'
 import { GROUP_LIMIT, LAST_CLASS, LAST_CLASS_ISO, START, START_ISO } from '../../../landing/src/data/bootcamp'
 
 /**
@@ -73,7 +73,14 @@ test('разметка курса: даты, размер группы и про
   const sameAs = byType<{ sameAs: string[] }>('Person')!.sameAs
   expect(sameAs).toEqual(AUTHOR_PROFILES)
   expect(new Set(sameAs).size).toBe(sameAs.length)
-  expect(sameAs).toEqual(expect.arrayContaining(['https://nadtocheev.ru/', 'https://t.me/eugene_galera']))
+  expect(sameAs).toEqual(expect.arrayContaining(['https://nadtocheev.ru/', 'https://mentorcareer.ru/mentor', 'https://t.me/eugene_galera']))
+
+  // Организация та же, что на mentorcareer.ru: поисковики собирают её с разных сайтов по @id и ссылкам.
+  const organization = byType<{ '@id': string; url: string; sameAs: string[] }>('Organization')
+  expect(organization).toMatchObject({ '@id': ORGANIZATION_ID, url: 'https://mentorcareer.ru/' })
+  expect(organization?.sameAs).toEqual(ORGANIZATION_PROFILES)
+  expect(byType('Course')?.provider).toEqual({ '@id': ORGANIZATION_ID })
+  await expect(page.locator('#mentor a[href="https://mentorcareer.ru/mentor"]')).toBeVisible()
 
   const site = byType('WebSite')
   expect(site?.['@id']).toBe(`${SITE}/#website`)
@@ -242,6 +249,8 @@ test('оплата, оферта, качество, политика и согл
   const llms = await (await request.get(`${origin}/llms.txt`)).text()
   expect(llms).toContain(`${SITE}/bootcamp/nodejs/payment/`)
   expect(llms).toContain(`${SITE}/bootcamp/nodejs/offer/`)
+  expect(llms).toContain('## Связанные сайты')
+  expect(llms).toContain('https://mentorcareer.ru/mentor')
   const sample = await request.get(`${origin}/bootcamp/samples/nodejs-week-01-node-runtime.pdf`)
   expect(sample.status()).toBe(200)
   expect(sample.headers()['content-type']).toBe('application/pdf')

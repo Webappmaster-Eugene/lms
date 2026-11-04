@@ -4,7 +4,7 @@ import BootcampFooter from '../../components/BootcampFooter.astro'
 import BootcampHeader from '../../components/BootcampHeader.astro'
 import GuideScreen from '../../components/GuideScreen.astro'
 import screens from '../../data/screens.json'
-import { AUTHOR_PROFILES, AUTHOR_URL, SITE_URL } from '../../config'
+import { AUTHOR_PROFILES, AUTHOR_URL, MENTOR_SITE_URL, ORGANIZATION_ID, SITE_URL } from '../../config'
 import {
   AUDIENCE, BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, COURSE_DESCRIPTION, COURSE_NAME, ENTRY_TASK_DAYS, ENTRY_TASK_MINUTES, FACTS, FAQ, GROUP_LIMIT, LAST_CLASS_ISO, LOG, MENTOR_EXPERIENCE, OFFER_PATH, PAINS, PATH, PAYMENT_PATH, PREP_START, PRICE,
   PRIVACY_PATH, PROGRAM, PROGRAM_KEY, QUALITY_PATH, RENTAL_FLOW, REVIEW_DAYS, SAMPLE_MANUAL, SAMPLE_QUESTIONS, START, START_ISO, WEEKLY_HOURS, WEEKS,
@@ -18,7 +18,7 @@ const schema = [
   {
     '@type': 'Course', '@id': `${pageUrl}#course`, name: COURSE_NAME, description, inLanguage: 'ru',
     audience: { '@type': 'EducationalAudience', audienceType: 'frontend- и fullstack-разработчики, junior и middle backend-разработчики' },
-    provider: { '@id': `${SITE_URL}/#organization` },
+    provider: { '@id': ORGANIZATION_ID },
     offers: { '@type': 'Offer', category: 'Paid', price: PRICE.value, priceCurrency: 'RUB', availability: 'https://schema.org/PreOrder', url: pageUrl },
     educationalLevel: 'Средний',
     coursePrerequisites: 'Уверенный JavaScript, чтение типов TypeScript, работа с Git',
@@ -107,6 +107,7 @@ const extraSize = (screen: string) => {
         <p class="bc-mentor-name">Евгений Надточеев</p>
         <p>Fullstack-разработчик с упором на backend. Сам ведёт занятия, проверяет работы и принимает защиты всех участников.</p>
         <a class="bc-link" href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Подробнее на nadtocheev.ru</a>
+        <a class="bc-link" href={`${MENTOR_SITE_URL}/mentor`} target="_blank" rel="noopener">Менторство и консультации - mentorcareer.ru</a>
       </div>
       <div>
         <p>{MENTOR_EXPERIENCE} в коммерческой разработке. Поддерживает микросервисы, которыми пользуются больше 40 тысяч человек в день, с нагрузкой до 2000 запросов в секунду. Перевёл сервисы с Express на Fastify: по замерам k6 задержка упала вдвое при той же памяти. Строил учёт денег на реальных платежах без двойных списаний, с доставкой событий через Outbox и Kafka.</p>

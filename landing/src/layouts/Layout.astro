@@ -1,6 +1,6 @@
 ---
 import '../styles/global.css'
-import { LMS_URL, SITE_URL } from '../config'
+import { MENTOR_SITE_URL, ORGANIZATION_ID, ORGANIZATION_PROFILES, SITE_URL, YANDEX_VERIFICATION } from '../config'
 import { FAQ } from '../data/faq'
 
 interface Props {
@@ -22,10 +22,10 @@ const dateModified = new Date().toISOString()
 const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': [
-    { '@type': 'Organization', '@id': `${SITE_URL}/#organization`, name: 'MentorCareer', url: LMS_URL, logo: { '@type': 'ImageObject', url: new URL('/logo.png', SITE_URL).href, width: 180, height: 180 } },
-    { '@type': 'WebSite', '@id': `${SITE_URL}/#website`, name: 'MentorCareer - инструкция', url: SITE_URL, inLanguage: 'ru', publisher: { '@id': `${SITE_URL}/#organization` } },
+    { '@type': 'Organization', '@id': ORGANIZATION_ID, name: 'MentorCareer', url: `${MENTOR_SITE_URL}/`, sameAs: ORGANIZATION_PROFILES, logo: { '@type': 'ImageObject', url: new URL('/logo.png', SITE_URL).href, width: 180, height: 180 } },
+    { '@type': 'WebSite', '@id': `${SITE_URL}/#website`, name: 'MentorCareer - инструкция', url: SITE_URL, inLanguage: 'ru', publisher: { '@id': ORGANIZATION_ID } },
     { '@type': 'ImageObject', '@id': `${SITE_URL}/#primaryimage`, url: ogImage, width: 1200, height: 630, caption: ogImageAlt },
-    { '@type': 'WebPage', '@id': `${canonicalUrl}#webpage`, name: title, description, url: canonicalUrl, inLanguage: 'ru', dateModified, isPartOf: { '@id': `${SITE_URL}/#website` }, publisher: { '@id': `${SITE_URL}/#organization` }, primaryImageOfPage: { '@id': `${SITE_URL}/#primaryimage` } },
+    { '@type': 'WebPage', '@id': `${canonicalUrl}#webpage`, name: title, description, url: canonicalUrl, inLanguage: 'ru', dateModified, isPartOf: { '@id': `${SITE_URL}/#website` }, publisher: { '@id': ORGANIZATION_ID }, primaryImageOfPage: { '@id': `${SITE_URL}/#primaryimage` } },
     { '@type': 'FAQPage', '@id': `${SITE_URL}/#faq`, mainEntity: FAQ.map(({ question, answer }) => ({ '@type': 'Question', name: question, acceptedAnswer: { '@type': 'Answer', text: answer } })) },
   ],
 }
@@ -38,6 +38,7 @@ const jsonLd = {
     <title>{title}</title>
     <meta name="description" content={description} />
     <meta name="robots" content={noindex ? 'noindex, follow' : 'index, follow'} />
+    <meta name="yandex-verification" content={YANDEX_VERIFICATION} />
     <link rel="canonical" href={canonicalUrl} />
     <!-- Текст первого экрана набран этими начертаниями; без предзагрузки шрифты находятся только после разбора стилей. -->
     <link rel="preload" href="/fonts/golos-text-400-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
