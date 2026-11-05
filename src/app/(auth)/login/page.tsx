@@ -3,7 +3,8 @@
 import { useState, type FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { BookOpen, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
+import { BrandMark } from '@/components/brand/BrandMark'
 import { safeRedirectPath } from '@/lib/safe-redirect'
 import { useHydrated } from '@/hooks/use-hydrated'
 
@@ -48,9 +49,7 @@ export default function LoginPage() {
   return (
     <div className="w-full max-w-md space-y-8 px-4">
       <div className="text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
-          <BookOpen className="h-8 w-8 text-primary-foreground" />
-        </div>
+        <BrandMark size={64} className="mx-auto" />
         <h1 className="mt-6 text-2xl font-bold tracking-tight text-foreground">
           MentorCareer LMS
         </h1>

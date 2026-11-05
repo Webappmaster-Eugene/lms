@@ -2,7 +2,8 @@
 
 import { useState, type FormEvent } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, BookOpen, Loader2, Mail } from 'lucide-react'
+import { ArrowLeft, Loader2, Mail } from 'lucide-react'
+import { BrandMark } from '@/components/brand/BrandMark'
 import { useHydrated } from '@/hooks/use-hydrated'
 
 export default function ForgotPasswordPage() {
@@ -40,9 +41,7 @@ export default function ForgotPasswordPage() {
   return (
     <div className="w-full max-w-md space-y-8 px-4">
       <div className="text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
-          <BookOpen className="h-8 w-8 text-primary-foreground" />
-        </div>
+        <BrandMark size={64} className="mx-auto" />
         <h1 className="mt-6 text-2xl font-bold tracking-tight text-foreground">
           Восстановление пароля
         </h1>

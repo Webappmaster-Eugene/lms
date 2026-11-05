@@ -1,0 +1,10 @@
+---
+import { WORDMARK } from '../data/brand-mark'
+
+interface Props {
+  class?: string
+}
+const { class: className } = Astro.props
+---
+{/* Заливка на самом контуре: общее правило лендинга для svg снимает её с корневого элемента. */}
+<svg viewBox={WORDMARK.viewBox} class={className} role="img" aria-label="MentorCareer" focusable="false"><path d={WORDMARK.d} fill="currentColor" stroke="none" /></svg>

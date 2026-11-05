@@ -22,7 +22,7 @@ const dateModified = new Date().toISOString()
 const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': [
-    { '@type': 'Organization', '@id': ORGANIZATION_ID, name: 'MentorCareer', url: `${MENTOR_SITE_URL}/`, sameAs: ORGANIZATION_PROFILES, logo: { '@type': 'ImageObject', url: new URL('/logo.png', SITE_URL).href, width: 180, height: 180 } },
+    { '@type': 'Organization', '@id': ORGANIZATION_ID, name: 'MentorCareer', url: `${MENTOR_SITE_URL}/`, sameAs: ORGANIZATION_PROFILES, logo: { '@type': 'ImageObject', url: new URL('/logo.png', SITE_URL).href, width: 512, height: 512 } },
     { '@type': 'WebSite', '@id': `${SITE_URL}/#website`, name: 'MentorCareer - инструкция', url: SITE_URL, inLanguage: 'ru', publisher: { '@id': ORGANIZATION_ID } },
     { '@type': 'ImageObject', '@id': `${SITE_URL}/#primaryimage`, url: ogImage, width: 1200, height: 630, caption: ogImageAlt },
     { '@type': 'WebPage', '@id': `${canonicalUrl}#webpage`, name: title, description, url: canonicalUrl, inLanguage: 'ru', dateModified, isPartOf: { '@id': `${SITE_URL}/#website` }, publisher: { '@id': ORGANIZATION_ID }, primaryImageOfPage: { '@id': `${SITE_URL}/#primaryimage` } },

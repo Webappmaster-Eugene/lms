@@ -1,5 +1,5 @@
 /* Only the public offline shell is cached. Lessons, APIs and media always use the network. */
-const SHELL_CACHE = 'mentorcareer-shell-v2'
+const SHELL_CACHE = 'mentorcareer-shell-v3'
 const SHELL = ['/offline.html', '/images/pwa/icon-192.png', '/images/pwa/icon-512.png']
 
 self.addEventListener('install', (event) => {
@@ -55,7 +55,7 @@ self.addEventListener('push', (event) => {
       {
         body: typeof data.message === 'string' ? data.message.slice(0, 300) : 'У вас новое уведомление',
         icon: '/images/pwa/icon-192.png',
-        badge: '/images/pwa/icon-192.png',
+        badge: '/images/pwa/badge-96.png',
         tag: typeof data.tag === 'string' ? data.tag.slice(0, 100) : undefined,
         data: { url: destination(data.link) },
       },

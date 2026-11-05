@@ -20,7 +20,7 @@ const ogImageAlt = 'Буткемп Node.js: backend сервиса прокат�
 const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': [
-    { '@type': 'Organization', '@id': ORGANIZATION_ID, name: 'MentorCareer', url: `${MENTOR_SITE_URL}/`, sameAs: ORGANIZATION_PROFILES, logo: { '@type': 'ImageObject', url: new URL('/logo.png', SITE_URL).href, width: 180, height: 180 } },
+    { '@type': 'Organization', '@id': ORGANIZATION_ID, name: 'MentorCareer', url: `${MENTOR_SITE_URL}/`, sameAs: ORGANIZATION_PROFILES, logo: { '@type': 'ImageObject', url: new URL('/logo.png', SITE_URL).href, width: 512, height: 512 } },
     // Тот же узел, что у главной (Layout.astro): страницы буткемпа - часть сайта info.mentorcareer.ru.
     { '@type': 'WebSite', '@id': `${SITE_URL}/#website`, name: 'MentorCareer - инструкция', url: SITE_URL, inLanguage: 'ru', publisher: { '@id': ORGANIZATION_ID } },
     { '@type': 'WebPage', '@id': `${canonicalUrl}#webpage`, name: title, description, url: canonicalUrl, inLanguage: 'ru', dateModified: PAGE_UPDATED.iso, isPartOf: { '@id': `${SITE_URL}/#website` }, publisher: { '@id': ORGANIZATION_ID } },
