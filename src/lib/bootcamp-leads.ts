@@ -265,9 +265,10 @@ export function leadResumeKind(bytes: Uint8Array): LeadResumeKind | null {
     return tail.includes('%%EOF') && tail.includes('xref') ? { extension: 'pdf', mimetype: 'application/pdf' } : null
   }
   if (!head.startsWith('PK\x03\x04')) return null
-  // Имена частей лежат в архиве открытым текстом, поэтому состав виден без распаковки. Макросы нам в резюме не нужны.
+  // Имена частей лежат в архиве открытым текстом, поэтому состав виден без распаковки. Основная часть называется
+  // по-разному: Word Online пишет word/document2.xml. Макросы нам в резюме не нужны.
   const raw = new TextDecoder('latin1').decode(bytes)
-  if (!raw.includes('[Content_Types].xml') || !raw.includes('word/document.xml') || raw.includes('vbaProject.bin')) return null
+  if (!raw.includes('[Content_Types].xml') || !raw.includes('word/document') || raw.includes('vbaProject.bin')) return null
   return { extension: 'docx', mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { BootcampLeadError, describeLeadSource, isLeadTrap, leadBodyFromForm, leadResumeKind, leadResumeName, normalizeLeadTelegram, parseBootcampLead } from '@/lib/bootcamp-leads'
-import { LEAD_ANSWERS, LEAD_DOCX, LEAD_DOCX_WITH_MACROS, LEAD_PDF, leadFormData } from '../fixtures/bootcampLead'
+import { LEAD_ANSWERS, LEAD_DOCX, LEAD_DOCX_WITH_MACROS, LEAD_DOCX_WORD_ONLINE, LEAD_PDF, LEAD_PDF_NEAR_LIMIT, leadFormData } from '../fixtures/bootcampLead'
 import { zipOf } from '../fixtures/zip'
 
 const valid = { ...LEAD_ANSWERS, program: 'nodejs', email: '  Ivan.Petrov@Mail.RU ', name: '  Иван   Петров ', consent: true, consentVersion: '2026-10-26' }
@@ -171,6 +171,8 @@ describe('предзапись на буткемп: разбор формы', ()
       // Только заголовок: Payload такой файл не примет, поэтому отказываем сразу и с объяснением.
       expect(leadResumeKind(bytes('%PDF-1.7 обрывок'))).toBeNull()
       expect(leadResumeKind(LEAD_DOCX)?.extension).toBe('docx')
+      expect(leadResumeKind(LEAD_DOCX_WORD_ONLINE)?.extension).toBe('docx')
+      expect(leadResumeKind(new TextEncoder().encode(LEAD_PDF_NEAR_LIMIT))?.extension).toBe('pdf')
       // Строка с именем части есть, а самого документа нет: это обычный архив.
       expect(leadResumeKind(zipOf('word/document.xml', '<w:document/>'))).toBeNull()
       expect(leadResumeKind(LEAD_DOCX_WITH_MACROS)).toBeNull()

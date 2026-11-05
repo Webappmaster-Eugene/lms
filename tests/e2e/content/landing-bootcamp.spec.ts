@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 
 import { USERS } from '../fixtures/data'
 import { APP_URL, LANDING_URL, LANDING_USE } from '../fixtures/env'
-import { LEAD_ANSWERS, LEAD_PDF } from '../../fixtures/bootcampLead'
+import { LEAD_ANSWERS, LEAD_PDF, LEAD_PDF_NEAR_LIMIT } from '../../fixtures/bootcampLead'
 import { zipOf } from '../../fixtures/zip'
 import { ENTRY_TASKS } from '../../../src/data/bootcamp-entry/tasks'
 import { AUTHOR_PROFILES, ORGANIZATION_ID, ORGANIZATION_PROFILES } from '../../../landing/src/config'
@@ -181,6 +181,18 @@ test('форма: быстрее 15 секунд - понятный отказ, 
   await expect(page.locator('[data-status]')).toHaveText(/слишком быстро/)
   await expect(page.getByRole('textbox', { name: 'Ваша история' })).toHaveValue(LEAD_ANSWERS.story)
   await expect(page.locator('[data-done]')).toBeHidden()
+})
+
+test('форма: файл почти на 5 МБ проходит через настоящий сервер и прокси лендинга', async ({ page, request }) => {
+  const email = `lead-big-${Date.now()}@mail.test`
+  await page.clock.install()
+  await page.goto(PAGE)
+  await fillLead(page, email)
+  await page.locator('#lead-resume').setInputFiles({ name: 'Большое резюме.pdf', mimeType: 'application/pdf', buffer: Buffer.from(LEAD_PDF_NEAR_LIMIT) })
+  await page.getByRole('button', { name: 'Оставить заявку' }).click()
+  await expect(page.locator('[data-done]')).toBeVisible({ timeout: 30_000 })
+  const [lead] = await adminLeads(request, email)
+  expect(lead?.resume).toBeTruthy()
 })
 
 test('форма: неверный файл и ошибка сервера показываются у поля резюме', async ({ page }) => {

@@ -15,7 +15,7 @@ import { logger } from '@/lib/telemetry'
 import { ENTRY_TASK_RESEND_AFTER_MS, sendEntryTask } from '@/server/bootcamp-entry-task'
 import { captureEmails, createAdmin, createStudent, getTestPayload, login, rest, uid, type TestUser } from '../helpers/payload'
 import { LEAD_BODY_MAX_BYTES, LEAD_RESUME_MAX_BYTES, LEAD_RESUMES_MAX_TOTAL_BYTES } from '@/lib/bootcamp-leads'
-import { LEAD_ANSWERS, LEAD_DOCX, LEAD_DOCX_WITH_MACROS, LEAD_PDF, leadFormData } from '../../fixtures/bootcampLead'
+import { LEAD_ANSWERS, LEAD_DOCX, LEAD_DOCX_WITH_MACROS, LEAD_DOCX_WORD_ONLINE, LEAD_PDF, leadFormData } from '../../fixtures/bootcampLead'
 import { zipOf } from '../../fixtures/zip'
 
 let payload: Payload
@@ -501,9 +501,9 @@ describe('POST /api/bootcamp/leads: предзапись с лендинга', (
       expect(existsSync(`media/bootcamp-lead-resumes/${doc.filename}`)).toBe(false)
     })
 
-    it('принимает настоящий DOCX', async () => {
+    it.each([['из Word', LEAD_DOCX], ['из Word Online', LEAD_DOCX_WORD_ONLINE]])('принимает настоящий DOCX %s', async (_label, file) => {
       const email = `${uid('docx')}@mail.test`
-      expect((await send(lead(email), { resume: new File([new Uint8Array(LEAD_DOCX)], 'cv.docx') })).status).toBe(200)
+      expect((await send(lead(email), { resume: new File([new Uint8Array(file)], 'cv.docx') })).status).toBe(200)
       const [row] = await stored(email)
       const doc = await payload.findByID({ collection: 'bootcamp-lead-resumes', id: Number(row?.resume), overrideAccess: true })
       expect(doc.filename).toMatch(/\.docx$/)

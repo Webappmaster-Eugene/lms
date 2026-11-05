@@ -59,5 +59,14 @@ const DOCX_PARTS = {
 
 /** Состав как у файла из Word: без [Content_Types].xml такой файл не считается документом. */
 export const LEAD_DOCX = zipFiles(DOCX_PARTS)
+/** Word Online называет основную часть иначе: она задана в [Content_Types].xml, а не именем файла. */
+export const LEAD_DOCX_WORD_ONLINE = zipFiles({
+  '[Content_Types].xml': DOCX_PARTS['[Content_Types].xml'].replace('/word/document.xml', '/word/document2.xml'),
+  '_rels/.rels': DOCX_PARTS['_rels/.rels'].replace('word/document.xml', 'word/document2.xml'),
+  'word/document2.xml': DOCX_PARTS['word/document.xml'],
+})
 /** Документ с макросами: расширение и основной текст те же, поэтому отличить можно только по составу. */
 export const LEAD_DOCX_WITH_MACROS = zipFiles({ ...DOCX_PARTS, 'word/vbaProject.bin': 'макрос' })
+
+/** Почти на предел: маленькая фикстура не покажет ограничений сервера и прокси по размеру тела. */
+export const LEAD_PDF_NEAR_LIMIT = `%PDF-1.4\n%${'x'.repeat(4_900_000)}\n${LEAD_PDF.slice('%PDF-1.4\n'.length)}`
