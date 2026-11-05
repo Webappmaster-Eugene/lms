@@ -11,7 +11,7 @@ import { markLearningAccessAuditActor, persistLearningAccessPolicy } from '@/pay
 type Executor = { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }
 type SessionsAdapter = { drizzle: Executor; sessions?: Record<string | number, { db: Executor } | undefined> }
 
-async function transactionDb(req: PayloadRequest): Promise<Executor> {
+export async function transactionDb(req: PayloadRequest): Promise<Executor> {
   const adapter = req.payload.db as unknown as SessionsAdapter
   const transactionID = await req.transactionID
   const db = transactionID === undefined ? undefined : adapter.sessions?.[transactionID]?.db

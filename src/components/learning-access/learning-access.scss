@@ -49,9 +49,36 @@
   &__trainer-preview { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--theme-elevation-200); }
   &__save { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; position: sticky; bottom: 0; padding: 16px 0; background: var(--theme-elevation-0); border-top: 1px solid var(--theme-elevation-250); }
   &__save > span { font-size: 13px; margin-right: auto; }
+  &__new { width: 100%; margin-bottom: 16px; }
+  &__students small { margin-top: 2px; }
   button.learning-access__primary { color: var(--theme-elevation-0); background: var(--theme-text); border-color: var(--theme-text); }
   button.learning-access__primary:hover:not(:disabled) { opacity: .85; }
+  .student-panel, .student-credentials { margin: 16px 0 24px; padding: 16px 20px; border: 1px solid var(--theme-elevation-250); }
+  .student-credentials { border-left: 3px solid var(--theme-success-500, #32834c); background: var(--theme-elevation-50); }
+  .student-credentials textarea { width: 100%; padding: 10px 12px; font: inherit; font-family: var(--font-mono, monospace); color: var(--theme-text); background: var(--theme-input-bg, var(--theme-elevation-0)); border: 1px solid var(--theme-elevation-300); border-radius: 4px; resize: vertical; }
+  .student-panel p, .student-credentials p, .access-tree > p { margin: 0 0 12px; }
+  .student-panel__line { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0 0 12px; overflow-wrap: anywhere; }
+  .student-panel form, .student-panel > div:not(.access-tree__actions) { margin-top: 16px; }
+  .access-tree { margin: 24px 0 32px; }
+  .access-tree__summary { margin: 12px 0; font-size: 14px; color: var(--theme-elevation-650); }
+  .access-tree__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  .access-tree ul { list-style: none; margin: 0; padding: 0 0 0 22px; }
+  ul.access-tree__root { padding-left: 0; }
+  .access-tree__row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--theme-elevation-150); }
+  .access-tree__expand { width: 28px; height: 28px; padding: 0; line-height: 1; }
+  .access-tree__spacer { width: 28px; }
+  .access-tree__mark { flex-direction: row; align-items: flex-start; gap: 10px; min-width: 0; cursor: pointer; overflow-wrap: anywhere; }
+  .access-tree__mark input { width: auto; flex-shrink: 0; margin-top: 3px; accent-color: var(--theme-text); }
+  .access-tree__side { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
+  .access-tree__side small { display: inline; }
+  .access-tree__side strong { min-width: 62px; text-align: right; font-weight: 500; }
+  .access-tree__side strong[data-state='closed'] { color: var(--theme-elevation-650); }
+  .access-tree__side button { padding: 3px 8px; font-size: 13px; }
+  .access-tree h4 { margin: 12px 0 4px 22px; font-size: 13px; font-weight: 600; color: var(--theme-elevation-650); }
   @media (max-width: 800px) {
+    .access-tree__row { grid-template-columns: 28px minmax(0, 1fr); }
+    .access-tree__side { grid-column: 2; justify-content: flex-start; }
+    .access-tree ul { padding-left: 12px; }
     &__layout { grid-template-columns: 1fr; gap: 24px; }
     aside { border-right: 0; padding-right: 0; padding-bottom: 20px; border-bottom: 1px solid var(--theme-elevation-200); }
     &__students { max-height: 220px; overflow-y: auto; }

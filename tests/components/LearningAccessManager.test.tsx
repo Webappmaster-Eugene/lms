@@ -11,6 +11,9 @@ let saveStatus = 409
 let snapshotError: { error: string; code: string } | null = null
 const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
   const address = new URL(String(url), 'http://localhost')
+  if (address.pathname === '/api/manage/students' && init?.method === 'POST') return Response.json({ student: { id: 35, email: 'new@example.test', firstName: 'Другой', lastName: 'Ученик', telegram: null, isActive: true }, credentials: { email: 'new@example.test', password: 'Pass2word345abc' } }, { status: 201 })
+  if (address.pathname.startsWith('/api/manage/students/')) return Response.json({ student: { id: 34, email: 'alexander@example.test', firstName: 'Александр', lastName: 'Студент', telegram: null, isActive: true }, impact: { progress: 0, certificates: 0, comments: 0, notes: 0, rules: 0, points: 0, blockers: [] } })
+  if (address.searchParams.get('kind') === 'catalog') return Response.json({ roadmaps: [], nodes: [], courses: [], sections: [] })
   if (init?.method === 'PUT') {
     saved = JSON.parse(String(init.body)) as Record<string, unknown>
     if (saveError) return Response.json({ error: saveError }, { status: saveStatus })
@@ -26,6 +29,43 @@ const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) 
 })
 
 beforeEach(() => { vi.stubGlobal('fetch', fetchMock); fetchMock.mockClear(); saved = null; saveError = null; saveStatus = 409; snapshotError = null })
+
+describe('админ заводит ученика', () => {
+  it('создание выбирает ученика и показывает логин с паролем, пока их не скроют', async () => {
+    const user = userEvent.setup()
+    render(<LearningAccessManager />)
+    await user.click(screen.getByRole('button', { name: 'Новый ученик' }))
+    const form = screen.getByRole('form', { name: 'Новый ученик' })
+    await user.type(within(form).getByLabelText('Почта (логин)'), 'new@example.test')
+    await user.type(within(form).getByLabelText('Имя'), 'Другой')
+    await user.type(within(form).getByLabelText('Фамилия'), 'Ученик')
+    await user.click(within(form).getByRole('button', { name: 'Создать ученика' }))
+    const notice = await screen.findByRole('region', { name: 'Логин и пароль ученика' })
+    expect((within(notice).getByLabelText('Текст для отправки ученику') as HTMLTextAreaElement).value).toContain('Пароль: Pass2word345abc')
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('?user=35'))).toBe(true))
+    expect(screen.queryByRole('form', { name: 'Новый ученик' })).not.toBeInTheDocument()
+    await user.click(within(notice).getByRole('button', { name: 'Скрыть' }))
+    expect(screen.queryByRole('region', { name: 'Логин и пароль ученика' })).not.toBeInTheDocument()
+  })
+
+  it('повторный клик по выбранному ученику не оставляет вечную загрузку', async () => {
+    const user = userEvent.setup()
+    render(<LearningAccessManager />)
+    await user.click(await screen.findByRole('button', { name: 'Александр (alexander@example.test)' }))
+    await screen.findByRole('heading', { name: 'Александр Студент' })
+    await user.click(screen.getByRole('button', { name: 'Александр (alexander@example.test)' }))
+    expect(screen.getByRole('heading', { name: 'Александр Студент' })).toBeInTheDocument()
+    expect(screen.queryByText('Загружаем назначения…')).not.toBeInTheDocument()
+  })
+
+  it('новый ученик недоступен, пока есть несохранённые доступы', async () => {
+    const user = userEvent.setup()
+    render(<LearningAccessManager initialUserId={34} />)
+    await screen.findByRole('heading', { name: 'Александр Студент' })
+    await user.click(screen.getByRole('radio', { name: /Тренажёр выключен/ }))
+    expect(screen.getByRole('button', { name: 'Новый ученик' })).toBeDisabled()
+  })
+})
 
 describe('админ назначает обучение', () => {
   it('при удалённой цели даёт ссылку на список назначений и не показывает сохранение', async () => {
@@ -197,7 +237,7 @@ describe('назначения: выбор ученика, ошибки и пр�
     api((address, init) => !init?.method && address.searchParams.get('user') === '35' ? Response.json({ ...original, userId: 35, student: { id: 35, title: 'Другой ученик' } }) : undefined)
     const user = userEvent.setup()
     render(<LearningAccessManager />)
-    expect(screen.getByText('Выберите ученика, которому хотите открыть обучение.')).toBeInTheDocument()
+    expect(screen.getByText('Выберите ученика или создайте нового.')).toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: 'Другой ученик' }))
     expect(await screen.findByRole('heading', { name: 'Другой ученик' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Другой ученик' })).toHaveAttribute('aria-pressed', 'true')

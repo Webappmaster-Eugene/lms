@@ -105,7 +105,7 @@ describe('GET/PUT /api/manage/learning-access — поиск и испорчен
     const response = await accessGET(get(`manage/learning-access?kind=students&search=${marker}`))
     expect(response.status).toBe(200)
     const body = await response.json() as { docs: { id: number; title: string }[]; page: number; hasNextPage: boolean }
-    expect(body.docs).toContainEqual({ id: student.id, title: `Ученик${marker} Поиска (${student.email})` })
+    expect(body.docs).toContainEqual({ id: student.id, title: `Ученик${marker} Поиска (${student.email})`, active: true })
     expect(body.docs.some((doc) => doc.id === admin.id)).toBe(false)
     expect(body).toMatchObject({ page: 1, hasNextPage: false })
   })
