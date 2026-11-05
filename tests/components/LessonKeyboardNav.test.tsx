@@ -90,6 +90,21 @@ describe('стрелки между уроками', () => {
       expect(push).not.toHaveBeenCalled()
     })
 
+    it('режим урока: развёрнут документ, а перематывается часть поверх него', () => {
+      render(<><LessonKeyboardNav prevHref="/lessons/a" nextHref="/lessons/c" /><div data-lesson-fullscreen-target><video /></div></>)
+      const video = document.querySelector('video') as HTMLVideoElement
+      Object.defineProperty(video, 'duration', { value: 100, configurable: true })
+      video.currentTime = 10
+      document.documentElement.setAttribute('data-lesson-fullscreen', '')
+      fullscreen(document.documentElement)
+
+      expect(fireEvent.keyDown(document.body, { key: 'ArrowRight' })).toBe(false)
+
+      expect(video.currentTime).toBe(15)
+      expect(push).not.toHaveBeenCalled()
+      document.documentElement.removeAttribute('data-lesson-fullscreen')
+    })
+
     it('другой развёрнутый блок стрелки не забирает и урок не меняет', () => {
       render(<><LessonKeyboardNav prevHref="/lessons/a" nextHref="/lessons/c" /><div data-testid="slides" /></>)
       fullscreen(document.querySelector('[data-testid="slides"]') as Element)

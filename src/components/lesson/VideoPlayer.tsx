@@ -4,9 +4,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ExternalLink, Play, Clock, Loader2, RotateCw } from 'lucide-react'
 
 import { useVideoMemory } from '@/hooks/use-video-memory'
+import { toggleLessonFullscreen } from '@/lib/lesson-fullscreen'
 import { anotherVideoPlaying, watchVideoWarmup } from '@/lib/lesson-video-warmup'
 import { MEDIA_SOURCE_HEADER } from '@/lib/media-source-status'
 import { parsePublicResourceUrl } from '@/lib/yandex-disk-url'
+import { LessonFullscreenButton } from './LessonFullscreenButton'
 import { TransportStreamPlayer } from './TransportStreamPlayer'
 import { VideoMemoryBar } from './VideoMemoryBar'
 import { VideoShareButton } from './VideoShareButton'
@@ -417,7 +419,7 @@ function NativeVideo({ memoryId, videoUrl, playbackAttempt = 0, direct = false, 
 
   return (
     <>
-      <div data-lesson-video="native" className="touch-pan-y touch-pinch-zoom overflow-hidden rounded-xl border border-border bg-black">
+      <div data-lesson-video="native" className="relative touch-pan-y touch-pinch-zoom overflow-hidden rounded-xl border border-border bg-black">
         <video
           ref={videoRef}
           src={source}
@@ -425,11 +427,16 @@ function NativeVideo({ memoryId, videoUrl, playbackAttempt = 0, direct = false, 
           aria-label={label}
           controls
           preload="none"
-          controlsList="nodownload"
+          controlsList="nodownload nofullscreen"
           disableRemotePlayback
           playsInline
           onContextMenu={(event) => event.preventDefault()}
+          // Двойной щелчок мышью разворачивал видео сам браузером, пока его кнопка не была скрыта.
+          onDoubleClick={(event) => {
+            if (window.matchMedia('(hover: hover)').matches) toggleLessonFullscreen(event.currentTarget)
+          }}
         />
+        <LessonFullscreenButton className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70" />
       </div>
       <VideoMemoryBar {...memory} loadsOnPlay />
       <VideoShareButton videoRef={videoRef} videoId={memoryId ?? videoUrl} />

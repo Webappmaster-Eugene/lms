@@ -1,11 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Maximize2, Minimize2, Pause, Play, Volume2, VolumeX } from 'lucide-react'
+import { Loader2, Pause, Play, Volume2, VolumeX } from 'lucide-react'
 
 import { useVideoMemory } from '@/hooks/use-video-memory'
+import { lessonFullscreenTarget } from '@/lib/lesson-fullscreen'
 import { anotherVideoPlaying } from '@/lib/lesson-video-warmup'
 import { formatTime } from '@/lib/video-memory'
+import { LessonFullscreenButton } from './LessonFullscreenButton'
 import { VideoMemoryBar } from './VideoMemoryBar'
 import { VideoShareButton } from './VideoShareButton'
 
@@ -58,7 +60,6 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
   const playerRef = useRef<PlayerHandle | null>(null)
   const shellRef = useRef<HTMLDivElement | null>(null)
 
-  const [fullscreen, setFullscreen] = useState(false)
   const [ready, setReady] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [muted, setMuted] = useState(false)
@@ -214,29 +215,24 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
   )
 
   useEffect(() => {
-    const onChange = () => setFullscreen(document.fullscreenElement === shellRef.current)
     // Во весь экран фокус не обязан быть на шкале, а стрелки должны перематывать.
     const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || document.fullscreenElement !== shellRef.current || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+      if (event.defaultPrevented || !shellRef.current || lessonFullscreenTarget() !== shellRef.current || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
       if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
       event.preventDefault()
       seekTo((videoRef.current?.currentTime ?? 0) + (event.key === 'ArrowRight' ? 10 : -10))
     }
-    document.addEventListener('fullscreenchange', onChange)
     document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('fullscreenchange', onChange)
-      document.removeEventListener('keydown', onKey)
-    }
+    return () => document.removeEventListener('keydown', onKey)
   }, [seekTo])
 
   return (
     <div className="space-y-3">
-      <div ref={shellRef} data-lesson-video-shell className="overflow-hidden rounded-xl border border-border bg-black [&:fullscreen]:flex [&:fullscreen]:flex-col [&:fullscreen]:rounded-none [&:fullscreen]:border-0">
-        <div data-lesson-video="stream" className="relative touch-pan-y touch-pinch-zoom [:fullscreen>&]:min-h-0 [:fullscreen>&]:flex-1">
+      <div ref={shellRef} data-lesson-video-shell className="overflow-hidden rounded-xl border border-border bg-black">
+        <div data-lesson-video="stream" className="relative touch-pan-y touch-pinch-zoom">
           <video
             ref={videoRef}
-            className="aspect-video w-full [:fullscreen_&]:aspect-auto [:fullscreen_&]:h-full"
+            className="aspect-video w-full"
             playsInline
             disableRemotePlayback
             onContextMenu={(event) => event.preventDefault()}
@@ -306,14 +302,7 @@ export function TransportStreamPlayer({ src, memoryKey, durationMinutes, onFailu
             {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
           </button>
 
-          <button
-            type="button"
-            onClick={() => void (fullscreen ? document.exitFullscreen() : shellRef.current?.requestFullscreen?.())?.catch(() => undefined)}
-            aria-label={fullscreen ? 'Свернуть' : 'Во весь экран'}
-            className="rounded p-1 transition-colors hover:bg-white/10"
-          >
-            {fullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
-          </button>
+          <LessonFullscreenButton className="rounded p-1 transition-colors hover:bg-white/10" />
         </div>
       </div>
       <VideoMemoryBar {...memory} />

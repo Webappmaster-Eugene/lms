@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { isLessonFullscreen, lessonFullscreenTarget } from '@/lib/lesson-fullscreen'
 
 type Props = { prevHref: string | null; nextHref: string | null }
 
@@ -35,10 +36,11 @@ export function LessonKeyboardNav({ prevHref, nextHref }: Props) {
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
       if (isTyping(event.target) || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return
-      const fullscreen = document.fullscreenElement
-      if (fullscreen) {
+      const lessonMode = isLessonFullscreen()
+      const fullscreen = lessonMode ? lessonFullscreenTarget()?.querySelector('video') : document.fullscreenElement
+      if (lessonMode || fullscreen) {
         // preventDefault снимает и перемотку браузера: иначе шаг посчитался бы дважды.
-        if (seekFullscreenVideo(fullscreen, event.key === 'ArrowLeft' ? -FULLSCREEN_SEEK_SECONDS : FULLSCREEN_SEEK_SECONDS)) event.preventDefault()
+        if (fullscreen && seekFullscreenVideo(fullscreen, event.key === 'ArrowLeft' ? -FULLSCREEN_SEEK_SECONDS : FULLSCREEN_SEEK_SECONDS)) event.preventDefault()
         return
       }
       if (isOnPlayer(event.target)) return

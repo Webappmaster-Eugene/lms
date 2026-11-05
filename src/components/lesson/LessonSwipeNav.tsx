@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { enterLessonFullscreen, exitLessonFullscreen, isLessonFullscreen, isLessonFullscreenFromRotation, lessonFullscreenAvailable, lessonFullscreenTarget, moveLessonFullscreen, retryLessonFullscreen } from '@/lib/lesson-fullscreen'
 import { swipeDirection, swipeTarget, trackWheel, WHEEL_IDLE, type SwipeDirection, type SwipeLesson, type SwipeTarget } from '@/lib/lesson-swipe'
 import { isTyping } from './LessonKeyboardNav'
 
@@ -10,12 +11,10 @@ type Props = { slug: string; previous: SwipeLesson | null; next: SwipeLesson | n
 
 /** Кадр видео урока; значение - вид плеера: native, stream или embed. */
 const VIDEO_SELECTOR = '[data-lesson-video]'
-/** Рамка потокового плеера с его кнопками: во весь экран разворачивается она, а не голое видео. */
-const SHELL_SELECTOR = '[data-lesson-video-shell]'
 const CONTROL_SELECTOR = 'button, a, input, select, textarea, [role="slider"]'
 /** Внизу нативного плеера шкала перемотки и громкость: их тянут пальцем вбок, это не листание. */
 const NATIVE_CONTROLS_BAND_PX = 56
-/** Во весь экран кнопки браузера крупнее и стоят выше шкалы. */
+/** Во весь экран кнопки браузера стоят выше шкалы, а сам кадр занимает весь экран и места хватает. */
 const FULLSCREEN_CONTROLS_BAND_PX = 96
 /** До этого сдвига неясно, листают видео или прокручивают страницу. */
 const AXIS_LOCK_PX = 12
@@ -30,7 +29,7 @@ const ARRIVAL_TTL_MS = 30_000
 /** Полоса загрузки в шапке ловит только клики по ссылкам: пока сервер отвечает, о переходе говорит плашка. */
 const PENDING_HINT_MS = 15_000
 
-type Arrival = { slug: string; edge: 'first' | 'last'; play: boolean; fullscreen: boolean; expiresAt: number }
+type Arrival = { slug: string; edge: 'first' | 'last'; play: boolean; sentAt: number; expiresAt: number }
 /** Переход клиентский, и модуль переживает смену урока: так новая страница узнаёт, куда прокрутить и запускать ли видео. */
 let arrival: Arrival | null = null
 /** Тоже в модуле: инерция жеста, сменившего урок, не должна пролистать ещё раз уже на новой странице. */
@@ -72,23 +71,10 @@ function playWhenReady(frame: HTMLElement) {
   else video.addEventListener('loadedmetadata', play, { once: true })
 }
 
-/** Развёрнутый элемент этого кадра: нативный плеер разворачивает сам <video>, потоковый - рамку с кнопками. */
-function fullscreenHost(frame: HTMLElement): Element | null {
+/** Браузер развернул само видео сам, чаще всего по повороту: режим потом выключается обратным поворотом. */
+function browserExpanded(frame: HTMLElement): Element | null {
   const element = document.fullscreenElement
-  return element && (frame.contains(element) || element.contains(frame)) ? element : null
-}
-
-/** Отказ браузера оставляет видео в обычном режиме: жест тачпада, в отличие от касания, права на вход не даёт. */
-function enterFullscreen(frame: HTMLElement) {
-  const target = frame.dataset.lessonVideo === 'native' ? frame.querySelector('video') : frame.closest(SHELL_SELECTOR)
-  void target?.requestFullscreen?.().catch(() => undefined)
-}
-
-/** Поверх развёрнутого элемента новый не кладём: выход из него вернул бы предыдущую часть, а не страницу. */
-async function moveFullscreen(frame: HTMLElement) {
-  await document.exitFullscreen().catch(() => undefined)
-  frame.scrollIntoView({ block: 'center' })
-  enterFullscreen(frame)
+  return element && element !== document.documentElement && (frame.contains(element) || element.contains(frame)) ? element : null
 }
 
 function allFrames(): HTMLElement[] {
@@ -97,7 +83,7 @@ function allFrames(): HTMLElement[] {
 
 /** Какое видео имеет в виду клавиша: развёрнутое, потом играющее, потом ближайшее к середине экрана. */
 function currentFrame(frames: HTMLElement[]): HTMLElement | undefined {
-  const active = frames.find((frame) => fullscreenHost(frame)) ?? frames.find((frame) => isPlaying(frame.querySelector('video')))
+  const active = frames.find((frame) => lessonFullscreenTarget()?.contains(frame) || browserExpanded(frame)) ?? frames.find((frame) => isPlaying(frame.querySelector('video')))
   if (active) return active
   const distance = (frame: HTMLElement) => {
     const rect = frame.getBoundingClientRect()
@@ -133,19 +119,23 @@ export function LessonSwipeNav({ slug, previous, next }: Props) {
 
   // Прибытие после смахивания: переход шёл без штатной прокрутки, место выбираем сами.
   useEffect(() => {
-    const pending = arrival
-    if (!pending || pending.slug !== slug) return
-    arrival = null
-    if (Date.now() > pending.expiresAt) return
+    const pending = arrival?.slug === slug ? arrival : null
+    if (pending) arrival = null
+    if (!pending || Date.now() > pending.expiresAt) {
+      // Сюда пришли не смахиванием: развёрнутая часть осталась на старой странице, пустой экран не оставляем.
+      if (isLessonFullscreen() && !lessonFullscreenTarget()) void exitLessonFullscreen()
+      return
+    }
     const frames = allFrames()
     const frame = pending.edge === 'first' ? frames[0] : frames.at(-1)
     if (!frame) {
+      if (isLessonFullscreen()) void exitLessonFullscreen()
       window.scrollTo(0, 0)
       return
     }
-    frame.scrollIntoView({ block: 'center' })
+    if (isLessonFullscreen()) moveLessonFullscreen(frame)
+    else frame.scrollIntoView({ block: 'center' })
     if (pending.play) playWhenReady(frame)
-    if (pending.fullscreen) enterFullscreen(frame)
   }, [slug])
 
   useEffect(() => {
@@ -163,8 +153,8 @@ export function LessonSwipeNav({ slug, previous, next }: Props) {
       const current = gesture.current
       gesture.current = null
       if (current) release(current.frame)
-      clearTimeout(pendingTimer.current)
-      setHint(null)
+      // Касание кадра не отменяет уже идущий переход: о нём плашка должна говорить и дальше.
+      setHint((shown) => (shown?.pending ? shown : null))
     }
 
     const navigate = (spot: Spot, direction: SwipeDirection) => {
@@ -172,21 +162,36 @@ export function LessonSwipeNav({ slug, previous, next }: Props) {
       if (!target) return
       const video = spot.frame.querySelector('video')
       const playing = isPlaying(video)
-      const fullscreen = fullscreenHost(spot.frame) !== null
+      const expanded = browserExpanded(spot.frame) !== null
       if (playing) video.pause()
       if (target.kind === 'video') {
         const frame = spot.frames[target.index]
-        if (fullscreen) void moveFullscreen(frame)
+        if (expanded) void enterLessonFullscreen(frame, { rotated: true })
+        else if (isLessonFullscreen()) moveLessonFullscreen(frame)
         else frame.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' })
         // Запуск прямо в обработчике касания: iOS разрешает звук только так.
         if (playing) playWhenReady(frame)
         return
       }
-      arrival = { slug: target.slug, edge: target.edge, play: playing, fullscreen, expiresAt: Date.now() + ARRIVAL_TTL_MS }
-      latest.current.router.push(`/lessons/${target.slug}`, { scroll: false })
       // Новый урок заменит этот компонент вместе с плашкой; срок нужен, если переход сорвался.
-      setHint(placeHint(spot, direction, hintLabel(direction, target), true, true))
-      pendingTimer.current = setTimeout(() => setHint(null), PENDING_HINT_MS)
+      const showPending = () => {
+        clearTimeout(pendingTimer.current)
+        setHint(placeHint(spot, direction, hintLabel(direction, target), true, true))
+        pendingTimer.current = setTimeout(() => setHint(null), PENDING_HINT_MS)
+      }
+      const sent = arrival?.slug === target.slug ? arrival : null
+      // Повторное смахивание, пока сервер отвечает, начало бы переход заново и только отодвинуло бы его.
+      if (sent && Date.now() - sent.sentAt < PENDING_HINT_MS) {
+        showPending()
+        return
+      }
+      // Видео прежнего урока удалится вместе со страницей: документ останется развёрнутым и без него.
+      if (expanded) void enterLessonFullscreen(spot.frame, { rotated: true })
+      const now = Date.now()
+      // Первое смахивание уже поставило видео на паузу, но ученик хотел смотреть дальше.
+      arrival = { slug: target.slug, edge: target.edge, play: playing || Boolean(arrival?.play), sentAt: now, expiresAt: now + ARRIVAL_TTL_MS }
+      latest.current.router.push(`/lessons/${target.slug}`, { scroll: false })
+      showPending()
     }
 
     const onStart = (event: TouchEvent) => {
@@ -198,10 +203,10 @@ export function LessonSwipeNav({ slug, previous, next }: Props) {
       const frame = target.closest<HTMLElement>(VIDEO_SELECTOR)
       if (!frame) return
       const touch = event.touches[0]
-      // Развёрнутое видео лежит поверх страницы: у его кадра в потоке страницы другие размеры.
-      const host = fullscreenHost(frame)
+      // Развёрнутое браузером видео лежит поверх страницы: у его кадра в потоке страницы другие размеры.
+      const host = browserExpanded(frame)
       const rect = (host ?? frame).getBoundingClientRect()
-      const band = host ? FULLSCREEN_CONTROLS_BAND_PX : NATIVE_CONTROLS_BAND_PX
+      const band = host || isLessonFullscreen() ? FULLSCREEN_CONTROLS_BAND_PX : NATIVE_CONTROLS_BAND_PX
       if (frame.dataset.lessonVideo === 'native' && touch.clientY > rect.bottom - band) return
       const frames = allFrames()
       gesture.current = { frame, frames, index: frames.indexOf(frame), x: touch.clientX, y: touch.clientY, startedAt: performance.now(), rect, horizontal: false }
@@ -229,6 +234,7 @@ export function LessonSwipeNav({ slug, previous, next }: Props) {
     }
 
     const onEnd = (event: TouchEvent) => {
+      retryLessonFullscreen()
       const current = gesture.current
       cancel()
       if (!current) return
@@ -252,10 +258,12 @@ export function LessonSwipeNav({ slug, previous, next }: Props) {
       wheel = step.track
       if (!step.direction) return
       const frames = allFrames()
-      navigate({ frame, frames, index: frames.indexOf(frame), rect: (fullscreenHost(frame) ?? frame).getBoundingClientRect() }, step.direction)
+      navigate({ frame, frames, index: frames.indexOf(frame), rect: (browserExpanded(frame) ?? frame).getBoundingClientRect() }, step.direction)
     }
 
     const onKey = (event: KeyboardEvent) => {
+      // Браузер не развернул документ: его Esc здесь не сработает.
+      if (event.key === 'Escape' && isLessonFullscreen() && !document.fullscreenElement) void exitLessonFullscreen()
       if (!event.shiftKey || event.altKey || event.ctrlKey || event.metaKey || event.repeat || event.defaultPrevented) return
       // По коду клавиши, а не букве: в русской раскладке те же кнопки дают Т и З.
       const direction: SwipeDirection | null = event.code === 'KeyN' ? 'next' : event.code === 'KeyP' ? 'prev' : null
@@ -264,7 +272,20 @@ export function LessonSwipeNav({ slug, previous, next }: Props) {
       const frame = currentFrame(frames)
       if (!frame) return
       event.preventDefault()
-      navigate({ frame, frames, index: frames.indexOf(frame), rect: (fullscreenHost(frame) ?? frame).getBoundingClientRect() }, direction)
+      navigate({ frame, frames, index: frames.indexOf(frame), rect: (browserExpanded(frame) ?? frame).getBoundingClientRect() }, direction)
+    }
+
+    const onRotate = () => {
+      if (!lessonFullscreenAvailable() || !window.matchMedia('(pointer: coarse)').matches) return
+      const type = window.screen.orientation?.type
+      const landscape = type ? type.startsWith('landscape') : window.matchMedia('(orientation: landscape)').matches
+      if (!landscape) {
+        if (isLessonFullscreenFromRotation()) void exitLessonFullscreen()
+        return
+      }
+      if (isLessonFullscreen() || document.fullscreenElement) return
+      const frame = allFrames().find((item) => item.dataset.lessonVideo !== 'embed' && isPlaying(item.querySelector('video')))
+      if (frame) void enterLessonFullscreen(frame, { rotated: true })
     }
 
     document.addEventListener('touchstart', onStart, { passive: true })
@@ -273,6 +294,9 @@ export function LessonSwipeNav({ slug, previous, next }: Props) {
     document.addEventListener('touchcancel', cancel, { passive: true })
     document.addEventListener('wheel', onWheel, { passive: false })
     window.addEventListener('keydown', onKey)
+    // Браузеры расходятся в том, какое из двух событий присылают.
+    window.addEventListener('orientationchange', onRotate)
+    window.screen.orientation?.addEventListener?.('change', onRotate)
     return () => {
       document.removeEventListener('touchstart', onStart)
       document.removeEventListener('touchmove', onMove)
@@ -280,9 +304,15 @@ export function LessonSwipeNav({ slug, previous, next }: Props) {
       document.removeEventListener('touchcancel', cancel)
       document.removeEventListener('wheel', onWheel)
       window.removeEventListener('keydown', onKey)
+      window.removeEventListener('orientationchange', onRotate)
+      window.screen.orientation?.removeEventListener?.('change', onRotate)
       if (gesture.current) release(gesture.current.frame)
       gesture.current = null
       clearTimeout(pendingTimer.current)
+      // Ушли с урока совсем: новая страница режим не подхватит, а пустой экран оставлять нельзя.
+      requestAnimationFrame(() => {
+        if (isLessonFullscreen() && !lessonFullscreenTarget()) void exitLessonFullscreen()
+      })
     }
   }, [])
 
@@ -292,6 +322,7 @@ export function LessonSwipeNav({ slug, previous, next }: Props) {
   return (
     <div
       aria-hidden="true"
+      data-lesson-fullscreen-overlay
       style={{ top: hint.top, left: hint.left, maxWidth: hint.maxWidth }}
       className={`pointer-events-none fixed z-50 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium shadow-lg transition-colors ${hint.armed ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background/90 text-foreground'}`}
     >

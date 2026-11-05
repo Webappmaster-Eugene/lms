@@ -9,18 +9,18 @@ const NOTES = '## Коротко\n\nСуть урока одной строко�
 const MOBILE = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }
 
 /** Настоящий урок из трёх записей и конспекта: браузерное поведение плеера моками не проверить. */
-async function createLesson(admin: APIRequestContext) {
+async function createLesson(admin: APIRequestContext, { parts = PARTS, order = 9000 }: { parts?: number; order?: number } = {}) {
   const buffer = await readFile(new URL('../fixtures/resume-test.webm', import.meta.url))
   const stamp = Date.now()
   const media: { id: number; url: string }[] = []
-  for (let part = 1; part <= PARTS; part++) {
+  for (let part = 1; part <= parts; part++) {
     const uploaded = await admin.post(`${APP_URL}/api/media`, { multipart: { _payload: JSON.stringify({ alt: `Часть ${part}` }), file: { name: `player-${stamp}-${part}.webm`, mimeType: 'video/webm', buffer } } })
     expect(uploaded.status()).toBe(201)
     media.push((await uploaded.json()).doc)
   }
   const course = (await (await admin.get(`${APP_URL}/api/courses?where[slug][equals]=${CONTENT.course.slug}&depth=0`)).json()).docs[0]
   const created = await admin.post(`${APP_URL}/api/lessons`, { data: {
-    title: `Урок из трёх частей ${stamp}`, course: course.id, isPublished: true, estimatedMinutes: 30,
+    title: `Урок из частей ${parts} ${stamp}`, course: course.id, isPublished: true, estimatedMinutes: 30, order,
     content: [
       ...media.map((file, index) => ({ blockType: 'video', title: `Часть ${index + 1}`, videoUrl: file.url, displayMode: 'embed' })),
       { blockType: 'lessonNotes', markdown: NOTES, source: 'author' },
@@ -32,6 +32,12 @@ async function createLesson(admin: APIRequestContext) {
 
 const framePlaying = (page: Page) => page.locator('[data-lesson-video] video').evaluateAll((videos) => (videos as HTMLVideoElement[]).map((video) => !video.paused))
 const fullscreenIndex = (page: Page) => page.evaluate(() => [...document.querySelectorAll('[data-lesson-video] video')].indexOf(document.fullscreenElement as Element))
+const isDocumentExpanded = (page: Page) => page.evaluate(() => document.fullscreenElement === document.documentElement)
+const targetIndex = (page: Page) => page.evaluate(() => [...document.querySelectorAll('[data-lesson-video]')].findIndex((frame) => frame.hasAttribute('data-lesson-fullscreen-target')))
+const targetRect = (page: Page) => page.evaluate(() => {
+  const { x, y, width, height } = (document.querySelector('[data-lesson-fullscreen-target]') as HTMLElement).getBoundingClientRect()
+  return { x, y, width, height }
+})
 
 async function fingerSwipe(page: Page, fromX: number, toX: number, y: number) {
   const cdp = await page.context().newCDPSession(page)
@@ -47,16 +53,20 @@ test.describe('плеер урока из нескольких частей', ()
   let admin: APIRequestContext
   let lesson: Lesson
   let media: { id: number; url: string }[]
+  let nextLesson: Lesson
+  let nextMedia: { id: number; url: string }[]
 
   test.beforeAll(async ({ browser }) => {
     adminContext = await browser.newContext({ extraHTTPHeaders: { Origin: APP_URL }, storageState: storageStateOf('admin') })
     admin = adminContext.request
     ;({ lesson, media } = await createLesson(admin))
+    // Сразу следом: смахивание с последней части ведёт сюда.
+    ;({ lesson: nextLesson, media: nextMedia } = await createLesson(admin, { parts: 1, order: 9001 }))
   })
 
   test.afterAll(async () => {
-    await admin.delete(`${APP_URL}/api/lessons/${lesson.id}`)
-    for (const file of media) await admin.delete(`${APP_URL}/api/media/${file.id}`)
+    for (const created of [lesson, nextLesson]) await admin.delete(`${APP_URL}/api/lessons/${created.id}`)
+    for (const file of [...media, ...nextMedia]) await admin.delete(`${APP_URL}/api/media/${file.id}`)
     await adminContext.close()
   })
 
@@ -137,10 +147,85 @@ test.describe('плеер урока из нескольких частей', ()
     await context.close()
   })
 
-  test('телефон: смахивание во весь экран переносит режим на следующую часть', async ({ browser }) => {
+  test('телефон: кнопка разворачивает документ, смахивание листает части и уроки без выхода из режима', async ({ browser }) => {
+    const { context, page, videos } = await openLesson(browser, MOBILE)
+    await page.evaluate(() => {
+      const state = window as unknown as { fullscreenChanges: number }
+      state.fullscreenChanges = 0
+      document.addEventListener('fullscreenchange', () => { state.fullscreenChanges++ })
+    })
+    await videos.nth(0).scrollIntoViewIfNeeded()
+    await page.locator('[data-lesson-video]').nth(0).getByRole('button', { name: 'Во весь экран' }).click()
+    await expect.poll(() => isDocumentExpanded(page)).toBe(true)
+    await videos.nth(0).evaluate((video: HTMLVideoElement) => video.play())
+    const size = page.viewportSize() ?? MOBILE.viewport
+
+    // Кадр занимает весь экран: предки не должны запирать position: fixed в своих границах.
+    await expect.poll(() => targetIndex(page)).toBe(0)
+    expect(await targetRect(page)).toEqual({ x: 0, y: 0, width: size.width, height: size.height })
+
+    await fingerSwipe(page, size.width - 40, 40, size.height / 2)
+
+    await expect.poll(() => targetIndex(page)).toBe(1)
+    await expect.poll(() => framePlaying(page)).toEqual([false, true, false])
+
+    await fingerSwipe(page, size.width - 40, 40, size.height / 2)
+    await expect.poll(() => targetIndex(page)).toBe(2)
+
+    // С последней части - следующий урок: режим тот же, вход повторять не нужно.
+    await fingerSwipe(page, size.width - 40, 40, size.height / 2)
+    await expect.poll(() => page.url()).toContain(nextLesson.slug)
+    await expect.poll(() => targetIndex(page)).toBe(0)
+    expect(await isDocumentExpanded(page)).toBe(true)
+    await expect.poll(() => page.locator('[data-lesson-video] video').first().evaluate((video: HTMLVideoElement) => !video.paused)).toBe(true)
+    expect(await page.evaluate(() => (window as unknown as { fullscreenChanges: number }).fullscreenChanges)).toBe(1)
+
+    await page.locator('[data-lesson-fullscreen-target]').getByRole('button', { name: 'Свернуть' }).click()
+    await expect.poll(() => isDocumentExpanded(page)).toBe(false)
+    await expect.poll(() => targetIndex(page)).toBe(-1)
+    await context.close()
+  })
+
+  test('телефон: пока следующий урок грузится, плашка видна поверх кадра и переход не повторяется', async ({ browser }) => {
+    const { context, page, videos } = await openLesson(browser, MOBILE)
+    const last = page.locator('[data-lesson-video]').nth(PARTS - 1)
+    await last.scrollIntoViewIfNeeded()
+    await last.getByRole('button', { name: 'Во весь экран' }).click()
+    await expect.poll(() => isDocumentExpanded(page)).toBe(true)
+    await videos.nth(PARTS - 1).evaluate((video: HTMLVideoElement) => video.play())
+    const size = page.viewportSize() ?? MOBILE.viewport
+    const requests: string[] = []
+    page.on('request', (request) => {
+      // Заранее подгруженные ссылки не в счёт: нужны сами переходы на следующий урок.
+      if (request.url().includes(`${nextLesson.slug}?_rsc=`) && !request.headers()['next-router-prefetch']) requests.push(request.url())
+    })
+    // Сервер отвечает не сразу: как и на проде, есть время заметить плашку и смахнуть ещё раз.
+    await page.route(/_rsc=/, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await route.continue()
+    })
+
+    await fingerSwipe(page, size.width - 40, 40, size.height / 2)
+    const plate = page.locator('[data-lesson-fullscreen-overlay]')
+    await expect(plate).toBeVisible()
+    // Над кадром, а не под ним: иначе во весь экран ничто не покажет, что переход идёт.
+    expect(await page.evaluate(() => {
+      const zIndex = (selector: string) => Number(getComputedStyle(document.querySelector(selector) as HTMLElement).zIndex)
+      return zIndex('[data-lesson-fullscreen-overlay]') > zIndex('[data-lesson-fullscreen-target]')
+    })).toBe(true)
+    await fingerSwipe(page, size.width - 40, 40, size.height / 2)
+    await expect(plate).toBeVisible()
+
+    await expect.poll(() => page.url()).toContain(nextLesson.slug)
+    expect(requests).toHaveLength(1)
+    await expect.poll(() => page.locator('[data-lesson-video] video').first().evaluate((video: HTMLVideoElement) => !video.paused)).toBe(true)
+    await context.close()
+  })
+
+  test('телефон: браузер развернул само видео - первое смахивание переводит в режим документа', async ({ browser }) => {
     const { context, page, videos } = await openLesson(browser, MOBILE)
     await videos.nth(0).scrollIntoViewIfNeeded()
-    // evaluate идёт с признаком действия пользователя, как нажатие кнопки плеера.
+    // evaluate идёт с признаком действия пользователя, как поворот телефона у Chrome.
     await videos.nth(0).evaluate(async (video: HTMLVideoElement) => {
       await video.requestFullscreen()
       await video.play()
@@ -150,22 +235,46 @@ test.describe('плеер урока из нескольких частей', ()
 
     await fingerSwipe(page, size.width - 40, 40, size.height / 2)
 
-    await expect.poll(() => fullscreenIndex(page)).toBe(1)
+    await expect.poll(() => targetIndex(page)).toBe(1)
     await expect.poll(() => framePlaying(page)).toEqual([false, true, false])
     await context.close()
   })
 
-  test('телефон: шкала внизу развёрнутого видео остаётся перемоткой', async ({ browser }) => {
+  test('телефон: поворот с играющим видео разворачивает его, обратный поворот сворачивает', async ({ browser }) => {
+    const { context, page, videos } = await openLesson(browser, MOBILE)
+    await videos.nth(1).scrollIntoViewIfNeeded()
+    await videos.nth(1).evaluate((video: HTMLVideoElement) => video.play())
+    const cdp = await context.newCDPSession(page)
+    const rotate = (width: number, height: number, type: 'landscapePrimary' | 'portraitPrimary', angle: number) =>
+      cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 3, mobile: true, screenOrientation: { type, angle } })
+
+    await rotate(844, 390, 'landscapePrimary', 90)
+
+    await expect.poll(() => targetIndex(page)).toBe(1)
+    await expect.poll(() => targetRect(page)).toEqual({ x: 0, y: 0, width: 844, height: 390 })
+
+    await fingerSwipe(page, 800, 40, 195)
+
+    await expect.poll(() => targetIndex(page)).toBe(2)
+    await expect.poll(() => framePlaying(page)).toEqual([false, false, true])
+
+    await rotate(390, 844, 'portraitPrimary', 0)
+
+    await expect.poll(() => targetIndex(page)).toBe(-1)
+    await context.close()
+  })
+
+  test('телефон: шкала внизу развёрнутого кадра остаётся перемоткой', async ({ browser }) => {
     const { context, page, videos } = await openLesson(browser, MOBILE)
     await videos.nth(0).scrollIntoViewIfNeeded()
-    await videos.nth(0).evaluate((video: HTMLVideoElement) => video.requestFullscreen())
-    await expect.poll(() => fullscreenIndex(page)).toBe(0)
+    await page.locator('[data-lesson-video]').nth(0).getByRole('button', { name: 'Во весь экран' }).click()
+    await expect.poll(() => isDocumentExpanded(page)).toBe(true)
     const size = page.viewportSize() ?? MOBILE.viewport
 
     await fingerSwipe(page, size.width - 40, 40, size.height - 30)
     await page.waitForTimeout(500)
 
-    expect(await fullscreenIndex(page)).toBe(0)
+    expect(await targetIndex(page)).toBe(0)
     await context.close()
   })
 
@@ -174,8 +283,8 @@ test.describe('плеер урока из нескольких частей', ()
     const first = videos.nth(0)
     await first.scrollIntoViewIfNeeded()
     await expect.poll(() => first.evaluate((video: HTMLVideoElement) => video.readyState)).toBeGreaterThanOrEqual(1)
-    await first.evaluate((video: HTMLVideoElement) => video.requestFullscreen())
-    await expect.poll(() => fullscreenIndex(page)).toBe(0)
+    await page.locator('[data-lesson-video]').nth(0).getByRole('button', { name: 'Во весь экран' }).click()
+    await expect.poll(() => isDocumentExpanded(page)).toBe(true)
     const start = await first.evaluate((video: HTMLVideoElement) => video.currentTime)
     const url = page.url()
 
@@ -183,32 +292,31 @@ test.describe('плеер урока из нескольких частей', ()
 
     await expect.poll(() => first.evaluate((video: HTMLVideoElement) => video.currentTime)).toBeCloseTo(start + 5, 0)
     expect(page.url()).toBe(url)
-    expect(await fullscreenIndex(page)).toBe(0)
+    expect(await targetIndex(page)).toBe(0)
 
     await page.keyboard.press('Shift+KeyN')
 
-    await expect.poll(() => fullscreenIndex(page)).toBe(1)
+    await expect.poll(() => targetIndex(page)).toBe(1)
+    expect(await isDocumentExpanded(page)).toBe(true)
     await context.close()
   })
 
-  test('компьютер: жест тачпада листает часть; без права на вход она играет в обычном режиме', async ({ browser }) => {
+  test('компьютер: жест тачпада листает часть и не выбрасывает из режима', async ({ browser }) => {
     const { context, page, videos } = await openLesson(browser)
-    const first = videos.nth(0)
-    await first.scrollIntoViewIfNeeded()
-    await first.evaluate(async (video: HTMLVideoElement) => {
-      await video.requestFullscreen()
-      await video.play()
-    })
-    await expect.poll(() => fullscreenIndex(page)).toBe(0)
-    // Право на вход от evaluate истекает: дальше только то, что даёт сам жест, а он прав не даёт.
+    await videos.nth(0).scrollIntoViewIfNeeded()
+    await page.locator('[data-lesson-video]').nth(0).getByRole('button', { name: 'Во весь экран' }).click()
+    await expect.poll(() => isDocumentExpanded(page)).toBe(true)
+    await videos.nth(0).evaluate((video: HTMLVideoElement) => video.play())
+    // Право на вход от клика истекает: дальше только то, что даёт сам жест, а он прав не даёт.
     await page.waitForTimeout(6000)
     const size = page.viewportSize() ?? { width: 1280, height: 720 }
     await page.mouse.move(size.width / 2, size.height / 2)
 
     await page.mouse.wheel(150, 0)
 
+    await expect.poll(() => targetIndex(page)).toBe(1)
     await expect.poll(() => framePlaying(page)).toEqual([false, true, false])
-    expect(await fullscreenIndex(page)).not.toBe(0)
+    expect(await isDocumentExpanded(page)).toBe(true)
     await context.close()
   })
 

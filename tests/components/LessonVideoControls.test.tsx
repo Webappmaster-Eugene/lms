@@ -224,39 +224,62 @@ describe('потоковый плеер MPEG-TS', () => {
     expect(resumed.play).not.toHaveBeenCalled()
   })
 
-  it('разворачивает рамку вместе с кнопками, а отказ браузера не роняет плеер', async () => {
-    const user = userEvent.setup()
-    const { video } = await renderStream()
-    const shell = video.closest('[data-lesson-video-shell]') as HTMLElement
-    expect(shell).toContainElement(screen.getByRole('button', { name: 'Во весь экран' }))
-    shell.requestFullscreen = vi.fn(() => Promise.reject(new TypeError('denied')))
-
-    await user.click(screen.getByRole('button', { name: 'Во весь экран' }))
-
-    expect(shell.requestFullscreen).toHaveBeenCalledOnce()
-  })
-
   describe('во весь экран', () => {
-    afterEach(() => { Reflect.deleteProperty(document, 'fullscreenElement') })
+    const root = document.documentElement
+    let requestFullscreen: ReturnType<typeof vi.fn>
+
+    beforeEach(() => {
+      requestFullscreen = vi.fn(function (this: Element) {
+        Object.defineProperty(document, 'fullscreenElement', { value: this, configurable: true })
+        document.dispatchEvent(new Event('fullscreenchange'))
+        return Promise.resolve()
+      })
+      HTMLElement.prototype.requestFullscreen = requestFullscreen as unknown as typeof HTMLElement.prototype.requestFullscreen
+      document.exitFullscreen = vi.fn(() => {
+        Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true })
+        document.dispatchEvent(new Event('fullscreenchange'))
+        return Promise.resolve()
+      })
+    })
+    afterEach(async () => {
+      if (root.hasAttribute('data-lesson-fullscreen')) await act(async () => { await (await import('@/lib/lesson-fullscreen')).exitLessonFullscreen() })
+      Reflect.deleteProperty(document, 'fullscreenElement')
+      Reflect.deleteProperty(document, 'exitFullscreen')
+      Reflect.deleteProperty(HTMLElement.prototype, 'requestFullscreen')
+    })
 
     async function enterFullscreen() {
+      const user = userEvent.setup()
       const rendered = await renderStream()
-      const shell = rendered.video.closest('[data-lesson-video-shell]') as HTMLElement
       act(() => buffer(rendered.video, 300))
-      Object.defineProperty(document, 'fullscreenElement', { value: shell, configurable: true })
-      act(() => { document.dispatchEvent(new Event('fullscreenchange')) })
-      return rendered
+      await user.click(screen.getByRole('button', { name: 'Во весь экран' }))
+      return { ...rendered, user }
     }
 
+    it('разворачивает документ, а поверх него рамку вместе с кнопками', async () => {
+      const { video } = await enterFullscreen()
+
+      expect(requestFullscreen.mock.contexts).toEqual([root])
+      const shell = video.closest('[data-lesson-video-shell]') as HTMLElement
+      expect(shell).toHaveAttribute('data-lesson-fullscreen-target')
+      expect(shell).toContainElement(screen.getByRole('button', { name: 'Свернуть' }))
+    })
+
+    it('отказ браузера не роняет плеер: рамка всё равно поверх страницы', async () => {
+      requestFullscreen.mockImplementationOnce(() => Promise.reject(new TypeError('denied')))
+      const { video } = await enterFullscreen()
+
+      expect(video.closest('[data-lesson-video-shell]')).toHaveAttribute('data-lesson-fullscreen-target')
+    })
+
     it('кнопка сворачивает обратно', async () => {
-      const user = userEvent.setup()
-      await enterFullscreen()
-      document.exitFullscreen = vi.fn(() => Promise.resolve())
+      const { video, user } = await enterFullscreen()
 
       await user.click(screen.getByRole('button', { name: 'Свернуть' }))
 
       expect(document.exitFullscreen).toHaveBeenCalledOnce()
-      Reflect.deleteProperty(document, 'exitFullscreen')
+      expect(video.closest('[data-lesson-video-shell]')).not.toHaveAttribute('data-lesson-fullscreen-target')
+      expect(screen.getByRole('button', { name: 'Во весь экран' })).toBeInTheDocument()
     })
 
     it('стрелки перематывают без фокуса на шкале и не считаются дважды на ней', async () => {

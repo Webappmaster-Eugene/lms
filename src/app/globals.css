@@ -188,3 +188,51 @@ body {
     width: 90%;
   }
 }
+
+/* controlsList только гасит кнопку браузера, а рядом со своей серая сбивает с толку. Без своей (iPhone) не прячем. */
+[data-lesson-video] video:has(~ [data-lesson-fullscreen-button])::-webkit-media-controls-fullscreen-button {
+  display: none;
+}
+
+/* Полноэкранный режим урока (src/lib/lesson-fullscreen.ts): развёрнут документ, видна только нужная часть. */
+html[data-lesson-fullscreen],
+html[data-lesson-fullscreen] body {
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #000;
+}
+html[data-lesson-fullscreen] body * {
+  visibility: hidden;
+}
+html[data-lesson-fullscreen] [data-lesson-fullscreen-target],
+html[data-lesson-fullscreen] [data-lesson-fullscreen-target] *,
+html[data-lesson-fullscreen] [data-lesson-fullscreen-overlay],
+html[data-lesson-fullscreen] [data-lesson-fullscreen-overlay] * {
+  visibility: visible;
+}
+html[data-lesson-fullscreen] [data-lesson-fullscreen-target] {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  background: #000;
+}
+html[data-lesson-fullscreen] [data-lesson-fullscreen-target] [data-lesson-video='stream'] {
+  flex: 1;
+  min-height: 0;
+}
+html[data-lesson-fullscreen] [data-lesson-fullscreen-target] video {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+  object-fit: contain;
+}
+html[data-lesson-fullscreen] [data-lesson-fullscreen-overlay] {
+  z-index: 70;
+}

@@ -119,7 +119,7 @@ describe('встроенное воспроизведение видео', () =>
     const { container } = render(<VideoPlayer title="Урок" videoUrl={url} displayMode="link" />)
     const video = container.querySelector('video')
     expect(video).toHaveAttribute('src', url)
-    expect(video).toHaveAttribute('controlsList', 'nodownload')
+    expect(video).toHaveAttribute('controlsList', 'nodownload nofullscreen')
     if (video) fireEvent.error(video)
     expect(await screen.findByTestId('transport-stream')).toHaveAttribute('data-src', '/api/yandex-disk/proxy?lesson=42&block=video-1&playbackAttempt=1')
     expect(fetchMock).toHaveBeenCalledWith(url, expect.objectContaining({ headers: { Range: 'bytes=0-375' }, credentials: 'same-origin' }))
