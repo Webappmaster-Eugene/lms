@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Award,
-  BookOpen,
   Bookmark,
   Code2,
   Compass,
@@ -31,6 +30,7 @@ import { useEffect } from 'react'
 import { MobileSheet } from './MobileSheet'
 import { ThemeToggle } from './ThemeToggle'
 import { SHORTCUTS_OPEN_EVENT } from './KeyboardShortcuts'
+import { BrandMark, BrandWordmark } from '@/components/brand/BrandMark'
 import { cn } from '@/lib/utils'
 import { useSidebar } from './SidebarContext'
 import { disconnectDevicePush } from '@/lib/pwa-client'
@@ -77,10 +77,8 @@ export function Sidebar({ isAdmin = false, trainerEnabled = true, guidesEnabled 
     <>
       {/* Logo */}
       <div className={cn('flex h-16 items-center gap-3 px-4', mobile && 'hidden')}>
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-          <BookOpen className="h-5 w-5 text-primary-foreground" />
-        </div>
-        <span className="text-lg font-bold text-foreground">MentorCareer</span>
+        <BrandMark size={36} className="shrink-0" />
+        <BrandWordmark className="h-[15px] w-auto text-foreground" />
       </div>
 
       {/* Navigation */}

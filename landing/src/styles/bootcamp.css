@@ -48,7 +48,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 /* Шапка */
 .bc-header { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 68px; padding: 0 max(20px, calc((100vw - 1160px) / 2)); background: var(--page); border-bottom: 1px solid var(--line); }
 .bc-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; text-decoration: none; min-height: 44px; }
-.bc-brand svg { width: 32px; height: 32px; padding: 5px; color: var(--accent); background: #e6f2ec; border-radius: 8px; }
+.bc-brand-word { height: 14px; width: auto; flex: none; }
 .bc-brand-product { color: var(--muted); font-weight: 400; padding-left: 12px; border-left: 1px solid var(--line); }
 .bc-header-cta { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 8px; font-size: 15px; font-weight: 700; color: var(--accent); text-decoration: none; border: 1.5px solid var(--accent); }
 .bc-header-cta:hover { color: #fff; background: var(--accent); }

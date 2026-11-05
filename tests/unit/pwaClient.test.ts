@@ -136,6 +136,42 @@ describe('определение среды', () => {
     expect(isInstalledPwa()).toBe(false)
   })
 
+  describe('режим для аналитики', () => {
+    function stubMode(mode: 'standalone' | 'fullscreen' | 'browser', element: unknown = null) {
+      vi.stubGlobal('window', { matchMedia: (query: string) => ({ matches: query === `(display-mode: ${mode})` }) })
+      vi.stubGlobal('navigator', {})
+      vi.stubGlobal('document', { fullscreenElement: element })
+    }
+
+    it('вкладка браузера во весь экран остаётся браузером', async () => {
+      const { observedStandalone } = await freshClient()
+      stubMode('browser')
+      expect(observedStandalone()).toBe(false)
+      stubMode('fullscreen', {})
+      expect(observedStandalone()).toBe(false)
+    })
+
+    it('приложение во весь экран остаётся приложением, пока оба признака не сняты', async () => {
+      const { observedStandalone } = await freshClient()
+      stubMode('standalone')
+      expect(observedStandalone()).toBe(true)
+      stubMode('fullscreen', {})
+      expect(observedStandalone()).toBe(true)
+      stubMode('fullscreen')
+      expect(observedStandalone()).toBe(true)
+      stubMode('standalone')
+      expect(observedStandalone()).toBe(true)
+    })
+
+    it('если страницу развернули до первого замера, режим не выдумывается', async () => {
+      const { observedStandalone } = await freshClient()
+      stubMode('fullscreen', {})
+      expect(observedStandalone()).toBeUndefined()
+      stubMode('standalone')
+      expect(observedStandalone()).toBe(true)
+    })
+  })
+
   it.each([
     ['iPhone', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', platform: 'iPhone', maxTouchPoints: 5 }, true],
     ['iPad с iPadOS, притворяющийся Mac', { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', platform: 'MacIntel', maxTouchPoints: 5 }, true],

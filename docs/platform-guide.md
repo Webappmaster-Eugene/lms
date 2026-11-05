@@ -43,9 +43,9 @@ screens.json и координаты меток. Инструкция отраж
   `scripts/landing-server.mjs` повторяет это для тестов. Ссылки с `utm_*` Яндекс
   склеивает по `Clean-param` из `robots.txt`, Google — по canonical.
 - HTML отдаётся с `Cache-Control: no-cache`, чтобы после выката не показывалась старая версия.
-- `og.png` 1200×630 нарисована HTML-шаблоном со шрифтом Golos Text и снимком
+- `og.png` 1200×630 рисует `scripts/brand/og.ts`: шрифт Golos Text и снимок
   `guide/dashboard.webp`, без личных упоминаний. Telegram кеширует превью ссылки,
-  обновить его можно через @WebpageBot.
+  обновить его можно через @WebpageBot. Устройство знака - `docs/brand.md`.
 
 ## Домены
 

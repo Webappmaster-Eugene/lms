@@ -44,6 +44,19 @@ describe('наблюдения страниц и реальные Web Vitals', (
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('в приложении во весь экран продолжает сообщать режим приложения', async () => {
+    let mode = '(display-mode: standalone)'
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === mode }))
+    render(<StudentActivityBridge userId={34} />)
+    // Chromium отвечает display-mode: fullscreen и в установленном приложении.
+    mode = '(display-mode: fullscreen)'
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: document.createElement('video') })
+    try {
+      await act(() => vi.advanceTimersByTimeAsync(60000))
+      expect(bodies().map(({ body }) => body.standalone)).toEqual([true, true])
+    } finally { Reflect.deleteProperty(document, 'fullscreenElement') }
+  })
+
   it.each(['/admin/collections/users/34', '/trainer/interview/private-room-token'])('не передаёт приватный идентификатор %s', (path) => {
     state.path = path
     render(<StudentActivityBridge userId={34} />)

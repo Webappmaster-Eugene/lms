@@ -1,0 +1,13 @@
+---
+import { BRAND_COLORS, BRAND_TILE_RADIUS, brandCut } from '../data/brand-mark'
+
+interface Props {
+  size: number
+  class?: string
+}
+const { size, class: className } = Astro.props
+const cut = brandCut(size)
+const radius = size <= 32 ? BRAND_TILE_RADIUS.small : BRAND_TILE_RADIUS.large
+---
+{/* Обводка снята на каждой фигуре: общее правило лендинга для svg рисует её всем иконкам. */}
+<svg viewBox="0 0 512 512" width={size} height={size} class={className} aria-hidden="true" focusable="false"><rect width="512" height="512" rx={radius} fill={BRAND_COLORS.deep} stroke="none" /><path d={cut.oars.join('')} fill={BRAND_COLORS.sail} stroke="none" /><path d={cut.bow} fill={BRAND_COLORS.sun} stroke="none" /></svg>

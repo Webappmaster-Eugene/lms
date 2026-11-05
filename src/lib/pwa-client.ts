@@ -34,6 +34,17 @@ export function isFullscreenNow(): boolean {
   return Boolean(document.fullscreenElement) || window.matchMedia('(display-mode: fullscreen)').matches
 }
 
+let lastKnownInstalled: boolean | undefined
+
+/**
+ * Режим для аналитики. Сервер перезаписывает его при каждом запросе, поэтому во весь экран
+ * отправляем последний достоверный ответ: иначе сессия приложения на время видео стала бы браузером.
+ */
+export function observedStandalone(): boolean | undefined {
+  if (!isFullscreenNow()) lastKnownInstalled = isInstalledPwa()
+  return lastKnownInstalled
+}
+
 export function isIosDevice(): boolean {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 }
