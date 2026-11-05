@@ -1,7 +1,8 @@
-import { expect, test, type APIRequestContext } from '@playwright/test'
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 
 import { USERS } from '../fixtures/data'
 import { APP_URL, LANDING_URL, LANDING_USE } from '../fixtures/env'
+import { LEAD_ANSWERS, LEAD_PDF } from '../../fixtures/bootcampLead'
 import { zipOf } from '../../fixtures/zip'
 import { ENTRY_TASKS } from '../../../src/data/bootcamp-entry/tasks'
 import { AUTHOR_PROFILES, ORGANIZATION_ID, ORGANIZATION_PROFILES } from '../../../landing/src/config'
@@ -25,7 +26,23 @@ async function adminLeads(request: APIRequestContext, email: string) {
   const token = await adminToken(request)
   const found = await request.get(`${APP_URL}/api/bootcamp-leads?where[email][equals]=${encodeURIComponent(email)}&depth=0`, { headers: { Authorization: `JWT ${token}` } })
   expect(found.status()).toBe(200)
-  return (await found.json() as { docs: { email: string; name: string | null; submissionCount: number; source: { utmSource: string | null }; entryTaskToken: string | null; entrySubmissionCount: number | null }[] }).docs
+  return (await found.json() as { docs: { email: string; name: string | null; submissionCount: number; source: { utmSource: string | null }; problem: string | null; resume: number | null; fillSeconds: number | null; entryTaskSentAt: string | null; entryTaskToken: string | null; entrySubmissionCount: number | null }[] }).docs
+}
+
+/** Анкета так, как её заполняет человек: подписи полей, а не имена. */
+async function fillLead(page: Page, email: string) {
+  await page.getByRole('textbox', { name: 'Имя' }).fill(LEAD_ANSWERS.name)
+  await page.getByRole('textbox', { name: 'Telegram' }).fill(LEAD_ANSWERS.telegram)
+  await page.getByRole('textbox', { name: 'Email' }).fill(email)
+  await page.getByRole('combobox', { name: 'С чем вы пришли?' }).selectOption(LEAD_ANSWERS.reason)
+  await page.getByRole('textbox', { name: 'В чём сейчас проблема?' }).fill(LEAD_ANSWERS.problem)
+  await page.getByRole('textbox', { name: 'Ваша история' }).fill(LEAD_ANSWERS.story)
+  await page.getByRole('textbox', { name: 'Какой результат будет успехом и к какому сроку?' }).fill(LEAD_ANSWERS.goal)
+  await page.getByRole('combobox', { name: 'Насколько срочно?' }).selectOption(LEAD_ANSWERS.urgency)
+  await page.getByRole('combobox', { name: 'Сколько часов в неделю готовы уделять?' }).selectOption(LEAD_ANSWERS.hoursPerWeek)
+  await page.getByRole('checkbox').check()
+  // Сервер не принимает анкету быстрее 15 секунд: часы страницы двигаем, а не ждём.
+  await page.clock.fastForward(20_000)
 }
 
 test('страница: метаданные, CSP без нарушений, адрес без косой черты ведёт на канонический', async ({ page, request }) => {
@@ -87,55 +104,108 @@ test('разметка курса: даты, размер группы и про
   expect(byType('WebPage')?.isPartOf).toEqual({ '@id': site?.['@id'] })
 })
 
-test('форма с клавиатуры: ошибки рядом с полями, заявка сохраняется, повтор не плодит дубль', async ({ page, request }) => {
+test('форма: ошибки рядом с полями, анкета с резюме сохраняется, в конце ссылка на Telegram, повтор не плодит дубль', async ({ page, request }) => {
   const email = `lead-${Date.now()}@mail.test`
+  await page.clock.install()
   await page.goto(`${PAGE}?utm_source=e2e&utm_medium=test`)
   const submit = page.getByRole('button', { name: 'Оставить заявку' })
 
   await submit.click()
-  const emailField = page.getByRole('textbox', { name: 'Email' })
-  await expect(emailField).toBeFocused()
-  await expect(emailField).toHaveAttribute('aria-invalid', 'true')
+  const nameField = page.getByRole('textbox', { name: 'Имя' })
+  await expect(nameField).toBeFocused()
+  await expect(nameField).toHaveAttribute('aria-invalid', 'true')
+  await expect(page.locator('#lead-name-error')).toHaveText(/Как к вам обращаться/)
+  await expect(page.locator('#lead-telegram-error')).toHaveText(/Укажите Telegram/)
   await expect(page.locator('#lead-email-error')).toHaveText(/Укажите email/)
+  await expect(page.locator('#lead-reason-error')).toHaveText(/с чем вы пришли/)
+  await expect(page.locator('#lead-problem-error')).toHaveText(/в чём сейчас проблема/)
+  await expect(page.locator('#lead-story-error')).toHaveText(/свою историю/)
   await expect(page.locator('#lead-consent-error')).toHaveText(/Отметьте согласие/)
 
-  await emailField.fill(email.toUpperCase())
-  await page.keyboard.press('Tab')
-  await page.keyboard.type('Иван')
-  // Скрытое поле для роботов в порядок Tab не входит: следующим идёт согласие.
-  await page.keyboard.press('Tab')
-  await expect(page.getByRole('checkbox')).toBeFocused()
-  await page.keyboard.press('Space')
-  // Дальше — ссылка на политику в подписи согласия, затем кнопка.
-  await page.keyboard.press('Tab')
-  await page.keyboard.press('Tab')
-  await expect(submit).toBeFocused()
-  await page.keyboard.press('Enter')
+  // Сто раз одно слово проверку длины прошло бы, а связным текстом не считается.
+  const problem = page.getByRole('textbox', { name: 'В чём сейчас проблема?' })
+  await problem.fill('работа '.repeat(20))
+  await expect(page.locator('#lead-problem-count')).toHaveText('139 из 100 знаков')
+  await submit.click()
+  await expect(page.locator('#lead-problem-error')).toHaveText(/связного текста/)
+
+  await fillLead(page, email.toUpperCase())
+  await page.getByRole('textbox', { name: 'Ссылки' }).fill('github.com/ivan')
+  await page.locator('#lead-resume').setInputFiles({ name: 'Иван резюме.pdf', mimeType: 'application/pdf', buffer: Buffer.from(LEAD_PDF) })
+  await submit.click()
 
   const done = page.locator('[data-done]')
   await expect(done).toBeVisible()
   await expect(done).toBeFocused()
-  await expect(done).toContainText(`Заявка сохранена`)
-  await expect(done).toContainText('письмо с личной ссылкой на входное задание')
+  await expect(done).toContainText('Заявка сохранена')
   await expect(done).toContainText(email.toUpperCase())
+  const telegram = done.getByRole('link', { name: 'Написать в Telegram @eugene_galera' })
+  const href = new URL(await telegram.getAttribute('href') ?? '')
+  expect(href.origin + href.pathname).toBe('https://t.me/eugene_galera')
+  expect(href.searchParams.get('text')).toBe('Здравствуйте! Меня зовут Иван. Заявка на буткемп Node.js: Сменить работу или вырасти в грейде.')
 
   const [lead] = await adminLeads(request, email)
-  expect(lead).toMatchObject({ email, name: 'Иван', submissionCount: 1, source: { utmSource: 'e2e' } })
+  expect(lead).toMatchObject({ email, name: 'Иван', submissionCount: 1, source: { utmSource: 'e2e' }, telegram: '@ivan_petrov', reason: 'switch-or-grow', links: 'https://github.com/ivan' })
+  expect(lead?.problem).toBe(LEAD_ANSWERS.problem)
+  expect(lead?.resume).toBeTruthy()
+  expect(lead?.fillSeconds).toBeGreaterThanOrEqual(20)
+  // Задание уходит только кнопкой в карточке.
+  expect(lead?.entryTaskSentAt ?? null).toBeNull()
 
   await page.goto(PAGE)
-  await page.getByRole('textbox', { name: 'Email' }).fill(email)
-  await page.getByRole('checkbox').check()
-  await page.getByRole('button', { name: 'Оставить заявку' }).click()
+  await fillLead(page, email)
+  await submit.click()
   await expect(page.locator('[data-done]')).toBeVisible()
   const again = await adminLeads(request, email)
   expect(again).toHaveLength(1)
   expect(again[0]?.submissionCount).toBe(2)
 })
 
-test('сбой сети и ошибка сервера: введённое остаётся, ложного успеха нет', async ({ page }) => {
+test('форма: быстрее 15 секунд - понятный отказ, ввод остаётся', async ({ page }) => {
+  const email = `lead-fast-${Date.now()}@mail.test`
+  await page.clock.install()
   await page.goto(PAGE)
-  await page.getByRole('textbox', { name: 'Email' }).fill(`lead-offline-${Date.now()}@mail.test`)
+  await page.getByRole('textbox', { name: 'Имя' }).fill(LEAD_ANSWERS.name)
+  await page.getByRole('textbox', { name: 'Telegram' }).fill(LEAD_ANSWERS.telegram)
+  await page.getByRole('textbox', { name: 'Email' }).fill(email)
+  await page.getByRole('combobox', { name: 'С чем вы пришли?' }).selectOption(LEAD_ANSWERS.reason)
+  await page.getByRole('textbox', { name: 'В чём сейчас проблема?' }).fill(LEAD_ANSWERS.problem)
+  await page.getByRole('textbox', { name: 'Ваша история' }).fill(LEAD_ANSWERS.story)
+  await page.getByRole('textbox', { name: 'Какой результат будет успехом и к какому сроку?' }).fill(LEAD_ANSWERS.goal)
+  await page.getByRole('combobox', { name: 'Насколько срочно?' }).selectOption(LEAD_ANSWERS.urgency)
+  await page.getByRole('combobox', { name: 'Сколько часов в неделю готовы уделять?' }).selectOption(LEAD_ANSWERS.hoursPerWeek)
   await page.getByRole('checkbox').check()
+
+  await page.getByRole('button', { name: 'Оставить заявку' }).click()
+
+  await expect(page.locator('[data-status]')).toHaveText(/слишком быстро/)
+  await expect(page.getByRole('textbox', { name: 'Ваша история' })).toHaveValue(LEAD_ANSWERS.story)
+  await expect(page.locator('[data-done]')).toBeHidden()
+})
+
+test('форма: неверный файл и ошибка сервера показываются у поля резюме', async ({ page }) => {
+  await page.clock.install()
+  await page.goto(PAGE)
+  await fillLead(page, `lead-file-${Date.now()}@mail.test`)
+  const resume = page.locator('#lead-resume')
+
+  await resume.setInputFiles({ name: 'cv.txt', mimeType: 'text/plain', buffer: Buffer.from('резюме') })
+  await page.getByRole('button', { name: 'Оставить заявку' }).click()
+  await expect(page.locator('#lead-resume-error')).toHaveText(/PDF или DOCX/)
+  await expect(resume).toBeFocused()
+
+  // Расширение верное, а содержимое нет: это видит только сервер.
+  await resume.setInputFiles({ name: 'cv.pdf', mimeType: 'application/pdf', buffer: Buffer.from('MZ исполняемый файл') })
+  await page.getByRole('button', { name: 'Оставить заявку' }).click()
+  await expect(page.locator('#lead-resume-error')).toHaveText(/PDF или DOCX/)
+  await expect(page.locator('[data-done]')).toBeHidden()
+  await expect(page.getByRole('textbox', { name: 'В чём сейчас проблема?' })).toHaveValue(LEAD_ANSWERS.problem)
+})
+
+test('сбой сети и ошибка сервера: введённое остаётся, ложного успеха нет', async ({ page }) => {
+  await page.clock.install()
+  await page.goto(PAGE)
+  await fillLead(page, `lead-offline-${Date.now()}@mail.test`)
   const status = page.locator('[data-status]')
 
   await page.route('**/api/bootcamp/leads', (route) => route.abort('internetdisconnected'))
@@ -148,6 +218,7 @@ test('сбой сети и ошибка сервера: введённое ос�
   await page.getByRole('button', { name: 'Оставить заявку' }).click()
   await expect(status).toHaveText(/сервер ответил 502/)
   await expect(page.getByRole('textbox', { name: 'Email' })).not.toHaveValue('')
+  await expect(page.getByRole('textbox', { name: 'Ваша история' })).toHaveValue(LEAD_ANSWERS.story)
   await expect(page.getByRole('checkbox')).toBeChecked()
   await expect(page.getByRole('button', { name: 'Оставить заявку' })).toBeEnabled()
 
@@ -271,7 +342,7 @@ test('входное задание: личная страница без вхо
   const email = `entry-${Date.now()}@example.com`
   const sent = await request.post(`${APP_URL}/api/bootcamp/leads`, {
     headers: { Origin: APP_URL, 'Sec-Fetch-Site': 'same-origin' },
-    data: { program: 'nodejs', email, name: 'Иван', consent: true, consentVersion: '2026-10-27' },
+    multipart: { ...LEAD_ANSWERS, program: 'nodejs', email, consent: 'on', consentVersion: '2026-10-27' },
   })
   expect(sent.status()).toBe(200)
   const [lead] = await adminLeads(request, email)

@@ -1,8 +1,11 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-import { parseBootcampLead } from '@/lib/bootcamp-leads'
+import { BOOTCAMP_LEAD_HOURS, BOOTCAMP_LEAD_REASONS, BOOTCAMP_LEAD_URGENCIES, LEAD_ANSWER_LIMITS, LEAD_LINKS_MAX, LEAD_RESUME_MAX_BYTES, parseBootcampLead } from '@/lib/bootcamp-leads'
+import { LEAD_ANSWERS } from '../fixtures/bootcampLead'
+import * as leadForm from '../../landing/src/data/bootcamp-form'
 import { AUDIENCE, CONSENT_VERSION, FACTS, FAQ, LOG, OFFER_VERSION, PAINS, PATH, PRICE, PROGRAM, PROGRAM_KEY, SAMPLE_MANUAL, SAMPLE_QUESTIONS } from '../../landing/src/data/bootcamp'
+import { AUTHOR_PROFILES } from '../../landing/src/config'
 import { OPERATOR } from '../../landing/src/data/privacy'
 import screens from '../../landing/src/data/screens.json'
 
@@ -32,7 +35,22 @@ describe('лендинг буткемпа: форма предзаписи', () 
   })
 
   it('версию согласия со страницы принимает сервер', () => {
-    expect(parseBootcampLead({ program: PROGRAM_KEY, email: 'a@mail.ru', consent: true, consentVersion: CONSENT_VERSION }).consentVersion).toBe(CONSENT_VERSION)
+    expect(parseBootcampLead({ ...LEAD_ANSWERS, program: PROGRAM_KEY, email: 'a@mail.ru', consent: true, consentVersion: CONSENT_VERSION }).consentVersion).toBe(CONSENT_VERSION)
+  })
+
+  // Лендинг - отдельный пакет: варианты и пороги формы записаны в нём ещё раз.
+  it('варианты и пороги анкеты совпадают с тем, что принимает сервер', () => {
+    expect(leadForm.LEAD_REASONS).toEqual(BOOTCAMP_LEAD_REASONS)
+    expect(leadForm.LEAD_URGENCIES).toEqual(BOOTCAMP_LEAD_URGENCIES)
+    expect(leadForm.LEAD_HOURS).toEqual(BOOTCAMP_LEAD_HOURS)
+    expect(leadForm.LEAD_ANSWER_LIMITS).toEqual(LEAD_ANSWER_LIMITS)
+    expect(leadForm.LEAD_LINKS_MAX).toBe(LEAD_LINKS_MAX)
+    expect(leadForm.LEAD_RESUME_MAX_BYTES).toBe(LEAD_RESUME_MAX_BYTES)
+  })
+
+  it('форма ведёт в личный Telegram наставника, тот же адрес, что в профилях автора', () => {
+    expect(leadForm.PERSONAL_TELEGRAM.url).toBe(`https://t.me/${leadForm.PERSONAL_TELEGRAM.handle}`)
+    expect(AUTHOR_PROFILES).toContain(leadForm.PERSONAL_TELEGRAM.url)
   })
 
   // Форма шлёт ключ программы, а цену и редакцию оферты LMS берёт из программы в CMS.
@@ -40,7 +58,7 @@ describe('лендинг буткемпа: форма предзаписи', () 
   it('форма шлёт ключ программы, миграция заводит программу с ценой и офертой страницы', () => {
     const page = readFileSync(landing('src/pages/bootcamp/nodejs.astro'), 'utf8')
     expect(page).toMatch(/data-lead-form data-program=\{PROGRAM_KEY\}/)
-    expect(readFileSync(landing('src/scripts/bootcamp-form.ts'), 'utf8')).toContain('program: form.dataset.program')
+    expect(readFileSync(landing('src/scripts/bootcamp-form.ts'), 'utf8')).toContain("data.set('program', form.dataset.program")
     const migration = readFileSync(new URL('../../src/migrations/20261031_225020_bootcamp_programs.ts', import.meta.url), 'utf8')
     const seed = migration.match(/VALUES \(([\s\S]*?)\) ON CONFLICT/)?.[1] ?? ''
     expect(seed).toContain(`'${PROGRAM_KEY}'`)
@@ -51,6 +69,8 @@ describe('лендинг буткемпа: форма предзаписи', () 
   it('nginx передаёт заявку в LMS с адресом клиента от Traefik и без своего', () => {
     const location = nginx.match(/location = \/api\/bootcamp\/leads \{([\s\S]*?)\n {4}\}/)?.[1] ?? ''
     expect(location).toContain('limit_except POST')
+    // Анкета и файл резюме до 5 МБ: меньше - nginx оборвёт заявку с резюме.
+    expect(location).toContain('client_max_body_size 6m;')
     expect(location).toMatch(/proxy_pass \$lms_app;/)
     expect(location).toContain('proxy_set_header X-Forwarded-For $http_x_forwarded_for;')
     expect(location).not.toContain('$proxy_add_x_forwarded_for')

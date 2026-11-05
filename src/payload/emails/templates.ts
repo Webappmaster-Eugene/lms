@@ -286,21 +286,35 @@ type BootcampLeadEmailInput = {
   name: string | null
   program: string
   source: string
+  telegram?: string | null
+  reason?: string | null
+  problem?: string | null
+  story?: string | null
+  goal?: string | null
+  urgency?: string | null
+  hoursPerWeek?: string | null
+  links?: string | null
+  resume?: string | null
 }
 
-/** Команде: пришла новая предзапись. Ученику письмо не уходит — адрес не подтверждён. */
-export function bootcampLeadEmail({ id, address, name, program, source }: BootcampLeadEmailInput): EmailContent {
+/** Команде: пришла новая заявка, анкета целиком. Кандидату письмо не уходит, пока владелец не отправит задание. */
+export function bootcampLeadEmail({ id, address, name, program, source, telegram, reason, problem, story, goal, urgency, hoursPerWeek, links, resume }: BootcampLeadEmailInput): EmailContent {
   const url = `${BASE_URL}/admin/collections/bootcamp-leads/${encodeURIComponent(String(id))}`
-  const rows: [string, string][] = [['Email', address], ['Имя', name ?? 'не указано'], ['Программа', program], ['Откуда', source]]
+  const rows = ([
+    ['Email', address], ['Имя', name ?? 'не указано'], ['Telegram', telegram], ['Программа', program], ['Тема', reason],
+    ['В чём проблема', problem], ['История', story], ['Какой результат будет успехом и к какому сроку', goal], ['Насколько срочно', urgency],
+    ['Часов в неделю', hoursPerWeek], ['Ссылки', links], ['Резюме', resume], ['Откуда', source],
+  ] as [string, string | null | undefined][]).filter((row): row is [string, string] => Boolean(row[1]))
+  const intro = 'С лендинга пришла заявка. Прочитайте анкету и, если заявка подходит, отправьте входное задание кнопкой в карточке.'
   return email(
     `Новая заявка на буткемп: ${address}`,
-    `Заявка от ${address}: входное задание ушло кандидату автоматически.`,
+    `Заявка от ${address} ждёт проверки анкеты.`,
     'Новая заявка на буткемп',
-    `${paragraph('С лендинга пришла предзапись. Ответьте человеку и отметьте этап заявки в CMS.')}
-    ${notice(rows.map(([title, value]) => `<strong style="color:#27272a;">${escapeHtml(title)}</strong><br><span style="word-break:break-all;">${escapeHtml(value)}</span>`).join('<br><br>'))}
+    `${paragraph(intro)}
+    ${notice(rows.map(([title, value]) => `<strong style="color:#27272a;">${escapeHtml(title)}</strong><br><span style="white-space:pre-wrap;overflow-wrap:anywhere;">${escapeHtml(value)}</span>`).join('<br><br>'))}
     ${button('Открыть заявку', url)}
     ${fallbackLink(url)}`,
-    `С лендинга пришла предзапись. Ответьте человеку и отметьте этап заявки в CMS.\n\n${rows.map(([title, value]) => `${title}: ${value}`).join('\n')}\n\nОткрыть заявку: ${url}`,
+    `${intro}\n\n${rows.map(([title, value]) => `${title}: ${value}`).join('\n\n')}\n\nОткрыть заявку: ${url}`,
   )
 }
 
@@ -316,10 +330,10 @@ type BootcampEntryTaskEmailInput = {
   replyable: boolean
 }
 
-/** Кандидату сразу после заявки: личная ссылка на входное задание и сроки. */
+/** Кандидату, когда владелец прочитал анкету и отправил задание: личная ссылка и сроки. */
 export function bootcampEntryTaskEmail({ name, program, url, dueDate, reviewDays, minutes, summary = 'три небольшие функции на JavaScript', replyable }: BootcampEntryTaskEmailInput): EmailContent {
   const hello = name?.trim() ? `Здравствуйте, ${name.trim()}!` : 'Здравствуйте!'
-  const intro = `Спасибо за заявку на буткемп ${program}. Входное задание ждёт вас на платформе MentorCareer по личной ссылке. Она открывает только ваше задание, поэтому не пересылайте её.`
+  const intro = `Мы прочитали вашу заявку на буткемп ${program}. Входное задание ждёт вас на платформе MentorCareer по личной ссылке. Она открывает только ваше задание, поэтому не пересылайте её.`
   const terms = `Задание решается прямо на странице, ничего устанавливать не нужно: ${summary}, обычно на них уходит ${minutes} минут. Решение отправляется кнопкой на той же странице, срок до ${dueDate} включительно. Мы ответим в течение ${reviewDays} дней после отправки.`
   const reply = replyable ? 'Если появятся вопросы, ответьте на это письмо.' : ''
   const reason = 'Вы получили это письмо, потому что оставили заявку на буткемп на info.mentorcareer.ru. Если заявку оставили не вы, письмо можно удалить.'

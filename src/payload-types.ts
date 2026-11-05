@@ -114,6 +114,7 @@ export interface Config {
     'bootcamp-programs': BootcampProgram;
     'bootcamp-leads': BootcampLead;
     'bootcamp-entry-tasks': BootcampEntryTask;
+    'bootcamp-lead-resumes': BootcampLeadResume;
     'bootcamp-enrollments': BootcampEnrollment;
     'bootcamp-payments': BootcampPayment;
     'bootcamp-lead-events': BootcampLeadEvent;
@@ -171,6 +172,7 @@ export interface Config {
     'bootcamp-programs': BootcampProgramsSelect<false> | BootcampProgramsSelect<true>;
     'bootcamp-leads': BootcampLeadsSelect<false> | BootcampLeadsSelect<true>;
     'bootcamp-entry-tasks': BootcampEntryTasksSelect<false> | BootcampEntryTasksSelect<true>;
+    'bootcamp-lead-resumes': BootcampLeadResumesSelect<false> | BootcampLeadResumesSelect<true>;
     'bootcamp-enrollments': BootcampEnrollmentsSelect<false> | BootcampEnrollmentsSelect<true>;
     'bootcamp-payments': BootcampPaymentsSelect<false> | BootcampPaymentsSelect<true>;
     'bootcamp-lead-events': BootcampLeadEventsSelect<false> | BootcampLeadEventsSelect<true>;
@@ -1873,6 +1875,19 @@ export interface BootcampLead {
   id: number;
   email: string;
   name?: string | null;
+  telegram?: string | null;
+  reason?: ('first-job' | 'switch-or-grow' | 'interviews' | 'new-area' | 'other') | null;
+  problem?: string | null;
+  story?: string | null;
+  goal?: string | null;
+  urgency?: ('now' | 'soon' | 'browsing') | null;
+  hoursPerWeek?: ('under-5' | '5-10' | '10-20' | 'over-20') | null;
+  links?: string | null;
+  resume?: (number | null) | BootcampLeadResume;
+  /**
+   * С первого касания формы до отправки. Меньше минуты при длинных ответах - повод присмотреться.
+   */
+  fillSeconds?: number | null;
   program: string;
   /**
    * Меняется кнопками в блоке «Путь заявки» вверху карточки.
@@ -1887,6 +1902,10 @@ export interface BootcampLead {
     | 'preparation'
     | 'rejected'
     | 'withdrawn';
+  /**
+   * Отмечается вручную: после отправки формы кандидату предлагают написать в личку.
+   */
+  wroteTelegram?: boolean | null;
   assignee?: (number | null) | User;
   nextActionAt?: string | null;
   /**
@@ -1918,7 +1937,7 @@ export interface BootcampLead {
    */
   entryTaskToken?: string | null;
   /**
-   * Пусто - письмо кандидату не ушло. Повторная заявка с того же адреса отправит его снова.
+   * Пусто - задание ещё не отправлено: оно уходит кнопкой в блоке «Путь заявки».
    */
   entryTaskSentAt?: string | null;
   entryTaskDueAt?: string | null;
@@ -1967,6 +1986,27 @@ export interface BootcampLead {
     | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * Файлы из заявок на буткемп. Удаляются вместе с заявкой.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-lead-resumes".
+ */
+export interface BootcampLeadResume {
+  id: number;
+  originalName?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
 }
 /**
  * Кандидат видит последнее активное задание своей программы: описание на странице и архив для скачивания.
@@ -2278,6 +2318,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'bootcamp-entry-tasks';
         value: number | BootcampEntryTask;
+      } | null)
+    | ({
+        relationTo: 'bootcamp-lead-resumes';
+        value: number | BootcampLeadResume;
       } | null)
     | ({
         relationTo: 'bootcamp-enrollments';
@@ -3300,8 +3344,19 @@ export interface BootcampProgramsSelect<T extends boolean = true> {
 export interface BootcampLeadsSelect<T extends boolean = true> {
   email?: T;
   name?: T;
+  telegram?: T;
+  reason?: T;
+  problem?: T;
+  story?: T;
+  goal?: T;
+  urgency?: T;
+  hoursPerWeek?: T;
+  links?: T;
+  resume?: T;
+  fillSeconds?: T;
   program?: T;
   status?: T;
+  wroteTelegram?: T;
   assignee?: T;
   nextActionAt?: T;
   isTest?: T;
@@ -3356,6 +3411,24 @@ export interface BootcampEntryTasksSelect<T extends boolean = true> {
   program?: T;
   active?: T;
   readme?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  focalX?: T;
+  focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-lead-resumes_select".
+ */
+export interface BootcampLeadResumesSelect<T extends boolean = true> {
+  originalName?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;

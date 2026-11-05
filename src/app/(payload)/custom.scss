@@ -68,3 +68,16 @@ html[data-theme='dark'] {
     }
   }
 }
+
+// Анкету кандидата читают целиком, а бледный текст закрытых полей Payload для этого не годится.
+.lead-answers {
+  input:disabled,
+  textarea:disabled {
+    color: var(--theme-text);
+    -webkit-text-fill-color: var(--theme-text);
+  }
+
+  .rs__single-value {
+    color: var(--theme-text);
+  }
+}

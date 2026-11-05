@@ -373,12 +373,15 @@ export async function reopenLead(payload: Payload, admin: User, leadId: number):
 /** «Продлить срок и отправить задание ещё раз»: та же ссылка, новый срок от сегодняшнего дня. */
 export async function extendEntryTask(payload: Payload, admin: User, leadId: number): Promise<LeadPathState> {
   const lead = await findLead(payload, leadId)
-  requireStage(lead, DECISION_STAGES, 'Продлить входное задание')
+  const first = !lead.entryTaskSentAt
+  requireStage(lead, DECISION_STAGES, first ? 'Отправить входное задание' : 'Продлить входное задание')
   const dueAt = await sendEntryTask(payload, { ...lead, entryTaskDueAt: null })
   if (!dueAt) throw new EnrollmentInputError('Письмо с заданием не ушло (сбой почты или предел писем в час). Подробности в журнале приложения.', 502)
   // Новый срок - новые попытки: иначе кандидат, истративший все отправки, получил бы срок, которым не может воспользоваться.
   await db(payload).execute(sql`update bootcamp_leads set entry_submission_count = 0, updated_at = now() where id = ${leadId}`)
-  await journal(payload, { lead: leadId, type: 'entry_task_extended', actor: admin, message: `Задание отправлено ещё раз, новый срок ${formatEntryTaskDate(dueAt)}, отправок снова ${ENTRY_TASK_MAX_SUBMISSIONS}` })
+  await journal(payload, first
+    ? { lead: leadId, type: 'entry_task_sent', actor: admin, message: `Задание отправлено, срок ${formatEntryTaskDate(dueAt)}` }
+    : { lead: leadId, type: 'entry_task_extended', actor: admin, message: `Задание отправлено ещё раз, новый срок ${formatEntryTaskDate(dueAt)}, отправок снова ${ENTRY_TASK_MAX_SUBMISSIONS}` })
   return leadPathState(payload, leadId)
 }
 

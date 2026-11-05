@@ -139,7 +139,7 @@ export function LeadPathPanel() {
     reject: <>{input('message', 'Причина', 'Необязательно. Уйдёт кандидату в письме', 'textarea')}{confirm('Да, отказать', `На ${lead.email} уйдёт письмо с решением.`)}</>,
     withdraw: <>{input('message', 'Заметка', 'Необязательно. Кандидату письмо не уходит', 'textarea')}{confirm('Да, кандидат отказался', 'Заявка закроется без письма.')}</>,
     reopen: confirm('Да, вернуть', 'Заявка вернётся к решению, письма не будет.'),
-    'extend-entry-task': confirm('Да, отправить', `На ${lead.email} уйдёт письмо с той же ссылкой и новым сроком, 7 дней. Отправок решения снова будет 3.`),
+    'extend-entry-task': confirm('Да, отправить', lead.entryTaskSentAt ? `На ${lead.email} уйдёт письмо с той же ссылкой и новым сроком, 7 дней. Отправок решения снова будет 3.` : `На ${lead.email} уйдёт письмо с личной ссылкой на задание. На него 7 дней, отправок решения 3.`),
     'resend-payment': <>{input('dueDays', 'Новый срок оплаты, дней', 'От сегодняшнего дня', 'number')}{confirm('Да, отправить', `На ${lead.email} уйдёт письмо с той же ссылкой и новым сроком.`)}</>,
     'cancel-admission': confirm('Да, отменить допуск', 'Ссылка на оплату перестанет работать, заявка вернётся к решению. Кандидату письмо не уходит.'),
     'mark-paid': <>
@@ -166,10 +166,10 @@ export function LeadPathPanel() {
 
       <Step title="1. Заявка и входное задание" done={Boolean(lead.entrySubmittedAt)}>
         <p className="enrollment__hint">
-          Заявка {at(lead.createdAt)}. {lead.entryTaskSentAt ? `Задание отправлено ${at(lead.entryTaskSentAt)}, срок ${lead.entryTaskDueAt ? at(lead.entryTaskDueAt) : 'не задан'}.` : 'Письмо с заданием не ушло.'}
+          Заявка {at(lead.createdAt)}. {lead.entryTaskSentAt ? `Задание отправлено ${at(lead.entryTaskSentAt)}, срок ${lead.entryTaskDueAt ? at(lead.entryTaskDueAt) : 'не задан'}.` : 'Задание ещё не отправлено: прочитайте анкету ниже и отправьте его кнопкой, если заявка подходит.'}
           {' '}{lead.entrySubmittedAt ? `Решение ${at(lead.entrySubmittedAt)}: ${lead.entryPassed} из ${lead.entryTotal} тестов, отправок ${lead.entrySubmissionCount}. Код - ниже, в блоке «Решение входного задания».` : 'Решения пока нет.'}
         </p>
-        {DECISION.includes(lead.status) && !form && <div className="enrollment__actions">{button('Продлить срок и отправить задание ещё раз', () => open('extend-entry-task'))}</div>}
+        {DECISION.includes(lead.status) && !form && <div className="enrollment__actions">{lead.entryTaskSentAt ? button('Продлить срок и отправить задание ещё раз', () => open('extend-entry-task')) : button('Отправить входное задание', () => open('extend-entry-task'), true)}</div>}
         {shown('extend-entry-task')}
       </Step>
 

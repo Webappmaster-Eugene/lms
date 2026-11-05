@@ -3,6 +3,8 @@ import 'server-only'
 import { sql } from '@payloadcms/db-postgres'
 import type { Payload } from 'payload'
 
+import type { BootcampLeadInput } from '@/lib/bootcamp-leads'
+
 interface Executor {
   execute: (query: ReturnType<typeof sql>) => Promise<unknown>
 }
@@ -18,6 +20,20 @@ function db(payload: Payload): Executor {
 
 export async function markLeadResubmitted(payload: Payload, id: number, at: string): Promise<void> {
   await db(payload).execute(sql`update bootcamp_leads set submission_count = submission_count + 1, last_submitted_at = ${at}, updated_at = now() where id = ${id}`)
+}
+
+export type LeadAnswers = Pick<BootcampLeadInput, 'telegram' | 'reason' | 'problem' | 'story' | 'goal' | 'urgency' | 'hoursPerWeek' | 'links' | 'fillSeconds' | 'consentVersion'>
+
+/** Анкету получает только новая заявка без неё: адрес не подтверждён, поэтому заявку в работе так изменить нельзя. */
+export async function fillLeadAnswers(payload: Payload, id: number, answers: LeadAnswers, resumeId: number | null): Promise<boolean> {
+  const { telegram, reason, problem, story, goal, urgency, hoursPerWeek, links, fillSeconds, consentVersion } = answers
+  const result = await db(payload).execute(sql`update bootcamp_leads set telegram = ${telegram}, reason = ${reason}, problem = ${problem}, story = ${story}, goal = ${goal}, urgency = ${urgency}, hours_per_week = ${hoursPerWeek}, links = ${links}, fill_seconds = ${fillSeconds}, resume_id = ${resumeId}, consent_version = ${consentVersion}, consent_at = now(), updated_at = now() where id = ${id} and problem is null and status = 'new' returning id`)
+  return ((result as { rows?: unknown[] }).rows?.length ?? 0) > 0
+}
+
+export async function leadResumesTotalBytes(payload: Payload): Promise<number> {
+  const result = await db(payload).execute(sql`select coalesce(sum(filesize), 0) as total from bootcamp_lead_resumes`)
+  return Number((result as { rows?: { total?: unknown }[] }).rows?.[0]?.total ?? 0)
 }
 
 export async function markLeadTeamNotified(payload: Payload, id: number): Promise<void> {

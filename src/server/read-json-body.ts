@@ -15,17 +15,46 @@ export async function readRequestJson(request: Request, maxBytes: number): Promi
   }
 }
 
+/** Форма с файлом: тот же предел при чтении, что и у JSON, разбор только после него. */
+export async function readRequestForm(request: Request, maxBytes: number, deadlineMs?: number): Promise<FormData> {
+  const contentType = request.headers.get('content-type') ?? ''
+  if (contentType.split(';')[0]?.trim().toLowerCase() !== 'multipart/form-data') {
+    throw new RequestBodyError('Требуется Content-Type: multipart/form-data', 415)
+  }
+  try {
+    const bytes = await readBoundedBytes(request, maxBytes, deadlineMs)
+    return await new Response(bytes, { headers: { 'Content-Type': contentType } }).formData()
+  } catch (error) {
+    if (error instanceof RequestBodyError) throw error
+    if (request.signal.aborted || error instanceof Error && (error.name === 'AbortError' || error.message === 'aborted')) {
+      throw new RequestBodyError('Передача данных запроса прервана')
+    }
+    throw new RequestBodyError('Некорректные данные запроса')
+  }
+}
+
 /** Enforce the limit while reading; Content-Length can be missing or forged. */
 export async function readBoundedJson(request: Request, maxBytes: number): Promise<unknown> {
   if (request.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {
     throw new RequestBodyError('Требуется Content-Type: application/json', 415)
   }
+  const bytes = await readBoundedBytes(request, maxBytes)
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
+  } catch {
+    throw new RequestBodyError('Некорректные данные запроса')
+  }
+}
+
+async function readBoundedBytes(request: Request, maxBytes: number, deadlineMs?: number): Promise<Uint8Array<ArrayBuffer>> {
   const declared = Number(request.headers.get('content-length'))
   if (declared > maxBytes) throw new RequestBodyError('Слишком большой запрос', 413)
   const reader = request.body?.getReader()
   if (!reader) throw new RequestBodyError('Укажите данные запроса')
   const chunks: Uint8Array[] = []
   let size = 0
+  let expired = false
+  const timer = deadlineMs ? setTimeout(() => { expired = true; void reader.cancel().catch(() => undefined) }, deadlineMs) : undefined
   try {
     for (;;) {
       const chunk = await reader.read()
@@ -38,14 +67,12 @@ export async function readBoundedJson(request: Request, maxBytes: number): Promi
       chunks.push(chunk.value)
     }
   } finally {
+    clearTimeout(timer)
     reader.releaseLock()
   }
+  if (expired) throw new RequestBodyError('Передача данных запроса прервана')
   const bytes = new Uint8Array(size)
   let offset = 0
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength }
-  try {
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
-  } catch {
-    throw new RequestBodyError('Некорректные данные запроса')
-  }
+  return bytes
 }

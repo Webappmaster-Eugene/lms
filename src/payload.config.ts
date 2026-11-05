@@ -1,3 +1,4 @@
+import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -49,6 +50,7 @@ import { GuideCategories } from '@/payload/collections/GuideCategories'
 import { GuideReads } from '@/payload/collections/GuideReads'
 import { YandexDiskImports } from '@/payload/collections/YandexDiskImports'
 import { BootcampEntryTasks } from '@/payload/collections/BootcampEntryTasks'
+import { BootcampLeadResumes, LEAD_RESUMES_DIR } from '@/payload/collections/BootcampLeadResumes'
 import { BootcampEnrollments } from '@/payload/collections/BootcampEnrollments'
 import { BootcampLeads } from '@/payload/collections/BootcampLeads'
 import { BootcampLeadEvents } from '@/payload/collections/BootcampLeadEvents'
@@ -146,6 +148,7 @@ export default buildConfig({
     BootcampPrograms,
     BootcampLeads,
     BootcampEntryTasks,
+    BootcampLeadResumes,
     BootcampEnrollments,
     BootcampPayments,
     BootcampLeadEvents,
@@ -179,6 +182,10 @@ export default buildConfig({
   },
 
   onInit: async (payload) => {
+    // Заранее: каталог появляется с первым файлом, а до этого его путь мог бы занять файл ученика из медиатеки.
+    await mkdir(LEAD_RESUMES_DIR, { recursive: true }).catch((error: unknown) => {
+      payload.logger.error({ err: error, msg: 'Каталог резюме кандидатов не создан' })
+    })
     await bootstrapDefaultAchievements(payload)
     await bootstrapInterviewDirections(payload)
     // --- Auto-create admin user on first launch ---

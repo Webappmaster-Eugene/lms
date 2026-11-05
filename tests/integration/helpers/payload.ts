@@ -180,7 +180,7 @@ export async function rest(
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   path: string,
   { token, body }: { token?: string; body?: unknown } = {},
-): Promise<{ status: number; json: Record<string, unknown> }> {
+): Promise<{ status: number; json: Record<string, unknown>; headers: Headers }> {
   const headers = new Headers({ 'Content-Type': 'application/json' })
   if (token) headers.set('Authorization', `JWT ${token}`)
   const request = new Request(`http://lms.test/api${path}`, {
@@ -196,7 +196,7 @@ export async function rest(
   } catch {
     json = { raw: text }
   }
-  return { status: response.status, json }
+  return { status: response.status, headers: response.headers, json }
 }
 
 /** Ждёт, пока фоновые хуки допишут данные: afterChange в Payload синхронны, но письма и лог — нет. */

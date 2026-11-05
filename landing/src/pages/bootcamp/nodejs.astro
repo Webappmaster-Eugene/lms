@@ -9,6 +9,7 @@ import {
   AUDIENCE, BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, COURSE_DESCRIPTION, COURSE_NAME, ENTRY_TASK_DAYS, ENTRY_TASK_MINUTES, FACTS, FAQ, GROUP_LIMIT, LAST_CLASS_ISO, LOG, MENTOR_EXPERIENCE, OFFER_PATH, PAINS, PATH, PAYMENT_PATH, PREP_START, PRICE,
   PRIVACY_PATH, PROGRAM, PROGRAM_KEY, QUALITY_PATH, RENTAL_FLOW, REVIEW_DAYS, SAMPLE_MANUAL, SAMPLE_QUESTIONS, START, START_ISO, WEEKLY_HOURS, WEEKS,
 } from '../../data/bootcamp'
+import { LEAD_ANSWER_LIMITS, LEAD_HOURS, LEAD_LINKS_MAX, LEAD_REASONS, LEAD_URGENCIES, PERSONAL_TELEGRAM } from '../../data/bootcamp-form'
 
 // В заголовке то, что ищут: «буткемп», «Node.js», «курс backend».
 const title = 'Буткемп Node.js: курс backend с ревью наставника - MentorCareer'
@@ -95,7 +96,7 @@ const extraSize = (screen: string) => {
         <div>
           <h3>Что знать заранее не нужно</h3>
           <p>NestJS, SQL, брокеры сообщений и Docker. Им посвящена программа.</p>
-          <p>Перед зачислением вы делаете короткое входное задание: три функции на JavaScript прямо в браузере, на {ENTRY_TASK_MINUTES} минут. Оно приходит на email сразу после заявки: на него {ENTRY_TASK_DAYS}, ответ в течение {REVIEW_DAYS}. Если в основах JavaScript есть пробелы, мы подскажем, что подтянуть, и предложим следующий поток. Оплату в этом случае не берём.</p>
+          <p>Перед зачислением вы делаете короткое входное задание: три функции на JavaScript прямо в браузере, на {ENTRY_TASK_MINUTES} минут. Оно приходит на email, когда наставник прочитает заявку: на него {ENTRY_TASK_DAYS}, ответ в течение {REVIEW_DAYS}. Если в основах JavaScript есть пробелы, мы подскажем, что подтянуть, и предложим следующий поток. Оплату в этом случае не берём.</p>
         </div>
       </div>
       <div class="bc-actions"><a class="bc-button" href="#apply">Оставить заявку</a></div>
@@ -256,18 +257,81 @@ const extraSize = (screen: string) => {
 
     <section class="bc-section bc-apply" id="apply" aria-labelledby="apply-title">
       <div class="bc-apply-copy">
-        <h2 id="apply-title">Оставьте заявку, и входное задание сразу придёт на email</h2>
+        <h2 id="apply-title">Расскажите о себе: каждую заявку я читаю сам</h2>
+        <p>Вопросов несколько, потому что мне важно понять, с чем вы пришли и подойдёт ли вам буткемп. Обычно на анкету уходит 5-10 минут. Если заявка подходит, на email придёт входное задание.</p>
         <p>Точное время занятий сообщим до начала недели подготовки. Заявка ни к чему не обязывает, а оплаты на этой странице нет: платить нужно только после допуска, по личной ссылке из письма.</p>
       </div>
-      <form class="bc-form" data-lead-form data-program={PROGRAM_KEY} data-consent-version={CONSENT_VERSION} novalidate>
+      <form class="bc-form" data-lead-form data-program={PROGRAM_KEY} data-program-title="Node.js" data-consent-version={CONSENT_VERSION} novalidate>
+        <div class="bc-field">
+          <label for="lead-name">Имя</label>
+          <input id="lead-name" name="name" type="text" autocomplete="given-name" required maxlength="100" aria-describedby="lead-name-error" />
+          <p class="bc-error" id="lead-name-error" data-error-for="name" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-telegram">Telegram</label>
+          <p class="bc-hint" id="lead-telegram-hint">Ник, ссылка t.me или телефон. С этого аккаунта я буду ждать ваше сообщение.</p>
+          <input id="lead-telegram" name="telegram" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" required maxlength="100" aria-describedby="lead-telegram-hint lead-telegram-error" />
+          <p class="bc-error" id="lead-telegram-error" data-error-for="telegram" hidden></p>
+        </div>
         <div class="bc-field">
           <label for="lead-email">Email</label>
           <input id="lead-email" name="email" type="email" autocomplete="email" inputmode="email" required maxlength="254" aria-describedby="lead-email-error" />
           <p class="bc-error" id="lead-email-error" data-error-for="email" hidden></p>
         </div>
         <div class="bc-field">
-          <label for="lead-name">Имя <span class="bc-optional">необязательно</span></label>
-          <input id="lead-name" name="name" type="text" autocomplete="given-name" maxlength="100" />
+          <label for="lead-reason">С чем вы пришли?</label>
+          <select id="lead-reason" name="reason" required aria-describedby="lead-reason-error">
+            <option value="">Выберите</option>
+            {LEAD_REASONS.map(({ value, label }) => <option value={value}>{label}</option>)}
+          </select>
+          <p class="bc-error" id="lead-reason-error" data-error-for="reason" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-problem">В чём сейчас проблема?</label>
+          <p class="bc-hint" id="lead-problem-hint">Что не получается, что уже пробовали. От {LEAD_ANSWER_LIMITS.problem.min} знаков.</p>
+          <textarea id="lead-problem" name="problem" rows="5" required maxlength={LEAD_ANSWER_LIMITS.problem.max} aria-describedby="lead-problem-hint lead-problem-count lead-problem-error"></textarea>
+          <p class="bc-count" id="lead-problem-count" data-count-for="problem">0 из {LEAD_ANSWER_LIMITS.problem.min} знаков</p>
+          <p class="bc-error" id="lead-problem-error" data-error-for="problem" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-story">Ваша история</label>
+          <p class="bc-hint" id="lead-story-hint">Где работали или учились, сколько лет, какой стек, сколько откликов и собеседований. От {LEAD_ANSWER_LIMITS.story.min} знаков.</p>
+          <textarea id="lead-story" name="story" rows="5" required maxlength={LEAD_ANSWER_LIMITS.story.max} aria-describedby="lead-story-hint lead-story-count lead-story-error"></textarea>
+          <p class="bc-count" id="lead-story-count" data-count-for="story">0 из {LEAD_ANSWER_LIMITS.story.min} знаков</p>
+          <p class="bc-error" id="lead-story-error" data-error-for="story" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-goal">Какой результат будет успехом и к какому сроку?</label>
+          <textarea id="lead-goal" name="goal" rows="3" required maxlength={LEAD_ANSWER_LIMITS.goal.max} aria-describedby="lead-goal-error"></textarea>
+          <p class="bc-error" id="lead-goal-error" data-error-for="goal" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-urgency">Насколько срочно?</label>
+          <select id="lead-urgency" name="urgency" required aria-describedby="lead-urgency-error">
+            <option value="">Выберите</option>
+            {LEAD_URGENCIES.map(({ value, label }) => <option value={value}>{label}</option>)}
+          </select>
+          <p class="bc-error" id="lead-urgency-error" data-error-for="urgency" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-hours">Сколько часов в неделю готовы уделять?</label>
+          <select id="lead-hours" name="hoursPerWeek" required aria-describedby="lead-hours-error">
+            <option value="">Выберите</option>
+            {LEAD_HOURS.map(({ value, label }) => <option value={value}>{label}</option>)}
+          </select>
+          <p class="bc-error" id="lead-hours-error" data-error-for="hoursPerWeek" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-resume">Резюме <span class="bc-optional">необязательно</span></label>
+          <p class="bc-hint" id="lead-resume-hint">PDF или DOCX, до 5 МБ. Файл видит только наставник. Паспортные данные и другие лишние сведения лучше убрать.</p>
+          <input id="lead-resume" name="resume" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" aria-describedby="lead-resume-hint lead-resume-error" />
+          <p class="bc-error" id="lead-resume-error" data-error-for="resume" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-links">Ссылки <span class="bc-optional">необязательно</span></label>
+          <p class="bc-hint" id="lead-links-hint">GitHub, hh, LinkedIn, сайт. Каждую с новой строки, не больше {LEAD_LINKS_MAX}.</p>
+          <textarea id="lead-links" name="links" rows="3" maxlength="1600" autocapitalize="none" spellcheck="false" aria-describedby="lead-links-hint lead-links-error"></textarea>
+          <p class="bc-error" id="lead-links-error" data-error-for="links" hidden></p>
         </div>
         <div class="bc-trap" aria-hidden="true">
           <label for="lead-website">Сайт</label>
@@ -275,7 +339,7 @@ const extraSize = (screen: string) => {
         </div>
         <div class="bc-consent">
           <input id="lead-consent" name="consent" type="checkbox" required aria-describedby="lead-consent-error" />
-          <label for="lead-consent">Даю <a href={CONSENT_PATH} target="_blank">согласие на обработку персональных данных</a>: email и имени, чтобы получить ответ на заявку. Мне есть 18 лет</label>
+          <label for="lead-consent">Даю <a href={CONSENT_PATH} target="_blank">согласие на обработку персональных данных</a> из этой анкеты, чтобы получить ответ на заявку.</label>
           <p class="bc-error" id="lead-consent-error" data-error-for="consent" hidden></p>
         </div>
         <button class="bc-button" type="submit" data-submit>Оставить заявку</button>
@@ -285,7 +349,9 @@ const extraSize = (screen: string) => {
       </form>
       <div class="bc-done" data-done tabindex="-1" hidden>
         <h3>Заявка сохранена</h3>
-        <p>На <strong data-done-email></strong> ушло письмо с личной ссылкой на входное задание. Если письма нет, проверьте папку «Спам». Не нашли и через 15 минут, отправьте заявку ещё раз: письмо придёт повторно.</p>
+        <p>Теперь напишите мне лично в Telegram, я Евгений Надточеев, наставник буткемпа. Так я пойму, что вам это действительно важно. Сообщение уже заполнено, останется его отправить.</p>
+        <a class="bc-button bc-telegram" data-telegram-link href={PERSONAL_TELEGRAM.url} target="_blank" rel="noopener">Написать в Telegram @{PERSONAL_TELEGRAM.handle}</a>
+        <p>Заявку я прочитаю сам. Если она подходит, на <strong data-done-email></strong> придёт письмо со входным заданием.</p>
       </div>
     </section>
   </main>

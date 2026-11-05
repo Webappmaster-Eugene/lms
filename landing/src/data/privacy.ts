@@ -14,4 +14,4 @@ export const OPERATOR = {
 }
 
 /** Дата редакции политики — совпадает с CONSENT_VERSION формы. */
-export const POLICY_DATE = '31 октября 2026 года'
+export const POLICY_DATE = '5 ноября 2026 года'

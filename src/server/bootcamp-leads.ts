@@ -1,17 +1,22 @@
 import 'server-only'
 
+import { randomUUID } from 'node:crypto'
+
 import { ValidationError, type Payload } from 'payload'
 
 import { formatEntryTaskDate } from '@/lib/bootcamp-entry-task'
-import { BootcampLeadError, describeLeadSource, type BootcampLeadInput } from '@/lib/bootcamp-leads'
+import {
+  BOOTCAMP_LEAD_HOURS, BOOTCAMP_LEAD_REASONS, BOOTCAMP_LEAD_URGENCIES, BootcampLeadError, describeLeadSource, LEAD_RESUME_MAX_BYTES, LEAD_RESUMES_MAX_TOTAL_BYTES, leadOptionLabel, leadResumeKind, leadResumeName,
+  type BootcampLeadInput, type LeadResumeKind,
+} from '@/lib/bootcamp-leads'
 import type { BootcampProgramConfig } from '@/lib/bootcamp-programs'
 import { collectAllPages } from '@/lib/paginate'
 import { logger } from '@/lib/telemetry'
 import { bootcampLeadEmail } from '@/payload/emails/templates'
-import { adminLink, notifyAdmins } from '@/server/admin-telegram'
+import { adminLink, excerpt, notifyAdmins } from '@/server/admin-telegram'
 import { entryTaskResendDue, newEntryTaskToken, sendEntryTask } from '@/server/bootcamp-entry-task'
 import { journal } from '@/server/bootcamp-lead-events'
-import { markLeadResubmitted, markLeadTeamNotified } from '@/server/bootcamp-lead-marks'
+import { fillLeadAnswers, leadResumesTotalBytes, markLeadResubmitted, markLeadTeamNotified } from '@/server/bootcamp-lead-marks'
 import { findProgram } from '@/server/bootcamp-programs'
 import { createRateLimiter } from '@/server/trainer/rate-limit'
 import type { BootcampLead } from '@/payload-types'
@@ -24,6 +29,54 @@ export type SavedBootcampLead = {
 
 // Поток спама не должен превращаться в поток писем: сверх предела заявка сохраняется без письма.
 const teamMail = createRateLimiter('bootcamp-leads-mail', 30, 60 * 60_000)
+// Поток спама не должен забить диск: сверх предела заявка сохраняется без файла.
+const resumeStorage = createRateLimiter('bootcamp-lead-resumes', 30, 60 * 60_000)
+
+export type LeadResumeFile = LeadResumeKind & { data: Buffer, originalName: string }
+
+/** Файл из формы; пустое поле - браузер шлёт его, когда файл не выбран. */
+export async function readLeadResume(value: FormDataEntryValue | null): Promise<LeadResumeFile | null> {
+  if (!(value instanceof File) || (value.size === 0 && value.name === '')) return null
+  if (value.size === 0) throw new BootcampLeadError('Файл резюме пустой. Приложите другой файл.', 'resume')
+  if (value.size > LEAD_RESUME_MAX_BYTES) throw new BootcampLeadError('Файл резюме больше 5 МБ. Приложите файл поменьше или дайте ссылку на него.', 'resume')
+  const data = Buffer.from(await value.arrayBuffer())
+  const kind = leadResumeKind(data)
+  if (!kind) throw new BootcampLeadError('Резюме принимается в PDF или DOCX. Сохраните файл в одном из них или дайте ссылку на него.', 'resume')
+  return { ...kind, data, originalName: leadResumeName(value.name) }
+}
+
+/** Сбой файла заявку не теряет: человек уже написал анкету, а резюме сможет прислать в Telegram. */
+async function storeResume(payload: Payload, resume: LeadResumeFile): Promise<number | null> {
+  if (!resumeStorage.take('all')) {
+    logger.warn('Bootcamp lead resume dropped: hourly limit reached')
+    return null
+  }
+  try {
+    if (await leadResumesTotalBytes(payload) + resume.data.length > LEAD_RESUMES_MAX_TOTAL_BYTES) {
+      logger.error('Bootcamp lead resume dropped: total size limit reached')
+      return null
+    }
+    const doc = await payload.create({
+      collection: 'bootcamp-lead-resumes',
+      overrideAccess: true,
+      depth: 0,
+      data: { originalName: resume.originalName },
+      // Имя файла на диске своё: чужое могло бы совпасть или подсказать, чьё это резюме.
+      file: { data: resume.data, mimetype: resume.mimetype, name: `resume-${randomUUID()}.${resume.extension}`, size: resume.data.length },
+    })
+    return doc.id
+  } catch (error) {
+    logger.error('Bootcamp lead resume was not saved', error)
+    return null
+  }
+}
+
+async function dropResume(payload: Payload, id: number | null): Promise<void> {
+  if (id === null) return
+  await payload.delete({ collection: 'bootcamp-lead-resumes', id, overrideAccess: true }).catch((error: unknown) => {
+    logger.error('Orphan bootcamp lead resume was not deleted', error, { 'resume.id': id })
+  })
+}
 
 function isUniqueViolation(error: unknown): boolean {
   let current: unknown = error
@@ -50,7 +103,7 @@ async function findLead(payload: Payload, input: BootcampLeadInput): Promise<Boo
  * Сохраняет заявку. Повтор того же адреса — в том числе параллельный — не создаёт
  * вторую запись и не подменяет первую: растёт только счётчик отправок.
  */
-export async function saveBootcampLead(payload: Payload, input: BootcampLeadInput): Promise<SavedBootcampLead> {
+export async function saveBootcampLead(payload: Payload, input: BootcampLeadInput, resume: LeadResumeFile | null = null): Promise<SavedBootcampLead> {
   // Программа - запись в CMS: форма лендинга присылает только её ключ.
   const program = await findProgram(payload, input.program)
   if (!program) throw new BootcampLeadError('Такой программы нет. Обновите страницу и отправьте заявку ещё раз.')
@@ -59,6 +112,7 @@ export async function saveBootcampLead(payload: Payload, input: BootcampLeadInpu
   // Закрытый набор не принимает новые заявки, а повтор старой (письмо не дошло) обрабатывается как обычно.
   if (!lead && !program.isActive) throw new BootcampLeadError(`Набор на буткемп ${program.shortTitle} сейчас закрыт. Следите за новостями на странице буткемпа.`)
   if (!lead) {
+    const resumeId = resume ? await storeResume(payload, resume) : null
     try {
       lead = await payload.create({
         collection: 'bootcamp-leads',
@@ -66,46 +120,82 @@ export async function saveBootcampLead(payload: Payload, input: BootcampLeadInpu
         depth: 0,
         data: {
           program: input.program, email: input.email, name: input.name, status: 'new', source: input.source,
+          telegram: input.telegram, reason: input.reason, problem: input.problem, story: input.story, goal: input.goal,
+          urgency: input.urgency, hoursPerWeek: input.hoursPerWeek, links: input.links, fillSeconds: input.fillSeconds, resume: resumeId,
           consentVersion: input.consentVersion, consentAt: now, submissionCount: 1, lastSubmittedAt: now,
           entryTaskToken: newEntryTaskToken(),
         },
       })
       const created = lead
+      const resumeLost = resume !== null && resumeId === null
       return {
         outcome: 'created',
-        notification: Promise.all([sendEntryTask(payload, created), notifyTeam(payload, created, program)]).then(async ([dueAt]) => {
-          await journal(payload, { lead: created.id, type: 'lead_created', message: dueAt ? `Заявка с лендинга, входное задание отправлено, срок ${formatEntryTaskDate(dueAt)}` : 'Заявка с лендинга, письмо с заданием не ушло' })
-          await notifyAdmins(leadEvent(created, program, 1, dueAt === null ? 'failed' : dueAt))
+        // Задание не уходит само: сначала анкету читает владелец (решение от 05.11.2026).
+        notification: notifyTeam(payload, created, program, resumeLost).then(async () => {
+          await journal(payload, { lead: created.id, type: 'lead_created', message: 'Заявка с лендинга, ждёт проверки анкеты' })
+          await notifyAdmins(leadEvent(created, program, 1, 'not-sent', true, resumeLost))
         }),
       }
     } catch (error) {
+      await dropResume(payload, resumeId)
       if (!isUniqueViolation(error)) throw error
       lead = await findLead(payload, input)
       if (!lead) throw error
     }
   }
   await markLeadResubmitted(payload, lead.id, now)
-  const repeated = lead
+  // Заявка со старой формы: анкеты в ней нет, и первая заполненная становится её анкетой, иначе ответы пропали бы.
+  let answered = false
+  let resumeLost = false
+  if (!lead.problem && lead.status === 'new') {
+    const resumeId = resume ? await storeResume(payload, resume) : null
+    answered = await fillLeadAnswers(payload, lead.id, input, resumeId)
+    if (!answered) await dropResume(payload, resumeId)
+    resumeLost = answered && resume !== null && resumeId === null
+  }
+  const repeated: BootcampLead = answered ? await payload.findByID({ collection: 'bootcamp-leads', id: lead.id, depth: 0, overrideAccess: true }) : lead
   const count = (lead.submissionCount ?? 1) + 1
-  // Повтор — обычно «письмо не пришло»: присылаем ту же ссылку ещё раз, но не чаще раза в 15 минут.
-  const notification = entryTaskResendDue(lead)
-    ? sendEntryTask(payload, lead).then((dueAt) => notifyAdmins(leadEvent(repeated, program, count, dueAt === null ? 'failed' : dueAt)))
-    : notifyAdmins(leadEvent(repeated, program, count, 'not-due'))
+  // Если задание уже отправляли, повтор - обычно «письмо не пришло»: присылаем ту же ссылку ещё раз, но не чаще раза в 15 минут.
+  // Пока владелец его не отправил, повтор заявки выдать задание не может.
+  const sent = Boolean(lead.entryTaskSentAt)
+  const notification = sent && entryTaskResendDue(lead)
+    ? sendEntryTask(payload, lead).then((dueAt) => notifyAdmins(leadEvent(repeated, program, count, dueAt === null ? 'failed' : dueAt, answered, resumeLost)))
+    : notifyAdmins(leadEvent(repeated, program, count, sent ? 'not-due' : 'not-sent', answered, resumeLost))
   return { outcome: 'repeat', notification }
 }
 
-/** Сообщение в Telegram о заявке: кто, откуда и ушло ли письмо с заданием. */
-function leadEvent(lead: BootcampLead, config: BootcampProgramConfig, submission: number, entryTask: string | 'failed' | 'not-due') {
+function fillTime(seconds: number | null | undefined): string | null {
+  if (!seconds) return null
+  return `Время заполнения: ${seconds < 60 ? `${seconds} с` : `${Math.round(seconds / 60)} мин`}`
+}
+
+/** Сообщение в Telegram о заявке: кто, что написал в анкете и ушло ли письмо с заданием. Файл резюме в Telegram не уходит. */
+function leadEvent(lead: BootcampLead, config: BootcampProgramConfig, submission: number, entryTask: string | 'failed' | 'not-due' | 'not-sent', withAnswers: boolean, resumeLost = false) {
   const program = config.shortTitle
   const who = [lead.name?.trim(), lead.email].filter(Boolean).join(', ')
   const task = entryTask === 'failed'
     ? 'Письмо с входным заданием не ушло, подробности в журнале приложения'
     : entryTask === 'not-due'
       ? 'Письмо с заданием повторно не отправлялось: с прошлого прошло меньше 15 минут'
-      : `Письмо с входным заданием ушло, срок до ${formatEntryTaskDate(entryTask)}`
+      : entryTask === 'not-sent'
+        ? 'Входное задание ещё не отправлено: кнопка в карточке заявки'
+        : `Письмо с входным заданием ушло, срок до ${formatEntryTaskDate(entryTask)}`
+  const answers = withAnswers ? [
+    lead.telegram ? `Telegram: ${lead.telegram}` : null,
+    leadOptionLabel(BOOTCAMP_LEAD_REASONS, lead.reason) ? `Тема: ${leadOptionLabel(BOOTCAMP_LEAD_REASONS, lead.reason)}` : null,
+    leadOptionLabel(BOOTCAMP_LEAD_URGENCIES, lead.urgency) ? `Срочность: ${leadOptionLabel(BOOTCAMP_LEAD_URGENCIES, lead.urgency)}` : null,
+    leadOptionLabel(BOOTCAMP_LEAD_HOURS, lead.hoursPerWeek) ? `Часов в неделю: ${leadOptionLabel(BOOTCAMP_LEAD_HOURS, lead.hoursPerWeek)}` : null,
+    // Предел Telegram 4096 знаков: целиком ответы лежат в карточке и в письме.
+    lead.problem ? `Проблема: ${excerpt(lead.problem, 900)}` : null,
+    lead.story ? `История: ${excerpt(lead.story, 900)}` : null,
+    lead.goal ? `Результат: ${excerpt(lead.goal, 400)}` : null,
+    lead.links ? `Ссылки: ${excerpt(lead.links.split('\n').join(' '))}` : null,
+    resumeLost ? 'Резюме приложено, но файл не сохранился: подробности в журнале приложения' : lead.resume ? 'Резюме приложено, файл в карточке' : null,
+    fillTime(lead.fillSeconds),
+  ] : []
   return {
     title: submission === 1 ? `Новая заявка на буткемп ${program}` : `Повторная заявка на буткемп ${program} (${submission}-я отправка формы)`,
-    lines: [who, `Откуда: ${describeLeadSource(lead.source)}`, task],
+    lines: [who, ...answers, `Откуда: ${describeLeadSource(lead.source)}`, task],
     link: adminLink(`/admin/collections/bootcamp-leads/${lead.id}`),
   }
 }
@@ -129,7 +219,7 @@ export async function adminEmails(payload: Payload): Promise<string[]> {
   return admins.filter((admin) => admin.isActive !== false && admin.email && !admin.email.endsWith('.invalid')).map((admin) => admin.email)
 }
 
-async function notifyTeam(payload: Payload, lead: BootcampLead, program: BootcampProgramConfig): Promise<void> {
+async function notifyTeam(payload: Payload, lead: BootcampLead, program: BootcampProgramConfig, resumeLost: boolean): Promise<void> {
   if (!teamMail.take('all')) {
     logger.warn('Bootcamp lead saved without team email: hourly mail limit reached', { 'lead.id': lead.id })
     return
@@ -146,6 +236,15 @@ async function notifyTeam(payload: Payload, lead: BootcampLead, program: Bootcam
       name: lead.name ?? null,
       program: program.title,
       source: describeLeadSource(lead.source),
+      telegram: lead.telegram ?? null,
+      reason: leadOptionLabel(BOOTCAMP_LEAD_REASONS, lead.reason),
+      problem: lead.problem ?? null,
+      story: lead.story ?? null,
+      goal: lead.goal ?? null,
+      urgency: leadOptionLabel(BOOTCAMP_LEAD_URGENCIES, lead.urgency),
+      hoursPerWeek: leadOptionLabel(BOOTCAMP_LEAD_HOURS, lead.hoursPerWeek),
+      links: lead.links ?? null,
+      resume: resumeLost ? 'приложено, но файл не сохранился' : lead.resume ? 'файл в карточке заявки' : 'нет',
     })
     for (const to of recipients) await payload.sendEmail({ to, ...content })
     await markLeadTeamNotified(payload, lead.id)

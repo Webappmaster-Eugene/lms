@@ -75,6 +75,26 @@ describe('панель «Путь заявки»', () => {
     expect(JSON.parse(String(init.body))).toMatchObject({ action: 'admit', withoutEntryTask: 'yes' })
   })
 
+  it('задание ещё не отправлено: главная кнопка отправляет его, текст о продлении не показывается', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json(state({}, { status: 'new', statusLabel: 'Новая', entryTaskSentAt: null, entryTaskDueAt: null, entrySubmittedAt: null })))
+      .mockResolvedValueOnce(Response.json(state()))
+    render(<LeadPathPanel />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Отправить входное задание' }))
+    expect(screen.getByText(/уйдёт письмо с личной ссылкой на задание/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Продлить срок и отправить задание ещё раз' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Да, отправить' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    const [, init] = fetchMock.mock.calls[1] as [string, RequestInit]
+    expect(JSON.parse(String(init.body))).toMatchObject({ action: 'extend-entry-task' })
+  })
+
+  it('задание уже ушло: кнопка продлевает срок', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json(state()))
+    render(<LeadPathPanel />)
+    expect(await screen.findByRole('button', { name: 'Продлить срок и отправить задание ещё раз' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Отправить входное задание' })).not.toBeInTheDocument()
+  })
+
   it('ошибку сервера показывает, форма остаётся открытой', async () => {
     fetchMock.mockResolvedValueOnce(Response.json(state())).mockResolvedValueOnce(Response.json({ error: 'Логин ivan уже у зачисленного ученика' }, { status: 409 }))
     render(<LeadPathPanel />)

@@ -1,7 +1,7 @@
-import { APIError, type CollectionBeforeDeleteHook, type CollectionConfig } from 'payload'
+import { APIError, type CollectionAfterDeleteHook, type CollectionBeforeDeleteHook, type CollectionConfig } from 'payload'
 
 import { ENTRY_TASK_MAX_SUBMISSIONS } from '@/lib/bootcamp-entry-task'
-import { BOOTCAMP_LEAD_STATUSES } from '@/lib/bootcamp-leads'
+import { BOOTCAMP_LEAD_HOURS, BOOTCAMP_LEAD_REASONS, BOOTCAMP_LEAD_STATUSES, BOOTCAMP_LEAD_URGENCIES, LEAD_ANSWER_LIMITS } from '@/lib/bootcamp-leads'
 import { validateProgramKey } from '@/payload/fields/bootcampProgramKey'
 import { isAdmin } from '@/payload/access/isAdmin'
 import { notifyLeadStatusChange } from '@/payload/hooks/bootcampLeadNotices'
@@ -20,6 +20,14 @@ const keepPaidLeads: CollectionBeforeDeleteHook = async ({ id, req }) => {
   if (payments.totalDocs > 0) throw new APIError('По заявке есть счета оплаты, удалить её нельзя. Закройте заявку кнопками «Пути заявки».', 409, null, true)
 }
 
+/** Резюме живёт, пока живёт заявка: удаление заявки по отзыву согласия должно убрать и файл. */
+const removeResume: CollectionAfterDeleteHook = async ({ doc, req }) => {
+  const resume = doc.resume && typeof doc.resume === 'object' ? doc.resume.id : doc.resume
+  if (resume) await req.payload.delete({ collection: 'bootcamp-lead-resumes', id: resume, overrideAccess: true, req })
+}
+
+const options = (items: readonly { value: string, label: string }[]) => items.map(({ value, label }) => ({ value, label }))
+
 /**
  * Предзапись с лендинга. Публичная форма пишет сюда только через
  * POST /api/bootcamp/leads; REST Payload и чтение — только администратору:
@@ -31,7 +39,7 @@ export const BootcampLeads: CollectionConfig = {
   admin: {
     group: 'Буткемпы',
     useAsTitle: 'email',
-    defaultColumns: ['email', 'name', 'program', 'status', 'nextActionAt', 'createdAt', 'entrySubmittedAt', 'entryPassed', 'paidAt'],
+    defaultColumns: ['email', 'name', 'telegram', 'wroteTelegram', 'urgency', 'program', 'status', 'createdAt', 'entryPassed'],
     description: 'Предзапись со страниц буткемпов на info.mentorcareer.ru. Повторная отправка того же адреса в той же программе не создаёт новую заявку, а увеличивает счётчик отправок.',
   },
   access: {
@@ -40,13 +48,30 @@ export const BootcampLeads: CollectionConfig = {
     update: isAdmin,
     delete: isAdmin,
   },
-  hooks: { afterChange: [notifyLeadStatusChange], beforeDelete: [keepPaidLeads] },
+  hooks: { afterChange: [notifyLeadStatusChange], beforeDelete: [keepPaidLeads], afterDelete: [removeResume] },
   // Одна заявка на адрес в программе: параллельные отправки не плодят дубли.
   indexes: [{ fields: ['program', 'email'], unique: true }],
   fields: [
     { name: 'leadPath', type: 'ui', admin: { components: { Field: '/components/bootcamp/LeadPathPanel#LeadPathPanel' } } },
     { name: 'email', type: 'email', required: true, label: 'Email', admin: readOnly },
     { name: 'name', type: 'text', maxLength: 100, label: 'Имя' },
+    {
+      type: 'collapsible',
+      label: 'Анкета кандидата',
+      admin: { className: 'lead-answers' },
+      fields: [
+        { name: 'telegram', type: 'text', maxLength: 100, label: 'Telegram', access: serverOnly, admin: readOnly },
+        { name: 'reason', type: 'select', options: options(BOOTCAMP_LEAD_REASONS), label: 'Тема', access: serverOnly, admin: readOnly },
+        { name: 'problem', type: 'textarea', maxLength: LEAD_ANSWER_LIMITS.problem.max, label: 'В чём проблема', access: serverOnly, admin: { ...readOnly, rows: 6 } },
+        { name: 'story', type: 'textarea', maxLength: LEAD_ANSWER_LIMITS.story.max, label: 'История', access: serverOnly, admin: { ...readOnly, rows: 6 } },
+        { name: 'goal', type: 'textarea', maxLength: LEAD_ANSWER_LIMITS.goal.max, label: 'Какой результат будет успехом и к какому сроку', access: serverOnly, admin: { ...readOnly, rows: 3 } },
+        { name: 'urgency', type: 'select', options: options(BOOTCAMP_LEAD_URGENCIES), label: 'Насколько срочно', access: serverOnly, admin: readOnly },
+        { name: 'hoursPerWeek', type: 'select', options: options(BOOTCAMP_LEAD_HOURS), label: 'Часов в неделю', access: serverOnly, admin: readOnly },
+        { name: 'links', type: 'textarea', maxLength: 2000, label: 'Ссылки', access: serverOnly, admin: readOnly },
+        { name: 'resume', type: 'upload', relationTo: 'bootcamp-lead-resumes', label: 'Резюме', access: serverOnly, admin: readOnly },
+        { name: 'fillSeconds', type: 'number', label: 'Время заполнения, секунд', access: serverOnly, admin: { ...readOnly, description: 'С первого касания формы до отправки. Меньше минуты при длинных ответах - повод присмотреться.' } },
+      ],
+    },
     // Ключ программы буткемпа (bootcamp-programs.key): от неё цена, оферта, курс и входное задание.
     { name: 'program', type: 'text', required: true, maxLength: 40, label: 'Программа', validate: validateProgramKey, admin: readOnly },
     {
@@ -59,6 +84,13 @@ export const BootcampLeads: CollectionConfig = {
       // Этап меняют только кнопки «Пути заявки» и события системы: у каждого перехода свои письма и проверки.
       access: serverOnly,
       admin: { ...readOnly, position: 'sidebar', description: 'Меняется кнопками в блоке «Путь заявки» вверху карточки.' },
+    },
+    {
+      name: 'wroteTelegram',
+      type: 'checkbox',
+      defaultValue: false,
+      label: 'Написал в Telegram',
+      admin: { position: 'sidebar', description: 'Отмечается вручную: после отправки формы кандидату предлагают написать в личку.' },
     },
     { name: 'assignee', type: 'relationship', relationTo: 'users', label: 'Ответственный', filterOptions: { role: { equals: 'admin' } }, admin: { position: 'sidebar' } },
     { name: 'nextActionAt', type: 'date', label: 'Следующее действие', admin: { position: 'sidebar', date: { pickerAppearance: 'dayAndTime' } } },
@@ -97,7 +129,7 @@ export const BootcampLeads: CollectionConfig = {
       access: serverOnly,
       admin: { ...readOnly, description: 'Страница задания на платформе: /entry-task/<эта строка>. Кто знает ссылку, тот видит задание, поэтому её не пересылают.' },
     },
-    { name: 'entryTaskSentAt', type: 'date', label: 'Письмо с заданием', access: serverOnly, admin: { ...readOnly, description: 'Пусто - письмо кандидату не ушло. Повторная заявка с того же адреса отправит его снова.' } },
+    { name: 'entryTaskSentAt', type: 'date', label: 'Письмо с заданием', access: serverOnly, admin: { ...readOnly, description: 'Пусто - задание ещё не отправлено: оно уходит кнопкой в блоке «Путь заявки».' } },
     { name: 'entryTaskDueAt', type: 'date', label: 'Срок входного задания', access: serverOnly, admin: readOnly },
     {
       type: 'collapsible',

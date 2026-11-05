@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 import { POST as gitlabEvents } from '@/app/api/bootcamp/gitlab-events/route'
 import { POST as leadForm } from '@/app/api/bootcamp/leads/route'
+import { LEAD_ANSWERS, leadFormData } from '../../fixtures/bootcampLead'
 import { POST as supportMessage } from '@/app/api/support-message/route'
 import { POST as retryRoute } from '@/app/api/bootcamp/enrollments/[id]/retry/route'
 import { GET as enrollmentState, POST as enrollRoute } from '@/app/api/bootcamp/leads/[id]/enrollment/route'
@@ -223,21 +224,28 @@ describe('зачисление из заявки', () => {
 })
 
 describe('события буткемпа в Telegram', () => {
-  it('новая заявка: кто, откуда и ушло ли письмо с заданием', async () => {
+  it('новая заявка: кто, откуда, анкета и что задание ещё не ушло', async () => {
     const email = `${uid('tg-lead')}@mail.test`.toLowerCase()
     const mail = captureEmails(payload)
     try {
       const response = await leadForm(new Request('http://info.test/api/bootcamp/leads', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Forwarded-Host': 'info.test', Origin: 'http://info.test', 'Sec-Fetch-Site': 'same-origin' },
-        body: JSON.stringify({ program: 'nodejs', email, name: 'Мария', consent: true, consentVersion: '2026-10-26', utm: { utm_source: 'habr' } }),
+        headers: { 'X-Forwarded-Host': 'info.test', Origin: 'http://info.test', 'Sec-Fetch-Site': 'same-origin' },
+        body: leadFormData({ ...LEAD_ANSWERS, program: 'nodejs', email, name: 'Мария', consent: true, consentVersion: '2026-10-26', utm: { utm_source: 'habr' }, links: 'github.com/maria' }),
       }))
       expect(response.status).toBe(200)
       await vi.waitFor(() => {
         const text = telegram.find((item) => item.startsWith('Новая заявка на буткемп Node.js'))
         expect(text).toContain(`Мария, ${email}`)
         expect(text).toContain('Откуда: habr')
-        expect(text).toContain('Письмо с входным заданием ушло, срок до')
+        expect(text).toContain('Входное задание ещё не отправлено')
+        expect(text).toContain('Telegram: @ivan_petrov')
+        expect(text).toContain('Тема: Сменить работу или вырасти в грейде')
+        expect(text).toContain('Срочность: 1-3 месяца')
+        expect(text).toContain(`Проблема: ${LEAD_ANSWERS.problem}`)
+        expect(text).toContain(`История: ${LEAD_ANSWERS.story}`)
+        expect(text).toContain('Ссылки: https://github.com/maria')
+        expect(text).toContain('Время заполнения: 20 с')
         expect(text).toMatch(/\/admin\/collections\/bootcamp-leads\/\d+$/)
       })
     } finally {

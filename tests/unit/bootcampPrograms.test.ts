@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { DEFAULT_ENTRY_TASK_SET, ENTRY_TASK_SETS, entryTaskSetOf, findTaskInSet } from '@/data/bootcamp-entry/sets'
 import { parseBootcampLead } from '@/lib/bootcamp-leads'
+import { LEAD_ANSWERS } from '../fixtures/bootcampLead'
 import { PROGRAM_KEY_PATTERN, toProgramConfig } from '@/lib/bootcamp-programs'
 import { BootcampPrograms } from '@/payload/collections/BootcampPrograms'
 import { bootcampEntryTaskEmail } from '@/payload/emails/templates'
@@ -29,7 +30,7 @@ describe('программа буткемпа', () => {
   })
 
   it('форма принимает любой ключ в формате, есть ли программа - решает сервер', () => {
-    const base = { email: 'a@mail.ru', consent: true, consentVersion: '2026-10-31' }
+    const base = { ...LEAD_ANSWERS, email: 'a@mail.ru', consent: true, consentVersion: '2026-10-31' }
     expect(parseBootcampLead({ ...base, program: 'python' }).program).toBe('python')
     expect(() => parseBootcampLead({ ...base, program: 'Python!' })).toThrow('Такой программы нет')
     expect(() => parseBootcampLead({ ...base })).toThrow('Такой программы нет')

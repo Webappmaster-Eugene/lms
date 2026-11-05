@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readBoundedJson } from '@/server/read-json-body'
+import { readBoundedJson, readRequestForm } from '@/server/read-json-body'
 
 const request = (body: BodyInit, headers: HeadersInit = { 'content-type': 'application/json' }) => new Request('https://lms.test/api/learning-state', { method: 'POST', body, headers, duplex: 'half' } as RequestInit)
 
@@ -31,5 +31,25 @@ describe('ограниченное чтение пользовательског
     await expect(readBoundedJson(request('{}', { 'content-type': 'text/plain' }), 100)).rejects.toMatchObject({ status: 415 })
     await expect(readBoundedJson(request('{broken'), 100)).rejects.toMatchObject({ status: 400 })
     await expect(readBoundedJson(request(new Uint8Array([255, 254])), 100)).rejects.toMatchObject({ status: 400 })
+  })
+})
+
+describe('ограниченное чтение формы с файлом', () => {
+  const multipart = { 'content-type': 'multipart/form-data; boundary=x' }
+  const part = '--x\r\nContent-Disposition: form-data; name="name"\r\n\r\nИван\r\n--x--\r\n'
+
+  it('разбирает форму и отклоняет другой тип', async () => {
+    expect((await readRequestForm(request(part, multipart), 1024)).get('name')).toBe('Иван')
+    await expect(readRequestForm(request(part), 1024)).rejects.toMatchObject({ status: 415 })
+  })
+
+  it('считает предел при чтении, а заголовку длины не верит', async () => {
+    const stream = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new Uint8Array(2048)); controller.close() } })
+    await expect(readRequestForm(request(stream, multipart), 1024)).rejects.toMatchObject({ status: 413 })
+  })
+
+  it('тело, которое не дослали в срок, не держит заявку', async () => {
+    const stream = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new TextEncoder().encode('--x')) } })
+    await expect(readRequestForm(request(stream, multipart), 1024, 20)).rejects.toMatchObject({ status: 400, message: 'Передача данных запроса прервана' })
   })
 })

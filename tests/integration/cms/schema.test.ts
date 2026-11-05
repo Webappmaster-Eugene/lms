@@ -16,8 +16,8 @@ let payload: Payload
 let ctx: FixtureContext
 let admin: User
 
-/** Загрузкам нужен файл: media проверяется отдельным блоком, архив входного задания — в bootcampLeads.test. */
-const SKIP_COLLECTIONS = new Set(['media', 'bootcamp-entry-tasks'])
+/** Загрузкам нужен файл: media проверяется отдельным блоком, архив входного задания и резюме — в bootcampLeads.test. */
+const SKIP_COLLECTIONS = new Set(['media', 'bootcamp-entry-tasks', 'bootcamp-lead-resumes'])
 
 type NamedField = Field & { name: string; required?: boolean; unique?: boolean; defaultValue?: unknown; hidden?: boolean }
 

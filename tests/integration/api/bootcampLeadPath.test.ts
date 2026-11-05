@@ -162,6 +162,23 @@ describe('путь заявки: этап только кнопками', () => 
     expect((await act((await newLead()).id, { ...admitBody(), group: 'nodejs-2027-1' })).status).toBe(200)
   })
 
+  it('«Отправить входное задание»: заявка без письма получает ссылку и срок, в журнале отдельная запись', async () => {
+    const mail = captureEmails(payload)
+    try {
+      const lead = await newLead({ entryTaskSentAt: null, entryTaskDueAt: null })
+      const response = await act(lead.id, { action: 'extend-entry-task' })
+      expect(response.status).toBe(200)
+      const fresh = await reload(lead.id)
+      expect(fresh.entryTaskSentAt).toBeTruthy()
+      expect(Date.parse(fresh.entryTaskDueAt ?? '')).toBeGreaterThan(Date.now() + 6 * 86_400_000)
+      expect(mail.sent.find((message) => message.to === lead.email)?.text).toContain(`/entry-task/${fresh.entryTaskToken}`)
+      const [sent] = (await payload.find({ collection: 'bootcamp-lead-events', where: { and: [{ lead: { equals: lead.id } }, { type: { equals: 'entry_task_sent' } }] }, overrideAccess: true })).docs
+      expect(sent?.message).toMatch(/Задание отправлено, срок/)
+    } finally {
+      mail.restore()
+    }
+  })
+
   it('«Продлить срок» присылает задание снова и возвращает все попытки отправки', async () => {
     const mail = captureEmails(payload)
     try {

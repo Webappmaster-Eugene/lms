@@ -24,7 +24,7 @@ function savedSolutions(value: unknown): Record<string, string> {
   return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
 }
 
-/** Личная страница кандидата: ссылка приходит письмом сразу после заявки на буткемп. */
+/** Личная страница кандидата: ссылка приходит письмом, когда наставник прочитал заявку на буткемп. */
 export default async function EntryTaskPage({ params }: Props) {
   const { token } = await params
   const payload = await getPayload()
