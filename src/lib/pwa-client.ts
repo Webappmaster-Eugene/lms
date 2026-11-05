@@ -25,6 +25,15 @@ export function isInstalledPwa(): boolean {
   return window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
 }
 
+/**
+ * Пока страница развёрнута, Chromium отвечает display-mode: fullscreen и в установленном
+ * приложении, поэтому отрицательный ответ isInstalledPwa() в это время ничего не значит.
+ * Признака два: при выходе элемент и display-mode могут обновиться не одновременно.
+ */
+export function isFullscreenNow(): boolean {
+  return Boolean(document.fullscreenElement) || window.matchMedia('(display-mode: fullscreen)').matches
+}
+
 export function isIosDevice(): boolean {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 }

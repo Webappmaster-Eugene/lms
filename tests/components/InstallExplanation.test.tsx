@@ -11,16 +11,18 @@ function navigatorProperty(name: string, value: unknown) {
 }
 let requestPermission: ReturnType<typeof vi.fn>
 let standalone: boolean
+let displayFullscreen: boolean
 
 beforeEach(() => {
   vi.useFakeTimers()
   localStorage.clear()
   standalone = false
+  displayFullscreen = false
   navigatorProperty('userAgent', 'Mozilla/5.0 Android Chrome')
   navigatorProperty('standalone', false)
   navigatorProperty('maxTouchPoints', 1)
   vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
-    matches: query === '(display-mode: standalone)' ? standalone : query === '(max-width: 1023px)',
+    matches: query === '(display-mode: standalone)' ? standalone : query === '(display-mode: fullscreen)' ? displayFullscreen : query === '(max-width: 1023px)',
     media: query, onchange: null, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(() => false),
   }))
   requestPermission = vi.fn()
@@ -37,6 +39,7 @@ afterEach(() => {
     else Reflect.deleteProperty(navigator, name)
   }
   descriptors.clear()
+  Reflect.deleteProperty(document, 'fullscreenElement')
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
   vi.useRealTimers()
@@ -49,6 +52,20 @@ function installEvent(outcome: 'accepted' | 'dismissed' = 'accepted') {
   const event = Object.assign(new Event('beforeinstallprompt'), { prompt: vi.fn(async () => undefined), userChoice: Promise.resolve({ outcome }) }) as InstallPromptEvent
   rememberInstallPrompt(event)
   return event
+}
+function fullscreenElement(element: Element | null) {
+  Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: element })
+}
+// Chromium отвечает display-mode: fullscreen вместо standalone и в установленном приложении.
+function enterFullscreen() {
+  standalone = false
+  displayFullscreen = true
+  fullscreenElement(document.createElement('video'))
+}
+function exitFullscreen({ app }: { app: boolean }) {
+  standalone = app
+  displayFullscreen = false
+  fullscreenElement(null)
 }
 
 describe('mobile PWA explanation', () => {
@@ -181,6 +198,70 @@ describe('mobile PWA explanation', () => {
     expect(screen.queryByRole('dialog', { name: 'Учиться удобнее с телефона' })).not.toBeInTheDocument()
     menu.close()
     menu.remove()
+    await reveal()
+    expect(screen.getByRole('dialog', { name: 'Учиться удобнее с телефона' })).toBeInTheDocument()
+  })
+
+  it('stays away from fullscreen video in an installed application when something re-renders it', async () => {
+    standalone = true
+    const { rerender } = render(<InstallExplanation />)
+    await reveal()
+    enterFullscreen()
+    rerender(<InstallExplanation paused />)
+    rerender(<InstallExplanation paused={false} />)
+    await reveal()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    exitFullscreen({ app: true })
+    await reveal()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(localStorage.getItem('lms:pwa-install-explained:v1')).toBeNull()
+  })
+
+  it('recognizes an installed application after fullscreen started before hydration', async () => {
+    enterFullscreen()
+    const { rerender } = render(<InstallExplanation />)
+    await reveal()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    exitFullscreen({ app: true })
+    await reveal()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    // Ожидание должно завершиться, а не оставить окно открытым до следующего входа во весь экран.
+    enterFullscreen()
+    rerender(<InstallExplanation paused />)
+    rerender(<InstallExplanation paused={false} />)
+    await reveal()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('in a browser tab waits for the student to leave fullscreen video', async () => {
+    render(<InstallExplanation />)
+    enterFullscreen()
+    await reveal()
+    await reveal()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    exitFullscreen({ app: false })
+    await reveal()
+    expect(screen.getByRole('dialog', { name: 'Учиться удобнее с телефона' })).toBeInTheDocument()
+  })
+
+  it('keeps waiting while display-mode still reports fullscreen after the element has left it', async () => {
+    enterFullscreen()
+    render(<InstallExplanation />)
+    await reveal()
+    fullscreenElement(null)
+    await reveal()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    exitFullscreen({ app: true })
+    await reveal()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('waits on the fullscreen element in a browser that does not report display-mode: fullscreen', async () => {
+    render(<InstallExplanation />)
+    fullscreenElement(document.createElement('video'))
+    await reveal()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fullscreenElement(null)
     await reveal()
     expect(screen.getByRole('dialog', { name: 'Учиться удобнее с телефона' })).toBeInTheDocument()
   })

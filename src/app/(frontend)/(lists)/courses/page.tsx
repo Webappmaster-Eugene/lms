@@ -3,10 +3,11 @@ import { getLearningRequest } from '@/server/learning-request'
 import { redirect } from 'next/navigation'
 import { BookOpen } from 'lucide-react'
 import { CourseCatalog } from '@/components/course/CourseCatalog'
-import { LockedSection } from '@/components/access/LockedSection'
+import { CoursesEmptyState } from '@/components/course/CoursesEmptyState'
 import { collectAllPages } from '@/lib/paginate'
 import { getLearningAccess } from '@/server/learning-access'
 import { getLearningCatalog, sharedRoadmapsByCourse } from '@/server/learning-catalog'
+import { getBootcamps } from '@/server/bootcamps'
 import { notBootcamp } from '@/lib/course-path'
 
 export const metadata: Metadata = {
@@ -124,6 +125,8 @@ export default async function CoursesListPage() {
     }
   })
 
+  const hasBootcamp = coursesWithProgress.length === 0 && (await getBootcamps(payload, user, req)).length > 0
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex items-center gap-3">
@@ -135,7 +138,7 @@ export default async function CoursesListPage() {
       </p>
 
       {coursesWithProgress.length === 0 ? (
-        <LockedSection title="Курсы вам пока не назначены" description="Здесь появятся курсы, которые откроет ментор, с программой и вашим прогрессом." />
+        <CoursesEmptyState hasBootcamp={hasBootcamp} />
       ) : (
         <CourseCatalog courses={coursesWithProgress} />
       )}

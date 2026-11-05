@@ -90,17 +90,31 @@ describe('кнопка завершения урока', () => {
   })
 
   describe('повторная отметка — запись уже есть', () => {
-    it('снимает отметку через PATCH по id записи', async () => {
+    it('снимает отметку через PATCH по id записи после подтверждения', async () => {
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
       const user = userEvent.setup()
       render(<CompletionButton lessonId={42} isCompleted progressId="p-7" />)
 
       await user.click(screen.getByRole('button'))
 
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Снять отметку'))
       await waitFor(() => expect(global.fetch).toHaveBeenCalled())
       const { url, init, body } = lastRequest()
       expect(url).toBe('/api/user-progress/p-7')
       expect(init.method).toBe('PATCH')
       expect(body).toMatchObject({ isCompleted: false, completedAt: null })
+    })
+
+    it('без подтверждения отметка остаётся: случайный клик прогресс не меняет', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(false)
+      const user = userEvent.setup()
+      render(<CompletionButton lessonId={42} isCompleted progressId="p-7" />)
+
+      await user.click(screen.getByRole('button'))
+
+      expect(global.fetch).not.toHaveBeenCalled()
+      expect(refresh).not.toHaveBeenCalled()
+      expect(screen.getByRole('button')).toHaveTextContent('Урок пройден')
     })
 
     it('возвращает отметку, не создавая вторую запись', async () => {

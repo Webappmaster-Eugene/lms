@@ -49,6 +49,9 @@ export function CompletionButton({
   }, [])
 
   async function toggleCompletion() {
+    // «Урок пройден» выглядит как статус, а нажатие по нему снимает отметку: случайный
+    // клик молча уменьшал прогресс курса.
+    if (progressId && completed && !window.confirm('Снять отметку «Урок пройден»? Урок снова станет непройденным, прогресс курса уменьшится.')) return
     setLoading(true)
     setError('')
 
