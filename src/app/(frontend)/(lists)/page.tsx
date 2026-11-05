@@ -235,7 +235,7 @@ export default async function DashboardPage() {
               {exactResume?.videoTitle && <span className="block mt-1">{exactResume.videoTitle} · {exactResume.ended ? 'Видео досмотрено' : `Остановились на ${formatTime(exactResume.seconds ?? 0)}`}</span>}
             </p>
           </div>
-          <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+          <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-lg bg-signal px-4 py-2 text-sm font-medium text-signal-foreground">
             Продолжить
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </span>

@@ -248,7 +248,7 @@ export async function CourseDetail({ slug, area }: { slug: string; area: CourseA
             </p>
             <p className="mt-1 truncate font-semibold text-foreground">{next.title}</p>
           </div>
-          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-signal px-4 py-2 text-sm font-medium text-signal-foreground">
             {completedCount > 0 ? 'Продолжить' : 'Начать'}
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </span>

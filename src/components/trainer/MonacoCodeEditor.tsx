@@ -66,12 +66,12 @@ function defineThemes(monaco: Monaco): void {
     inherit: true,
     rules: [],
     colors: {
-      'editor.background': '#0f1117',
-      'editor.lineHighlightBackground': '#171a23',
-      'editorLineNumber.foreground': '#4b5262',
-      'editorLineNumber.activeForeground': '#9aa3b5',
-      'editorGutter.background': '#0f1117',
-      'editorIndentGuide.background1': '#232735',
+      'editor.background': '#0b1412',
+      'editor.lineHighlightBackground': '#132320',
+      'editorLineNumber.foreground': '#51645e',
+      'editorLineNumber.activeForeground': '#a6b3ad',
+      'editorGutter.background': '#0b1412',
+      'editorIndentGuide.background1': '#21322e',
     },
   })
 
@@ -81,10 +81,10 @@ function defineThemes(monaco: Monaco): void {
     rules: [],
     colors: {
       'editor.background': '#ffffff',
-      'editor.lineHighlightBackground': '#f4f5f8',
-      'editorLineNumber.foreground': '#9aa3b5',
-      'editorLineNumber.activeForeground': '#4b5262',
-      'editorIndentGuide.background1': '#e7e9ef',
+      'editor.lineHighlightBackground': '#eef4f1',
+      'editorLineNumber.foreground': '#8b9d96',
+      'editorLineNumber.activeForeground': '#46605a',
+      'editorIndentGuide.background1': '#dfe8e3',
     },
   })
 }
