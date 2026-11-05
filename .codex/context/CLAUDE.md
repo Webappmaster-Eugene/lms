@@ -150,6 +150,10 @@
   БД: `pnpm test:integration tests/integration/cms/contentWorkflows.test.ts`.
   Обычные операции сохраняют ID, URL и историю; изменения данных через API
   не требуют деплоя кода.
+- `lms-students` — новые ученики и их доступы к роадмапам, курсам, разделам,
+  урокам: команда `pnpm students`, источник
+  `app/.claude/skills/lms-students/SKILL.md`. Владелец то же делает на экране
+  `/admin/learning-access`.
 
 Codex видит те же скиллы через адаптеры в `app/.agents/skills/` — они читают
 оригиналы, а не пересказывают их. После изменения скиллов, настроек Claude или
