@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import { onCLS, onINP, onLCP, type Metric } from 'web-vitals'
+import { observedStandalone } from '@/lib/pwa-client'
 
 function observedPath(path: string): string {
   if (path.startsWith('/admin')) return '/admin'
@@ -18,7 +19,7 @@ export function StudentActivityBridge({ userId }: { userId: number }) {
   useEffect(() => {
     path.current = pathname
     if (document.visibilityState !== 'visible') return
-    const body = { expectedUserId: userId, path: observedPath(pathname), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, standalone: window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone) }
+    const body = { expectedUserId: userId, path: observedPath(pathname), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, standalone: observedStandalone() }
     void fetch('/api/activity', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(10000) }).catch(() => { /* An observation failure cannot interrupt studying. */ })
   }, [pathname, userId])
 
@@ -36,7 +37,7 @@ export function StudentActivityBridge({ userId }: { userId: number }) {
     }
     const heartbeat = () => {
       if (document.visibilityState !== 'visible') return
-      void post('/api/activity', { expectedUserId: userId, path: observedPath(path.current), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, standalone: window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone) })
+      void post('/api/activity', { expectedUserId: userId, path: observedPath(path.current), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, standalone: observedStandalone() })
     }
     const flush = (beacon: boolean) => {
       for (const metric of pending.values()) {
