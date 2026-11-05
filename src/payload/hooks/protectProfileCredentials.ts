@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { APIError, Forbidden, type CollectionBeforeChangeHook, type CollectionBeforeOperationHook, type PayloadRequest } from 'payload'
 
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
-import { authSessionHash } from '@/payload/hooks/authSessionRevocations'
+import { authSessionHash, revokeUserSessions } from '@/payload/hooks/authSessionRevocations'
 import { passwordPolicyError } from '@/lib/profile'
 
 type Challenge = { userId: number; password: string }
@@ -44,7 +44,10 @@ export const protectProfileCredentials: CollectionBeforeChangeHook = async ({ op
   if (patch.trusted) return data
   const actorRole = req.user ? (await getAuthoritativeLearningPolicy(req.payload, req.user.id, req)).role : null
   // Administrators can still manage other accounts through the CMS.
-  if (actorRole === 'admin' && req.user?.id !== originalDoc.id) return data
+  if (actorRole === 'admin' && req.user?.id !== originalDoc.id) {
+    // adminPasswordReset ставит только серверный маршрут: прежние сессии и ссылка из приглашения больше не действуют.
+    return req.context.adminPasswordReset === true && changingPassword ? { ...data, sessions: [], resetPasswordToken: null, resetPasswordExpiration: null } : data
+  }
   if (!req.user || req.user.id !== originalDoc.id || !challenge || challenge.userId !== originalDoc.id) throw new APIError('Меняйте email и пароль в настройках профиля с подтверждением текущего пароля', 403)
   const sid = '_sid' in req.user && typeof req.user._sid === 'string' ? req.user._sid : null
   const sessions = Array.isArray(originalDoc.sessions) ? originalDoc.sessions as { id: string; expiresAt: string }[] : []
@@ -55,18 +58,6 @@ export const protectProfileCredentials: CollectionBeforeChangeHook = async ({ op
     const error = passwordPolicyError(patch.password)
     if (error) throw new APIError(error, 400)
   }
-  const previousCapability = req.context.syncAuthSessionRevocations
-  req.context.syncAuthSessionRevocations = true
-  try {
-    for (const session of sessions) {
-      if (session.id === sid) continue
-      const sessionHash = authSessionHash(session.id)
-      const existing = await req.payload.find({ collection: 'auth-session-revocations', req, overrideAccess: true, limit: 1, depth: 0, where: { and: [{ user: { equals: originalDoc.id } }, { sessionHash: { equals: sessionHash } }] } })
-      if (!existing.docs.length) await req.payload.create({ collection: 'auth-session-revocations', req, overrideAccess: true, data: { user: originalDoc.id, sessionHash, expiresAt: new Date(Date.now() + 31 * 86400000).toISOString() } })
-    }
-  } finally {
-    if (previousCapability === undefined) delete req.context.syncAuthSessionRevocations
-    else req.context.syncAuthSessionRevocations = previousCapability
-  }
+  await revokeUserSessions(req, originalDoc.id, sessions.filter((session) => session.id !== sid).map((session) => session.id))
   return { ...data, sessions: sessions.filter((session) => session.id === sid), resetPasswordToken: null, resetPasswordExpiration: null }
 }

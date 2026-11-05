@@ -41,6 +41,7 @@
     "test:e2e:report": "playwright show-report",
     "test:db:up": "node scripts/test-db.mjs up",
     "test:db:down": "node scripts/test-db.mjs down",
+    "students": "node scripts/lms-students.mjs",
     "wt:new": "node scripts/worktree.mjs new",
     "wt:setup": "node scripts/worktree.mjs setup",
     "wt:list": "node scripts/worktree.mjs list",

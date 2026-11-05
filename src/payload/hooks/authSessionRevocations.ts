@@ -10,6 +10,22 @@ const DAY_MS = 24 * 60 * 60 * 1000
 
 export function authSessionHash(sid: string): string { return createHash('sha256').update(sid).digest('hex') }
 
+/** Отзывает перечисленные сессии в транзакции req; запись в журнал отзывов закрыта обычным API. */
+export async function revokeUserSessions(req: PayloadRequest, userId: number, sessionIds: readonly string[]): Promise<void> {
+  const previousCapability = req.context.syncAuthSessionRevocations
+  req.context.syncAuthSessionRevocations = true
+  try {
+    for (const id of new Set(sessionIds)) {
+      const sessionHash = authSessionHash(id)
+      const existing = await req.payload.find({ collection: 'auth-session-revocations', req, overrideAccess: true, limit: 1, depth: 0, where: { and: [{ user: { equals: userId } }, { sessionHash: { equals: sessionHash } }] } })
+      if (!existing.docs.length) await req.payload.create({ collection: 'auth-session-revocations', req, overrideAccess: true, data: { user: userId, sessionHash, expiresAt: new Date(Date.now() + 31 * DAY_MS).toISOString() } })
+    }
+  } finally {
+    if (previousCapability === undefined) delete req.context.syncAuthSessionRevocations
+    else req.context.syncAuthSessionRevocations = previousCapability
+  }
+}
+
 async function revokedHashes(payload: Payload, req: PayloadRequest, userId: number, sessions: string[]): Promise<Set<string>> {
   const hashes = sessions.map(authSessionHash)
   const result = new Set<string>()

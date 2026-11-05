@@ -44,7 +44,8 @@ test('администратор назначает роадмап с исклю
     await studentPage.goto(`/lessons/${CONTENT.lessons[0].slug}`)
     await expect(studentPage.getByText(/Доступ к этому уроку пока не назначен/)).toBeVisible()
     await studentPage.goto('/admin/learning-access')
-    await expect(studentPage.getByRole('heading', { name: 'Доступ к обучению', exact: true })).toHaveCount(0)
+    await expect(studentPage.locator('.learning-access')).toHaveCount(0)
+    expect((await learner.request.get(`${APP_URL}/api/manage/learning-access?kind=catalog`)).status()).toBe(403)
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 960 })
       for (const theme of ['light', 'dark']) {
@@ -57,6 +58,55 @@ test('администратор назначает роадмап с исклю
     }
   } finally {
     if (userId) await admin.request.delete(`${APP_URL}/api/users/${userId}`)
+    await learner.close()
+    await admin.close()
+  }
+})
+
+test('администратор создаёт ученика, открывает карту и курс в дереве, ученик входит выданным паролем, ученик удаляется', async ({ browser }) => {
+  const admin = await browser.newContext({ extraHTTPHeaders: { Origin: APP_URL }, storageState: storageStateOf('admin') })
+  const learner = await browser.newContext({ extraHTTPHeaders: { Origin: APP_URL }, storageState: { cookies: [], origins: [] } })
+  const email = `tree-${Date.now()}@lms.test`
+  let created = false
+  try {
+    const page = await admin.newPage()
+    await page.goto('/admin/learning-access')
+    await page.getByRole('button', { name: 'Новый ученик' }).click()
+    const form = page.getByRole('form', { name: 'Новый ученик' })
+    await form.getByLabel('Почта (логин)').fill(email)
+    await form.getByLabel('Имя').fill('Дарья')
+    await form.getByLabel('Фамилия').fill('Деревьева')
+    await form.getByRole('button', { name: 'Создать ученика' }).click()
+    const notice = page.getByRole('region', { name: 'Логин и пароль ученика' })
+    const text = await notice.getByLabel('Текст для отправки ученику').inputValue()
+    created = true
+    const password = /Пароль: (\S+)/.exec(text)?.[1]
+    expect(password).toBeTruthy()
+    await expect(page.getByRole('heading', { name: 'Дарья Деревьева' })).toBeVisible()
+
+    const tree = page.getByRole('region', { name: 'Дерево доступа' })
+    await tree.getByLabel('Поиск по роадмапам и курсам').fill(CONTENT.course.title)
+    await tree.getByRole('checkbox', { name: CONTENT.course.title, exact: true }).check()
+    await expect(tree.getByRole('checkbox', { name: CONTENT.roadmap.title, exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Сохранить назначения' }).click()
+    await expect(page.getByText(/Назначения сохранены/)).toBeVisible()
+
+    expect((await learner.request.post(`${APP_URL}/api/users/login`, { data: { email, password } })).status()).toBe(200)
+    const lessons = await learner.request.get(`${APP_URL}/api/lessons?where[slug][equals]=${CONTENT.lessons[0].slug}&depth=0`)
+    expect((await lessons.json()).docs).toHaveLength(1)
+
+    const card = page.getByRole('region', { name: 'Карточка ученика' })
+    await card.getByRole('button', { name: 'Удалить' }).click()
+    await card.getByLabel('Для подтверждения введите почту ученика').fill(email)
+    await card.getByRole('button', { name: 'Удалить навсегда' }).click()
+    await expect(page.getByText('Ученик удалён.')).toBeVisible()
+    created = false
+    expect((await learner.request.post(`${APP_URL}/api/users/login`, { data: { email, password } })).status()).toBe(401)
+  } finally {
+    if (created) {
+      const found = await (await admin.request.get(`${APP_URL}/api/users?where[email][equals]=${encodeURIComponent(email)}&depth=0`)).json() as { docs: { id: number }[] }
+      for (const doc of found.docs) await admin.request.delete(`${APP_URL}/api/users/${doc.id}`)
+    }
     await learner.close()
     await admin.close()
   }

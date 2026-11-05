@@ -1,45 +1,19 @@
 import { createHash } from 'node:crypto'
 import { sql } from '@payloadcms/db-postgres'
-import { commitTransaction, createLocalReq, getPayload, initTransaction, killTransaction, ValidationError, type Payload, type PayloadRequest, type Where } from 'payload'
-import config from '@payload-config'
+import { commitTransaction, createLocalReq, initTransaction, killTransaction, ValidationError, type Payload, type PayloadRequest, type Where } from 'payload'
 
-import { AssignmentInputError, assignmentId, storedAssignmentTarget, validateAssignmentInput, type AssignmentInput, type AssignmentRule, type AssignmentSnapshot } from '@/components/learning-access/contracts'
+import { AssignmentInputError, assignmentId, storedAssignmentTarget, validateAssignmentInput, type AssignmentInput, type AssignmentRule, type AssignmentSnapshot, type RuleLesson } from '@/components/learning-access/contracts'
 import { buildLearningAccess, learningGrantIsActive, learningRelationId, learningTargetCollections, type LearningTargetCollection } from '@/lib/learning-access'
 import { buildTrainerAccess } from '@/lib/trainer-access'
 import { buildGuideAccess, type GuidesAccessMode } from '@/lib/guide-access'
 import { collectAllPages } from '@/lib/paginate'
 import { lockLearningAccess } from '@/payload/hooks/learningAccessLock'
+import type { AccessCatalog } from '@/lib/learning-access-edit'
+import { assertSameOrigin, authenticateManager } from '@/server/manage-auth'
 
 const response = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } })
 const pageSize = 25
 const titles = (collection: LearningTargetCollection) => collection === 'roadmap-nodes' ? 'label' : 'title'
-
-async function authenticate(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = new Headers(request.headers)
-  const authorization = headers.get('Authorization')
-  if (authorization !== null) {
-    if (!/^(?:JWT|Bearer) \S+$/.test(authorization)) throw new AssignmentInputError('Требуется авторизация', 401)
-    headers.delete('Cookie')
-  }
-  const { user } = await payload.auth({ headers })
-  if (!user) throw new AssignmentInputError('Требуется авторизация', 401)
-  if (user.role !== 'admin') throw new AssignmentInputError('Назначать обучение может только администратор', 403)
-  return { payload, user, authorization }
-}
-
-function assertSameOrigin(request: Request, authorization: string | null) {
-  if (authorization !== null) return
-  const url = new URL(request.url)
-  const origins = new Set([url.origin])
-  if (process.env.NEXT_PUBLIC_SERVER_URL) origins.add(new URL(process.env.NEXT_PUBLIC_SERVER_URL).origin)
-  const host = request.headers.get('Host')
-  const forwarded = request.headers.get('X-Forwarded-Proto')?.split(',')[0]?.trim()
-  const protocol = forwarded === 'https' || forwarded === 'http' ? `${forwarded}:` : url.protocol
-  if (host && /^[a-z0-9.:[\]-]+$/i.test(host)) origins.add(new URL(`${protocol}//${host}`).origin)
-  const site = request.headers.get('Sec-Fetch-Site')
-  if (!origins.has(request.headers.get('Origin') ?? '') || site === 'cross-site' || site === 'same-site') throw new AssignmentInputError('Сохранение доступно только со страницы платформы', 403)
-}
 
 function queryId(raw: string | null): number {
   return assignmentId(raw && /^\d+$/.test(raw) ? Number(raw) : undefined)
@@ -77,6 +51,50 @@ async function ruleTitles(payload: Payload, rules: AssignmentRule[], req: Payloa
     for (const doc of result.docs) labels.set(`${collection}:${doc.id}`, 'label' in doc ? doc.label : doc.title)
   }))
   return rules.map((rule) => ({ ...rule, title: labels.get(`${rule.target.relationTo}:${rule.target.value}`) ?? 'Материал удалён' }))
+}
+
+const relationId = (value: unknown) => learningRelationId(value)
+
+function ruleLessonOf(doc: { id: number; title: string; course: unknown; section?: unknown; isPublished?: boolean | null }): RuleLesson | null {
+  const course = relationId(doc.course)
+  return course === null ? null : { id: doc.id, title: doc.title, course, section: relationId(doc.section), isPublished: doc.isPublished === true }
+}
+
+/** Без метаданных уроков из правил дерево после перезагрузки показало бы родителей неверно. */
+async function ruleLessons(payload: Payload, rules: AssignmentRule[], req: PayloadRequest): Promise<RuleLesson[]> {
+  const ids = rules.filter((rule) => rule.target.relationTo === 'lessons').map((rule) => rule.target.value)
+  if (!ids.length) return []
+  const docs = await collectAllPages(({ page, limit }) => payload.find({ collection: 'lessons', where: { id: { in: ids } }, page, limit, sort: 'id', depth: 0, select: { title: true, course: true, section: true, isPublished: true }, overrideAccess: false, req }), { label: 'Уроки из правил ученика' })
+  return docs.flatMap((doc) => ruleLessonOf(doc) ?? [])
+}
+
+async function snapshotResponse(payload: Payload, current: AssignmentSnapshot, req: PayloadRequest) {
+  return { ...current, rules: await ruleTitles(payload, current.rules, req), ruleLessons: await ruleLessons(payload, current.rules, req) }
+}
+
+/** Только названия и связи: для дерева весь каталог нужен сразу, а текст уроков здесь не читается. */
+async function accessCatalog(payload: Payload, req: PayloadRequest): Promise<AccessCatalog> {
+  const [roadmaps, nodes, courses, sections] = await Promise.all([
+    collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmaps', page, limit, sort: ['order', 'id'], depth: 0, select: { title: true, isPublished: true }, overrideAccess: false, req }), { label: 'Роадмапы для дерева доступа' }),
+    collectAllPages(({ page, limit }) => payload.find({ collection: 'roadmap-nodes', page, limit, sort: ['order', 'id'], depth: 0, select: { label: true, roadmap: true, course: true, nodeType: true, sharedCourses: true }, overrideAccess: false, req }), { label: 'Темы для дерева доступа' }),
+    collectAllPages(({ page, limit }) => payload.find({ collection: 'courses', page, limit, sort: ['order', 'id'], depth: 0, select: { title: true, roadmap: true, roadmapNode: true, isPublished: true, assignedOnly: true, isBootcamp: true }, overrideAccess: false, req }), { label: 'Курсы для дерева доступа' }),
+    collectAllPages(({ page, limit }) => payload.find({ collection: 'sections', page, limit, sort: ['order', 'id'], depth: 0, select: { title: true, course: true, isPublished: true }, overrideAccess: false, req }), { label: 'Разделы для дерева доступа' }),
+  ])
+  return {
+    roadmaps: roadmaps.map((roadmap) => ({ id: roadmap.id, title: roadmap.title, isPublished: roadmap.isPublished === true })),
+    nodes: nodes.flatMap((node) => {
+      const roadmap = relationId(node.roadmap)
+      return roadmap === null ? [] : [{ id: node.id, label: node.label, roadmap, course: relationId(node.course), nodeType: node.nodeType ?? null, sharedCourses: (node.sharedCourses ?? []).flatMap((course) => relationId(course) ?? []) }]
+    }),
+    courses: courses.flatMap((course) => {
+      const roadmap = relationId(course.roadmap)
+      return roadmap === null ? [] : [{ id: course.id, title: course.title, roadmap, roadmapNode: relationId(course.roadmapNode), isPublished: course.isPublished === true, assignedOnly: course.assignedOnly === true, isBootcamp: course.isBootcamp === true }]
+    }),
+    sections: sections.flatMap((section) => {
+      const course = relationId(section.course)
+      return course === null ? [] : [{ id: section.id, title: section.title, course, isPublished: section.isPublished === true }]
+    }),
+  }
 }
 
 async function validateTargets(payload: Payload, input: AssignmentInput, req: PayloadRequest) {
@@ -161,7 +179,7 @@ function failure(error: unknown) {
 
 export async function GET(request: Request) {
   try {
-    const { payload, user } = await authenticate(request)
+    const { payload, user } = await authenticateManager(request)
     const req = await createLocalReq({ user, req: { headers: request.headers } }, payload)
     const url = new URL(request.url)
     const kind = url.searchParams.get('kind')
@@ -170,8 +188,14 @@ export async function GET(request: Request) {
     if (search.length > 100) throw new AssignmentInputError('Поисковый запрос слишком длинный')
     if (kind === 'students') {
       const where: Where = { and: [{ role: { equals: 'student' } }, ...(search ? [{ or: [{ firstName: { contains: search } }, { lastName: { contains: search } }, { email: { contains: search } }] }] : [])] }
-      const result = await payload.find({ collection: 'users', where, page, limit: pageSize, sort: 'id', depth: 0, select: { firstName: true, lastName: true, email: true }, overrideAccess: false, req })
-      return response({ docs: result.docs.map((student) => ({ id: student.id, title: `${student.firstName} ${student.lastName} (${student.email})` })), page, hasNextPage: result.hasNextPage })
+      const result = await payload.find({ collection: 'users', where, page, limit: pageSize, sort: 'id', depth: 0, select: { firstName: true, lastName: true, email: true, isActive: true }, overrideAccess: false, req })
+      return response({ docs: result.docs.map((student) => ({ id: student.id, title: `${student.firstName} ${student.lastName} (${student.email})`, active: student.isActive !== false })), page, hasNextPage: result.hasNextPage })
+    }
+    if (kind === 'catalog') return response(await accessCatalog(payload, req))
+    if (kind === 'lessons') {
+      const course = queryId(url.searchParams.get('course'))
+      const docs = await collectAllPages(({ page, limit }) => payload.find({ collection: 'lessons', where: { course: { equals: course } }, page, limit, sort: ['order', 'id'], depth: 0, select: { title: true, course: true, section: true, isPublished: true }, overrideAccess: false, req }), { label: 'Уроки курса для дерева доступа' })
+      return response({ docs: docs.flatMap((doc) => ruleLessonOf(doc) ?? []) })
     }
     if (kind === 'targets') {
       const rawType = url.searchParams.get('type')
@@ -184,11 +208,15 @@ export async function GET(request: Request) {
         if (!field) throw new AssignmentInputError('У выбранного типа нет родительского материала')
         clauses.push({ [field]: { equals: queryId(parent) } })
       }
-      const result = await payload.find({ collection, where: clauses.length ? { and: clauses } : {}, page, limit: pageSize, sort: 'id', depth: 0, select: collection === 'roadmap-nodes' ? { label: true, roadmap: true } : { title: true, isPublished: true }, overrideAccess: false, req })
-      return response({ docs: result.docs.map((doc) => ({ id: doc.id, title: 'label' in doc ? doc.label : doc.title, published: 'isPublished' in doc ? doc.isPublished : undefined })), page, hasNextPage: result.hasNextPage })
+      const result = await payload.find({ collection, where: clauses.length ? { and: clauses } : {}, page, limit: pageSize, sort: 'id', depth: 0, select: collection === 'roadmap-nodes' ? { label: true, roadmap: true } : collection === 'lessons' ? { title: true, isPublished: true, course: true, section: true } : { title: true, isPublished: true }, overrideAccess: false, req })
+      return response({ docs: result.docs.map((doc) => {
+        const option = { id: doc.id, title: 'label' in doc ? doc.label : doc.title, published: 'isPublished' in doc ? doc.isPublished : undefined }
+        const lesson = 'course' in doc && 'section' in doc ? ruleLessonOf(doc as Parameters<typeof ruleLessonOf>[0]) : null
+        return lesson ? { ...option, lesson } : option
+      }), page, hasNextPage: result.hasNextPage })
     }
     const current = await snapshot(payload, queryId(url.searchParams.get('user')), req)
-    return response({ ...current, rules: await ruleTitles(payload, current.rules, req) })
+    return response(await snapshotResponse(payload, current, req))
   } catch (error) { return failure(error) }
 }
 
@@ -196,7 +224,7 @@ async function mutate(request: Request, save: boolean) {
   let req: PayloadRequest | undefined
   let payload: Payload | undefined
   try {
-    const auth = await authenticate(request)
+    const auth = await authenticateManager(request)
     payload = auth.payload
     assertSameOrigin(request, auth.authorization)
     if (request.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase() !== 'application/json') throw new AssignmentInputError('Для сохранения требуется JSON')
@@ -239,10 +267,9 @@ async function mutate(request: Request, save: boolean) {
       } else await payload.create({ collection: 'learning-access-grants', data: { ...data, ruleKey: `${input.userId}:${rule.target.relationTo}:${rule.target.value}` }, overrideAccess: false, req })
     }
     if (current.mode !== input.mode || current.catalogVisibility !== input.catalogVisibility || current.trainerMode !== input.trainerMode || current.guidesMode !== input.guidesMode) await payload.update({ collection: 'users', id: input.userId, data: { learningAccessMode: input.mode, learningCatalogVisibility: input.catalogVisibility, trainerAccessMode: input.trainerMode, guidesAccessMode: input.guidesMode }, overrideAccess: false, req })
-    const next = await snapshot(payload, input.userId, req)
-    const rules = await ruleTitles(payload, next.rules, req)
+    const next = await snapshotResponse(payload, await snapshot(payload, input.userId, req), req)
     await commitTransaction(req)
-    return response({ ...next, rules })
+    return response(next)
   } catch (error) {
     if (req && save) await killTransaction(req)
     if (!(error instanceof AssignmentInputError) && !(error instanceof Error && 'status' in error && typeof error.status === 'number' && error.status < 500)) payload?.logger.error({ msg: 'Learning assignment management failed', error: error instanceof Error ? error.name : 'UnknownError' })

@@ -54,7 +54,8 @@ async function communityUrl(req: PayloadRequest): Promise<string | undefined> {
 
 export const sendInviteEmail: CollectionAfterChangeHook = async ({ doc, operation, req }) => {
   if (operation !== 'create') return doc
-  if (req.context?.skipHooks) return doc
+  // suppressInvite задаёт только серверный маршрут: логин и пароль администратор передаёт сам.
+  if (req.context?.skipHooks || req.context?.suppressInvite === true) return doc
 
   return withSpan('hook.sendInviteEmail', { 'user.email': doc.email }, async () => {
     try {
