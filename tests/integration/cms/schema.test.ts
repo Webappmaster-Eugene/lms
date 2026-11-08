@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { CollectionSlug, Field, Payload } from 'payload'
 
+import { COMMENT_MAX_LENGTH } from '@/lib/comment-threads'
 import type { Course, Lesson, Roadmap, User } from '@/payload-types'
 
 import { getTestPayload, uid } from '../helpers/payload'
@@ -57,7 +58,7 @@ async function expectInvalidField(slug: string, field: string, promise: Promise<
     return
   }
   if (slug === 'comments' && field === 'content') {
-    await expect(promise).rejects.toMatchObject({ status: 400, message: 'Комментарий должен содержать от 1 до 2000 символов' })
+    await expect(promise).rejects.toMatchObject({ status: 400, message: `Комментарий должен содержать от 1 до ${COMMENT_MAX_LENGTH} символов` })
     return
   }
   expect(await validationPaths(promise), `${slug}.${field}`).toContain(field)
