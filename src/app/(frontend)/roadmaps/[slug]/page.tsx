@@ -7,7 +7,7 @@ import { getRoadmapNodeExtras } from '@/server/roadmap-node-extras'
 import { lexicalPlainText } from '@/lib/lexical-text'
 import { routeSlug } from '@/lib/route-slug'
 import { orderRoadmapNodes } from '@/lib/roadmap-sequence'
-import { groupCoursesByNode, summarizeNode } from '@/lib/roadmap-node-courses'
+import { groupCoursesByNode, nextStepTopicId, summarizeNode } from '@/lib/roadmap-node-courses'
 import {
   blockingPrerequisites,
   nextLesson,
@@ -77,10 +77,14 @@ export default async function RoadmapDetailPage({ params }: Props) {
   const nodeDocs = orderRoadmapNodes(content.nodes.filter((node) => access.canBrowseNode(node.id)), roadmap.slug)
   const edgeDocs = content.edges
   const nodeRank = new Map(nodeDocs.map((node, index) => [String(node.id), index]))
-  const mainCourseRank = new Map(nodeDocs.flatMap((node, index) => {
+  // Курс может стоять в нескольких темах: место в списке задаёт первая из них.
+  const mainCourseRank = new Map<string, number>()
+  nodeDocs.forEach((node, index) => {
     const courseId = resolveRelationId(node.course)
-    return [...(courseId ? [courseId] : []), ...node.sharedCourses.map(String)].map((id) => [id, index] as const)
-  }))
+    for (const id of [...(courseId ? [courseId] : []), ...node.sharedCourses.map(String)]) {
+      if (!mainCourseRank.has(id)) mainCourseRank.set(id, index)
+    }
+  })
   const rankCourse = (course: (typeof content.courses)[number]) =>
     nodeRank.get(resolveRelationId(course.roadmapNode) ?? '') ?? mainCourseRank.get(String(course.id)) ?? Number.MAX_SAFE_INTEGER
   // Курс другого роадмапа держится только на своей теме: без неё он не должен всплыть в «других курсах» карты.
@@ -432,13 +436,9 @@ function buildGraphData(
   const nodeIdSet = new Set<string>()
   const placedCourseIds = new Set<string>()
 
-  let learningOrder = 0
-  const graphNodes: AnyRoadmapNode[] = rawNodes.map((n, index) => {
-    nodeIdSet.add(n.nodeId)
-
+  const summaries = rawNodes.map((n) => {
     const linkedCourseId = resolveRelationId(n.course)
     const linkedCourse = linkedCourseId ? courseMap.get(linkedCourseId) ?? null : null
-
     const extras = n.nodeType === 'category' ? [] : extrasByNode.get(n.id) ?? []
     // Тема без опубликованного курса с уроками и без гайдов и буткемпов — не тупик, а «скоро»:
     // клик по ней никуда не ведёт, но каркас карты сохраняется.
@@ -448,6 +448,19 @@ function buildGraphData(
       n.nodeType === 'category',
       extras.length,
     )
+    return { linkedCourse, extras, summary }
+  })
+  const nextStepCourse = nextStepCourseId ? courseMap.get(nextStepCourseId) ?? null : null
+  const nextStepTopic = nextStepTopicId(
+    rawNodes.map((n, index) => ({ id: String(n.id), nodeType: n.nodeType, courseIds: summaries[index].summary.courses.map((c) => c.id) })),
+    nextStepCourse,
+  )
+
+  let learningOrder = 0
+  const graphNodes: AnyRoadmapNode[] = rawNodes.map((n, index) => {
+    nodeIdSet.add(n.nodeId)
+
+    const { linkedCourse, extras, summary } = summaries[index]
     const { courses: nodeCourses, totalLessons, completedLessons, progressPercent, comingSoon } = summary
     const fullCourses = nodeCourses.flatMap((c) => courseMap.get(c.id) ?? [])
     // Прогресс и статус темы с уроками — только по курсам. Тема без уроков открыта, если открыт
@@ -486,8 +499,7 @@ function buildGraphData(
         stage: n.stage ?? null,
         color: n.color ?? null,
         bullets: canManage ? bullets : bullets.map(protectProgramText),
-        isNextStep:
-          n.nodeType !== 'category' && nextStepCourseId !== null && fullCourses.some((c) => c.id === nextStepCourseId),
+        isNextStep: nextStepTopic === String(n.id),
       },
     }
   })

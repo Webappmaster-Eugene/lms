@@ -1,6 +1,6 @@
 {
   "../.claude/settings.json": "9a159c8c0b5a585c307fca6fc6eb2b6a4927ce644464ee53b5e4ef1894e2c516",
-  "../.claude/settings.local.json": "c530be885f980b0767a1c04e962dd0f7d63ca9214bb0a265b15fa1e51d8116e5",
+  "../.claude/settings.local.json": "8c8e42aa4bf153417143aea2d7c349277fb5a5c26765c88f31eb03de045b44c1",
   "../CLAUDE.md": "ada41ca6db3718866d095076d0ddb2ddcb458c87b475ddebda9cd855a1cdf9f7",
   "../expert_info/lms/agents/code-cartographer.md": "3d81a258a6489a881ad3b2ef27f3436f3d1ae806fccd9a38d116843397fdb0f6",
   "../expert_info/lms/agents/explorer.md": "acc7be79175c3867cb4f31bf8d593fab410dba7500dcd18b875386e7e29b91e8",
@@ -18,8 +18,8 @@
   "../expert_info/lms/project.md": "65cfe929b2e0c01e353e401d9898e69ab236736c2fb0c331d506ff889af25bdd",
   ".claude/skills/deploy-check/SKILL.md": "a3788ef164bc4dc821919b16aeae8417713037e8f0b45dc0d42adf35d3fd89c7",
   ".claude/skills/lms-content/SKILL.md": "a69fb4c40d551c1fa7832eb9c9aeaf353096e1b2baf5242cf9fe58ab9174f4c2",
-  ".claude/skills/lms-content/references/content.md": "1ef1ab0d79b4da0d9af96c3a64fea578208fa49f4cfd9ca081bbfe6849dab626",
-  ".claude/skills/lms-content/references/roadmaps.md": "e5872d7817c586a8e9eab7f0ef9d90f4b17dfc1b2b6fb10d534df3c6d65a1bfe",
+  ".claude/skills/lms-content/references/content.md": "4efffb24a56327ff244c24450b9e573b587023a16805158ef9206f5443dd1a6e",
+  ".claude/skills/lms-content/references/roadmaps.md": "300b3e96f6677057f8f3c1f86b25ccc3db41d45af42f2266f037df91ba390835",
   ".claude/skills/lms-content/references/trainer.md": "51c7aa072cb1fcf0aaf0d8e866184071829369cd8ef0c14ed4dc7189a4b4feba",
   ".claude/skills/lms-content/references/users.md": "78212547ad3178de2368e9411bd96e5535e920ace3550281d28b2f93c35014ba",
   ".claude/skills/lms-students/SKILL.md": "7b8b7d0dfece00ba2d9cd744d8ea7428acda5c03c6b038f7329415d406b59caf",

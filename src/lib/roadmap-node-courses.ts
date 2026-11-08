@@ -45,6 +45,20 @@ export function groupCoursesByNode(courses: NodeCourse[]): Map<string, NodeCours
 }
 
 /**
+ * Тема «следующего шага». Курс может стоять в нескольких темах карты: в своей и
+ * дополнительным курсом других. Подсветка нужна одна - родная тема курса, иначе
+ * первая по порядку карты.
+ */
+export function nextStepTopicId(
+  topics: { id: string; nodeType?: string | null; courseIds: string[] }[],
+  course: { id: string; nodeId: string | null } | null,
+): string | null {
+  if (!course) return null
+  const holders = topics.filter((topic) => topic.nodeType !== 'category' && topic.courseIds.includes(course.id))
+  return (holders.find((topic) => topic.id === course.nodeId) ?? holders[0])?.id ?? null
+}
+
+/**
  * Состояние узла по его курсам. Основной курс идёт первым — именно он
  * открывается по клику; остальные курсы темы следуют за ним. Гайды и буткемпы
  * темы (`extrasCount`) в прогресс не входят, но тема с ними не «готовится».

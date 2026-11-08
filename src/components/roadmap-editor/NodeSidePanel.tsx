@@ -109,7 +109,7 @@ function extraOptionsLoader(url: string, what: string) {
 
 const loadGuides = extraOptionsLoader('/api/guides?limit=500&sort=title&depth=0&select[title]=true&select[isPublished]=true', 'гайды')
 const loadBootcamps = extraOptionsLoader('/api/courses?where[isBootcamp][equals]=true&limit=100&depth=0&select[title]=true&select[isPublished]=true', 'буткемпы')
-const loadAllCourses = extraOptionsLoader('/api/courses?limit=1000&sort=title&depth=0&select[title]=true&select[isPublished]=true&select[roadmap]=true&select[isBootcamp]=true', 'курсы других роадмапов')
+const loadAllCourses = extraOptionsLoader('/api/courses?limit=1000&sort=title&depth=0&select[title]=true&select[isPublished]=true&select[roadmap]=true&select[isBootcamp]=true', 'курсы для темы')
 
 export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: Props) {
   const data = node.data as EditorNodeData
@@ -129,7 +129,8 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
   const { data: guides, loading: guidesLoading } = useAsyncData<ExtraOptions>(loadGuides, NO_OPTIONS)
   const { data: bootcamps, loading: bootcampsLoading } = useAsyncData<ExtraOptions>(loadBootcamps, NO_OPTIONS)
   const { data: allCourses, loading: allCoursesLoading } = useAsyncData<ExtraOptions>(loadAllCourses, NO_OPTIONS)
-  const sharedCourseOptions = { ...allCourses, items: allCourses.items.filter((course) => course.roadmap !== roadmapId && !course.isBootcamp) }
+  // Курсы своей карты тоже можно: тема показывает цельный курс, где лежат её уроки, вместо сборного.
+  const sharedCourseOptions = { ...allCourses, items: allCourses.items.filter((course) => !course.isBootcamp && course.id !== data.courseId) }
   // Буткемп привязывается только своим списком; уже выбранный оставляем, чтобы его можно было снять.
   const courseOptions = courses.filter((course) => !course.isBootcamp || course.id === data.courseId)
 
@@ -282,8 +283,8 @@ export function NodeSidePanel({ node, roadmapId, onUpdate, onDelete, onClose }: 
         {data.nodeType !== 'category' && (
           <>
             <ExtraChecklist
-              label="Курсы из других роадмапов"
-              hint="Курс остаётся в своём роадмапе, а здесь входит в тему, прогресс и завершение карты."
+              label="Дополнительные курсы темы"
+              hint="Цельные курсы этой или другой карты, где есть уроки по теме. Курс остаётся в своей теме, а здесь входит в тему, прогресс и завершение карты."
               unknownLabel="Курс"
               options={sharedCourseOptions}
               loading={allCoursesLoading}

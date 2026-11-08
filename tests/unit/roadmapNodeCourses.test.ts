@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { groupCoursesByNode, summarizeNode, type NodeCourse } from '@/lib/roadmap-node-courses'
+import { groupCoursesByNode, nextStepTopicId, summarizeNode, type NodeCourse } from '@/lib/roadmap-node-courses'
 
 /**
  * Узел карты рассчитан на тему, а не на один курс: по React их четыре,
@@ -112,5 +112,28 @@ describe('состояние узла по его курсам', () => {
     const withCourse = summarizeNode(course({ id: '1', totalLessons: 4, completedCount: 1 }), [], false, 3)
     expect(withCourse).toMatchObject({ totalLessons: 4, completedLessons: 1, progressPercent: 25, comingSoon: false })
     expect(summarizeNode(null, [], true, 2).comingSoon).toBe(false)
+  })
+})
+
+describe('тема следующего шага', () => {
+  const topics = [
+    { id: '1', nodeType: 'category', courseIds: ['10'] },
+    { id: '2', nodeType: 'topic', courseIds: ['10'] },
+    { id: '3', nodeType: 'topic', courseIds: ['10', '11'] },
+    { id: '4', nodeType: 'subtopic', courseIds: ['10'] },
+  ]
+
+  it('курс в нескольких темах подсвечивает одну - свою', () => {
+    expect(nextStepTopicId(topics, { id: '10', nodeId: '3' })).toBe('3')
+  })
+
+  it('без своей темы на карте - первая тема по порядку, категория не в счёт', () => {
+    expect(nextStepTopicId(topics, { id: '10', nodeId: null })).toBe('2')
+    expect(nextStepTopicId(topics, { id: '10', nodeId: '99' })).toBe('2')
+  })
+
+  it('нет следующего курса или он не стоит ни в одной теме - подсветки нет', () => {
+    expect(nextStepTopicId(topics, null)).toBeNull()
+    expect(nextStepTopicId(topics, { id: '12', nodeId: null })).toBeNull()
   })
 })

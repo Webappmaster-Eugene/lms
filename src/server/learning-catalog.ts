@@ -68,7 +68,7 @@ const relationIds = (value: unknown): number[] => Array.isArray(value) ? value.f
   const raw = item !== null && typeof item === 'object' ? (item as { id?: unknown }).id : item
   return id(raw) ? [Number(raw)] : []
 }) : []
-/** Категория — заголовок этапа, а не тема: курсы других роадмапов у неё не учитываются. */
+/** Категория — заголовок этапа, а не тема: дополнительные курсы у неё не учитываются. */
 const sharedCourseIds = (node: { nodeType?: string | null; sharedCourses?: unknown }) => node.nodeType === 'category' ? [] : relationIds(node.sharedCourses)
 export function validCatalog(value: unknown): value is LearningCatalog {
   return object(value) && keys(value, ['courses', 'sections', 'roadmaps', 'nodes', 'invalidLessonIds']) &&
@@ -137,13 +137,18 @@ export async function getLearningCatalog(payload: Payload, req?: Partial<Payload
   }, validCatalog)
 }
 
-/** Роадмапы, в темах которых курс стоит как курс другой карты. */
+/**
+ * Другие роадмапы, в темах которых стоит курс. Своя карта сюда не входит: тема может держать
+ * курс своей же карты, и без этого фильтра каталог подписал бы курс «также в» его родной карте.
+ */
 export function sharedRoadmapsByCourse(catalog: LearningCatalog): Map<number, number[]> {
+  const ownRoadmap = new Map(catalog.courses.map((course) => [course.id, learningRelationId(course.roadmap)]))
   const result = new Map<number, number[]>()
   for (const node of catalog.nodes) {
     const roadmapId = learningRelationId(node.roadmap)
     if (roadmapId === null) continue
     for (const courseId of relationIds(node.sharedCourses)) {
+      if (ownRoadmap.get(courseId) === roadmapId) continue
       const roadmaps = result.get(courseId) ?? []
       if (!roadmaps.includes(roadmapId)) roadmaps.push(roadmapId)
       result.set(courseId, roadmaps)

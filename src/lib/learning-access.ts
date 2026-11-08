@@ -16,7 +16,7 @@ export type LearningLessonMetadata = { id: number; course: unknown; section?: un
 /**
  * `guides` — только опубликованные гайды темы, `bootcamps` — буткемпы, привязанные к ней полем узла.
  * Гайды и буткемпы показывают тему без курса, но не открывают ни её курсы, ни саму карту.
- * `sharedCourses` — курсы других роадмапов, которые тема показывает как свои: они входят в программу карты.
+ * `sharedCourses` — дополнительные курсы темы из этой или другой карты: тема показывает их как свои, они входят в программу карты.
  */
 export type LearningNodeMetadata = { id: number; roadmap: unknown; nodeType?: string | null; course?: unknown; guides?: number[]; bootcamps?: number[]; sharedCourses?: unknown[] | null }
 export type LearningPolicyMetadata = {
@@ -117,8 +117,8 @@ export function buildLearningAccess(
     effects.push(decision)
     primaryTopicEffects.set(course.id, effects)
   }
-  // Тема другой карты может открыть курс, но не закрыть: запрет там не должен отнимать курс
-  // в его собственном роадмапе. Поэтому ниже из этих тем учитывается только allow.
+  // Тема, где курс стоит дополнительным, может открыть его, но не закрыть: запрет там не должен
+  // отнимать курс в его родной теме. Поэтому ниже из этих тем учитывается только allow.
   // Категория и курс, ставший буткемпом уже в теме, отсекаются здесь, а не у источников:
   // каталог, точечная проверка видео и предпросмотр обязаны решать одинаково.
   const sharedTopics = new Map<number, LearningNodeMetadata[]>()

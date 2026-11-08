@@ -253,3 +253,46 @@ describe('буткемп в темах нескольких роадмапов',
     }
   })
 })
+
+describe('курс своей карты дополнительным в другой теме', () => {
+  /** Курс в родной теме своей карты и он же дополнительным курсом второй темы той же карты. */
+  async function ownRoadmapShared() {
+    const tree = await createCourseTree(payload, { lessons: 1 })
+    const home = await topic(tree.roadmap.id, { course: tree.course.id })
+    await payload.update({ collection: 'courses', id: tree.course.id, data: { roadmapNode: home.id } })
+    const extra = await topic(tree.roadmap.id, { sharedCourses: [tree.course.id] })
+    return { tree, home, extra }
+  }
+
+  it('каталог не подписывает курс «также в» его же карте, карта отдаёт курс один раз', async () => {
+    const { tree } = await ownRoadmapShared()
+    const other = await createCourseTree(payload, { lessons: 1 })
+    await topic(other.roadmap.id, { sharedCourses: [tree.course.id] })
+
+    expect(sharedRoadmapsByCourse(await getLearningCatalog(payload)).get(tree.course.id)).toEqual([other.roadmap.id])
+    expect((await getRoadmapContent(payload, tree.roadmap.id)).courses.map((course) => course.id)).toEqual([tree.course.id])
+  })
+
+  it('назначение на тему открывает курс, запрет этой темы не отнимает курс родной темы', async () => {
+    const { tree, home, extra } = await ownRoadmapShared()
+    const byExtra = await createStudent(payload, { learningAccessMode: 'assigned', learningCatalogVisibility: 'assigned' })
+    expect(await canAccessLesson(payload, byExtra, tree.lessons[0].id)).toBe(false)
+    await assign(byExtra, 'roadmap-nodes', extra.id)
+    expect(await canAccessLesson(payload, byExtra, tree.lessons[0].id)).toBe(true)
+
+    const byHome = await createStudent(payload, { learningAccessMode: 'assigned' })
+    await assign(byHome, 'roadmap-nodes', home.id)
+    await assign(byHome, 'roadmap-nodes', extra.id, 'deny')
+    expect(await canAccessLesson(payload, byHome, tree.lessons[0].id)).toBe(true)
+  })
+
+  it('урок завершает карту один раз: один бонус и один сертификат', async () => {
+    const { tree } = await ownRoadmapShared()
+    const learner = await createStudent(payload, { learningAccessMode: 'all' })
+
+    await finish(learner, tree.lessons[0].id)
+
+    expect(await roadmapBonuses(learner)).toEqual([String(tree.roadmap.id)])
+    expect(await roadmapCertificates(learner)).toEqual([String(tree.roadmap.id)])
+  })
+})
