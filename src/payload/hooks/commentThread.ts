@@ -17,7 +17,7 @@ import { adminLink, excerpt as longExcerpt, notifyAdminsAfterCommit } from '@/se
  * постороннему, а сам он получил бы доступ к чужой переписке.
  */
 
-type CommentDoc = { id: number; user: unknown; lesson: unknown; parentComment?: unknown }
+type CommentDoc = { id: number; user: unknown; lesson: unknown; parentComment?: unknown; isResolved?: boolean | null }
 
 const EXCERPT = 200
 
@@ -88,13 +88,20 @@ async function lessonOf(req: PayloadRequest, lesson: unknown) {
 export const notifyCommentThread: CollectionAfterChangeHook = async ({ doc, operation, req }) => {
   if (operation !== 'create' || req.context?.skipHooks) return doc
 
+  const root = doc.parentComment ? await findRoot(req, doc.parentComment) : null
+  // Уточнение автора к закрытому вопросу снова ждёт ментора, иначе оно не попадёт в «Ждёт ответа».
+  // Запись адаптером, а не операцией: сбой операции откатил бы транзакцию молча, вместе с уточнением.
+  // Вне try: если запись не прошла, пусть не сохранится и уточнение, а ученик увидит ошибку.
+  if (root?.isResolved && relationId(root.user) === relationId(doc.user)) {
+    await req.payload.db.updateOne({ collection: 'comments', id: root.id, data: { isResolved: false }, req, returning: false })
+  }
+
   return withSpan('hook.notifyCommentThread', { 'comment.id': doc.id }, async () => {
     try {
       const author = relationId(doc.user)
       const lesson = await lessonOf(req, doc.lesson)
 
-      if (doc.parentComment) {
-        const root = await findRoot(req, doc.parentComment)
+      if (root) {
         const asker = relationId(root.user)
         // Своё уточнение в своей ветке: в CMS уведомлять некого, но наставнику в Telegram оно нужно.
         if (asker === author) {

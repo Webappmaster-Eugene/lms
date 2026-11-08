@@ -6,7 +6,7 @@ import { MessageSquare } from 'lucide-react'
 
 import { StatusBadge } from '@/components/lesson/LessonComments'
 import { markAnswersRead } from '@/lib/answer-notifications'
-import { authorName, isMentorReply, threadStatus, STATUS_LABELS, type ThreadStatus } from '@/lib/comment-threads'
+import { authorName, isMentorReply, messagePreview, threadStatus, STATUS_LABELS, type ThreadStatus } from '@/lib/comment-threads'
 import type { QuestionThread } from '@/lib/questions'
 import { cn, formatDate, pluralize } from '@/lib/utils'
 
@@ -91,10 +91,10 @@ export function MyQuestions({ threads }: { threads: QuestionThread[] }) {
                 )}
                 <StatusBadge status={status} />
               </div>
-              <p className="line-clamp-3 whitespace-pre-wrap text-sm text-foreground">{thread.question.content}</p>
+              <p className="line-clamp-3 whitespace-pre-wrap text-sm text-foreground [overflow-wrap:anywhere]">{messagePreview(thread.question.content)}</p>
               {last && (
-                <p className="line-clamp-2 border-l-2 border-border pl-3 text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">{authorName(last.user)}:</span> {last.content}
+                <p className="line-clamp-2 border-l-2 border-border pl-3 text-sm text-muted-foreground [overflow-wrap:anywhere]">
+                  <span className="font-medium text-foreground">{authorName(last.user)}:</span> {messagePreview(last.content)}
                 </p>
               )}
               <p className="text-xs text-muted-foreground">

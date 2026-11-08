@@ -23,6 +23,8 @@ function api({ postOk = true } = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Черновики живут в localStorage и перешли бы из теста в тест.
+  localStorage.clear()
   window.history.replaceState(null, '', '/lessons/effects')
   api()
 })

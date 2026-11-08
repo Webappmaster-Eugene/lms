@@ -72,6 +72,12 @@ describe('мои вопросы', () => {
     expect(screen.getByText('1 вопрос')).toBeInTheDocument()
   })
 
+  it('в превью вместо кода пометка, без разметки', () => {
+    render(<MyQuestions threads={[thread(1, { question: { ...thread(1).question, content: 'Почему **падает**?\n```js\nfoo()\n```' } })]} />)
+
+    expect(screen.getByText(/Почему падает\?/)).toHaveTextContent('Почему падает? [код]')
+  })
+
   it('недоступный урок не даёт битой ссылки', () => {
     render(<MyQuestions threads={threads} />)
 
@@ -91,6 +97,8 @@ describe('вопросы учеников — страница ментора', 
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Черновики ответов живут в localStorage и перешли бы из теста в тест.
+    localStorage.clear()
     calls = []
     global.fetch = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
       calls.push({ url: String(url), init })
@@ -115,6 +123,40 @@ describe('вопросы учеников — страница ментора', 
     await waitFor(() => expect(refresh).toHaveBeenCalled())
     expect(calls[0].url).toBe('/api/comments')
     expect(JSON.parse(String(calls[0].init?.body))).toEqual({ content: 'Смотрите StrictMode', parentComment: 1 })
+  })
+
+  it('«Ответить и закрыть» отправляет ответ, затем закрывает вопрос', async () => {
+    const user = userEvent.setup()
+    render(<MentorQuestions threads={[thread(1)]} />)
+
+    await user.type(screen.getByRole('textbox', { name: /Ответ ученику/ }), 'Готово')
+    await user.click(screen.getByRole('button', { name: 'Ответить и закрыть' }))
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled())
+    expect(calls.map((c) => [c.url, c.init?.method])).toEqual([['/api/comments', 'POST'], ['/api/comments/1', 'PATCH']])
+    expect(JSON.parse(String(calls[1].init?.body))).toEqual({ isResolved: true })
+    expect(toast).toHaveBeenCalledWith('Ответ отправлен, вопрос закрыт', 'success')
+  })
+
+  it('если после ответа закрыть не вышло, ответ не теряется и ментор знает об этом', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    global.fetch = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) =>
+      init?.method === 'PATCH' ? new Response(null, { status: 500 }) : Response.json({ doc: {} })) as unknown as typeof fetch
+    const user = userEvent.setup()
+    render(<MentorQuestions threads={[thread(1)]} />)
+
+    await user.type(screen.getByRole('textbox', { name: /Ответ ученику/ }), 'Готово')
+    await user.click(screen.getByRole('button', { name: 'Ответить и закрыть' }))
+
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('Ответ отправлен, но вопрос закрыть не удалось', 'error'))
+    expect(refresh).toHaveBeenCalled()
+    expect(screen.getByRole('textbox', { name: /Ответ ученику/ })).toHaveValue('')
+  })
+
+  it('таймкод в вопросе ведёт ментора на момент видео в уроке', () => {
+    render(<MentorQuestions threads={[thread(1, { question: { ...thread(1).question, content: 'Непонятно на 2:05' } })]} />)
+
+    expect(screen.getByRole('link', { name: '2:05' })).toHaveAttribute('href', '/lessons/lesson-1?t=125')
   })
 
   it('Ctrl+Enter отправляет ответ', async () => {

@@ -95,11 +95,41 @@ describe('редактирование и удаление своих комме
     expect((await payload.findByID({ collection: 'comments', id })).content).toBe('(Комментарий удалён)')
   })
 
-  it('отвергает пустой текст и текст длиннее 2000 символов', async () => {
-    const id = await comment(mine)
-    for (const content of ['   ', 'x'.repeat(2001)]) {
+  it('принимает вопрос с кодом до 5000 символов, отвергает пустой и длиннее', async () => {
+    const id = await comment(mine, 'x'.repeat(5000))
+    for (const content of ['   ', 'x'.repeat(5001)]) {
       expect((await rest('PATCH', `/comments/${id}`, { token: mine, body: { content } })).status).toBe(400)
     }
+    expect((await rest('POST', '/comments', { token: mine, body: { lesson: tree.lessons[0].id, content: 'x'.repeat(5001) } })).status).toBe(400)
+  })
+
+  it('автор закрывает свой вопрос, но не чужой, не уточнение и не снимает отметку сам', async () => {
+    const root = await comment(mine)
+    const reply = await comment(mine, 'Уточнение', root)
+    const foreign = await comment(other, 'Чужой вопрос')
+
+    expect((await rest('PATCH', `/comments/${root}`, { token: mine, body: { isResolved: true } })).status).toBe(200)
+    expect((await payload.findByID({ collection: 'comments', id: root })).isResolved).toBe(true)
+    expect((await rest('PATCH', `/comments/${root}`, { token: mine, body: { isResolved: false } })).status).toBe(200)
+    expect((await payload.findByID({ collection: 'comments', id: root })).isResolved).toBe(true)
+
+    expect((await rest('PATCH', `/comments/${reply}`, { token: mine, body: { isResolved: true } })).status).toBe(200)
+    expect((await payload.findByID({ collection: 'comments', id: reply })).isResolved).toBe(false)
+    expect((await rest('PATCH', `/comments/${foreign}`, { token: mine, body: { isResolved: true } })).status).toBeGreaterThanOrEqual(400)
+    expect((await payload.findByID({ collection: 'comments', id: foreign })).isResolved).toBe(false)
+  })
+
+  it('уточнение автора открывает закрытый вопрос снова, ответ ментора - нет', async () => {
+    const root = await comment(mine, 'Вопрос, который закроют')
+    await comment(mentor, 'Ответ', root)
+    expect((await rest('PATCH', `/comments/${root}`, { token: mentor, body: { isResolved: true } })).status).toBe(200)
+
+    await comment(mentor, 'Дополнение ментора', root)
+    expect((await payload.findByID({ collection: 'comments', id: root })).isResolved).toBe(true)
+
+    const followUp = await comment(mine, 'А если без хука?', root)
+    expect(await payload.findByID({ collection: 'comments', id: root, depth: 0 })).toMatchObject({ isResolved: false, content: 'Вопрос, который закроют' })
+    expect((await payload.findByID({ collection: 'comments', id: followUp })).content).toBe('А если без хука?')
   })
 
   it('проверяет актуальный доступ к уроку при правке и удалении', async () => {
@@ -141,7 +171,7 @@ describe('редактирование и удаление своих комме
     expect(after.docs.map(({ id, message, isRead }) => ({ id, message, isRead }))).toEqual(before.docs.map(({ id, message, isRead }) => ({ id, message, isRead })))
   })
 
-  it.each(['student', 'admin'] as const)('правка %s сохраняет свежий resolved; отметку явно меняет только ментор', async (actor) => {
+  it.each(['student', 'admin'] as const)('правка %s сохраняет свежий resolved; снять отметку может только ментор', async (actor) => {
     const id = await comment(mine)
     let enter: () => void = () => undefined
     let release: () => void = () => undefined
@@ -165,8 +195,9 @@ describe('редактирование и удаление своих комме
       expect(await payload.findByID({ collection: 'comments', id })).toMatchObject({ content: 'Правка с подделкой', isResolved: true })
       expect((await rest('PATCH', `/comments/${id}`, { token: mentor, body: { isResolved: false } })).status).toBe(200)
       expect((await payload.findByID({ collection: 'comments', id })).isResolved).toBe(false)
+      // Закрыть свой вопрос автор может: ответ помог.
       expect((await rest('PATCH', `/comments/${id}`, { token: mine, body: { isResolved: true } })).status).toBe(200)
-      expect((await payload.findByID({ collection: 'comments', id })).isResolved).toBe(false)
+      expect((await payload.findByID({ collection: 'comments', id })).isResolved).toBe(true)
     } finally {
       release()
       if (pending) await pending

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { authorName, groupThreads, isMentorReply, threadStatus, type CommentDoc } from '@/lib/comment-threads'
+import { authorInitials, authorName, formatMessageTime, groupThreads, isMentorReply, messagePreview, threadStatus, type CommentDoc } from '@/lib/comment-threads'
 
 const c = (id: number, createdAt: string, parentComment: number | null = null, user: CommentDoc['user'] = { id: 1, firstName: 'Анна' }): CommentDoc => ({
   id,
@@ -69,5 +69,59 @@ describe('статус ветки', () => {
 
   it('решённый — решён, что бы ни было в ветке', () => {
     expect(threadStatus({ question: { ...question, isResolved: true }, replies: [student(2)] })).toBe('resolved')
+  })
+})
+
+describe('превью сообщения для списков', () => {
+  it('блок кода заменяется пометкой, разметка снимается', () => {
+    const text = [
+      '## Ошибка в **useEffect**',
+      'Пишу `fetch` и [ссылку](https://example.org):',
+      '```ts',
+      'const x = 1',
+      '```',
+      'Что не так?',
+    ].join('\n')
+
+    expect(messagePreview(text)).toBe('Ошибка в useEffect\nПишу fetch и ссылку:\n[код]\nЧто не так?')
+  })
+
+  it('незакрытый блок не выдаёт код за текст', () => {
+    expect(messagePreview('Вот:\n```\nsecret()\nещё')).toBe('Вот:\n[код]')
+  })
+
+  it('обычный текст остаётся как был', () => {
+    expect(messagePreview('Почему 2 * 3 = 6?\nИ ещё вопрос')).toBe('Почему 2 * 3 = 6?\nИ ещё вопрос')
+  })
+})
+
+describe('время сообщения', () => {
+  const now = new Date(2026, 10, 8, 15, 0)
+  const at = (year: number, month: number, day: number, hours: number, minutes: number, seconds = 0) =>
+    new Date(year, month, day, hours, minutes, seconds).toISOString()
+
+  it('свежие сообщения - по минутам', () => {
+    expect(formatMessageTime(at(2026, 10, 8, 14, 59, 40), now)).toBe('только что')
+    expect(formatMessageTime(at(2026, 10, 8, 14, 55), now)).toBe('5 минут назад')
+    expect(formatMessageTime(at(2026, 10, 8, 14, 39), now)).toBe('21 минуту назад')
+  })
+
+  it('дальше - день и время', () => {
+    expect(formatMessageTime(at(2026, 10, 8, 9, 5), now)).toBe('сегодня в 09:05')
+    expect(formatMessageTime(at(2026, 10, 7, 23, 50), now)).toBe('вчера в 23:50')
+    expect(formatMessageTime(at(2026, 10, 3, 9, 30), now)).toBe('3 ноября в 09:30')
+    expect(formatMessageTime(at(2025, 11, 31, 9, 30), now)).toMatch(/^31 декабря 2025/)
+  })
+
+  it('битая дата не превращается в «Invalid Date»', () => {
+    expect(formatMessageTime('мусор', now)).toBe('')
+  })
+})
+
+describe('инициалы автора', () => {
+  it('две первые буквы имени и фамилии', () => {
+    expect(authorInitials({ id: 1, firstName: 'анна', lastName: 'Ли' })).toBe('АЛ')
+    expect(authorInitials({ id: 1, firstName: 'Анна' })).toBe('А')
+    expect(authorInitials({ id: 1 })).toBe('П')
   })
 })

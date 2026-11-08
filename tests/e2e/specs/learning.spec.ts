@@ -122,7 +122,7 @@ test('вопрос к уроку: ментор отвечает, ученик в
   await mentorPage.goto('/admin/questions')
   const card = mentorPage.locator(`#comment-${questionId}`)
   await card.getByRole('textbox', { name: /Ответ ученику/ }).fill('Ответ ментора e2e')
-  await card.getByRole('button', { name: 'Ответить' }).click()
+  await card.getByRole('button', { name: 'Ответить', exact: true }).click()
   await expect(mentorPage.getByText('Ответ отправлен - ученик получит уведомление')).toBeVisible()
   await mentorPage.getByRole('button', { name: /Есть ответ/ }).click()
   await expect(mentorPage.locator(`#comment-${questionId}`)).toContainText('Ответ ментора e2e')
@@ -155,6 +155,49 @@ test('вопрос к уроку: ментор отвечает, ученик в
     'href',
     `/lessons/${second.slug}#comment-${questionId}`,
   )
+})
+
+test('вопрос с кодом: блок кода, просмотр, ответ с закрытием и повторное открытие уточнением', async ({ page, browser }) => {
+  const marker = `Код e2e ${Date.now()}`
+  await page.goto(`/lessons/${third.slug}`)
+  const box = page.getByRole('textbox', { name: 'Вопрос к уроку' })
+  await box.fill(`${marker}\n`)
+  await page.getByRole('button', { name: 'Код', exact: true }).first().click()
+  // Кнопка возвращает фокус в поле кадром позже - курсор уже внутри пустого блока.
+  await expect(box).toBeFocused()
+  await page.keyboard.type('const answer = 42')
+  await expect(box).toHaveValue(`${marker}\n\`\`\`\nconst answer = 42\n\`\`\`\n`)
+
+  // Черновик переживает перезагрузку страницы.
+  await page.reload()
+  await expect(page.getByRole('textbox', { name: 'Вопрос к уроку' })).toHaveValue(`${marker}\n\`\`\`\nconst answer = 42\n\`\`\`\n`)
+
+  await page.getByRole('button', { name: 'Просмотр' }).first().click()
+  await expect(page.getByRole('region', { name: 'Просмотр сообщения' }).locator('pre')).toContainText('const answer = 42')
+  await page.getByRole('button', { name: 'Отправить вопрос', exact: true }).click()
+  await expect(page.getByText('Вопрос отправлен ментору')).toBeVisible()
+  const thread = page.getByRole('listitem').filter({ hasText: marker })
+  await expect(thread.locator('pre')).toContainText('const answer = 42')
+  await expect(thread.getByRole('button', { name: 'Копировать код' })).toBeVisible()
+  const questionId = (await thread.getAttribute('id'))?.replace('comment-', '')
+
+  const mentor = await browser.newContext({ baseURL: APP_URL, storageState: storageStateOf('admin') })
+  const mentorPage = await mentor.newPage()
+  await mentorPage.goto('/admin/questions')
+  const card = mentorPage.locator(`#comment-${questionId}`)
+  await expect(card.locator('pre')).toContainText('const answer = 42')
+  await card.getByRole('textbox', { name: /Ответ ученику/ }).fill('Используйте `let`')
+  await card.getByRole('button', { name: 'Ответить и закрыть' }).click()
+  await expect(mentorPage.getByText('Ответ отправлен, вопрос закрыт')).toBeVisible()
+  await mentor.close()
+
+  await page.reload()
+  await expect(thread.getByText('Решён')).toBeVisible()
+  await expect(thread.locator('code', { hasText: 'let' })).toBeVisible()
+  await thread.getByRole('button', { name: 'Уточнить' }).click()
+  await thread.getByRole('textbox', { name: 'Уточнение к вопросу' }).fill('А если нужен const?')
+  await thread.getByRole('button', { name: 'Отправить уточнение' }).click()
+  await expect(thread.getByText('Ждёт ответа')).toBeVisible()
 })
 
 test.describe('видео досмотрено — предложение отметить урок', () => {

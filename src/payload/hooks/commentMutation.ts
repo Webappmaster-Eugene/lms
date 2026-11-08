@@ -1,6 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import { APIError, type CollectionBeforeValidateHook, type PayloadRequest } from 'payload'
 
+import { COMMENT_MAX_LENGTH } from '@/lib/comment-threads'
 import { relationId } from '@/lib/relation-id'
 import { requireLessonAccess } from '@/server/learning-access'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
@@ -36,8 +37,10 @@ export const guardCommentMutation: CollectionBeforeValidateHook = async ({ data,
     data.parentComment = current.parentComment ? relationId(current.parentComment) : null
     if (!patch.keys.has('content')) data.content = current.content
     // Omitted checkboxes contain a pre-lock fallback; only an explicit administrative patch may replace the fresh value.
-    const explicitAdministrativeResolve = patch.keys.has('isResolved') && (actorIsAdmin || (!req.user && patch.overrideAccess))
-    if (!explicitAdministrativeResolve) data.isResolved = current.isResolved ?? false
+    // The asker may only close their own question; reopening is a clarification, not a PATCH.
+    const askerCloses = Boolean(req.user) && !current.parentComment && relationId(current.user) === req.user?.id && data.isResolved === true
+    const explicitResolve = patch.keys.has('isResolved') && (actorIsAdmin || (!req.user && patch.overrideAccess) || askerCloses)
+    if (!explicitResolve) data.isResolved = current.isResolved ?? false
     data.deletedAt = req.context.removeOwnedComment ? new Date().toISOString() : null
   } else {
     if (req.user && !actorIsAdmin) data.isResolved = false
@@ -45,8 +48,8 @@ export const guardCommentMutation: CollectionBeforeValidateHook = async ({ data,
   }
   if (req.context.removeOwnedComment) data.content = DELETED_COMMENT
   if ('content' in data) {
-    if (typeof data.content !== 'string' || !data.content.trim() || data.content.trim().length > 2000) {
-      throw new APIError('Комментарий должен содержать от 1 до 2000 символов', 400)
+    if (typeof data.content !== 'string' || !data.content.trim() || data.content.trim().length > COMMENT_MAX_LENGTH) {
+      throw new APIError(`Комментарий должен содержать от 1 до ${COMMENT_MAX_LENGTH} символов`, 400)
     }
     data.content = data.content.trim()
   }

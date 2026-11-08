@@ -57,6 +57,8 @@ const sendButton = () => screen.getByRole('button', { name: /Отправ.* во
 describe('вопросы к уроку', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Черновики живут в localStorage и перешли бы из теста в тест.
+    localStorage.clear()
     mockApi()
   })
 
@@ -241,6 +243,57 @@ describe('вопросы к уроку', () => {
       await waitFor(() => expect(posted).toHaveLength(1))
       expect(posted[0]).toEqual({ lesson: 42, content: 'А если без StrictMode?', parentComment: 5 })
       expect(toast).toHaveBeenCalledWith('Уточнение отправлено', 'success')
+    })
+  })
+
+  describe('закрытие вопроса учеником', () => {
+    it('после ответа ментора автор закрывает вопрос сам', async () => {
+      mockApi({ pages: [[comment(1), comment(2, { content: 'Ответ', user: 3, parentComment: 1 })]] })
+      const user = userEvent.setup()
+      render(<LessonComments lessonId={42} userId={7} />)
+
+      await user.click(await screen.findByRole('button', { name: 'Вопрос решён' }))
+
+      await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringMatching(/^Вопрос закрыт/), 'success'))
+      const call = vi.mocked(fetch).mock.calls.find(([url, init]) => String(url) === '/api/comments/1' && init?.method === 'PATCH')
+      expect(JSON.parse(String(call?.[1]?.body))).toEqual({ isResolved: true })
+    })
+
+    it('без ответа ментора и в решённой ветке кнопки нет', async () => {
+      mockApi({ pages: [[comment(1), comment(2, { isResolved: true }), comment(3, { content: 'Ответ', user: 3, parentComment: 2 })]] })
+      render(<LessonComments lessonId={42} userId={7} />)
+
+      await screen.findByText('Ответ')
+      expect(screen.queryByRole('button', { name: 'Вопрос решён' })).not.toBeInTheDocument()
+    })
+
+    it('уточнение к решённому вопросу предупреждает, что откроет его снова', async () => {
+      mockApi({ pages: [[comment(1, { isResolved: true })]] })
+      const user = userEvent.setup()
+      render(<LessonComments lessonId={42} userId={7} />)
+
+      await user.click(await screen.findByRole('button', { name: 'Уточнить' }))
+      expect(screen.getByRole('textbox', { name: 'Уточнение к вопросу' })).toHaveAttribute('placeholder', 'Уточнение снова откроет вопрос')
+    })
+  })
+
+  describe('текст переписки', () => {
+    it('код из вопроса показывается блоком, а не одной строкой', async () => {
+      mockApi({ pages: [[comment(1, { content: 'Почему падает?\n\n```\nconst a = 1\nconst b = 2\n```' })]] })
+      const { container } = render(<LessonComments lessonId={42} />)
+
+      await screen.findByText('Почему падает?')
+      expect(container.querySelector('pre')?.textContent).toBe('const a = 1\nconst b = 2\n')
+    })
+
+    it('недописанный вопрос возвращается в поле после ухода со страницы', async () => {
+      const user = userEvent.setup()
+      const { unmount } = render(<LessonComments lessonId={42} userId={7} />)
+      await user.type(questionBox(), 'Почему так')
+      unmount()
+
+      render(<LessonComments lessonId={42} userId={7} />)
+      expect(questionBox()).toHaveValue('Почему так')
     })
   })
 

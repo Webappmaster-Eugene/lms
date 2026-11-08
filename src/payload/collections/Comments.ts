@@ -8,6 +8,8 @@ import { guardLearningLessonWrite } from '@/payload/hooks/learningLessonWrite'
 import { learningStateRead } from '@/payload/access/learningStateRead'
 import { guardCommentMutation, removeOwnedComment } from '@/payload/hooks/commentMutation'
 import { captureRawCollectionPatch } from '@/payload/hooks/rawCollectionPatch'
+import { COMMENT_MAX_LENGTH } from '@/lib/comment-threads'
+import { relationId } from '@/lib/relation-id'
 
 export const Comments: CollectionConfig = {
   slug: 'comments',
@@ -60,7 +62,7 @@ export const Comments: CollectionConfig = {
       type: 'textarea',
       required: true,
       label: 'Комментарий',
-      maxLength: 2000,
+      maxLength: COMMENT_MAX_LENGTH,
     },
     {
       name: 'parentComment',
@@ -79,7 +81,11 @@ export const Comments: CollectionConfig = {
       label: 'Решён (для Q&A)',
       access: {
         create: async ({ req }) => (await isAdmin({ req })) === true,
-        update: async ({ req }) => (await isAdmin({ req })) === true,
+        update: async ({ req, doc, data }) => {
+          if ((await isAdmin({ req })) === true) return true
+          // Автор закрывает свой вопрос, когда ответ помог. Снова открывает его уточнение (notifyCommentThread).
+          return Boolean(req.user && doc && !doc.parentComment && relationId(doc.user) === req.user.id && data?.isResolved === true)
+        },
       },
       admin: {
         position: 'sidebar',

@@ -1,13 +1,17 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
-import { CheckCircle2, CornerDownRight, Loader2, MessageSquare, Send } from 'lucide-react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
+import { CheckCircle2, CornerDownRight, Loader2, MessageSquare, Pencil, Trash2 } from 'lucide-react'
 import { useAsyncData } from '@/hooks/use-async-data'
 import { useHydrated } from '@/hooks/use-hydrated'
+import { usePageHasVideo } from '@/hooks/use-page-has-video'
 import { useToast } from '@/components/ui/Toast'
+import { ChatMessage } from '@/components/questions/ChatMessage'
+import { MessageComposer, type ComposerAction } from '@/components/questions/MessageComposer'
+import { MessageContent, type TimestampTarget } from '@/components/questions/MessageContent'
 import { markAnswersRead } from '@/lib/answer-notifications'
-import { authorId, authorName, groupThreads, isMentorReply, threadStatus, STATUS_LABELS, type CommentDoc, type Thread, type ThreadStatus } from '@/lib/comment-threads'
-import { cn, formatDate } from '@/lib/utils'
+import { authorId, groupThreads, isMentorReply, threadStatus, STATUS_LABELS, type CommentDoc, type Thread, type ThreadStatus } from '@/lib/comment-threads'
+import { cn } from '@/lib/utils'
 
 type Props = {
   /** Числовой id — Payload отвергает строковые id в relationship-полях. */
@@ -21,20 +25,22 @@ const MAX_PAGES = 20
 
 type Loaded = { threads: Thread[]; failed: boolean }
 
-async function postComment(body: Record<string, unknown>) {
-  const res = await fetch('/api/comments', {
-    method: 'POST',
+const ASK: ComposerAction[] = [{ id: 'send', label: 'Отправить', ariaLabel: 'Отправить вопрос', busyLabel: 'Отправляем…', busyAriaLabel: 'Отправляем вопрос' }]
+const CLARIFY: ComposerAction[] = [{ id: 'send', label: 'Отправить', ariaLabel: 'Отправить уточнение', busyLabel: 'Отправляем…', busyAriaLabel: 'Отправляем уточнение' }]
+const SAVE: ComposerAction[] = [{ id: 'save', label: 'Сохранить', busyLabel: 'Сохраняем…' }]
+
+async function request(url: string, method: 'POST' | 'PATCH', body: Record<string, unknown>) {
+  const res = await fetch(url, {
+    method,
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`POST /api/comments → ${res.status}`)
+  if (!res.ok) throw new Error(`${method} ${url} → ${res.status}`)
 }
 
 export function LessonComments({ lessonId, userId }: Props) {
   const hydrated = useHydrated()
-  const [newComment, setNewComment] = useState('')
-  const [submitting, setSubmitting] = useState(false)
   const { toast } = useToast()
 
   const loadComments = useCallback(
@@ -78,19 +84,20 @@ export function LessonComments({ lessonId, userId }: Props) {
     document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: 'center' })
   }, [loading])
 
-  async function handleSubmit() {
-    if (!newComment.trim()) return
-    setSubmitting(true)
+  // Таймкоды в переписке перематывают видео урока, если оно есть.
+  const hasVideo = usePageHasVideo()
+  const timestamps = useMemo<TimestampTarget>(() => (hasVideo ? { kind: 'seek' } : null), [hasVideo])
+
+  async function ask(text: string) {
     try {
-      await postComment({ lesson: lessonId, content: newComment.trim() })
-      setNewComment('')
+      await request('/api/comments', 'POST', { lesson: lessonId, content: text })
       toast('Вопрос отправлен ментору', 'success')
       reload()
+      return true
     } catch (error) {
       console.error('Не удалось отправить вопрос', error)
       toast('Не удалось отправить вопрос', 'error')
-    } finally {
-      setSubmitting(false)
+      return false
     }
   }
 
@@ -102,32 +109,20 @@ export function LessonComments({ lessonId, userId }: Props) {
           Вопросы к уроку
           {threads.length > 0 && <span className="text-sm font-normal text-muted-foreground">({threads.length})</span>}
         </h3>
-        <p className="text-sm text-muted-foreground">
-          Вопросы видите только вы и ментор. Когда он ответит, придёт уведомление.
-        </p>
+        <p className="text-sm text-muted-foreground">Вопросы видите только вы и ментор. Ответ придёт уведомлением.</p>
       </div>
 
-      <div className="flex gap-3">
-        <textarea
-          disabled={!hydrated}
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          aria-label="Вопрос к уроку"
-          placeholder="Что осталось непонятным?"
-          maxLength={2000}
-          rows={2}
-          className="min-w-0 flex-1 resize-none rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-        />
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={!hydrated || submitting || !newComment.trim()}
-          aria-label={submitting ? 'Отправляем вопрос' : 'Отправить вопрос'}
-          className="flex h-11 w-11 shrink-0 items-center justify-center self-end rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-        >
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        </button>
-      </div>
+      <MessageComposer
+        label="Вопрос к уроку"
+        placeholder="Что осталось непонятным?"
+        draftKey={`${userId ?? 'guest'}:lesson:${lessonId}`}
+        disabled={!hydrated}
+        actions={ASK}
+        onSubmit={ask}
+        guide
+        videoTime
+        timestamps={timestamps}
+      />
 
       {loading ? (
         <div className="flex items-center justify-center py-8">
@@ -138,13 +133,11 @@ export function LessonComments({ lessonId, userId }: Props) {
           Не удалось загрузить вопросы - обновите страницу
         </p>
       ) : threads.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">
-          Вопросов пока нет. Если что-то непонятно - спросите, ментор ответит здесь же.
-        </p>
+        <p className="py-6 text-center text-sm text-muted-foreground">Вопросов пока нет.</p>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-4">
           {threads.map((thread) => (
-            <ThreadItem key={thread.question.id} thread={thread} lessonId={lessonId} userId={userId} onPosted={reload} />
+            <ThreadItem key={thread.question.id} thread={thread} lessonId={lessonId} userId={userId} timestamps={timestamps} onPosted={reload} />
           ))}
         </ul>
       )}
@@ -152,47 +145,64 @@ export function LessonComments({ lessonId, userId }: Props) {
   )
 }
 
-function ThreadItem({ thread, lessonId, userId, onPosted }: { thread: Thread; lessonId: number; userId?: number; onPosted: () => void }) {
+function ThreadItem({ thread, lessonId, userId, timestamps, onPosted }: {
+  thread: Thread
+  lessonId: number
+  userId?: number
+  timestamps: TimestampTarget
+  onPosted: () => void
+}) {
   const { question, replies } = thread
   const status = threadStatus(thread)
   const [replying, setReplying] = useState(false)
-  const [text, setText] = useState('')
-  const [sending, setSending] = useState(false)
+  const [resolving, setResolving] = useState(false)
   const { toast } = useToast()
+  const mine = userId !== undefined && authorId(question.user) === String(userId)
 
-  async function send() {
-    if (!text.trim()) return
-    setSending(true)
+  async function clarify(text: string) {
     try {
-      await postComment({ lesson: lessonId, content: text.trim(), parentComment: Number(question.id) })
-      setText('')
+      await request('/api/comments', 'POST', { lesson: lessonId, content: text, parentComment: Number(question.id) })
       setReplying(false)
       toast('Уточнение отправлено', 'success')
       onPosted()
+      return true
     } catch (error) {
       console.error('Не удалось отправить уточнение', error)
       toast('Не удалось отправить уточнение', 'error')
-    } finally {
-      setSending(false)
+      return false
     }
   }
 
+  async function resolve() {
+    setResolving(true)
+    try {
+      await request(`/api/comments/${question.id}`, 'PATCH', { isResolved: true })
+      toast('Вопрос закрыт. Если что-то снова неясно - напишите уточнение', 'success')
+      onPosted()
+    } catch (error) {
+      console.error('Не удалось закрыть вопрос', error)
+      toast('Не удалось закрыть вопрос', 'error')
+    } finally {
+      setResolving(false)
+    }
+  }
+
+  const actionClass = 'flex min-h-11 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50'
   return (
-    <li id={`comment-${question.id}`} className="scroll-mt-24 space-y-3 rounded-lg border border-border bg-card px-4 py-3">
-      <CommentBody comment={question} userId={userId} onChanged={onPosted}>
+    <li id={`comment-${question.id}`} className="scroll-mt-24 space-y-3 rounded-xl border border-border bg-card p-4">
+      <CommentBody comment={question} mentor={false} userId={userId} timestamps={timestamps} onChanged={onPosted}>
         <StatusBadge status={status} />
       </CommentBody>
 
       {replies.length > 0 && (
-        <ul className="space-y-3 border-l-2 border-border pl-4">
+        <ul className="space-y-3 border-t border-border pt-3">
           {replies.map((reply) => {
             const mentor = isMentorReply(reply, question)
             return (
-              <li key={reply.id} className={cn(mentor && '-ml-2 rounded-md bg-primary/5 p-2')}>
-                <CommentBody comment={reply} userId={userId} onChanged={onPosted}>
-                  {mentor && reply.user && typeof reply.user === 'object' && (
-                    <Badge className="bg-primary/10 text-foreground">Ментор</Badge>
-                  )}
+              <li key={reply.id} className={cn(mentor && '-mx-2 rounded-lg bg-primary/5 p-2')}>
+                <CommentBody comment={reply} mentor={mentor} userId={userId} timestamps={timestamps} onChanged={onPosted}>
+                  {/* Профиль ментора ученику обычно не виден - тогда «Ментор» уже стоит вместо имени. */}
+                  {mentor && reply.user && typeof reply.user === 'object' && <Badge className="bg-primary/10 text-foreground">Ментор</Badge>}
                 </CommentBody>
               </li>
             )
@@ -201,67 +211,72 @@ function ThreadItem({ thread, lessonId, userId, onPosted }: { thread: Thread; le
       )}
 
       {replying ? (
-        <div className="flex gap-2">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            aria-label="Уточнение к вопросу"
-            maxLength={2000}
-            rows={2}
+        <div className="border-t border-border pt-3">
+          <MessageComposer
+            label="Уточнение к вопросу"
+            placeholder={status === 'resolved' ? 'Уточнение снова откроет вопрос' : 'Что ещё неясно?'}
+            draftKey={`${userId ?? 'guest'}:thread:${question.id}`}
             autoFocus
-            className="min-w-0 flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+            actions={CLARIFY}
+            onSubmit={clarify}
+            onCancel={() => setReplying(false)}
+            videoTime
+            timestamps={timestamps}
           />
-          <button
-            type="button"
-            onClick={send}
-            disabled={sending || !text.trim()}
-            aria-label={sending ? 'Отправляем уточнение' : 'Отправить уточнение'}
-            className="flex h-11 w-11 shrink-0 items-center justify-center self-end rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-          >
-            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </button>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => setReplying(true)}
-          className="flex min-h-11 items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <CornerDownRight className="h-3.5 w-3.5" aria-hidden="true" />
-          Уточнить
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setReplying(true)} className={actionClass}>
+            <CornerDownRight className="h-3.5 w-3.5" aria-hidden="true" />
+            Уточнить
+          </button>
+          {mine && status === 'answered' && !question.deletedAt && (
+            <button type="button" onClick={() => void resolve()} disabled={resolving} className={actionClass}>
+              {resolving ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-3.5 w-3.5 text-success" aria-hidden="true" />}
+              Вопрос решён
+            </button>
+          )}
+        </div>
       )}
     </li>
   )
 }
 
-function CommentBody({ comment, userId, onChanged, children }: { comment: CommentDoc; userId?: number; onChanged: () => void; children?: React.ReactNode }) {
+function CommentBody({ comment, mentor, userId, timestamps, onChanged, children }: {
+  comment: CommentDoc
+  mentor: boolean
+  userId?: number
+  timestamps: TimestampTarget
+  onChanged: () => void
+  children?: React.ReactNode
+}) {
   const [editing, setEditing] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  const [draft, setDraft] = useState(comment.content)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const { toast } = useToast()
   const mine = userId !== undefined && authorId(comment.user) === String(userId)
 
-  async function mutate(remove: boolean) {
-    if (pending || (!remove && !draft.trim())) return
+  async function mutate(content: string | null): Promise<boolean> {
+    const remove = content === null
     setPending(true)
     setError('')
     try {
       const res = await fetch(`/api/comments/${comment.id}${remove ? '/remove' : ''}`, {
         method: remove ? 'DELETE' : 'PATCH', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        ...(remove ? {} : { body: JSON.stringify({ content: draft.trim() }) }),
+        ...(remove ? {} : { body: JSON.stringify({ content }) }),
       })
       if (!res.ok) throw new Error(`Изменение комментария → ${res.status}`)
       setEditing(false)
       setConfirming(false)
       toast(remove ? 'Комментарий удалён' : 'Комментарий изменён', 'success')
       onChanged()
+      return true
     } catch (err) {
       console.error('Не удалось изменить комментарий', err)
       setError(remove ? 'Не удалось удалить комментарий. Попробуйте ещё раз.' : 'Не удалось сохранить изменения. Ваш текст остался в поле - попробуйте ещё раз.')
+      return false
     } finally {
       setPending(false)
     }
@@ -271,51 +286,54 @@ function CommentBody({ comment, userId, onChanged, children }: { comment: Commen
     setEditing(false)
     setConfirming(false)
     setError('')
-    setDraft(comment.content)
   }
 
+  const iconClass = 'flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground'
   const buttonClass = 'min-h-11 rounded-md px-2 text-sm font-medium hover:bg-muted disabled:opacity-50'
+  const canChange = mine && !comment.deletedAt && !editing && !confirming
   return (
-    <div className="space-y-1">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-medium text-foreground [overflow-wrap:anywhere]">
-          {authorName(comment.user)}
-          {children}
-        </span>
-        <span className="text-xs text-muted-foreground">{formatDate(comment.createdAt)}</span>
-      </div>
-      {editing ? (
-        <div className="space-y-2">
-          <textarea aria-label="Текст комментария" autoFocus rows={3} maxLength={2000} value={draft}
-            disabled={pending} onChange={(event) => setDraft(event.target.value)}
-            className="w-full resize-y rounded-lg border border-input bg-background p-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className={buttonClass} onClick={() => void mutate(false)} disabled={pending || !draft.trim()}>{pending ? 'Сохраняем…' : 'Сохранить'}</button>
-            <button type="button" className={buttonClass} onClick={cancel} disabled={pending}>Отмена</button>
-          </div>
-        </div>
-      ) : (
-        <p className={cn('whitespace-pre-wrap text-sm [overflow-wrap:anywhere]', comment.deletedAt ? 'italic text-muted-foreground' : 'text-foreground')}>
-          {comment.deletedAt ? '(Комментарий удалён)' : comment.content}
-        </p>
+    <ChatMessage
+      comment={comment}
+      mentor={mentor}
+      badges={children}
+      actions={canChange && (
+        <>
+          <button type="button" aria-label="Изменить" title="Изменить" className={iconClass} onClick={() => setEditing(true)}>
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button type="button" aria-label="Удалить" title="Удалить" className={iconClass} onClick={() => setConfirming(true)}>
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </>
       )}
-      {mine && !comment.deletedAt && !editing && !confirming && (
-        <div className="flex flex-wrap gap-2 text-muted-foreground">
-          <button type="button" className={buttonClass} onClick={() => { setDraft(comment.content); setEditing(true) }}>Изменить</button>
-          <button type="button" className={buttonClass} onClick={() => setConfirming(true)}>Удалить</button>
-        </div>
+    >
+      {editing ? (
+        <MessageComposer
+          label="Текст комментария"
+          initialValue={comment.content}
+          autoFocus
+          actions={SAVE}
+          onSubmit={(text) => mutate(text)}
+          onCancel={cancel}
+          videoTime
+          timestamps={timestamps}
+        />
+      ) : comment.deletedAt ? (
+        <p className="text-sm italic text-muted-foreground">(Комментарий удалён)</p>
+      ) : (
+        <MessageContent content={comment.content} timestamps={timestamps} />
       )}
       {confirming && (
         <div role="alertdialog" aria-label="Удалить комментарий?" className="space-y-2 rounded-lg border border-border p-3">
           <p className="text-sm text-foreground">Удалить комментарий? Его текст исчезнет. Ответы и уточнения в ветке сохранятся. Отменить удаление нельзя.</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={cn(buttonClass, 'text-destructive')} onClick={() => void mutate(true)} disabled={pending}>{pending ? 'Удаляем…' : 'Подтвердить удаление'}</button>
+            <button type="button" className={cn(buttonClass, 'text-destructive')} onClick={() => void mutate(null)} disabled={pending}>{pending ? 'Удаляем…' : 'Подтвердить удаление'}</button>
             <button type="button" autoFocus className={buttonClass} onClick={cancel} disabled={pending}>Отмена</button>
           </div>
         </div>
       )}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    </div>
+    </ChatMessage>
   )
 }
 

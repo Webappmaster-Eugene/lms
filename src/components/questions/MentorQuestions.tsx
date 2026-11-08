@@ -3,13 +3,16 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, Loader2, Send } from 'lucide-react'
+import { CheckCircle2, Loader2 } from 'lucide-react'
 
 import { StatusBadge } from '@/components/lesson/LessonComments'
+import { ChatMessage } from '@/components/questions/ChatMessage'
+import { MessageComposer, type ComposerAction } from '@/components/questions/MessageComposer'
+import { MessageContent, type TimestampTarget } from '@/components/questions/MessageContent'
 import { useToast } from '@/components/ui/Toast'
 import { authorName, isMentorReply, threadStatus, STATUS_LABELS, type ThreadStatus } from '@/lib/comment-threads'
 import type { QuestionThread } from '@/lib/questions'
-import { cn, formatDate } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 type Filter = 'all' | ThreadStatus
 
@@ -81,31 +84,44 @@ export function MentorQuestions({ threads }: { threads: QuestionThread[] }) {
   )
 }
 
+const REPLY: ComposerAction[] = [
+  { id: 'reply', label: 'Ответить', busyLabel: 'Отправляем…' },
+  { id: 'reply-resolve', label: 'Ответить и закрыть', busyLabel: 'Отправляем…', secondary: true },
+]
+
 function MentorThread({ thread, status }: { thread: QuestionThread; status: ThreadStatus }) {
   const { question, replies, lesson } = thread
-  const [text, setText] = useState('')
-  const [busy, setBusy] = useState<'reply' | 'resolve' | null>(null)
+  const [resolving, setResolving] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+  const timestamps = useMemo<TimestampTarget>(() => (lesson ? { kind: 'link', lessonSlug: lesson.slug } : null), [lesson])
 
-  async function reply() {
-    if (!text.trim()) return
-    setBusy('reply')
+  async function reply(text: string, action: string) {
     try {
       await send('/api/comments', 'POST', { content: text, parentComment: Number(question.id) })
-      setText('')
-      toast('Ответ отправлен - ученик получит уведомление', 'success')
-      router.refresh()
     } catch (error) {
       console.error('Не удалось отправить ответ', error)
       toast('Не удалось отправить ответ', 'error')
-    } finally {
-      setBusy(null)
+      return false
     }
+    if (action === 'reply-resolve') {
+      try {
+        await send(`/api/comments/${question.id}`, 'PATCH', { isResolved: true })
+        toast('Ответ отправлен, вопрос закрыт', 'success')
+      } catch (error) {
+        // Ответ уже у ученика - поле очищаем, а закрыть можно ещё раз кнопкой.
+        console.error('Не удалось закрыть вопрос после ответа', error)
+        toast('Ответ отправлен, но вопрос закрыть не удалось', 'error')
+      }
+    } else {
+      toast('Ответ отправлен - ученик получит уведомление', 'success')
+    }
+    router.refresh()
+    return true
   }
 
   async function resolve() {
-    setBusy('resolve')
+    setResolving(true)
     try {
       await send(`/api/comments/${question.id}`, 'PATCH', { isResolved: true })
       toast('Вопрос закрыт', 'success')
@@ -114,84 +130,65 @@ function MentorThread({ thread, status }: { thread: QuestionThread; status: Thre
       console.error('Не удалось закрыть вопрос', error)
       toast('Не удалось закрыть вопрос', 'error')
     } finally {
-      setBusy(null)
+      setResolving(false)
     }
   }
 
   return (
-    <li id={`comment-${question.id}`} className="scroll-mt-24 space-y-3 rounded-xl border border-border bg-card p-4 sm:p-5">
+    <li id={`comment-${question.id}`} className="scroll-mt-24 space-y-4 rounded-xl border border-border bg-card p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0 space-y-0.5">
-          <p className="font-medium text-foreground">{authorName(question.user)}</p>
-          {lesson ? (
-            <Link
-              href={`/lessons/${lesson.slug}#comment-${question.id}`}
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              {lesson.title}
-            </Link>
-          ) : (
-            <span className="text-sm text-muted-foreground">Урок снят с публикации</span>
-          )}
-        </div>
+        {lesson ? (
+          <Link
+            href={`/lessons/${lesson.slug}#comment-${question.id}`}
+            className="min-w-0 text-sm font-medium text-muted-foreground [overflow-wrap:anywhere] hover:text-foreground"
+          >
+            {lesson.title}
+          </Link>
+        ) : (
+          <span className="text-sm text-muted-foreground">Урок снят с публикации</span>
+        )}
         <StatusBadge status={status} />
       </div>
 
-      <div className="space-y-1">
-        <p className="text-xs text-muted-foreground">{formatDate(question.createdAt)}</p>
-        <p className="whitespace-pre-wrap text-sm text-foreground">{question.content}</p>
-      </div>
+      <ChatMessage comment={question} mentor={false}>
+        <MessageContent content={question.content} timestamps={timestamps} />
+      </ChatMessage>
 
       {replies.length > 0 && (
-        <ul className="space-y-2 border-l-2 border-border pl-4">
-          {replies.map((r) => (
-            <li key={r.id} className={cn('text-sm', isMentorReply(r, question) && '-ml-2 rounded-md bg-primary/5 p-2')}>
-              <span className="font-medium text-foreground">{authorName(r.user)}</span>
-              <span className="text-xs text-muted-foreground"> · {formatDate(r.createdAt)}</span>
-              <p className="whitespace-pre-wrap text-foreground">{r.content}</p>
-            </li>
-          ))}
+        <ul className="space-y-3 border-t border-border pt-3">
+          {replies.map((r) => {
+            const mentor = isMentorReply(r, question)
+            return (
+              <li key={r.id} className={cn(mentor && '-mx-2 rounded-lg bg-primary/5 p-2')}>
+                <ChatMessage comment={r} mentor={mentor}>
+                  <MessageContent content={r.content} timestamps={timestamps} />
+                </ChatMessage>
+              </li>
+            )
+          })}
         </ul>
       )}
 
       {status !== 'resolved' && (
-        <div className="space-y-2">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault()
-                void reply()
-              }
-            }}
-            aria-label={`Ответ ученику ${authorName(question.user)}`}
-            placeholder="Ответ ученику… (Ctrl/⌘+Enter - отправить)"
-            maxLength={2000}
-            rows={3}
-            className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-          />
-          <div className="flex flex-wrap justify-end gap-2">
+        <MessageComposer
+          label={`Ответ ученику ${authorName(question.user)}`}
+          placeholder="Ответ ученику…"
+          draftKey={`mentor:thread:${question.id}`}
+          actions={REPLY}
+          onSubmit={reply}
+          timestamps={timestamps}
+          extra={(
             <button
               type="button"
               onClick={resolve}
-              disabled={busy !== null}
-              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+              disabled={resolving}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
             >
-              {busy === 'resolve' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              {resolving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
               Отметить решённым
             </button>
-            <button
-              type="button"
-              onClick={reply}
-              disabled={busy !== null || !text.trim()}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-            >
-              {busy === 'reply' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Ответить
-            </button>
-          </div>
-        </div>
+          )}
+        />
       )}
     </li>
   )
