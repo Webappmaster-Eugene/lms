@@ -127,18 +127,21 @@ function renderVideoBlock(block: ContentBlock, memoryId?: string) {
 }
 
 function renderImageBlock(block: ContentBlock) {
-  const image = block.image as { url?: string; alt?: string } | null
+  const image = block.image as { url?: string; alt?: string; width?: number | null; height?: number | null } | null
 
   if (!image?.url) return null
 
+  // Картинка не крупнее своего размера: растянутая на всю колонку, она мылится.
   return (
-    <figure className="space-y-2">
+    <figure className="mx-auto w-fit max-w-full space-y-2">
       <div className="overflow-hidden rounded-xl border border-border">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={image.url}
           alt={(block.altText as string) ?? image.alt ?? ''}
-          className="w-full object-contain"
+          width={image.width ?? undefined}
+          height={image.height ?? undefined}
+          className="block h-auto max-h-[70vh] max-w-full object-contain"
         />
       </div>
       {typeof block.caption === 'string' && block.caption && (

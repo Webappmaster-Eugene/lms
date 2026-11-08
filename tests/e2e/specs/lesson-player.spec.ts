@@ -301,6 +301,23 @@ test.describe('плеер урока из нескольких частей', ()
     await context.close()
   })
 
+  test('широкий экран: плеер не растягивается на всю ширину, а во весь экран занимает весь экран', async ({ browser }) => {
+    const wide = { width: 2560, height: 1440 }
+    const { context, page } = await openLesson(browser, { viewport: wide })
+    const frame = page.locator('[data-lesson-video]').nth(0)
+    await frame.scrollIntoViewIfNeeded()
+
+    // 1024 px - предел колонки урока: шире ролик 720p заметно мылится.
+    const box = await frame.boundingBox()
+    expect(box?.width).toBeGreaterThan(600)
+    expect(box?.width).toBeLessThanOrEqual(1024)
+
+    await frame.getByRole('button', { name: 'Во весь экран' }).click()
+    await expect.poll(() => isDocumentExpanded(page)).toBe(true)
+    await expect.poll(() => targetRect(page)).toEqual({ x: 0, y: 0, ...wide })
+    await context.close()
+  })
+
   test('компьютер: жест тачпада листает часть и не выбрасывает из режима', async ({ browser }) => {
     const { context, page, videos } = await openLesson(browser)
     await videos.nth(0).scrollIntoViewIfNeeded()

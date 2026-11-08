@@ -314,8 +314,8 @@ export default async function LessonPage({ params }: Props) {
           assignedOnly={policy.catalogVisibility === 'assigned'}
         />
       )}
-      {/* Main content */}
-      <div className={`min-w-0 space-y-8 [overflow-wrap:anywhere] ${hasSidebar ? 'flex-1' : 'mx-auto max-w-4xl'}`}>
+      {/* Предел ширины: на широком экране плеер и картинки иначе растягиваются и мылятся. */}
+      <div className={`mx-auto w-full min-w-0 max-w-5xl space-y-8 [overflow-wrap:anywhere] ${hasSidebar ? 'flex-1' : ''}`}>
         {/* Навигация */}
         {course && (
           <Link

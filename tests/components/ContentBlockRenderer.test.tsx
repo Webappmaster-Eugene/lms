@@ -106,6 +106,25 @@ describe('содержимое урока', () => {
       expect(screen.getByText('Схема потока')).toBeInTheDocument()
     })
 
+    it('картинка выводится в своём размере, а не растягивается на всю колонку', () => {
+      renderBlocks([{ blockType: 'image', image: { url: '/small.webp', alt: 'Опрос', width: 575, height: 323 } }])
+
+      const image = screen.getByRole('img', { name: 'Опрос' })
+      // Натуральный размер нужен браузеру, чтобы не растягивать картинку 575 px на широкий экран.
+      expect(image).toHaveAttribute('width', '575')
+      expect(image).toHaveAttribute('height', '323')
+      expect(image).not.toHaveClass('w-full')
+      expect(image).toHaveClass('max-w-full')
+    })
+
+    it('картинка без известного размера всё равно показывается', () => {
+      renderBlocks([{ blockType: 'image', image: { url: '/p.png', alt: 'Схема', width: null, height: null } }])
+
+      const image = screen.getByRole('img', { name: 'Схема' })
+      expect(image).not.toHaveAttribute('width')
+      expect(image).toHaveAttribute('src', '/p.png')
+    })
+
     it('файл отдаётся ссылкой на скачивание', () => {
       renderBlocks([{ blockType: 'file', file: { url: '/a.pdf', filename: 'Конспект.pdf' } }])
 
