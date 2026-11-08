@@ -24,7 +24,7 @@ export const CONSENT_PATH = '/consent/'
 /** Версия текста политики и согласия: уходит с заявкой и меняется вместе с ними. */
 export const CONSENT_VERSION = '2026-11-05'
 /** Дата последней правки содержания страниц буткемпа: видна в подвале и в dateModified. */
-export const PAGE_UPDATED = { iso: '2026-11-05', text: '5 ноября 2026 года' }
+export const PAGE_UPDATED = { iso: '2026-11-08', text: '8 ноября 2026 года' }
 /** Плановая дата старта для разметки курса; в тексте — START. */
 export const START_ISO = '2027-02-13'
 export const START = '13 февраля 2027 года'

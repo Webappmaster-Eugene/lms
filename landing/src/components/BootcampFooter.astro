@@ -1,13 +1,15 @@
 ---
 import { AUTHOR_URL, LMS_URL } from '../config'
 import { BOOTCAMP_PATH, CONSENT_PATH, OFFER_PATH, PAGE_UPDATED, PAYMENT_PATH, PRIVACY_PATH, QUALITY_PATH } from '../data/bootcamp'
+import { PERSONAL_TELEGRAM } from '../data/bootcamp-form'
 import { OPERATOR } from '../data/privacy'
 ---
 <footer class="bc-footer">
   <div class="bc-footer-about">
     <p><a href={BOOTCAMP_PATH}>MentorCareer, буткемп Node.js</a></p>
     <!-- Исполнитель и оператор данных: закон о защите прав потребителей требует, чтобы покупатель видел, с кем имеет дело. -->
-    <p>Исполнитель: {OPERATOR.name}, {OPERATOR.status}, ИНН {OPERATOR.inn}. Почта: <a href={`mailto:${OPERATOR.email}`}>{OPERATOR.email}</a></p>
+    <p>Исполнитель: {OPERATOR.name}, {OPERATOR.status}, ИНН {OPERATOR.inn}.</p>
+    <p>Связь: почта <a href={`mailto:${OPERATOR.email}`}>{OPERATOR.email}</a>, Telegram <a href={PERSONAL_TELEGRAM.url} target="_blank" rel="noopener noreferrer">@{PERSONAL_TELEGRAM.handle}</a></p>
     <p>Страница обновлена {PAGE_UPDATED.text}</p>
   </div>
   <nav aria-label="Ссылки в подвале">

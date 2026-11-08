@@ -207,6 +207,8 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
 .bc-doc h1 { font-size: clamp(30px, 4vw, 42px); font-weight: 800; letter-spacing: -0.035em; }
 .bc-doc h2 { margin-top: 40px; font-size: 24px; }
 .bc-doc p, .bc-doc ul { margin-top: 14px; }
+.bc-doc .bc-steps { margin-top: 14px; padding-left: 24px; }
+.bc-doc .bc-steps li + li { margin-top: 10px; }
 .bc-doc .bc-note { margin-top: 18px; }
 .bc-lede-doc { margin-top: 18px; font-size: 19px; color: var(--muted); }
 .bc-doc .bc-faq { margin-top: 18px; }
