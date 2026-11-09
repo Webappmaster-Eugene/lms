@@ -90,6 +90,7 @@ export interface Config {
     bookmarks: Bookmark;
     'guide-reads': GuideRead;
     comments: Comment;
+    'reply-templates': ReplyTemplate;
     notifications: Notification;
     'notification-preferences': NotificationPreference;
     'push-subscriptions': PushSubscription;
@@ -148,6 +149,7 @@ export interface Config {
     bookmarks: BookmarksSelect<false> | BookmarksSelect<true>;
     'guide-reads': GuideReadsSelect<false> | GuideReadsSelect<true>;
     comments: CommentsSelect<false> | CommentsSelect<true>;
+    'reply-templates': ReplyTemplatesSelect<false> | ReplyTemplatesSelect<true>;
     notifications: NotificationsSelect<false> | NotificationsSelect<true>;
     'notification-preferences': NotificationPreferencesSelect<false> | NotificationPreferencesSelect<true>;
     'push-subscriptions': PushSubscriptionsSelect<false> | PushSubscriptionsSelect<true>;
@@ -1347,6 +1349,29 @@ export interface Comment {
   createdAt: string;
 }
 /**
+ * Вставляются кнопкой «Заготовки» в поле ответа на странице «Вопросы учеников»
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reply-templates".
+ */
+export interface ReplyTemplate {
+  id: number;
+  /**
+   * По нему заготовку ищут в списке
+   */
+  title: string;
+  /**
+   * Markdown, как в ответе. {имя} - имя ученика, {урок} - название урока
+   */
+  content: string;
+  /**
+   * Частые заготовки стоят в списке выше
+   */
+  usageCount?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "notifications".
  */
@@ -2268,6 +2293,10 @@ export interface PayloadLockedDocument {
         value: number | Comment;
       } | null)
     | ({
+        relationTo: 'reply-templates';
+        value: number | ReplyTemplate;
+      } | null)
+    | ({
         relationTo: 'notifications';
         value: number | Notification;
       } | null)
@@ -2886,6 +2915,17 @@ export interface CommentsSelect<T extends boolean = true> {
   content?: T;
   parentComment?: T;
   isResolved?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reply-templates_select".
+ */
+export interface ReplyTemplatesSelect<T extends boolean = true> {
+  title?: T;
+  content?: T;
+  usageCount?: T;
   updatedAt?: T;
   createdAt?: T;
 }

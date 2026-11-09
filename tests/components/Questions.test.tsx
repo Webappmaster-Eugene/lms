@@ -245,4 +245,82 @@ describe('вопросы учеников — страница ментора', 
     expect(screen.getByRole('button', { name: 'Отметить решённым' })).toBeEnabled()
     expect(log).toHaveBeenCalledWith('Не удалось закрыть вопрос', expect.any(Error))
   })
+
+  const templates = [{ id: 9, title: 'Нужен код', content: '{имя}, пришлите код из «{урок}»', usageCount: 3 }]
+
+  it('заготовка подставляет имя ученика и урок ветки и учитывается одним запросом', async () => {
+    const user = userEvent.setup()
+    render(<MentorQuestions threads={[thread(1)]} templates={templates} />)
+
+    await user.click(screen.getByRole('button', { name: 'Заготовки' }))
+    await user.click(screen.getByRole('button', { name: /Нужен код/ }))
+
+    expect(screen.getByRole('textbox', { name: /Ответ ученику/ })).toHaveValue('Анна, пришлите код из «Урок 1»')
+    await waitFor(() => expect(calls.map((c) => [c.url, c.init?.method])).toEqual([['/api/reply-templates/9/use', 'POST']]))
+  })
+
+  it('сбой счётчика не мешает ответу', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    global.fetch = vi.fn(async () => new Response(null, { status: 500 })) as unknown as typeof fetch
+    const user = userEvent.setup()
+    render(<MentorQuestions threads={[thread(1)]} templates={templates} />)
+
+    await user.click(screen.getByRole('button', { name: 'Заготовки' }))
+    await user.click(screen.getByRole('button', { name: /Нужен код/ }))
+
+    expect(screen.getByRole('textbox', { name: /Ответ ученику/ })).toHaveValue('Анна, пришлите код из «Урок 1»')
+    await waitFor(() => expect(warn).toHaveBeenCalledWith('Не удалось учесть вставку заготовки', expect.any(Error)))
+    expect(toast).not.toHaveBeenCalled()
+  })
+
+  it('ответ сохраняется заготовкой и страница подтягивает её', async () => {
+    const user = userEvent.setup()
+    render(<MentorQuestions threads={[thread(1)]} />)
+
+    await user.type(screen.getByRole('textbox', { name: /Ответ ученику/ }), 'Анна, перезапустите сервер')
+    await user.click(screen.getByRole('button', { name: 'Заготовки' }))
+    await user.click(screen.getByRole('button', { name: 'Сохранить текст как заготовку' }))
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }))
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled())
+    expect(calls[0].url).toBe('/api/reply-templates')
+    expect(JSON.parse(String(calls[0].init?.body))).toEqual({ title: 'Анна, перезапустите сервер', content: '{имя}, перезапустите сервер' })
+    expect(toast).toHaveBeenCalledWith('Заготовка сохранена', 'success')
+  })
+
+  it('если сохранить не вышло, название остаётся и ментор видит ошибку', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    global.fetch = vi.fn(async () => new Response(null, { status: 400 })) as unknown as typeof fetch
+    const user = userEvent.setup()
+    render(<MentorQuestions threads={[thread(1)]} />)
+
+    await user.type(screen.getByRole('textbox', { name: /Ответ ученику/ }), 'Текст')
+    await user.click(screen.getByRole('button', { name: 'Заготовки' }))
+    await user.click(screen.getByRole('button', { name: 'Сохранить текст как заготовку' }))
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }))
+
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('Не удалось сохранить заготовку', 'error'))
+    expect(screen.getByRole('textbox', { name: 'Название заготовки' })).toHaveValue('Текст')
+    expect(refresh).not.toHaveBeenCalled()
+  })
+
+  it('примеры добавляются все; при частичном сбое ментор знает сколько', async () => {
+    const user = userEvent.setup()
+    render(<MentorQuestions threads={[thread(1)]} />)
+    await user.click(screen.getByRole('button', { name: 'Заготовки' }))
+    await user.click(screen.getByRole('button', { name: 'Добавить примеры' }))
+
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('Примеры добавлены - поправьте их под себя', 'success'))
+    expect(calls.map((c) => c.url)).toEqual(Array(4).fill('/api/reply-templates'))
+    expect(refresh).toHaveBeenCalledTimes(1)
+
+    vi.clearAllMocks()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    let call = 0
+    global.fetch = vi.fn(async () => (++call === 2 ? new Response(null, { status: 500 }) : Response.json({ doc: {} }))) as unknown as typeof fetch
+    await user.click(screen.getByRole('button', { name: 'Добавить примеры' }))
+
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('Добавлено примеров: 3 из 4', 'error'))
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
 })

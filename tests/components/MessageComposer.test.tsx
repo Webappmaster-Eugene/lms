@@ -150,6 +150,130 @@ describe('поле сообщения', () => {
   })
 })
 
+/** Заготовки ответов ментора: список под полем, подстановка имени и урока, сохранение своего ответа. */
+describe('заготовки в поле ответа', () => {
+  const template = (id: number, title: string, content: string) => ({ id, title, content, usageCount: 0 })
+
+  function withTemplates(items = [template(1, 'Нужен код', '{имя}, пришлите код'), template(2, 'Это в уроке', 'Смотрите «{урок}»')]) {
+    const templates = {
+      items,
+      values: { name: 'Анна', lesson: 'Хуки' },
+      onUse: vi.fn(),
+      onSave: vi.fn(async () => true),
+      onAddStarters: vi.fn(async () => {}),
+    }
+    setup({ label: 'Ответ ученику', draftKey: undefined, templates })
+    return { templates, area: () => screen.getByRole('textbox', { name: 'Ответ ученику' }) as HTMLTextAreaElement }
+  }
+
+  it('без заготовок кнопки нет - у ученика поле прежнее', () => {
+    setup()
+    expect(screen.queryByRole('button', { name: 'Заготовки' })).not.toBeInTheDocument()
+  })
+
+  it('щелчок вставляет заготовку на место курсора с именем ученика и возвращает фокус в поле', async () => {
+    const { templates, area } = withTemplates()
+    fireEvent.change(area(), { target: { value: 'Добрый день! ' } })
+    area().setSelectionRange(13, 13)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Заготовки' }))
+    expect(screen.getByRole('button', { name: 'Заготовки' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('searchbox', { name: 'Найти заготовку' })).toHaveFocus()
+    fireEvent.click(screen.getByRole('button', { name: /Нужен код/ }))
+
+    expect(area()).toHaveValue('Добрый день! Анна, пришлите код')
+    expect(templates.onUse).toHaveBeenCalledWith(1)
+    expect(screen.queryByRole('region', { name: 'Заготовки ответов' })).not.toBeInTheDocument()
+    await waitFor(() => expect(area()).toHaveFocus())
+  })
+
+  it('Ctrl+. открывает список, поиск с Enter вставляет первую найденную, Escape закрывает', async () => {
+    const user = userEvent.setup()
+    const { area } = withTemplates()
+
+    area().focus()
+    await user.keyboard('{Control>}.{/Control}')
+    await user.type(screen.getByRole('searchbox', { name: 'Найти заготовку' }), 'урок{Enter}')
+    expect(area()).toHaveValue('Смотрите «Хуки»')
+
+    await waitFor(() => expect(area()).toHaveFocus())
+    await user.keyboard('{Control>}.{/Control}')
+    expect(screen.getByRole('region', { name: 'Заготовки ответов' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('region', { name: 'Заготовки ответов' })).not.toBeInTheDocument()
+    await waitFor(() => expect(area()).toHaveFocus())
+  })
+
+  it('стрелки ходят по списку и возвращаются в поиск', async () => {
+    const user = userEvent.setup()
+    withTemplates()
+    await user.click(screen.getByRole('button', { name: 'Заготовки' }))
+
+    await user.keyboard('{ArrowDown}')
+    expect(screen.getByRole('button', { name: /Нужен код/ })).toHaveFocus()
+    await user.keyboard('{ArrowDown}')
+    expect(screen.getByRole('button', { name: /Это в уроке/ })).toHaveFocus()
+    await user.keyboard('{ArrowUp}{ArrowUp}')
+    expect(screen.getByRole('searchbox', { name: 'Найти заготовку' })).toHaveFocus()
+  })
+
+  it('поиск без совпадений так и говорит', async () => {
+    const user = userEvent.setup()
+    withTemplates()
+    await user.click(screen.getByRole('button', { name: 'Заготовки' }))
+    await user.type(screen.getByRole('searchbox', { name: 'Найти заготовку' }), 'деплой')
+
+    expect(screen.getByText('Ничего не нашлось')).toBeInTheDocument()
+  })
+
+  it('свой ответ сохраняется заготовкой: имя и урок становятся метками', async () => {
+    const user = userEvent.setup()
+    const { templates, area } = withTemplates()
+    await user.click(screen.getByRole('button', { name: 'Заготовки' }))
+    expect(screen.getByRole('button', { name: 'Сохранить текст как заготовку' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Заготовки' }))
+
+    fireEvent.change(area(), { target: { value: 'Анна, это есть в «Хуки»\nПосмотрите ещё раз' } })
+    await user.click(screen.getByRole('button', { name: 'Заготовки' }))
+    await user.click(screen.getByRole('button', { name: 'Сохранить текст как заготовку' }))
+    const title = screen.getByRole('textbox', { name: 'Название заготовки' })
+    expect(title).toHaveValue('Анна, это есть в «Хуки»')
+    await user.clear(title)
+    await user.type(title, 'Ответ про хуки{Enter}')
+
+    await waitFor(() => expect(templates.onSave).toHaveBeenCalledWith('Ответ про хуки', '{имя}, это есть в «{урок}»\nПосмотрите ещё раз'))
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Название заготовки' })).not.toBeInTheDocument())
+    expect(area()).toHaveValue('Анна, это есть в «Хуки»\nПосмотрите ещё раз')
+  })
+
+  it('пустой список предлагает добавить примеры', async () => {
+    const user = userEvent.setup()
+    const { templates } = withTemplates([])
+    await user.click(screen.getByRole('button', { name: 'Заготовки' }))
+
+    expect(screen.getByText(/Заготовок пока нет/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Добавить примеры' }))
+    expect(templates.onAddStarters).toHaveBeenCalled()
+  })
+
+  it('заготовка, которая не влезает в предел, не вставляется, и видно почему', () => {
+    const { templates, area } = withTemplates()
+    fireEvent.change(area(), { target: { value: 'а'.repeat(4990) } })
+    fireEvent.click(screen.getByRole('button', { name: 'Заготовки' }))
+    fireEvent.click(screen.getByRole('button', { name: /Нужен код/ }))
+
+    expect(area().value).toHaveLength(4990)
+    expect(screen.getByRole('alert')).toHaveTextContent('«Нужен код» не помещается')
+    expect(templates.onUse).not.toHaveBeenCalled()
+  })
+
+  it('ссылка ведёт к правке заготовок в CMS', () => {
+    withTemplates()
+    fireEvent.click(screen.getByRole('button', { name: 'Заготовки' }))
+    expect(screen.getByRole('link', { name: 'Изменить заготовки' })).toHaveAttribute('href', '/admin/collections/reply-templates')
+  })
+})
+
 /** Текст сообщения пишет ученик: Markdown без исполнения HTML, код подсвечен, время видео кликабельно. */
 describe('текст сообщения', () => {
   it('не исполняет HTML ученика и не грузит чужие картинки', () => {

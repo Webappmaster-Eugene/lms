@@ -79,6 +79,7 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   'trainer-tasks': (ctx) => ({ title: `Задача ${uid()}`, topic: ctx.topicId, starterCode: '// код' }),
   'user-trainer-progress': (ctx) => ({ user: ctx.studentId, task: ctx.taskId }),
   'faq-items': () => ({ question: 'Вопрос?', answer: lexical('Ответ') }),
+  'reply-templates': () => ({ title: `Заготовка ${uid()}`, content: '{имя}, пришлите код целиком' }),
   'yandex-disk-imports': (ctx) => ({ publicUrl: 'https://disk.yandex.ru/d/test', course: ctx.courseId, importedBy: ctx.userId }),
   // Ключ уникален и в формате ключа программы: латиница, цифры и дефис.
   'bootcamp-programs': () => ({

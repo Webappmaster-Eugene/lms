@@ -78,6 +78,7 @@ export const ADMIN_NAV_GROUPS = [
     label: 'Общение и настройки',
     items: [
       { href: '/admin/collections/comments', label: 'Комментарии к урокам' },
+      { href: '/admin/collections/reply-templates', label: 'Заготовки ответов' },
       { href: '/admin/collections/notifications', label: 'Уведомления' },
       { href: '/manage/broadcasts', label: 'Email-рассылки' },
       { href: '/admin/collections/faq-items', label: 'Вопросы и ответы' },

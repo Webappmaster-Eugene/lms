@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 
 import { CONTENT, USERS, NOT_FOUND_HEADING } from '../fixtures/data'
@@ -198,6 +199,55 @@ test('вопрос с кодом: блок кода, просмотр, отве�
   await thread.getByRole('textbox', { name: 'Уточнение к вопросу' }).fill('А если нужен const?')
   await thread.getByRole('button', { name: 'Отправить уточнение' }).click()
   await expect(thread.getByText('Ждёт ответа')).toBeVisible()
+})
+
+test('заготовка ответа: ментор сохраняет свой ответ и вставляет его с именем ученика', async ({ page, browser }) => {
+  const marker = `Заготовка e2e ${Date.now()}`
+  await page.goto(`/lessons/${first.slug}`)
+  await page.getByRole('textbox', { name: 'Вопрос к уроку' }).fill(`Вопрос ${marker}`)
+  await page.getByRole('button', { name: 'Отправить вопрос' }).click()
+  await expect(page.getByText('Вопрос отправлен ментору')).toBeVisible()
+  const thread = page.getByRole('listitem').filter({ hasText: marker })
+  const questionId = (await thread.getAttribute('id'))?.replace('comment-', '')
+
+  const mentor = await browser.newContext({ baseURL: APP_URL, storageState: storageStateOf('admin') })
+  const mentorPage = await mentor.newPage()
+  await mentorPage.goto('/admin/questions')
+  const card = mentorPage.locator(`#comment-${questionId}`)
+  const reply = card.getByRole('textbox', { name: /Ответ ученику/ })
+  const answer = `${USERS.doer.firstName}, это разобрано в уроке «${first.title}»`
+  await reply.fill(answer)
+  await card.getByRole('button', { name: 'Заготовки' }).click()
+  await card.getByRole('button', { name: 'Сохранить текст как заготовку' }).click()
+  await card.getByRole('textbox', { name: 'Название заготовки' }).fill(marker)
+  // Панель и форма сохранения в обеих темах: на экране ментора нет отдельной проверки доступности.
+  // Без переходов: иначе axe меряет цвета на середине смены темы.
+  await mentorPage.addStyleTag({ content: '*, *::before, *::after { transition: none !important; }' })
+  for (const theme of ['light', 'dark']) {
+    await mentorPage.evaluate((value) => {
+      document.documentElement.classList.toggle('dark', value === 'dark')
+      document.documentElement.style.colorScheme = value
+    }, theme)
+    const audit = await new AxeBuilder({ page: mentorPage }).include(`#comment-${questionId}`).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()
+    const serious = audit.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)
+    expect(serious, `доступность заготовок, тема ${theme}`).toEqual([])
+  }
+  await card.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect(mentorPage.getByText('Заготовка сохранена')).toBeVisible()
+
+  // В заготовке имя и урок стали метками, при вставке подставились снова.
+  await reply.fill('')
+  await card.getByRole('searchbox', { name: 'Найти заготовку' }).fill(marker)
+  const saved = card.getByRole('button', { name: new RegExp(marker) })
+  await expect(saved).toContainText('{имя}, это разобрано в уроке «{урок}»')
+  await saved.click()
+  await expect(reply).toHaveValue(answer)
+  await card.getByRole('button', { name: 'Ответить', exact: true }).click()
+  await expect(mentorPage.getByText('Ответ отправлен - ученик получит уведомление')).toBeVisible()
+  await mentor.close()
+
+  await page.reload()
+  await expect(thread.getByText(answer)).toBeVisible()
 })
 
 test.describe('видео досмотрено — предложение отметить урок', () => {

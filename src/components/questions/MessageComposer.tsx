@@ -1,14 +1,16 @@
 'use client'
 
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { ChevronDown, Clock, Code2, Eye, Loader2, Pencil, Send } from 'lucide-react'
+import { ChevronDown, Clock, Code2, Eye, Loader2, MessageSquareText, Pencil, Send } from 'lucide-react'
 
 import { MessageContent, type TimestampTarget } from '@/components/questions/MessageContent'
+import { ReplyTemplatePicker, type ComposerTemplates } from '@/components/questions/ReplyTemplatePicker'
 import { useHydrated } from '@/hooks/use-hydrated'
 import { usePageHasVideo } from '@/hooks/use-page-has-video'
 import { COMMENT_MAX_LENGTH } from '@/lib/comment-threads'
 import { clearDraft, readDraft, saveDraft } from '@/lib/message-drafts'
 import { insertCode, insertText, type FieldEdit } from '@/lib/message-markdown'
+import { fillTemplate, type ReplyTemplateItem } from '@/lib/reply-templates'
 import { formatTime } from '@/lib/video-memory'
 import { cn } from '@/lib/utils'
 
@@ -44,6 +46,8 @@ type Props = {
   timestamps?: TimestampTarget
   /** Дополнительные кнопки слева от отправки, например «Отметить решённым». */
   extra?: ReactNode
+  /** Кнопка «Заготовки» - у ментора. */
+  templates?: ComposerTemplates
 }
 
 /** От этой доли предела появляется счётчик знаков. */
@@ -55,7 +59,7 @@ const COUNTER_FROM = 0.8
  */
 export function MessageComposer({
   label, placeholder, draftKey, initialValue, autoFocus, disabled = false, actions, onSubmit, onCancel,
-  guide = false, videoTime = false, timestamps = null, extra,
+  guide = false, videoTime = false, timestamps = null, extra, templates,
 }: Props) {
   // Пока поле этого ключа не трогали, в нём черновик. Он читается после гидратации: на сервере хранилища нет.
   // Ключ хранится вместе с текстом: при переходе к другому уроку компонент живёт дальше, а текст - нет.
@@ -65,9 +69,11 @@ export function MessageComposer({
   const [busy, setBusy] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
   const [guideOpen, setGuideOpen] = useState(false)
+  const [templatesOpen, setTemplatesOpen] = useState(false)
   const hasVideo = usePageHasVideo() && videoTime
   const areaRef = useRef<HTMLTextAreaElement>(null)
   const guideId = useId()
+  const templatesId = useId()
 
   useLayoutEffect(() => {
     const area = areaRef.current
@@ -82,8 +88,8 @@ export function MessageComposer({
     if (draftKey) saveDraft(draftKey, value)
   }
 
-  function apply(edit: FieldEdit) {
-    if (edit.value.length > COMMENT_MAX_LENGTH) return
+  function apply(edit: FieldEdit): boolean {
+    if (edit.value.length > COMMENT_MAX_LENGTH) return false
     change(edit.value)
     requestAnimationFrame(() => {
       const area = areaRef.current
@@ -91,6 +97,19 @@ export function MessageComposer({
       area.focus()
       area.setSelectionRange(edit.selectionStart, edit.selectionEnd)
     })
+    return true
+  }
+
+  function insertTemplate(item: ReplyTemplateItem): boolean {
+    if (!templates || !apply(insertText(text, ...selection(), fillTemplate(item.content, templates.values)))) return false
+    setTemplatesOpen(false)
+    templates.onUse(item.id)
+    return true
+  }
+
+  function closeTemplates() {
+    setTemplatesOpen(false)
+    requestAnimationFrame(() => areaRef.current?.focus())
   }
 
   function selection(): [number, number] {
@@ -141,6 +160,10 @@ export function MessageComposer({
               if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
                 event.preventDefault()
                 void submit(actions[0])
+              } else if (event.key === '.' && (event.ctrlKey || event.metaKey) && templates) {
+                // Ctrl+. - как у сохранённых ответов GitHub.
+                event.preventDefault()
+                setTemplatesOpen(true)
               } else if (event.key === 'Escape' && onCancel) {
                 event.preventDefault()
                 onCancel()
@@ -167,7 +190,22 @@ export function MessageComposer({
               Время видео
             </button>
           )}
-          <button type="button" className={toolClass} aria-pressed={preview} onClick={() => setPreview(!preview)} disabled={disabled}>
+          {templates && (
+            <button
+              type="button"
+              className={toolClass}
+              aria-expanded={templatesOpen}
+              aria-controls={templatesOpen ? templatesId : undefined}
+              aria-keyshortcuts="Control+. Meta+."
+              title="Ctrl/⌘+."
+              onClick={() => (templatesOpen ? closeTemplates() : setTemplatesOpen(true))}
+              disabled={disabled || preview}
+            >
+              <MessageSquareText className="h-3.5 w-3.5" aria-hidden="true" />
+              Заготовки
+            </button>
+          )}
+          <button type="button" className={toolClass} aria-pressed={preview} onClick={() => setPreview(!preview)} disabled={disabled || templatesOpen}>
             {preview ? <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
             {preview ? 'Писать' : 'Просмотр'}
           </button>
@@ -178,6 +216,10 @@ export function MessageComposer({
           )}
         </div>
       </div>
+
+      {templates && templatesOpen && (
+        <ReplyTemplatePicker id={templatesId} templates={templates} text={text} onInsert={insertTemplate} onClose={closeTemplates} />
+      )}
 
       <div className="flex flex-wrap items-center justify-end gap-2">
         {guide && (

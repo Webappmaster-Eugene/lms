@@ -64,6 +64,8 @@ const MATRIX: Record<string, Matrix> = {
   // Отзыв удаляет только админ: ученик меняет ответ, а не стирает историю.
   'guide-reads': { create: 'auth', read: 'own', update: 'own', delete: 'admin' },
   comments: { create: 'auth', read: 'own', update: 'own', delete: 'admin' },
+  // Заготовки - рабочий инструмент ментора: ученик их не видит.
+  'reply-templates': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
   notifications: { create: 'admin', read: 'own', update: 'own', delete: 'admin' },
   'notification-preferences': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
   'push-subscriptions': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
@@ -118,6 +120,7 @@ const PATCH: Record<string, Record<string, unknown>> = {
   bookmarks: { task: null },
   'guide-reads': { helpful: 'yes' },
   comments: { content: 'обновлено' },
+  'reply-templates': { title: 'Обновлено' },
   notifications: { isRead: true },
   'notification-preferences': { remindersEnabled: false },
   'push-subscriptions': { enabled: false },

@@ -9,9 +9,11 @@ import { StatusBadge } from '@/components/lesson/LessonComments'
 import { ChatMessage } from '@/components/questions/ChatMessage'
 import { MessageComposer, type ComposerAction } from '@/components/questions/MessageComposer'
 import { MessageContent, type TimestampTarget } from '@/components/questions/MessageContent'
+import type { ComposerTemplates } from '@/components/questions/ReplyTemplatePicker'
 import { useToast } from '@/components/ui/Toast'
 import { authorName, isMentorReply, threadStatus, STATUS_LABELS, type ThreadStatus } from '@/lib/comment-threads'
 import type { QuestionThread } from '@/lib/questions'
+import { STARTER_TEMPLATES, type ReplyTemplateItem } from '@/lib/reply-templates'
 import { cn } from '@/lib/utils'
 
 type Filter = 'all' | ThreadStatus
@@ -29,12 +31,56 @@ async function send(url: string, method: 'POST' | 'PATCH', body: Record<string, 
   if (!res.ok) throw new Error(`${method} ${url} → ${res.status}`)
 }
 
+type TemplateActions = Pick<ComposerTemplates, 'items' | 'onUse' | 'onSave' | 'onAddStarters'>
+
+/** Заготовки общие для всех веток экрана; ветка добавляет к ним только своё имя и урок. */
+function useTemplateActions(items: readonly ReplyTemplateItem[]): TemplateActions {
+  const router = useRouter()
+  const { toast } = useToast()
+  return useMemo(() => ({
+    items,
+    onUse(id) {
+      // Счётчик только сортирует список: его сбой не мешает ответу.
+      send(`/api/reply-templates/${id}/use`, 'POST', {}).catch((error: unknown) => {
+        console.warn('Не удалось учесть вставку заготовки', error)
+      })
+    },
+    async onSave(title, content) {
+      try {
+        await send('/api/reply-templates', 'POST', { title, content })
+      } catch (error) {
+        console.error('Не удалось сохранить заготовку', error)
+        toast('Не удалось сохранить заготовку', 'error')
+        return false
+      }
+      toast('Заготовка сохранена', 'success')
+      router.refresh()
+      return true
+    },
+    async onAddStarters() {
+      let added = 0
+      for (const starter of STARTER_TEMPLATES) {
+        try {
+          await send('/api/reply-templates', 'POST', starter)
+          added += 1
+        } catch (error) {
+          console.error('Не удалось добавить пример заготовки', starter.title, error)
+        }
+      }
+      if (added === STARTER_TEMPLATES.length) toast('Примеры добавлены - поправьте их под себя', 'success')
+      else toast(`Добавлено примеров: ${added} из ${STARTER_TEMPLATES.length}`, 'error')
+      if (added > 0) router.refresh()
+    },
+  }), [items, router, toast])
+}
+
 /**
  * Вопросы учеников для ментора: сначала ждущие ответа, ответ и «решён» —
  * прямо здесь, без админки Payload.
  */
-export function MentorQuestions({ threads }: { threads: QuestionThread[] }) {
+export function MentorQuestions({ threads, templates = [] }: { threads: QuestionThread[]; templates?: readonly ReplyTemplateItem[] }) {
   const [filter, setFilter] = useState<Filter>('waiting')
+  const templateActions = useTemplateActions(templates)
   const withStatus = useMemo(() => threads.map((t) => ({ thread: t, status: threadStatus(t) })), [threads])
   const counts = useMemo(() => {
     const result: Record<Filter, number> = { all: threads.length, answered: 0, waiting: 0, resolved: 0 }
@@ -76,7 +122,7 @@ export function MentorQuestions({ threads }: { threads: QuestionThread[] }) {
       ) : (
         <ul className="space-y-4">
           {shown.map(({ thread, status }) => (
-            <MentorThread key={thread.question.id} thread={thread} status={status} />
+            <MentorThread key={thread.question.id} thread={thread} status={status} templates={templateActions} />
           ))}
         </ul>
       )}
@@ -89,12 +135,17 @@ const REPLY: ComposerAction[] = [
   { id: 'reply-resolve', label: 'Ответить и закрыть', busyLabel: 'Отправляем…', secondary: true },
 ]
 
-function MentorThread({ thread, status }: { thread: QuestionThread; status: ThreadStatus }) {
+function MentorThread({ thread, status, templates }: { thread: QuestionThread; status: ThreadStatus; templates: TemplateActions }) {
   const { question, replies, lesson } = thread
   const [resolving, setResolving] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
   const timestamps = useMemo<TimestampTarget>(() => (lesson ? { kind: 'link', lessonSlug: lesson.slug } : null), [lesson])
+  const studentName = question.user && typeof question.user === 'object' ? question.user.firstName : null
+  const threadTemplates = useMemo<ComposerTemplates>(
+    () => ({ ...templates, values: { name: studentName, lesson: lesson?.title } }),
+    [templates, studentName, lesson],
+  )
 
   async function reply(text: string, action: string) {
     try {
@@ -177,6 +228,7 @@ function MentorThread({ thread, status }: { thread: QuestionThread; status: Thre
           actions={REPLY}
           onSubmit={reply}
           timestamps={timestamps}
+          templates={threadTemplates}
           extra={(
             <button
               type="button"

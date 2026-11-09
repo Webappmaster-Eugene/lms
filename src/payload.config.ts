@@ -45,6 +45,7 @@ import { UserTrainerProgress } from '@/payload/collections/UserTrainerProgress'
 import { InterviewDirections, InterviewRecordings, InterviewAnalysisUsage } from '@/payload/collections/InterviewLibrary'
 import { InterviewRooms } from '@/payload/collections/InterviewRooms'
 import { FaqItems } from '@/payload/collections/FaqItems'
+import { ReplyTemplates } from '@/payload/collections/ReplyTemplates'
 import { Guides } from '@/payload/collections/Guides'
 import { GuideCategories } from '@/payload/collections/GuideCategories'
 import { GuideReads } from '@/payload/collections/GuideReads'
@@ -124,6 +125,7 @@ export default buildConfig({
     Bookmarks,
     GuideReads,
     Comments,
+    ReplyTemplates,
     Notifications,
     NotificationPreferences,
     PushSubscriptions,
