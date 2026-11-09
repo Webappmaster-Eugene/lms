@@ -13,7 +13,6 @@ import { noticeSignatureBase, signatureHash } from '@/server/robokassa'
 import type { BootcampLead } from '@/payload-types'
 import { captureEmails, createAdmin, createCourseTree, getTestPayload, login, uid, type TestUser } from '../helpers/payload'
 import { createProgram, ensureNodejsProgramCourse } from '../helpers/bootcamp'
-import { OFFER_VERSION } from '../../../landing/src/data/bootcamp'
 
 let payload: Payload
 let admin: TestUser
@@ -283,7 +282,10 @@ describe('оплата через Робокассу', () => {
     await checkout(token)
     const payments = await payload.find({ collection: 'bootcamp-payments', where: { lead: { equals: lead.id } }, overrideAccess: true })
     expect(payments.docs).toHaveLength(1)
-    expect(payments.docs[0]).toMatchObject({ status: 'pending', isTest: false, offerVersion: OFFER_VERSION, amountKopecks: 4_500_000 })
+    // Редакция оферты - та, что сейчас у программы в CMS; совпадение с лендингом стережёт смоук bootcampLanding.
+    const program = (await payload.find({ collection: 'bootcamp-programs', where: { key: { equals: 'nodejs' } }, limit: 1, depth: 0, overrideAccess: true })).docs[0]
+    expect(payments.docs[0]).toMatchObject({ status: 'pending', isTest: false, offerVersion: program?.offerVersion, amountKopecks: 4_500_000 })
+    expect(program?.offerVersion).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect((await reload(lead.id)).paymentStartedAt).toBeTruthy()
   })
 
