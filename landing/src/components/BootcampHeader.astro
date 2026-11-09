@@ -1,5 +1,5 @@
 ---
-import { BOOTCAMP_PATH } from '../data/bootcamp'
+import { BOOTCAMP_PATH, FORMAT_PATH, PROGRAM_PATH } from '../data/bootcamp'
 import BrandMark from './BrandMark.astro'
 import BrandWordmark from './BrandWordmark.astro'
 
@@ -11,5 +11,6 @@ const { cta = `${BOOTCAMP_PATH}#apply` } = Astro.props
 ---
 <header class="bc-header">
   <a class="bc-brand" href={BOOTCAMP_PATH}><BrandMark size={32} /><BrandWordmark class="bc-brand-word" /><span class="bc-brand-product">Буткемп Node.js</span></a>
+  <nav class="bc-header-nav" aria-label="Страницы буткемпа"><a href={PROGRAM_PATH}>Программа</a><a href={FORMAT_PATH}>Как проходит</a></nav>
   <a class="bc-header-cta" href={cta}>Оставить заявку</a>
 </header>

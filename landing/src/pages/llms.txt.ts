@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro'
 
 import { LMS_URL, MENTOR_SITE_URL, SITE_URL, AUTHOR_URL } from '../config'
-import { BOOTCAMP_PATH, CONSENT_PATH, ENTRY_REVIEW_DAYS, ENTRY_TASK_DAYS, ENTRY_TASK_MINUTES, LAST_CLASS, OFFER_PATH, PAYMENT_PATH, PREP_START, PRICE, PRIVACY_PATH, PROGRAM, QUALITY_PATH, REVIEW_DAYS, SAMPLE_MANUAL, START } from '../data/bootcamp'
+import { BOOTCAMP_PATH, CONSENT_PATH, FORMAT_PATH, PROGRAM_PATH, SUMMARY, ENTRY_REVIEW_DAYS, ENTRY_TASK_DAYS, ENTRY_TASK_MINUTES, LAST_CLASS, OFFER_PATH, PAYMENT_PATH, PREP_START, PRICE, PRIVACY_PATH, PROGRAM, QUALITY_PATH, REVIEW_DAYS, SAMPLE_MANUAL, START } from '../data/bootcamp'
 import { programWeeksLabel } from '../data/courses-feed'
 
 /** Для ИИ-поиска: собирается из тех же данных, что и страницы, поэтому факты не расходятся с сайтом. */
@@ -21,11 +21,16 @@ const text = `# MentorCareer
 ## Буткемп Node.js
 
 - [Буткемп Node.js: курс backend с ревью наставника](${url(BOOTCAMP_PATH)}): для кого, что вы построите, путь недели на скриншотах, программа, наставник, вопросы, предзапись.
+- [Программа по неделям](${url(PROGRAM_PATH)}): задача проката, результаты обучения, технологии и вопросы собеседования каждой учебной недели, навыки паспорта.
+- [Как проходит обучение](${url(FORMAT_PATH)}): путь до старта, календарь, ритм недели, сдача и ревью, нагрузка, пропуски и пауза, ИИ, защита, паспорт навыков.
+- [Полный текст для ИИ-поиска](${url('/llms-full.txt')}): всё о буткемпе одним файлом, включая программу по неделям.
 - [Оплата и возврат](${url(PAYMENT_PATH)}): когда платить, способы оплаты, договор, чек, возврат при отказе.
 - [Договор-оферта](${url(OFFER_PATH)}): условия обучения, цена, доступы, пауза и перевод, отказ и расчёт возврата, реквизиты исполнителя.
 - [Методичка недели 1 целиком](${url(SAMPLE_MANUAL.href)}): пример материалов программы, PDF.
 - [Как мы отвечаем за качество](${url(QUALITY_PATH)}): эталонные решения, проверка тестов типовыми ошибками, закрытые тесты, ревью, методички, защита.
 - [Политика обработки персональных данных](${url(PRIVACY_PATH)}) и [согласие на обработку данных](${url(CONSENT_PATH)}).
+
+${SUMMARY}
 
 Онлайн-программа на 12 недель для frontend- и fullstack-разработчиков, которые ищут работу, и для junior и middle, которые хотят вырасти как backend-разработчики. Программа состоит из 20 учебных недель, поток проходит обычно по две за календарную неделю, одна неделя запасная. Нагрузка 20-30 часов в неделю, занятия в субботу (2 часа) и воскресенье (1,5 часа) по московскому времени, группа до 20 человек, ответ наставника на каждую сдачу в течение ${REVIEW_DAYS}. Старт планируется ${START} (неделя подготовки с ${PREP_START}), последние занятия ${LAST_CLASS}. Сейчас идёт предзапись.
 

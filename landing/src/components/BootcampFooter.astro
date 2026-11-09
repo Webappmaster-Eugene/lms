@@ -1,6 +1,6 @@
 ---
 import { AUTHOR_URL, LMS_URL } from '../config'
-import { BOOTCAMP_PATH, CONSENT_PATH, OFFER_PATH, PAGE_UPDATED, PAYMENT_PATH, PRIVACY_PATH, QUALITY_PATH } from '../data/bootcamp'
+import { BOOTCAMP_PATH, CONSENT_PATH, FORMAT_PATH, OFFER_PATH, PAGE_UPDATED, PAYMENT_PATH, PRIVACY_PATH, PROGRAM_PATH, QUALITY_PATH } from '../data/bootcamp'
 import { PERSONAL_TELEGRAM } from '../data/bootcamp-form'
 import { OPERATOR } from '../data/privacy'
 ---
@@ -13,6 +13,8 @@ import { OPERATOR } from '../data/privacy'
     <p>Страница обновлена {PAGE_UPDATED.text}</p>
   </div>
   <nav aria-label="Ссылки в подвале">
+    <a href={PROGRAM_PATH}>Программа по неделям</a>
+    <a href={FORMAT_PATH}>Как проходит обучение</a>
     <a href={PAYMENT_PATH}>Оплата и возврат</a>
     <a href={OFFER_PATH}>Договор-оферта</a>
     <a href={QUALITY_PATH}>Как мы отвечаем за качество</a>

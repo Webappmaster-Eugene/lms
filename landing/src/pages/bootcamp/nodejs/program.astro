@@ -1,0 +1,103 @@
+---
+import BootcampLayout from '../../../layouts/BootcampLayout.astro'
+import BootcampFooter from '../../../components/BootcampFooter.astro'
+import BootcampHeader from '../../../components/BootcampHeader.astro'
+import { SITE_URL } from '../../../config'
+import { BOOTCAMP_PATH, COURSE_NAME, FORMAT_PATH, PROGRAM, PROGRAM_PATH, PROGRAM_WEEKS, SAMPLE_MANUAL, WEEKS } from '../../../data/bootcamp'
+import { COMPETENCIES, PROGRAM_WEEKS_DETAILED, QUESTIONS_TEXT, WEEK_STACK, hoursText, inlineCode, plainText, weekAnchor, weekDates } from '../../../data/bootcamp-program'
+
+// Текст недель - выгрузка методичек (data/bootcamp-program.json), страница его не переписывает.
+const title = `Программа буткемпа Node.js: ${PROGRAM_WEEKS} недель и ${QUESTIONS_TEXT} собеседования`
+const description = `Программа буткемпа Node.js по неделям: задачи сервиса проката, навыки, стек от Fastify и PostgreSQL до Kafka и ClickHouse и ${QUESTIONS_TEXT} собеседования.`
+const pageUrl = new URL(PROGRAM_PATH, SITE_URL).href
+const courseId = `${new URL(BOOTCAMP_PATH, SITE_URL).href}#course`
+const weekName = (number: number, weekTitle: string) => `Неделя ${number}. ${weekTitle}`
+const competencyWeeks = (code: string) => PROGRAM_WEEKS_DETAILED.filter((week) => week.competencies.includes(code)).map((week) => week.number)
+const schema = [
+  {
+    '@type': 'Course', '@id': courseId, name: COURSE_NAME, url: new URL(BOOTCAMP_PATH, SITE_URL).href,
+    syllabusSections: PROGRAM_WEEKS_DETAILED.map((week) => ({
+      '@type': 'Syllabus', name: weekName(week.number, week.title), description: plainText(week.subtitle),
+      timeRequired: `PT${week.readingMinutes + week.practiceMinutes}M`, url: `${pageUrl}#${weekAnchor(week.number)}`,
+      teaches: WEEK_STACK[week.number],
+    })),
+  },
+  {
+    '@type': 'ItemList', '@id': `${pageUrl}#weeks`, name: 'Программа буткемпа Node.js по неделям', numberOfItems: PROGRAM_WEEKS_DETAILED.length,
+    itemListElement: PROGRAM_WEEKS_DETAILED.map((week, index) => ({ '@type': 'ListItem', position: index + 1, name: weekName(week.number, week.title), url: `${pageUrl}#${weekAnchor(week.number)}` })),
+  },
+]
+---
+<BootcampLayout title={title} description={description} crumb="Программа по неделям" schema={schema} ogImage="/bootcamp/og-nodejs-program.png" ogImageAlt={`Программа буткемпа Node.js: ${PROGRAM_WEEKS} учебных недель и ${QUESTIONS_TEXT} собеседования`}>
+  <BootcampHeader />
+  <main id="main" class="bc-doc bc-program-page">
+    <h1>Программа буткемпа Node.js по неделям</h1>
+    <p class="bc-lede-doc">{PROGRAM_WEEKS} учебных недель, которые поток проходит за {WEEKS} календарных: обычно по две за календарную неделю. Все недели строят один сервис, backend проката инструментов: от импорта каталога и HTTP API до оплаты без двойных списаний, очередей, Kafka, аналитики на ClickHouse, нагрузочных замеров и защиты проекта.</p>
+    <p>По каждой неделе ниже: что происходит в сервисе проката, чему вы научитесь и вопросы собеседования по теме, всего {QUESTIONS_TEXT}. Текст взят из методичек курса. Ответы на вопросы разбираются в методичках и на занятиях. Как устроены встречи, сдача работ и защита, описано на странице <a href={FORMAT_PATH}>«Как проходит обучение»</a>.</p>
+
+    <h2 id="calendar">Календарь потока</h2>
+    <table class="bc-program">
+      <caption class="sr-only">Календарь потока: даты встреч, учебные недели программы и темы</caption>
+      <thead><tr><th scope="col">Даты</th><th scope="col">Недели</th><th scope="col">Что изучаем на проекте</th></tr></thead>
+      <tbody>{PROGRAM.map(({ dates, weeks, topic }) => <tr><th scope="row">{dates}</th><td class="bc-program-weeks">{weeks}</td><td>{topic}</td></tr>)}</tbody>
+    </table>
+
+    <nav class="bc-toc" aria-label="Недели программы">
+      <h2 id="weeks">Недели программы</h2>
+      <ol>
+        {PROGRAM_WEEKS_DETAILED.map((week) => <li><a href={`#${weekAnchor(week.number)}`}><span>{week.number}</span>{week.title}</a></li>)}
+      </ol>
+    </nav>
+
+    {PROGRAM_WEEKS_DETAILED.map((week) => (
+      <section class="bc-week" id={weekAnchor(week.number)} aria-labelledby={`${weekAnchor(week.number)}-title`}>
+        <h2 id={`${weekAnchor(week.number)}-title`}>{weekName(week.number, week.title)}</h2>
+        <p class="bc-week-subtitle">{inlineCode(week.subtitle).map((part) => (part.code ? <code>{part.text}</code> : part.text))}</p>
+        <p class="bc-week-meta">
+          {week.number === 0 ? 'Неделя подготовки до старта' : `Встречи ${weekDates(week.number)}`}. Чтение {hoursText(week.readingMinutes)}, практика {hoursText(week.practiceMinutes)} по оценке методички.
+        </p>
+        <ul class="bc-tags" aria-label="Технологии и темы недели">{WEEK_STACK[week.number]?.map((tag) => <li>{tag}</li>)}</ul>
+        {week.task && (
+          <>
+            <h3>Задача проката</h3>
+            <p>{inlineCode(week.task).map((part) => (part.code ? <code>{part.text}</code> : part.text))}</p>
+          </>
+        )}
+        {week.outcomes.length > 0 && (
+          <>
+            <h3>Чему научитесь</h3>
+            <ul class="bc-list">{week.outcomes.map((item) => <li>{inlineCode(item).map((part) => (part.code ? <code>{part.text}</code> : part.text))}</li>)}</ul>
+          </>
+        )}
+        {week.questions.length > 0 && (
+          <>
+            <h3>Вопросы собеседования</h3>
+            <ol class="bc-list">{week.questions.map((item) => <li>{inlineCode(item).map((part) => (part.code ? <code>{part.text}</code> : part.text))}</li>)}</ol>
+          </>
+        )}
+        {week.competencies.length > 0 && (
+          <p class="bc-week-skills">Навыки из паспорта: {week.competencies.map((code) => COMPETENCIES[code]?.title).filter(Boolean).join('; ')}.</p>
+        )}
+        <a class="bc-week-top" href="#weeks">К списку недель</a>
+      </section>
+    ))}
+
+    <h2 id="skills">Навыки, которые подтверждает паспорт</h2>
+    <p>После защиты вы получаете паспорт навыков: список умений из матрицы курса, каждое со ссылкой на свидетельство в вашем проекте, тест, merge request или отчёт. Ниже все {Object.keys(COMPETENCIES).length} навыков и недели, где они разбираются.</p>
+    <table class="bc-skills">
+      <caption class="sr-only">Навыки паспорта и недели программы</caption>
+      <thead><tr><th scope="col">Навык</th><th scope="col">Недели</th></tr></thead>
+      <tbody>{Object.entries(COMPETENCIES).map(([code, { title: skill }]) => <tr><td>{skill}</td><td>{competencyWeeks(code).join(', ')}</td></tr>)}</tbody>
+    </table>
+
+    <h2 id="sample">Посмотрите методичку целиком</h2>
+    <p>Так устроена каждая из 21 методички: теория, разобранные примеры, задание, типовые ошибки, самопроверка и вопросы собеседования. Методичка первой недели открыта полностью.</p>
+    <p class="bc-doc-links">
+      <a class="bc-link" href={SAMPLE_MANUAL.href} target="_blank" rel="noopener">Методичка недели 1 (PDF, {SAMPLE_MANUAL.pages} страниц)</a>
+      <a class="bc-link" href={FORMAT_PATH}>Как проходит обучение</a>
+      <a class="bc-link" href={`${BOOTCAMP_PATH}#apply`}>Оставить заявку</a>
+    </p>
+    <p class="bc-note">Текст программы собран из текущих версий методичек и обновляется вместе с ними.</p>
+  </main>
+  <BootcampFooter />
+</BootcampLayout>

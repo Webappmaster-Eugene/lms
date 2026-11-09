@@ -11,12 +11,14 @@ interface Props {
   noindex?: boolean
   /** Название страницы в «хлебных крошках» после страницы буткемпа; на самой странице буткемпа не нужно. */
   crumb?: string
+  /** Картинка для соцсетей 1200 на 630: путь от корня сайта. */
+  ogImage?: string
+  ogImageAlt?: string
 }
 
-const { title, description, schema = [], noindex = false, crumb } = Astro.props
+const { title, description, schema = [], noindex = false, crumb, ogImage: ogPath = '/bootcamp/og-nodejs.png', ogImageAlt = 'Буткемп Node.js: backend сервиса проката за 12 недель, предзапись на поток' } = Astro.props
 const canonicalUrl = new URL(Astro.url.pathname, SITE_URL).href
-const ogImage = new URL('/bootcamp/og-nodejs.png', SITE_URL).href
-const ogImageAlt = 'Буткемп Node.js: backend сервиса проката, предзапись на поток'
+const ogImage = new URL(ogPath, SITE_URL).href
 const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': [

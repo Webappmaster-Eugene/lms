@@ -6,7 +6,8 @@ import { LEAD_ANSWERS, LEAD_PDF, LEAD_PDF_NEAR_LIMIT } from '../../fixtures/boot
 import { zipOf } from '../../fixtures/zip'
 import { ENTRY_TASKS } from '../../../src/data/bootcamp-entry/tasks'
 import { AUTHOR_PROFILES, ORGANIZATION_ID, ORGANIZATION_PROFILES } from '../../../landing/src/config'
-import { GROUP_LIMIT, LAST_CLASS, LAST_CLASS_ISO, START, START_ISO } from '../../../landing/src/data/bootcamp'
+import { FORMAT_PATH, GROUP_LIMIT, LAST_CLASS, LAST_CLASS_ISO, PROGRAM_PATH, START, START_ISO, WEEKS } from '../../../landing/src/data/bootcamp'
+import { INTERVIEW_QUESTIONS_TOTAL, PROGRAM_WEEKS_DETAILED, weekAnchor } from '../../../landing/src/data/bootcamp-program'
 
 /**
  * Страница буткемпа и форма предзаписи: заявка идёт через тот же путь, что в проде
@@ -307,13 +308,17 @@ test('путь недели на телефоне: снимок крупно у 
   expect(await page.locator('body').innerText()).not.toMatch(/[—–]/)
 })
 
-test('оплата, оферта, качество, политика и согласие: свои адреса в карте сайта, ссылки со страницы буткемпа, реквизиты', async ({ page, request }) => {
+test('программа, формат, оплата, оферта, качество, политика и согласие: свои адреса в карте сайта, ссылки со страницы буткемпа, реквизиты', async ({ page, request }) => {
   await page.goto(PAGE)
   await expect(page.locator('#lead-consent + label a')).toHaveAttribute('href', '/consent/')
   for (const path of ['/bootcamp/nodejs/payment/', '/bootcamp/nodejs/offer/', '/bootcamp/nodejs/quality/']) await expect(page.locator(`main a[href="${path}"]`)).toHaveCount(1)
+  for (const path of [PROGRAM_PATH, FORMAT_PATH]) {
+    await expect(page.locator(`main a[href="${path}"]`).first()).toBeVisible()
+    await expect(page.locator(`footer a[href="${path}"]`)).toHaveCount(1)
+  }
   const origin = new URL(LANDING_URL).origin
   const sitemap = await (await request.get(`${origin}/sitemap.xml`)).text()
-  for (const path of ['/bootcamp/nodejs/payment/', '/bootcamp/nodejs/offer/', '/bootcamp/nodejs/quality/', '/privacy/', '/consent/']) {
+  for (const path of [PROGRAM_PATH, FORMAT_PATH, '/bootcamp/nodejs/payment/', '/bootcamp/nodejs/offer/', '/bootcamp/nodejs/quality/', '/privacy/', '/consent/']) {
     const response = await page.goto(path)
     expect(response?.status(), path).toBe(200)
     await expect(page.locator('h1')).toHaveCount(1)
@@ -332,12 +337,56 @@ test('оплата, оферта, качество, политика и согл
   const llms = await (await request.get(`${origin}/llms.txt`)).text()
   expect(llms).toContain(`${SITE}/bootcamp/nodejs/payment/`)
   expect(llms).toContain(`${SITE}/bootcamp/nodejs/offer/`)
+  expect(llms).toContain(`${SITE}${PROGRAM_PATH}`)
+  expect(llms).toContain(`${SITE}${FORMAT_PATH}`)
+  expect(llms).toContain(`${SITE}/llms-full.txt`)
   expect(llms).toContain('## Связанные сайты')
   expect(llms).toContain('https://mentorcareer.ru/mentor')
   const sample = await request.get(`${origin}/bootcamp/samples/nodejs-week-01-node-runtime.pdf`)
   expect(sample.status()).toBe(200)
   expect(sample.headers()['content-type']).toBe('application/pdf')
   expect(llms).not.toMatch(/[—–]/)
+})
+
+test('программа по неделям: все недели с якорями, оглавление, разметка курса и полный текст для ИИ-поиска', async ({ page, request }) => {
+  await page.goto(PROGRAM_PATH)
+  const weeks = page.locator('section.bc-week')
+  await expect(weeks).toHaveCount(PROGRAM_WEEKS_DETAILED.length)
+  for (const week of PROGRAM_WEEKS_DETAILED) {
+    await expect(page.locator(`#${weekAnchor(week.number)} h2`)).toHaveText(`Неделя ${week.number}. ${week.title}`)
+    await expect(page.locator(`.bc-toc a[href="#${weekAnchor(week.number)}"]`)).toHaveCount(1)
+  }
+  // Вопросы собеседования на странице все, без ответов: столько же пунктов, сколько в выгрузке методичек.
+  const questions = page.locator('section.bc-week ol.bc-list > li')
+  await expect(questions).toHaveCount(INTERVIEW_QUESTIONS_TOTAL)
+
+  type Node = Record<string, unknown> & { '@type': string; '@id'?: string }
+  const graph = (await page.locator('script[type="application/ld+json"]').allTextContents()).flatMap((text) => (JSON.parse(text) as { '@graph': Node[] })['@graph'])
+  const course = graph.find((node) => node['@type'] === 'Course') as { '@id': string; syllabusSections: { name: string; url: string }[] } | undefined
+  expect(course?.['@id']).toBe(`${SITE}${PAGE}#course`)
+  expect(course?.syllabusSections).toHaveLength(PROGRAM_WEEKS_DETAILED.length)
+  // Каждый раздел программы в разметке ведёт на существующий якорь страницы.
+  for (const section of course?.syllabusSections ?? []) await expect(page.locator(new URL(section.url).hash)).toHaveCount(1)
+  const list = graph.find((node) => node['@type'] === 'ItemList') as { numberOfItems: number } | undefined
+  expect(list?.numberOfItems).toBe(PROGRAM_WEEKS_DETAILED.length)
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', `${SITE}/bootcamp/og-nodejs-program.png`)
+
+  await page.setViewportSize({ width: 360, height: 800 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0)
+
+  await page.goto(PAGE)
+  const mainGraph = (await page.locator('script[type="application/ld+json"]').allTextContents()).flatMap((text) => (JSON.parse(text) as { '@graph': Node[] })['@graph'])
+  const occupational = mainGraph.find((node) => node['@type'] === 'EducationalOccupationalProgram') as { timeToComplete: string; hasCourse: { '@id': string } } | undefined
+  expect(occupational?.timeToComplete).toBe(`P${WEEKS}W`)
+  expect(occupational?.hasCourse).toEqual({ '@id': `${SITE}${PAGE}#course` })
+
+  const origin = new URL(LANDING_URL).origin
+  const full = await request.get(`${origin}/llms-full.txt`)
+  expect(full.status()).toBe(200)
+  const text = await full.text()
+  for (const week of PROGRAM_WEEKS_DETAILED) expect(text).toContain(`### Неделя ${week.number}. ${week.title}`)
+  expect(text).not.toMatch(/[—–]/)
+  expect(text).not.toMatch(/\(K\d{2}/)
 })
 
 test('входное задание: личная страница без входа, проверка в браузере, отправка решения и прежний архив', async ({ page, request }) => {

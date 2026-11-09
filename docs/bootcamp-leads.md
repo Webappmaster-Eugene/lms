@@ -19,7 +19,8 @@ Astro). Тексты — `landing/src/pages/bootcamp/nodejs.astro` и `landing/s
 
 ## Юридические страницы, оплата и качество
 
-Страницы буткемпа: `/bootcamp/nodejs/`, `/bootcamp/nodejs/payment/` (оплата, договор, возврат),
+Страницы буткемпа: `/bootcamp/nodejs/`, `/bootcamp/nodejs/program/` (программа по неделям),
+`/bootcamp/nodejs/format/` (как проходит обучение), `/bootcamp/nodejs/payment/` (оплата, договор, возврат),
 `/bootcamp/nodejs/quality/` (как проверяем качество), `/privacy/` (политика), `/consent/` (согласие).
 Шапка и подвал общие (`BootcampHeader.astro`, `BootcampFooter.astro`); в подвале исполнитель с ИНН
 из `landing/src/data/privacy.ts` — закон о защите прав потребителей требует, чтобы покупатель его видел.
@@ -42,6 +43,8 @@ Astro). Тексты — `landing/src/pages/bootcamp/nodejs.astro` и `landing/s
   Решение владельца от 09.11.2026: поток проходит 20 учебных недель за 12 календарных (`WEEKS`,
   `PROGRAM_WEEKS`, календарь по датам в `PROGRAM`), нагрузка 20-30 часов в неделю, ответ на каждую
   сдачу в течение 3 дней (`REVIEW_DAYS`), возврат считается по учебным неделям программы.
+  Там же: в субботу 2 часа задачи и теория обеих учебных недель пары, в воскресенье 1,5 часа практика
+  и типовые ошибки (`WEEK_RHYTHM`); пятница - рекомендуемый срок сдачи, долг закрывается до защиты.
   Кнопок оплаты на страницах лендинга нет, e2e это проверяет: платят по личной ссылке из письма
   о допуске, через отдельный магазин Робокассы (с 31.10.2026, `docs/bootcamp-enrollment.md`);
   условия - в договоре-оферте `/bootcamp/nodejs/offer/` (`OFFER_VERSION`, редакция 09.11.2026; редакцию и название позиции в чеке
@@ -56,9 +59,19 @@ Astro). Тексты — `landing/src/pages/bootcamp/nodejs.astro` и `landing/s
   навыков (`bootcamp/content`). Не обещаем работу, зарплату, документ об образовании.
 
 Поиск и ИИ-поиск: заголовок с «буткемп», «Node.js», «курс backend»; JSON-LD — `Course` с
-программой, аудиторией, расписанием и наставником, `FAQPage`, `BreadcrumbList` на подстраницах,
-`dateModified` из `PAGE_UPDATED`. `llms.txt` собирается из данных страницы
-(`landing/src/pages/llms.txt.ts`), отдельного статичного файла нет. Новая страница-каталог
+программой, аудиторией, расписанием и наставником, `EducationalOccupationalProgram` (срок, вход,
+цена потока), `FAQPage`, `BreadcrumbList` на подстраницах, `dateModified` из `PAGE_UPDATED`; на
+странице программы тот же `Course` с разделами `syllabusSections` по неделям и `ItemList`. Абзац
+«Коротко» (`SUMMARY`) собран из констант: его нейросети берут в ответ целиком. `llms.txt` и полный
+`llms-full.txt` собираются из данных страниц (`landing/src/pages/llms*.txt.ts`), nginx отдаёт их с
+`X-Robots-Tag: noindex`, чтобы они не стали дублями страниц в выдаче.
+
+Программа по неделям - выгрузка методичек: в `bootcamp/content` `npm run export:landing
+<путь к landing/src/data/bootcamp-program.json>`, руками файл не правят; теги технологий недель -
+`WEEK_STACK` в `bootcamp-program.ts`. Картинки для соцсетей (`og-nodejs.png`,
+`og-nodejs-program.png`) пересобирает `pnpm bootcamp:og` из тех же данных - после смены сроков
+или программы. После выката лендинга `pnpm landing:indexnow` сообщает Яндексу и Bing адреса
+из карты сайта прода (ключ - `landing/public/<ключ>.txt`, файл публичный по протоколу IndexNow). Новая страница-каталог
 добавляется в карту сайта, в редирект без слеша в `nginx.conf` и `scripts/landing-server.mjs` —
 смоук-тест сверяет три списка.
 

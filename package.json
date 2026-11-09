@@ -17,6 +17,8 @@
     "seed": "cross-env NODE_OPTIONS=--no-deprecation payload run src/seed.ts",
     "seed:trainer": "cross-env NODE_OPTIONS=--no-deprecation payload run src/seed-trainer.ts",
     "brand:generate": "tsx scripts/brand/generate.ts",
+    "bootcamp:og": "tsx scripts/bootcamp-og.ts",
+    "landing:indexnow": "node scripts/landing-indexnow.mjs",
     "guide:publish": "node scripts/guide-publish.mjs",
     "trainer:sql-expected": "tsx scripts/build-sql-expected.ts",
     "sql:check": "tsx scripts/sql-check.ts",

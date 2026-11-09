@@ -5,7 +5,8 @@ import { ENTRY_TASK_REVIEW_DAYS } from '@/lib/bootcamp-entry-task'
 import { BOOTCAMP_LEAD_HOURS, BOOTCAMP_LEAD_REASONS, BOOTCAMP_LEAD_URGENCIES, LEAD_ANSWER_LIMITS, LEAD_LINKS_MAX, LEAD_RESUME_MAX_BYTES, parseBootcampLead } from '@/lib/bootcamp-leads'
 import { LEAD_ANSWERS } from '../fixtures/bootcampLead'
 import * as leadForm from '../../landing/src/data/bootcamp-form'
-import { AUDIENCE, CONSENT_VERSION, ENTRY_REVIEW_DAYS, FACTS, FAQ, LOG, OFFER_VERSION, PAINS, PATH, PRICE, PROGRAM, PROGRAM_KEY, SAMPLE_MANUAL, SAMPLE_QUESTIONS } from '../../landing/src/data/bootcamp'
+import { AUDIENCE, CONSENT_VERSION, COURSE_DESCRIPTION, ENTRY_REVIEW_DAYS, FACTS, FAQ, FORMATS, GROUP_LIMIT, LAST_CLASS, LOG, NOT_FOR, OFFER_VERSION, PAINS, PATH, PRICE, PROGRAM, PROGRAM_KEY, PROGRAM_WEEKS, REVIEW_DAYS, SAMPLE_MANUAL, SAMPLE_QUESTIONS, START_DAY, SUMMARY, WEEK_RHYTHM, WEEKS } from '../../landing/src/data/bootcamp'
+import { COMPETENCIES, INTERVIEW_QUESTIONS_TOTAL, PROGRAM_WEEKS_DETAILED, QUESTIONS_TEXT, WEEK_STACK, hoursText, inlineCode, plural, weekDates } from '../../landing/src/data/bootcamp-program'
 import { AUTHOR_PROFILES } from '../../landing/src/config'
 import { OPERATOR } from '../../landing/src/data/privacy'
 import screens from '../../landing/src/data/screens.json'
@@ -92,13 +93,13 @@ describe('лендинг буткемпа: форма предзаписи', () 
 describe('лендинг буткемпа: тексты и путь недели', () => {
   // Правило владельца 27.10.2026: в текстах страницы только короткий дефис.
   it('в текстах страницы, политики и формы нет длинного тире', () => {
-    const pages = ['src/pages/bootcamp/nodejs.astro', 'src/pages/bootcamp/nodejs/payment.astro', 'src/pages/bootcamp/nodejs/offer.astro', 'src/pages/bootcamp/nodejs/quality.astro', 'src/pages/privacy.astro', 'src/pages/consent.astro', 'src/components/BootcampFooter.astro']
+    const pages = ['src/pages/bootcamp/nodejs.astro', 'src/pages/bootcamp/nodejs/payment.astro', 'src/pages/bootcamp/nodejs/offer.astro', 'src/pages/bootcamp/nodejs/quality.astro', 'src/pages/bootcamp/nodejs/program.astro', 'src/pages/bootcamp/nodejs/format.astro', 'src/pages/privacy.astro', 'src/pages/consent.astro', 'src/components/BootcampFooter.astro', 'src/components/BootcampHeader.astro']
     const markup = pages.map((path) => readFileSync(landing(path), 'utf8').split('---').slice(2).join('---'))
     // Во фронтматтере страниц оплаты и ИИ-файла тексты тоже публичные: вопросы, описания, llms.txt.
-    const frontmatter = ['src/pages/bootcamp/nodejs/payment.astro', 'src/pages/bootcamp/nodejs/offer.astro', 'src/pages/llms.txt.ts'].map((path) => (readFileSync(landing(path), 'utf8').match(/'[^'\n]*'|`[^`]*`/g) ?? []).join(''))
+    const frontmatter = ['src/pages/bootcamp/nodejs/payment.astro', 'src/pages/bootcamp/nodejs/offer.astro', 'src/pages/bootcamp/nodejs/program.astro', 'src/pages/bootcamp/nodejs/format.astro', 'src/pages/llms.txt.ts', 'src/pages/llms-full.txt.ts'].map((path) => (readFileSync(landing(path), 'utf8').match(/'[^'\n]*'|`[^`]*`/g) ?? []).join(''))
     markup.push(...frontmatter)
     const messages = readFileSync(landing('src/scripts/bootcamp-form.ts'), 'utf8').match(/'[^'\n]*'/g) ?? []
-    expect(`${JSON.stringify({ AUDIENCE, FACTS, FAQ, LOG, PAINS, PATH, PROGRAM, SAMPLE_QUESTIONS })}${markup.join('')}${messages.join('')}`).not.toMatch(/[—–]/)
+    expect(`${JSON.stringify({ AUDIENCE, FACTS, FAQ, FORMATS, LOG, NOT_FOR, PAINS, PATH, PROGRAM, PROGRAM_WEEKS_DETAILED, SAMPLE_QUESTIONS, SUMMARY, WEEK_RHYTHM, WEEK_STACK })}${markup.join('')}${messages.join('')}`).not.toMatch(/[—–]/)
   })
 
   it('методичка-пример лежит в public, это PDF и лёгкий для телефона', () => {
@@ -121,11 +122,25 @@ describe('лендинг буткемпа: тексты и путь недели
   it('каждая страница из карты сайта перенаправляется со слешем и в nginx, и в тестовом сервере', () => {
     const sitemap = readFileSync(landing('src/pages/sitemap.xml.ts'), 'utf8')
     const pages = [...(sitemap.match(/const PAGES = \[([^\]]*)\]/)?.[1] ?? '').matchAll(/'\/([^']+)\/'/g)].map((match) => match[1] ?? '')
-    expect(pages).toEqual(expect.arrayContaining(['bootcamp/nodejs', 'bootcamp/nodejs/payment', 'bootcamp/nodejs/offer', 'bootcamp/nodejs/quality', 'privacy', 'consent']))
+    expect(pages).toEqual(expect.arrayContaining(['bootcamp/nodejs', 'bootcamp/nodejs/program', 'bootcamp/nodejs/format', 'bootcamp/nodejs/payment', 'bootcamp/nodejs/offer', 'bootcamp/nodejs/quality', 'privacy', 'consent']))
     const nginxPages = nginx.match(/location ~ \^\/\(([^)]*)\)\$/)?.[1]?.split('|') ?? []
     const serverPages = readFileSync(new URL('../../scripts/landing-server.mjs', import.meta.url), 'utf8').match(/url\.match\(\/\^\\\/\(([^)]*)\)/)?.[1]?.replaceAll('\\/', '/').split('|') ?? []
     expect(nginxPages.sort()).toEqual([...pages].sort())
     expect(serverPages.sort()).toEqual([...pages].sort())
+  })
+
+  // llms*.txt повторяют текст страниц: в индексе они стали бы дублями, ИИ-поиск их читает и так.
+  it('llms.txt и llms-full.txt закрыты от индекса заголовком, страницы - нет', () => {
+    const map = nginx.match(/map \$uri \$landing_robots_tag \{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(map).toMatch(/~\^\/llms\(-full\)\?\\\.txt\$\s+"noindex";/)
+    expect(map).toMatch(/default\s+"";/)
+    expect(nginx).toMatch(/^\s*add_header X-Robots-Tag \$landing_robots_tag;/m)
+  })
+
+  it('ключ IndexNow - публичный файл с тем же именем, что и содержимое', () => {
+    const keys = readdirSync(landing('public')).filter((name) => /^[0-9a-f]{32}\.txt$/.test(name))
+    expect(keys).toHaveLength(1)
+    expect(readFileSync(landing(`public/${keys[0]}`), 'utf8')).toBe(keys[0]!.slice(0, -4))
   })
 
   it('nginx не пишет журнал запросов с IP посетителей: политика обещает только журнал Traefik', () => {
@@ -137,5 +152,49 @@ describe('лендинг буткемпа: тексты и путь недели
       expect(steps.length, id).toBeGreaterThan(0)
       for (const { x, y } of steps) expect([x, y].every((value) => value > 0 && value < 100), id).toBe(true)
     }
+  })
+})
+
+describe('лендинг буткемпа: программа по неделям и короткие факты', () => {
+  it('выгрузка методичек: недели 0-20 подряд, у каждой теги, результаты и вопросы', () => {
+    expect(PROGRAM_WEEKS_DETAILED.map((week) => week.number)).toEqual(Array.from({ length: PROGRAM_WEEKS + 1 }, (_, index) => index))
+    for (const week of PROGRAM_WEEKS_DETAILED) {
+      expect(WEEK_STACK[week.number]?.length, `теги недели ${week.number}`).toBeGreaterThan(0)
+      expect(week.outcomes.length, `результаты недели ${week.number}`).toBeGreaterThan(0)
+      expect(week.questions.length, `вопросы недели ${week.number}`).toBeGreaterThan(0)
+      expect(week.task, `задача недели ${week.number}`).toBeTruthy()
+      // Коды компетенций в тексте сайту не нужны, их снимает выгрузка.
+      expect(week.outcomes.join(' ')).not.toMatch(/\(K\d{2}/)
+      for (const code of week.competencies) expect(COMPETENCIES[code], code).toBeDefined()
+      if (week.number > 0) expect(weekDates(week.number)).toMatch(/^\d/)
+    }
+    expect(Object.keys(WEEK_STACK).map(Number).sort((a, b) => a - b)).toEqual(PROGRAM_WEEKS_DETAILED.map((week) => week.number))
+  })
+
+  // «164 вопроса» написано в текстах руками: число обязано совпасть с методичками.
+  it('число вопросов собеседования в текстах совпадает с методичками', () => {
+    const texts = [JSON.stringify({ FAQ, PAINS }), readFileSync(landing('src/pages/bootcamp/nodejs.astro'), 'utf8')]
+    const mentioned = texts.flatMap((source) => [...source.matchAll(/(\d+) вопрос/g)].map((match) => Number(match[1])))
+    expect(mentioned.length).toBeGreaterThan(0)
+    for (const count of mentioned) expect(count).toBe(INTERVIEW_QUESTIONS_TOTAL)
+    expect(QUESTIONS_TEXT).toBe(`${INTERVIEW_QUESTIONS_TOTAL} вопроса`)
+  })
+
+  it('склонения и разметка кода в тексте', () => {
+    expect([1, 2, 5, 11, 21, 164, 112].map((count) => plural(count, ['вопрос', 'вопроса', 'вопросов']))).toEqual(['1 вопрос', '2 вопроса', '5 вопросов', '11 вопросов', '21 вопрос', '164 вопроса', '112 вопросов'])
+    expect([60, 90, 150, 660, 780].map(hoursText)).toEqual(['1 час', '1,5 часа', '2,5 часа', '11 часов', '13 часов'])
+    expect(inlineCode('деньги во `float` и `BigInt`')).toEqual([{ code: false, text: 'деньги во ' }, { code: true, text: 'float' }, { code: false, text: ' и ' }, { code: true, text: 'BigInt' }])
+  })
+
+  // Абзац «Коротко» нейросети берут в ответ целиком: в нём все главные факты потока.
+  it('абзац «Коротко» содержит срок, даты, цену, группу и срок ревью', () => {
+    for (const fact of [`${WEEKS} недель`, START_DAY, LAST_CLASS, PRICE.text, `до ${GROUP_LIMIT} человек`, REVIEW_DAYS, `${PROGRAM_WEEKS} учебных недель`, '20-30 часов']) expect(SUMMARY).toContain(fact)
+  })
+
+  // Описание главной страницы буткемпа - её meta description: длиннее 160 знаков выдача его обрезает.
+  it('описание курса укладывается в сниппет и называет срок и старт', () => {
+    expect(COURSE_DESCRIPTION.length).toBeGreaterThan(70)
+    expect(COURSE_DESCRIPTION.length).toBeLessThanOrEqual(160)
+    expect(COURSE_DESCRIPTION).toContain(`${WEEKS} недель с ${START_DAY}`)
   })
 })
