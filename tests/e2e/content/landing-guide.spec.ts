@@ -17,6 +17,14 @@ test('инструкция ссылается на платформу и сай�
   await expect(page.getByText('Зелёные тесты после «Запустить» ещё не означают зачёт. Всегда завершайте решение успешной отправкой на сервер.')).toBeVisible()
 })
 
+// Робокасса проверяет сайт магазина с корня info.mentorcareer.ru: оттуда должен вести путь к услуге, оплате с возвратом и политике.
+test('с главной есть путь к буткемпу, условиям оплаты и политике данных', async ({ page }) => {
+  await page.goto('/')
+  for (const href of ['/bootcamp/nodejs/', '/bootcamp/nodejs/payment/', '/privacy/']) {
+    await expect(page.locator(`footer a[href="${href}"]`)).toBeVisible()
+  }
+})
+
 test('шаги выбираются с экрана, показ можно остановить, увеличение закрывается с возвратом фокуса', async ({ page }) => {
   await page.goto('/#trainer')
   const guide = page.locator('#trainer [data-walkthrough]')

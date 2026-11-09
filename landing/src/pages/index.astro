@@ -6,11 +6,12 @@ import BrandWordmark from '../components/BrandWordmark.astro'
 import { CHAPTERS } from '../data/guide'
 import { FAQ } from '../data/faq'
 import { AUTHOR_URL, LMS_URL } from '../config'
+import { BOOTCAMP_PATH, PAYMENT_PATH, PRIVACY_PATH } from '../data/bootcamp'
 ---
 <Layout>
   <header class="site-header">
     <a class="brand" href="#top"><BrandMark class="brand-mark" size={36} /><BrandWordmark class="brand-word" /><span class="brand-detail">Гид по платформе</span></a>
-    <nav class="header-links" aria-label="Внешние сайты"><a class="author-link" href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">nadtocheev.ru</a><a class="platform-link" href={LMS_URL} aria-label="Открыть платформу"><span class="platform-text">Открыть платформу</span><span class="platform-text-small" aria-hidden="true">В платформу</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10" /></svg></a></nav>
+    <nav class="header-links" aria-label="Внешние сайты"><a class="author-link" href={BOOTCAMP_PATH}>Буткемп Node.js</a><a class="author-link" href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">nadtocheev.ru</a><a class="platform-link" href={LMS_URL} aria-label="Открыть платформу"><span class="platform-text">Открыть платформу</span><span class="platform-text-small" aria-hidden="true">В платформу</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10" /></svg></a></nav>
   </header>
   <div class="guide-layout" id="top">
     <aside class="contents">
@@ -87,7 +88,7 @@ import { AUTHOR_URL, LMS_URL } from '../config'
         <p class="checklist-progress" role="status">Выполнено <span data-check-count>0</span> из 6</p>
         <a href={LMS_URL} class="button">Открыть платформу и начать</a>
       </section>
-      <footer class="site-footer"><div><a class="footer-brand" href="#top">MentorCareer</a><p>Инструкция по учебной платформе</p></div><nav aria-label="Ссылки в подвале"><a href={LMS_URL}>Открыть платформу</a><a href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Сайт автора - nadtocheev.ru</a><a href="#top">К началу страницы</a></nav></footer>
+      <footer class="site-footer"><div><a class="footer-brand" href="#top">MentorCareer</a><p>Инструкция по учебной платформе</p></div><nav aria-label="Ссылки в подвале"><a href={LMS_URL}>Открыть платформу</a><a href={BOOTCAMP_PATH}>Буткемп Node.js: программа и цена</a><a href={PAYMENT_PATH}>Оплата, возврат и исполнитель</a><a href={PRIVACY_PATH}>Политика обработки персональных данных</a><a href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Сайт автора - nadtocheev.ru</a><a href="#top">К началу страницы</a></nav></footer>
     </main>
   </div>
   <dialog class="image-dialog" aria-labelledby="image-dialog-title">
