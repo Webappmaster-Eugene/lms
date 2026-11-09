@@ -1,10 +1,11 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
+import { ENTRY_TASK_REVIEW_DAYS } from '@/lib/bootcamp-entry-task'
 import { BOOTCAMP_LEAD_HOURS, BOOTCAMP_LEAD_REASONS, BOOTCAMP_LEAD_URGENCIES, LEAD_ANSWER_LIMITS, LEAD_LINKS_MAX, LEAD_RESUME_MAX_BYTES, parseBootcampLead } from '@/lib/bootcamp-leads'
 import { LEAD_ANSWERS } from '../fixtures/bootcampLead'
 import * as leadForm from '../../landing/src/data/bootcamp-form'
-import { AUDIENCE, CONSENT_VERSION, FACTS, FAQ, LOG, OFFER_VERSION, PAINS, PATH, PRICE, PROGRAM, PROGRAM_KEY, SAMPLE_MANUAL, SAMPLE_QUESTIONS } from '../../landing/src/data/bootcamp'
+import { AUDIENCE, CONSENT_VERSION, ENTRY_REVIEW_DAYS, FACTS, FAQ, LOG, OFFER_VERSION, PAINS, PATH, PRICE, PROGRAM, PROGRAM_KEY, SAMPLE_MANUAL, SAMPLE_QUESTIONS } from '../../landing/src/data/bootcamp'
 import { AUTHOR_PROFILES } from '../../landing/src/config'
 import { OPERATOR } from '../../landing/src/data/privacy'
 import screens from '../../landing/src/data/screens.json'
@@ -54,16 +55,26 @@ describe('лендинг буткемпа: форма предзаписи', () 
   })
 
   // Форма шлёт ключ программы, а цену и редакцию оферты LMS берёт из программы в CMS.
-  // Программу заводит миграция: её значения должны совпадать с тем, что видит посетитель.
-  it('форма шлёт ключ программы, миграция заводит программу с ценой и офертой страницы', () => {
+  // Программу заводит миграция, новые редакции оферты ставят миграции данных: значения
+  // должны совпадать с тем, что видит посетитель.
+  it('форма шлёт ключ программы, миграции дают программе цену и оферту страницы', () => {
     const page = readFileSync(landing('src/pages/bootcamp/nodejs.astro'), 'utf8')
     expect(page).toMatch(/data-lead-form data-program=\{PROGRAM_KEY\}/)
     expect(readFileSync(landing('src/scripts/bootcamp-form.ts'), 'utf8')).toContain("data.set('program', form.dataset.program")
-    const migration = readFileSync(new URL('../../src/migrations/20261031_225020_bootcamp_programs.ts', import.meta.url), 'utf8')
+    const migrations = new URL('../../src/migrations/', import.meta.url)
+    const migration = readFileSync(new URL('20261031_225020_bootcamp_programs.ts', migrations), 'utf8')
     const seed = migration.match(/VALUES \(([\s\S]*?)\) ON CONFLICT/)?.[1] ?? ''
     expect(seed).toContain(`'${PROGRAM_KEY}'`)
     expect(seed).toContain(`, ${PRICE.value * 100}, `)
-    expect(seed).toContain(`'${OFFER_VERSION}'`)
+    // Последняя миграция, которая ставит редакцию оферты, ставит редакцию страницы.
+    const ups = readdirSync(migrations).filter((name) => name.endsWith('.ts') && name !== 'index.ts').sort()
+      .map((name) => readFileSync(new URL(name, migrations), 'utf8').split('export async function down')[0] ?? '')
+      .filter((up) => up.includes('"offer_version"'))
+    expect(ups.at(-1)).toContain(`'${OFFER_VERSION}'`)
+  })
+
+  it('срок ответа на входное задание тот же, что обещают письмо и страница задания в LMS', () => {
+    expect(ENTRY_REVIEW_DAYS).toBe(`${ENTRY_TASK_REVIEW_DAYS} дней`)
   })
 
   it('nginx передаёт заявку в LMS с адресом клиента от Traefik и без своего', () => {

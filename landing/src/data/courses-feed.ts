@@ -25,17 +25,23 @@ export function weeksIn(range: string): number {
   return to - from + 1
 }
 
-/** Этапы «Плана»: учебные недели без недели подготовки, часы по нижней границе нагрузки. */
+/** «Недели 1-2», «Неделя 17», у запасной недели программы нет. */
+export function programWeeksLabel(weeks: string): string {
+  if (!weeks) return 'Запасная неделя'
+  return `${weeksIn(weeks) === 1 ? 'Неделя' : 'Недели'} ${weeks}`
+}
+
+/** Этапы «Плана»: календарные недели потока без недели подготовки, часы по нижней границе нагрузки. */
 export function feedPlan() {
-  return PROGRAM.filter(({ weeks }) => weeks !== '0').map(({ weeks, topic }, index) => ({
+  return PROGRAM.filter(({ weeks }) => weeks !== '0').map(({ dates, weeks, topic }, index) => ({
     order: index + 1,
     unit: topic,
-    hours: weeksIn(weeks) * WEEKLY_HOURS,
-    text: `Недели ${weeks}`,
+    hours: WEEKLY_HOURS,
+    text: `${dates}: ${programWeeksLabel(weeks).toLowerCase()}`,
   }))
 }
 
-/** Календарные месяцы потока с округлением вверх: 13 февраля - 4 июля это 5 месяцев. */
+/** Календарные месяцы потока с округлением вверх: 13 февраля - 6 мая это 3 месяца. */
 export function feedMonths(): number {
   const days = (Date.parse(LAST_CLASS_ISO) - Date.parse(START_ISO)) / 86_400_000 + 1
   return Math.ceil(days / (365.25 / 12))
@@ -51,7 +57,7 @@ function params(): Param[] {
     // На входе нужен уверенный JavaScript, TypeScript и Git: курс не для новичков.
     { name: 'Сложность', value: 'Для опытных' },
     { name: 'Часы в неделю', value: WEEKLY_HOURS },
-    // Занятия в субботу и воскресенье, сдача задачи каждую неделю, методички к каждой неделе.
+    // Занятия в субботу и воскресенье, сдача задач каждую учебную неделю, методички к каждой неделе.
     { name: 'Есть вебинары', value: true },
     { name: 'Есть домашние работы', value: true },
     { name: 'Есть текстовые уроки', value: true },

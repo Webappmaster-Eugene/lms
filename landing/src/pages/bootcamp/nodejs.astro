@@ -6,9 +6,10 @@ import GuideScreen from '../../components/GuideScreen.astro'
 import screens from '../../data/screens.json'
 import { AUTHOR_PROFILES, AUTHOR_URL, MENTOR_SITE_URL, ORGANIZATION_ID, SITE_URL } from '../../config'
 import {
-  AUDIENCE, BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, COURSE_DESCRIPTION, COURSE_NAME, ENTRY_TASK_DAYS, ENTRY_TASK_MINUTES, FACTS, FAQ, GROUP_LIMIT, LAST_CLASS_ISO, LOG, MENTOR_EXPERIENCE, OFFER_PATH, PAINS, PATH, PAYMENT_PATH, PREP_START, PRICE,
+  AUDIENCE, BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, COURSE_DESCRIPTION, COURSE_NAME, ENTRY_REVIEW_DAYS, ENTRY_TASK_DAYS, ENTRY_TASK_MINUTES, FACTS, FAQ, GROUP_LIMIT, LAST_CLASS_ISO, LOG, MENTOR_EXPERIENCE, OFFER_PATH, PAINS, PATH, PAYMENT_PATH, PREP_START, PRICE,
   PRIVACY_PATH, PROGRAM, PROGRAM_KEY, QUALITY_PATH, RENTAL_FLOW, REVIEW_DAYS, SAMPLE_MANUAL, SAMPLE_QUESTIONS, START, START_ISO, WEEKLY_HOURS, WEEKS,
 } from '../../data/bootcamp'
+import { programWeeksLabel } from '../../data/courses-feed'
 import { LEAD_ANSWER_LIMITS, LEAD_HOURS, LEAD_LINKS_MAX, LEAD_REASONS, LEAD_URGENCIES, PERSONAL_TELEGRAM } from '../../data/bootcamp-form'
 
 // В заголовке то, что ищут: «буткемп», «Node.js», «курс backend».
@@ -24,11 +25,11 @@ const schema = [
     educationalLevel: 'Средний',
     coursePrerequisites: 'Уверенный JavaScript, чтение типов TypeScript, работа с Git',
     teaches: ['Node.js', 'TypeScript', 'HTTP API на Fastify', 'NestJS', 'PostgreSQL', 'Redis', 'RabbitMQ', 'Kafka', 'ClickHouse', 'Docker', 'OpenTelemetry', 'GitLab CI', 'оплата без двойных списаний', 'восстановление после сбоев'],
-    syllabusSections: PROGRAM.map(({ weeks, topic }) => ({ '@type': 'Syllabus', name: `Недели ${weeks}`, description: topic })),
+    syllabusSections: PROGRAM.map(({ dates, weeks, topic }) => ({ '@type': 'Syllabus', name: `${dates}: ${programWeeksLabel(weeks).toLowerCase()}`, description: topic })),
     hasCourseInstance: {
       '@type': 'CourseInstance', courseMode: 'online', inLanguage: 'ru', startDate: START_ISO, endDate: LAST_CLASS_ISO,
       maximumAttendeeCapacity: GROUP_LIMIT,
-      // Нагрузка на странице 15-20 часов в неделю: в разметке нижняя граница.
+      // Нагрузка на странице 20-30 часов в неделю: в разметке нижняя граница.
       courseWorkload: `PT${WEEKS * WEEKLY_HOURS}H`,
       courseSchedule: { '@type': 'Schedule', repeatFrequency: 'P1W', repeatCount: WEEKS, byDay: ['https://schema.org/Saturday', 'https://schema.org/Sunday'], startDate: START_ISO, endDate: LAST_CLASS_ISO, scheduleTimezone: 'Europe/Moscow' },
       instructor: { '@id': `${pageUrl}#mentor` },
@@ -54,7 +55,7 @@ const extraSize = (screen: string) => {
       <div class="bc-hero-copy">
         <p class="bc-tape">Идёт предзапись. Старт планируется {START}, неделя подготовки с {PREP_START}</p>
         <h1 id="hero-title">Буткемп Node.js: backend, о котором спрашивают на собеседованиях</h1>
-        <p class="bc-lede">Для frontend- и fullstack-разработчиков, которые ищут работу, и для junior и middle, которые хотят вырасти как backend-разработчики. За 20 недель вы соберёте backend сервиса проката, от первого HTTP-маршрута до оплаты без двойных списаний, очередей и аналитики. Каждую неделю наставник читает ваш код.</p>
+        <p class="bc-lede">Для frontend- и fullstack-разработчиков, которые ищут работу, и для junior и middle, которые хотят вырасти как backend-разработчики. За 12 недель вы соберёте backend сервиса проката, от первого HTTP-маршрута до оплаты без двойных списаний, очередей и аналитики. Каждую неделю наставник читает ваш код.</p>
         <dl class="bc-facts">
           {FACTS.map(({ term, value }) => <div><dt>{term}</dt><dd>{value}</dd></div>)}
         </dl>
@@ -91,12 +92,12 @@ const extraSize = (screen: string) => {
       <div class="bc-columns bc-needs">
         <div>
           <h3>Что нужно уметь</h3>
-          <p>Писать на JavaScript: промисы, async/await, модули, классы. Читать типы TypeScript. Работать с Git: ветки, коммиты, merge request. И найти 15-20 часов в неделю на все 20 недель.</p>
+          <p>Писать на JavaScript: промисы, async/await, модули, классы. Читать типы TypeScript. Работать с Git: ветки, коммиты, merge request. И найти 20-30 часов в неделю на все 12 недель.</p>
         </div>
         <div>
           <h3>Что знать заранее не нужно</h3>
           <p>NestJS, SQL, брокеры сообщений и Docker. Им посвящена программа.</p>
-          <p>Перед зачислением вы делаете короткое входное задание: три функции на JavaScript прямо в браузере, на {ENTRY_TASK_MINUTES} минут. Оно приходит на email, когда наставник прочитает заявку: на него {ENTRY_TASK_DAYS}, ответ в течение {REVIEW_DAYS}. Если в основах JavaScript есть пробелы, мы подскажем, что подтянуть, и предложим следующий поток. Оплату в этом случае не берём.</p>
+          <p>Перед зачислением вы делаете короткое входное задание: три функции на JavaScript прямо в браузере, на {ENTRY_TASK_MINUTES} минут. Оно приходит на email, когда наставник прочитает заявку: на него {ENTRY_TASK_DAYS}, ответ в течение {ENTRY_REVIEW_DAYS}. Если в основах JavaScript есть пробелы, мы подскажем, что подтянуть, и предложим следующий поток. Оплату в этом случае не берём.</p>
         </div>
       </div>
       <div class="bc-actions"><a class="bc-button" href="#apply">Оставить заявку</a></div>
@@ -154,10 +155,11 @@ const extraSize = (screen: string) => {
 
     <section class="bc-section" id="program" aria-labelledby="program-title">
       <h2 id="program-title">Программа</h2>
+      <p class="bc-intro">20 учебных недель за 12 календарных: обычно две недели программы за календарную неделю, в середине потока запасная неделя без новой темы. Даты встреч уже учитывают праздники 2027 года.</p>
       <table class="bc-program">
-        <caption class="sr-only">Темы программы по неделям</caption>
-        <thead><tr><th scope="col">Недели</th><th scope="col">Что изучаем на проекте</th></tr></thead>
-        <tbody>{PROGRAM.map(({ weeks, topic }) => <tr><th scope="row">{weeks}</th><td>{topic}</td></tr>)}</tbody>
+        <caption class="sr-only">Календарь потока: даты встреч, учебные недели программы и темы</caption>
+        <thead><tr><th scope="col">Даты</th><th scope="col">Недели</th><th scope="col">Что изучаем на проекте</th></tr></thead>
+        <tbody>{PROGRAM.map(({ dates, weeks, topic }) => <tr><th scope="row">{dates}</th><td class="bc-program-weeks">{weeks}</td><td>{topic}</td></tr>)}</tbody>
       </table>
     </section>
 
@@ -166,7 +168,7 @@ const extraSize = (screen: string) => {
       <div class="bc-columns bc-columns-three bc-result">
         <div>
           <h3>Проект, о котором есть что рассказать</h3>
-          <p>Один сервис, который вы строили 20 недель: история коммитов, merge request с ревью наставника, зелёный CI. На собеседовании вы говорите о решениях, которые принимали сами, и о сбоях, которые сами разбирали. В конце вы защищаете проект перед наставником.</p>
+          <p>Один сервис, который вы строили 12 недель: история коммитов, merge request с ревью наставника, зелёный CI. На собеседовании вы говорите о решениях, которые принимали сами, и о сбоях, которые сами разбирали. В конце вы защищаете проект перед наставником.</p>
         </div>
         <div>
           <h3>Навыки backend-разработчика</h3>
@@ -213,7 +215,7 @@ const extraSize = (screen: string) => {
       <div class="bc-columns bc-columns-three bc-result">
         <div>
           <h3>Программу прошли сами</h3>
-          <p>Для каждой из 20 недель есть наше эталонное решение. Перед стартом все недели сданы через GitLab курса тем же путём, что пройдёте вы: merge request, CI, закрытые тесты.</p>
+          <p>Для каждой из 20 учебных недель программы есть наше эталонное решение. Перед стартом все недели сданы через GitLab курса тем же путём, что пройдёте вы: merge request, CI, закрытые тесты.</p>
         </div>
         <div>
           <h3>Тесты ловят типовые ошибки</h3>

@@ -4,8 +4,8 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { SITE_URL } from '../../landing/src/config'
-import { BOOTCAMP_PATH, COURSE_NAME, FACTS, LAST_CLASS, LAST_CLASS_ISO, PRICE, PROGRAM, PROGRAM_KEY, START, START_ISO, WEEKLY_HOURS, WEEKS } from '../../landing/src/data/bootcamp'
-import { coursesFeed, FEED_CATEGORY_ID, feedPlan, weeksIn } from '../../landing/src/data/courses-feed'
+import { BOOTCAMP_PATH, COURSE_NAME, FACTS, LAST_CLASS, LAST_CLASS_ISO, PRICE, PROGRAM, PROGRAM_KEY, PROGRAM_WEEKS, START, START_ISO, WEEKLY_HOURS, WEEKS } from '../../landing/src/data/bootcamp'
+import { coursesFeed, FEED_CATEGORY_ID, feedPlan, programWeeksLabel, weeksIn } from '../../landing/src/data/courses-feed'
 import { OPERATOR } from '../../landing/src/data/privacy'
 
 /**
@@ -61,11 +61,11 @@ describe('фид курсов Яндекса', () => {
     expect(Date.parse(LAST_CLASS_ISO)).toBeGreaterThan(Date.parse(START_ISO))
     const duration = param('Продолжительность')
     expect(duration.getAttribute('unit')).toBe('месяц')
-    expect(duration.textContent).toBe('5')
+    expect(duration.textContent).toBe('3')
     expect(FACTS.find(({ term }) => term === 'Длительность')?.value).toContain(`${WEEKS} недель`)
   })
 
-  it('план: этапы учебных недель по порядку, часы сходятся с нагрузкой', () => {
+  it('план: календарные недели потока по порядку, часы сходятся с нагрузкой', () => {
     const plan = params('План')
     expect(plan.length).toBeGreaterThanOrEqual(3)
     expect(plan.map((node) => Number(node.getAttribute('order')))).toEqual(plan.map((_, index) => index + 1))
@@ -73,10 +73,25 @@ describe('фид курсов Яндекса', () => {
       expect(node.getAttribute('unit')?.trim()).not.toBe('')
       expect(Number(node.getAttribute('hours'))).toBeGreaterThan(0)
     }
-    const studyWeeks = PROGRAM.filter(({ weeks }) => weeks !== '0')
-    expect(plan.map((node) => node.getAttribute('unit'))).toEqual(studyWeeks.map(({ topic }) => topic))
-    expect(studyWeeks.reduce((sum, { weeks }) => sum + weeksIn(weeks), 0)).toBe(WEEKS)
+    const calendar = PROGRAM.filter(({ weeks }) => weeks !== '0')
+    expect(plan.map((node) => node.getAttribute('unit'))).toEqual(calendar.map(({ topic }) => topic))
+    expect(calendar).toHaveLength(WEEKS)
     expect(feedPlan().reduce((sum, { hours }) => sum + hours, 0)).toBe(WEEKS * WEEKLY_HOURS)
+    // Учебные недели программы идут подряд, каждая ровно один раз, у запасной недели их нет.
+    const covered = calendar.flatMap(({ weeks }) => {
+      if (!weeks) return []
+      const from = Number(weeks.split('-')[0])
+      return Array.from({ length: weeksIn(weeks) }, (_, index) => from + index)
+    })
+    expect(covered).toEqual(Array.from({ length: PROGRAM_WEEKS }, (_, index) => index + 1))
+    expect(calendar.filter(({ weeks }) => !weeks)).toHaveLength(1)
+  })
+
+  it('подписи недель программы', () => {
+    expect(programWeeksLabel('1-2')).toBe('Недели 1-2')
+    expect(programWeeksLabel('17')).toBe('Неделя 17')
+    expect(programWeeksLabel('')).toBe('Запасная неделя')
+    expect(() => weeksIn('5-4')).toThrow()
   })
 
   it('значения параметров из справочника Яндекса', () => {

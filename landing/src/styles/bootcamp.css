@@ -136,7 +136,10 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
 .bc-program { width: 100%; max-width: 860px; border-collapse: collapse; margin-top: 24px; }
 .bc-program th, .bc-program td { text-align: left; vertical-align: top; padding: 13px 0; border-bottom: 1px solid var(--line); }
 .bc-program thead th { font-size: 14px; font-weight: 400; color: var(--muted); padding-top: 0; }
-.bc-program tbody th { width: 7.5em; font-variant-numeric: tabular-nums; color: var(--accent); }
+.bc-program tbody th { width: 9em; font-variant-numeric: tabular-nums; color: var(--accent); }
+/* Календарь: даты, недели программы, тема. Колонкам дат и недель нужен отступ от следующей. */
+.bc-program tbody th, .bc-program-weeks, .bc-program thead th:not(:last-child) { padding-right: 16px; }
+.bc-program-weeks { width: 4em; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
 
 /* Путь недели: главы идут по порядку, поэтому номер у заголовка. */
 .bc-sample { margin-top: 26px; font-size: 15px; color: var(--muted); }
@@ -243,6 +246,8 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
   .bc-flow li:not(:last-child)::after { width: 14px; }
   .bc-form, .bc-done { padding: 20px; }
   .bc-program tbody th { width: 4.5em; }
+  .bc-program tbody th, .bc-program-weeks, .bc-program thead th:not(:last-child) { padding-right: 10px; }
+  .bc-program-weeks { width: 3em; }
   .bc-footer { grid-template-columns: minmax(0, 1fr); }
   .bc-footer nav { grid-template-columns: minmax(0, 1fr); }
   .bc-lede-doc { font-size: 17px; }
