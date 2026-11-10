@@ -5,7 +5,7 @@ import {
   AUDIENCE, BOOTCAMP_PATH, FACTS, FAQ, FORMAT_PATH, NOT_FOR, OFFER_PATH, PAGE_UPDATED, PAYMENT_PATH, PROGRAM, PROGRAM_PATH, QUALITY_PATH,
   SAMPLE_MANUAL, SUMMARY, WEEK_RHYTHM,
 } from '../data/bootcamp'
-import { COMPETENCIES, PROGRAM_WEEKS_DETAILED, QUESTIONS_TEXT, WEEK_STACK, hoursText, weekAnchor, weekDates } from '../data/bootcamp-program'
+import { COMPETENCIES, PROGRAM_WEEKS_DETAILED, QUESTIONS_TEXT, WEEK_STACK, weekAnchor, weekDates, weekWorkText } from '../data/bootcamp-program'
 import { programWeeksLabel } from '../data/courses-feed'
 
 /**
@@ -17,8 +17,8 @@ const url = (path: string) => new URL(path, SITE_URL).href
 const week = (item: (typeof PROGRAM_WEEKS_DETAILED)[number]) => [
   `### Неделя ${item.number}. ${item.title}`,
   '',
-  `${item.subtitle}. ${item.number === 0 ? 'Неделя подготовки до старта' : `Встречи ${weekDates(item.number)}`}, чтение ${hoursText(item.readingMinutes)}, практика ${hoursText(item.practiceMinutes)} по оценке методички. Технологии и темы: ${WEEK_STACK[item.number]?.join(', ')}. Подробно: ${url(PROGRAM_PATH)}#${weekAnchor(item.number)}`,
-  ...(item.task ? ['', `Задача проката: ${item.task}`] : []),
+  `${item.subtitle}. ${item.number === 0 ? 'Неделя подготовки до старта' : `Встречи ${weekDates(item.number)}`}. ${weekWorkText(item)}. Технологии и темы: ${WEEK_STACK[item.number]?.join(', ')}. Подробно: ${url(PROGRAM_PATH)}#${weekAnchor(item.number)}`,
+  ...(item.task ? ['', `Задача недели: ${item.task}`] : []),
   ...(item.outcomes.length ? ['', 'Чему научитесь:', ...item.outcomes.map((line) => `- ${line}`)] : []),
   ...(item.questions.length ? ['', 'Вопросы собеседования:', ...item.questions.map((line, index) => `${index + 1}. ${line}`)] : []),
 ].join('\n')
@@ -52,11 +52,11 @@ ${PROGRAM.map(({ dates, weeks, topic }) => `- ${dates}${weeks ? `, ${programWeek
 
 ## Программа по неделям
 
-Текст методичек курса: задача проката, результаты обучения и ${QUESTIONS_TEXT} собеседования. Ответы разбираются в методичках и на занятиях. Методичка недели 1 открыта целиком: ${url(SAMPLE_MANUAL.href)}
+Текст методичек курса: задача недели, чему вы научитесь и ${QUESTIONS_TEXT} собеседования. Ответы разбираются в методичках и на занятиях. Методичка недели 1 открыта целиком: ${url(SAMPLE_MANUAL.href)}
 
 ${PROGRAM_WEEKS_DETAILED.map(week).join('\n\n')}
 
-## Навыки паспорта
+## Навыки, которые подтверждает защита
 
 ${Object.values(COMPETENCIES).map(({ title }) => `- ${title}`).join('\n')}
 

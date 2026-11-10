@@ -72,14 +72,20 @@ export function weekDates(number: number): string {
   return row.dates
 }
 
-/** «2,5 часа» и «13 часов»: время недели по оценке методички. */
-export function hoursText(minutes: number): string {
+/**
+ * «около 2,5 часа», «около 2 часов», «около 21 часа»: время недели из шапки методички. После «около»
+ * родительный падеж: дробное и число на 1 (кроме 11) - «часа», остальные целые - «часов».
+ */
+export function aboutHours(minutes: number): string {
   const hours = minutes / 60
   const text = Number.isInteger(hours) ? String(hours) : hours.toFixed(1).replace('.', ',')
-  const whole = Math.floor(hours)
-  const noun = !Number.isInteger(hours) ? 'часа' : whole % 10 === 1 && whole % 100 !== 11 ? 'час' : [2, 3, 4].includes(whole % 10) && ![12, 13, 14].includes(whole % 100) ? 'часа' : 'часов'
-  return `${text} ${noun}`
+  const noun = !Number.isInteger(hours) || (hours % 10 === 1 && hours % 100 !== 11) ? 'часа' : 'часов'
+  return `около ${text} ${noun}`
 }
+
+/** «На чтение уйдёт около 2,5 часа, на практику около 13 часов»: страница программы и llms-full.txt. */
+export const weekWorkText = (week: Pick<ProgramWeek, 'readingMinutes' | 'practiceMinutes'>) =>
+  `На чтение уйдёт ${aboutHours(week.readingMinutes)}, на практику ${aboutHours(week.practiceMinutes)}`
 
 /** «1 вопрос», «3 вопроса», «164 вопроса», «11 вопросов». */
 export function plural(count: number, [one, few, many]: readonly [string, string, string]): string {

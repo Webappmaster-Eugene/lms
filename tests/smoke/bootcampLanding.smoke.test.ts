@@ -6,7 +6,7 @@ import { BOOTCAMP_LEAD_HOURS, BOOTCAMP_LEAD_REASONS, BOOTCAMP_LEAD_URGENCIES, LE
 import { LEAD_ANSWERS } from '../fixtures/bootcampLead'
 import * as leadForm from '../../landing/src/data/bootcamp-form'
 import { AUDIENCE, CONSENT_VERSION, COURSE_DESCRIPTION, ENTRY_REVIEW_DAYS, FACTS, FAQ, FORMATS, GROUP_LIMIT, LAST_CLASS, LOG, NOT_FOR, OFFER_VERSION, PAINS, PATH, PRICE, PROGRAM, PROGRAM_KEY, PROGRAM_WEEKS, REVIEW_DAYS, SAMPLE_MANUAL, SAMPLE_QUESTIONS, START_DAY, SUMMARY, WEEK_RHYTHM, WEEKS } from '../../landing/src/data/bootcamp'
-import { COMPETENCIES, INTERVIEW_QUESTIONS_TOTAL, PROGRAM_WEEKS_DETAILED, QUESTIONS_TEXT, WEEK_STACK, hoursText, inlineCode, plural, weekDates } from '../../landing/src/data/bootcamp-program'
+import { COMPETENCIES, INTERVIEW_QUESTIONS_TOTAL, PROGRAM_WEEKS_DETAILED, QUESTIONS_TEXT, WEEK_STACK, aboutHours, inlineCode, plural, weekDates } from '../../landing/src/data/bootcamp-program'
 import { AUTHOR_PROFILES, METRIKA_GOALS, METRIKA_ID } from '../../landing/src/config'
 import { OPERATOR } from '../../landing/src/data/privacy'
 import screens from '../../landing/src/data/screens.json'
@@ -182,7 +182,7 @@ describe('лендинг буткемпа: программа по неделя�
 
   it('склонения и разметка кода в тексте', () => {
     expect([1, 2, 5, 11, 21, 164, 112].map((count) => plural(count, ['вопрос', 'вопроса', 'вопросов']))).toEqual(['1 вопрос', '2 вопроса', '5 вопросов', '11 вопросов', '21 вопрос', '164 вопроса', '112 вопросов'])
-    expect([60, 90, 150, 660, 780].map(hoursText)).toEqual(['1 час', '1,5 часа', '2,5 часа', '11 часов', '13 часов'])
+    expect([60, 90, 120, 150, 660, 780, 1260].map(aboutHours)).toEqual(['около 1 часа', 'около 1,5 часа', 'около 2 часов', 'около 2,5 часа', 'около 11 часов', 'около 13 часов', 'около 21 часа'])
     expect(inlineCode('деньги во `float` и `BigInt`')).toEqual([{ code: false, text: 'деньги во ' }, { code: true, text: 'float' }, { code: false, text: ' и ' }, { code: true, text: 'BigInt' }])
   })
 

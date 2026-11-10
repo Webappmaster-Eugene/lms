@@ -4,7 +4,7 @@ import BootcampFooter from '../../../components/BootcampFooter.astro'
 import BootcampHeader from '../../../components/BootcampHeader.astro'
 import { SITE_URL } from '../../../config'
 import { BOOTCAMP_PATH, COURSE_NAME, FORMAT_PATH, PROGRAM, PROGRAM_PATH, PROGRAM_WEEKS, SAMPLE_MANUAL, WEEKS } from '../../../data/bootcamp'
-import { COMPETENCIES, PROGRAM_WEEKS_DETAILED, QUESTIONS_TEXT, WEEK_STACK, hoursText, inlineCode, plainText, weekAnchor, weekDates } from '../../../data/bootcamp-program'
+import { COMPETENCIES, PROGRAM_WEEKS_DETAILED, QUESTIONS_TEXT, WEEK_STACK, inlineCode, plainText, weekAnchor, weekDates, weekWorkText } from '../../../data/bootcamp-program'
 
 // Текст недель - выгрузка методичек (data/bootcamp-program.json), страница его не переписывает.
 const title = `Программа буткемпа Node.js: ${PROGRAM_WEEKS} недель и ${QUESTIONS_TEXT} собеседования`
@@ -33,7 +33,7 @@ const schema = [
   <main id="main" class="bc-doc bc-program-page">
     <h1>Программа буткемпа Node.js по неделям</h1>
     <p class="bc-lede-doc">{PROGRAM_WEEKS} учебных недель, которые поток проходит за {WEEKS} календарных: обычно по две за календарную неделю. Все недели строят один сервис, backend проката инструментов: от импорта каталога и HTTP API до оплаты без двойных списаний, очередей, Kafka, аналитики на ClickHouse, нагрузочных замеров и защиты проекта.</p>
-    <p>По каждой неделе ниже: что происходит в сервисе проката, чему вы научитесь и вопросы собеседования по теме, всего {QUESTIONS_TEXT}. Текст взят из методичек курса. Ответы на вопросы разбираются в методичках и на занятиях. Как устроены встречи, сдача работ и защита, описано на странице <a href={FORMAT_PATH}>«Как проходит обучение»</a>.</p>
+    <p>Ниже по каждой неделе: какую задачу решает сервис проката, чему вы научитесь и какие вопросы по теме задают на собеседованиях, всего {QUESTIONS_TEXT}. Текст взят из методичек курса. Ответы на вопросы разбираются в методичках и на занятиях. Как устроены встречи, сдача работ и защита, описано на странице <a href={FORMAT_PATH}>«Как проходит обучение»</a>.</p>
 
     <h2 id="calendar">Календарь потока</h2>
     <table class="bc-program">
@@ -54,12 +54,12 @@ const schema = [
         <h2 id={`${weekAnchor(week.number)}-title`}>{weekName(week.number, week.title)}</h2>
         <p class="bc-week-subtitle">{inlineCode(week.subtitle).map((part) => (part.code ? <code>{part.text}</code> : part.text))}</p>
         <p class="bc-week-meta">
-          {week.number === 0 ? 'Неделя подготовки до старта' : `Встречи ${weekDates(week.number)}`}. Чтение {hoursText(week.readingMinutes)}, практика {hoursText(week.practiceMinutes)} по оценке методички.
+          {week.number === 0 ? 'Неделя подготовки до старта' : `Встречи ${weekDates(week.number)}`}. {weekWorkText(week)}.
         </p>
         <ul class="bc-tags" aria-label="Технологии и темы недели">{WEEK_STACK[week.number]?.map((tag) => <li>{tag}</li>)}</ul>
         {week.task && (
           <>
-            <h3>Задача проката</h3>
+            <h3>Задача недели</h3>
             <p>{inlineCode(week.task).map((part) => (part.code ? <code>{part.text}</code> : part.text))}</p>
           </>
         )}
@@ -75,15 +75,12 @@ const schema = [
             <ol class="bc-list">{week.questions.map((item) => <li>{inlineCode(item).map((part) => (part.code ? <code>{part.text}</code> : part.text))}</li>)}</ol>
           </>
         )}
-        {week.competencies.length > 0 && (
-          <p class="bc-week-skills">Навыки из паспорта: {week.competencies.map((code) => COMPETENCIES[code]?.title).filter(Boolean).join('; ')}.</p>
-        )}
         <a class="bc-week-top" href="#weeks">К списку недель</a>
       </section>
     ))}
 
-    <h2 id="skills">Навыки, которые подтверждает паспорт</h2>
-    <p>После защиты вы получаете паспорт навыков: список умений из матрицы курса, каждое со ссылкой на свидетельство в вашем проекте, тест, merge request или отчёт. Ниже все {Object.keys(COMPETENCIES).length} навыков и недели, где они разбираются.</p>
+    <h2 id="skills">Навыки, которые вы подтвердите на защите</h2>
+    <p>После защиты вы получаете паспорт навыков. В нём перечислены умения, которые вы показали на своём проекте, и у каждого есть ссылка на тест, merge request или отчёт. Ниже все {Object.keys(COMPETENCIES).length} навыков курса и недели, на которых их разбираем.</p>
     <table class="bc-skills">
       <caption class="sr-only">Навыки паспорта и недели программы</caption>
       <thead><tr><th scope="col">Навык</th><th scope="col">Недели</th></tr></thead>
