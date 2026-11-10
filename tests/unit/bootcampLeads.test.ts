@@ -22,7 +22,7 @@ describe('предзапись на буткемп: разбор формы', ()
       program: 'nodejs', email: 'ivan.petrov@mail.ru', name: 'Иван Петров', consentVersion: '2026-10-26',
       telegram: '@ivan_petrov', reason: 'switch-or-grow', problem: LEAD_ANSWERS.problem, story: LEAD_ANSWERS.story, goal: LEAD_ANSWERS.goal,
       urgency: 'soon', hoursPerWeek: '10-20', links: null, fillSeconds: 20,
-      source: { utmSource: null, utmMedium: null, utmCampaign: null, utmContent: null, utmTerm: null, referrerHost: null },
+      source: { utmSource: null, utmMedium: null, utmCampaign: null, utmContent: null, utmTerm: null, referrerHost: null, ymClientId: null },
     })
   })
 
@@ -57,9 +57,20 @@ describe('предзапись на буткемп: разбор формы', ()
       utm: { utm_source: ' telegram ', utm_medium: 'post\u0007x', utm_campaign: 'c'.repeat(300), utm_content: 7, extra: 'drop' },
       referrer: 'https://habr.com/ru/articles/1?email=ivan@mail.ru',
     })
-    expect(lead.source).toEqual({ utmSource: 'telegram', utmMedium: 'post x', utmCampaign: 'c'.repeat(100), utmContent: null, utmTerm: null, referrerHost: 'habr.com' })
+    expect(lead.source).toEqual({ utmSource: 'telegram', utmMedium: 'post x', utmCampaign: 'c'.repeat(100), utmContent: null, utmTerm: null, referrerHost: 'habr.com', ymClientId: null })
     expect(parseBootcampLead({ ...valid, referrer: 'javascript:alert(1)' }).source.referrerHost).toBeNull()
     expect(parseBootcampLead({ ...valid, utm: 'utm_source=x' }).source.utmSource).toBeNull()
+  })
+
+  it('ClientID Метрики: цифры сохраняет, всё другое отбрасывает без отказа в заявке', () => {
+    expect(parseBootcampLead({ ...valid, ymClientId: ' 1731234567123456789 ' }).source.ymClientId).toBe('1731234567123456789')
+    for (const ymClientId of ['', 'abc', '17312345671234567890123456789012', '1731234567.5', 42, null, '<script>']) {
+      expect(parseBootcampLead({ ...valid, ymClientId }).source.ymClientId, String(ymClientId)).toBeNull()
+    }
+  })
+
+  it('форма multipart: ClientID приходит своим полем', () => {
+    expect(parseBootcampLead(leadBodyFromForm(leadFormData({ ...valid, ymClientId: '1731234567123456789' }))).source.ymClientId).toBe('1731234567123456789')
   })
 
   it('заполненное скрытое поле помечает отправку робота', () => {

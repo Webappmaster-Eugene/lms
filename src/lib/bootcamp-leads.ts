@@ -72,7 +72,7 @@ export const LEAD_BODY_MAX_BYTES = LEAD_RESUME_MAX_BYTES + 64 * 1024
 /** Предел тела рассчитан на файл: текст проверяется посимвольно и не должен занимать все пять мегабайт. */
 export const LEAD_TEXT_MAX_CHARS = 64 * 1024
 
-export type BootcampLeadSource = Record<(typeof BOOTCAMP_UTM_FIELDS)[number][1] | 'referrerHost', string | null>
+export type BootcampLeadSource = Record<(typeof BOOTCAMP_UTM_FIELDS)[number][1] | 'referrerHost' | 'ymClientId', string | null>
 
 export type BootcampLeadInput = {
   /** Ключ программы; есть ли она и принимает ли заявки, сервер проверяет по CMS. */
@@ -119,6 +119,12 @@ function label(value: unknown): string | null {
   if (raw === null) return null
   const clean = [...raw].map((char) => (isControl(char) ? ' ' : char)).join('').replace(/\s+/g, ' ').trim().slice(0, 100)
   return clean || null
+}
+
+/** ClientID Яндекс Метрики - только цифры. Что-то другое отбрасывается: без него заявка всё равно нужна. */
+function metrikaClientId(value: unknown): string | null {
+  const raw = text(value)?.trim() ?? ''
+  return /^\d{1,30}$/.test(raw) ? raw : null
 }
 
 /** Только хост: полный адрес страницы-источника может нести чужие параметры и персональные данные. */
@@ -243,6 +249,7 @@ export function parseBootcampLead(body: unknown): BootcampLeadInput {
   const utm = data.utm && typeof data.utm === 'object' && !Array.isArray(data.utm) ? data.utm as Record<string, unknown> : {}
   const source = Object.fromEntries(BOOTCAMP_UTM_FIELDS.map(([key, field]) => [field, label(utm[key])])) as BootcampLeadSource
   source.referrerHost = referrerHost(data.referrer)
+  source.ymClientId = metrikaClientId(data.ymClientId)
 
   const fillMs = Number(data.fillMs)
   if (!Number.isFinite(fillMs) || fillMs < LEAD_MIN_FILL_MS) throw new BootcampLeadError('Форма заполнена слишком быстро. Проверьте ответы и отправьте заявку ещё раз.')

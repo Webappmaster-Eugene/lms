@@ -1948,6 +1948,10 @@ export interface BootcampLead {
     utmContent?: string | null;
     utmTerm?: string | null;
     referrerHost?: string | null;
+    /**
+     * По нему в Метрике (счётчик 114161391) можно найти визиты автора заявки. Пусто, если счётчик заблокирован или не успел загрузиться.
+     */
+    ymClientId?: string | null;
   };
   consentVersion: string;
   consentAt: string;
@@ -3410,6 +3414,7 @@ export interface BootcampLeadsSelect<T extends boolean = true> {
         utmContent?: T;
         utmTerm?: T;
         referrerHost?: T;
+        ymClientId?: T;
       };
   consentVersion?: T;
   consentAt?: T;

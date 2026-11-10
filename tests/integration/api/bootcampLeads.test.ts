@@ -94,12 +94,12 @@ describe('POST /api/bootcamp/leads: предзапись с лендинга', (
     const mail = captureEmails(payload)
     try {
       const email = `${uid('lead')}@mail.test`
-      const response = await send(lead(email.toUpperCase(), { utm: { utm_source: 'habr' }, referrer: 'https://habr.com/ru/articles/1' }))
+      const response = await send(lead(email.toUpperCase(), { utm: { utm_source: 'habr' }, referrer: 'https://habr.com/ru/articles/1', ymClientId: '1731234567123456789' }))
       expect(response.status).toBe(200)
       expect(response.headers.get('cache-control')).toBe('no-store')
       expect(await response.json()).toEqual({ ok: true })
       const [row] = await stored(email)
-      expect(row).toMatchObject({ email, name: 'Иван', program: 'nodejs', status: 'new', submissionCount: 1, consentVersion: '2026-10-26', source: { utmSource: 'habr', referrerHost: 'habr.com' } })
+      expect(row).toMatchObject({ email, name: 'Иван', program: 'nodejs', status: 'new', submissionCount: 1, consentVersion: '2026-10-26', source: { utmSource: 'habr', referrerHost: 'habr.com', ymClientId: '1731234567123456789' } })
       expect(row?.consentAt).toBeTruthy()
       expect(row).toMatchObject({
         telegram: '@ivan_petrov', reason: 'switch-or-grow', problem: LEAD_ANSWERS.problem, story: LEAD_ANSWERS.story, goal: LEAD_ANSWERS.goal,

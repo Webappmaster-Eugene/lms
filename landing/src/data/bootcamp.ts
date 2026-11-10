@@ -24,7 +24,7 @@ export const OFFER_PATH = '/bootcamp/nodejs/offer/'
 export const PRIVACY_PATH = '/privacy/'
 export const CONSENT_PATH = '/consent/'
 /** Версия текста политики и согласия: уходит с заявкой и меняется вместе с ними. */
-export const CONSENT_VERSION = '2026-11-05'
+export const CONSENT_VERSION = '2026-11-10'
 /** Дата последней правки содержания страниц буткемпа: видна в подвале и в dateModified. */
 export const PAGE_UPDATED = { iso: '2026-11-09', text: '9 ноября 2026 года' }
 /** Плановая дата старта для разметки курса; в тексте — START. */

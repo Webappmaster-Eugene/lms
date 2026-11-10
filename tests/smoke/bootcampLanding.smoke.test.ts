@@ -7,7 +7,7 @@ import { LEAD_ANSWERS } from '../fixtures/bootcampLead'
 import * as leadForm from '../../landing/src/data/bootcamp-form'
 import { AUDIENCE, CONSENT_VERSION, COURSE_DESCRIPTION, ENTRY_REVIEW_DAYS, FACTS, FAQ, FORMATS, GROUP_LIMIT, LAST_CLASS, LOG, NOT_FOR, OFFER_VERSION, PAINS, PATH, PRICE, PROGRAM, PROGRAM_KEY, PROGRAM_WEEKS, REVIEW_DAYS, SAMPLE_MANUAL, SAMPLE_QUESTIONS, START_DAY, SUMMARY, WEEK_RHYTHM, WEEKS } from '../../landing/src/data/bootcamp'
 import { COMPETENCIES, INTERVIEW_QUESTIONS_TOTAL, PROGRAM_WEEKS_DETAILED, QUESTIONS_TEXT, WEEK_STACK, hoursText, inlineCode, plural, weekDates } from '../../landing/src/data/bootcamp-program'
-import { AUTHOR_PROFILES } from '../../landing/src/config'
+import { AUTHOR_PROFILES, METRIKA_GOALS, METRIKA_ID } from '../../landing/src/config'
 import { OPERATOR } from '../../landing/src/data/privacy'
 import screens from '../../landing/src/data/screens.json'
 
@@ -196,5 +196,49 @@ describe('лендинг буткемпа: программа по неделя�
     expect(COURSE_DESCRIPTION.length).toBeGreaterThan(70)
     expect(COURSE_DESCRIPTION.length).toBeLessThanOrEqual(160)
     expect(COURSE_DESCRIPTION).toContain(`${WEEKS} недель с ${START_DAY}`)
+  })
+})
+
+describe('лендинг буткемпа: Яндекс Метрика', () => {
+  const read = (path: string) => readFileSync(landing(path), 'utf8')
+  const layout = read('src/layouts/BootcampLayout.astro')
+  const metrika = read('src/scripts/metrika.ts')
+  const form = read('src/scripts/bootcamp-form.ts')
+  const page = read('src/pages/bootcamp/nodejs.astro')
+  const privacy = read('src/pages/privacy.astro')
+
+  it('счётчик и уведомление о cookie есть на каждой странице буткемпа, и только там', () => {
+    expect(layout).toContain('<script src="../scripts/metrika.ts"></script>')
+    expect(layout).toMatch(/data-cookie-notice hidden/)
+    expect(layout).toContain('data-cookie-ok')
+    // Главная инструкции для учеников живёт на своём макете: её счётчик не касается.
+    expect(read('src/layouts/Layout.astro')).not.toContain('metrika')
+  })
+
+  it('Вебвизор выключен, tag.js грузится только на боевом домене', () => {
+    expect(metrika).toMatch(/webvisor: false/)
+    expect(metrika).not.toMatch(/webvisor: true/)
+    expect(metrika).toContain('location.host === new URL(SITE_URL).host')
+    expect(METRIKA_ID).toBe(114161391)
+  })
+
+  it('цели формы заведены в Метрике под теми же идентификаторами и вызываются из формы', () => {
+    expect(Object.values(METRIKA_GOALS)).toEqual(['lead_form_start', 'lead_submit', 'lead_telegram'])
+    for (const key of Object.keys(METRIKA_GOALS)) expect(form).toContain(`reachGoal(METRIKA_GOALS.${key})`)
+    expect(form).toContain("data.set('ymClientId', clientId)")
+  })
+
+  it('в ссылке на Telegram после заявки есть имя, поэтому Метрика её не отслеживает', () => {
+    expect(page).toMatch(/class="[^"]*\bym-disable-tracklink\b[^"]*" data-telegram-link/)
+  })
+
+  it('политика описывает Метрику и не обещает, что счётчиков нет', () => {
+    expect(privacy).toContain('Яндекс Метрик')
+    expect(privacy).toContain('Вебвизор')
+    expect(privacy).toContain('ClientID')
+    expect(privacy).not.toMatch(/cookie, счётчики и сервисы веб-аналитики/i)
+    expect(read('src/pages/consent.astro')).toContain('ClientID')
+    expect(layout).toContain('#metrika')
+    expect(privacy).toContain('id="metrika"')
   })
 })

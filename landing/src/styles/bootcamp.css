@@ -296,3 +296,14 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
   .bc-path-chapter { margin-top: 44px; }
   .bc-path-chapter > p { margin-left: 0; }
 }
+
+/* Уведомление о cookie и Метрике: карточка в углу, а не полоса во всю ширину, чтобы на компьютере
+   не закрывать кнопку формы и подвал. На телефоне - во всю ширину, кнопка крупная. */
+.bc-cookie { position: fixed; z-index: 30; left: 16px; bottom: 16px; display: flex; align-items: center; gap: 16px; max-width: 520px; padding: 14px 16px; background: var(--page); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgb(35 57 50 / 0.16); font-size: 15px; line-height: 1.5; }
+.bc-cookie p { max-width: none; }
+.bc-cookie a { color: var(--accent); }
+.bc-cookie-ok { flex: none; min-height: 44px; padding: 0 18px; border: 1.5px solid var(--accent); border-radius: 8px; background: var(--page); color: var(--accent); font-size: 15px; font-weight: 700; cursor: pointer; }
+.bc-cookie-ok:hover { color: #fff; background: var(--accent); }
+@media (max-width: 640px) {
+  .bc-cookie { left: 8px; right: 8px; bottom: 8px; max-width: none; flex-direction: column; align-items: stretch; gap: 10px; }
+}

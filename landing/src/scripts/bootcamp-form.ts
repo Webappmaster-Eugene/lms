@@ -1,6 +1,8 @@
 // Заявка на буткемп. Успех показывается только после ответа сервера о сохранении:
 // при сбое сети введённое остаётся в полях, и заявку можно отправить ещё раз.
+import { METRIKA_GOALS } from '../config'
 import { LEAD_ANSWER_LIMITS, LEAD_LINKS_MAX, LEAD_REASONS, LEAD_RESUME_MAX_BYTES, PERSONAL_TELEGRAM } from '../data/bootcamp-form'
+import { metrikaClientId, reachGoal } from './metrika'
 
 const ENDPOINT = '/api/bootcamp/leads'
 const TIMEOUT_MS = 15_000
@@ -53,6 +55,8 @@ function setup(form: HTMLFormElement) {
   const referrer = document.referrer && new URL(document.referrer).host !== location.host ? document.referrer : undefined
   // С первого ввода, а не с открытия страницы: страницу могли читать час, а робот в поля не печатает.
   let startedAt = 0
+  // В ссылке имя из анкеты, поэтому сам переход Метрика не записывает (ym-disable-tracklink), только цель.
+  done.querySelector('[data-telegram-link]')!.addEventListener('click', () => reachGoal(METRIKA_GOALS.telegram))
 
   /** Порядок - порядок на странице: фокус уходит на первое неверное поле. */
   const checks: Record<string, () => string> = {
@@ -103,7 +107,10 @@ function setup(form: HTMLFormElement) {
   }
 
   form.addEventListener('input', (event) => {
-    if (!startedAt) startedAt = performance.now()
+    if (!startedAt) {
+      startedAt = performance.now()
+      reachGoal(METRIKA_GOALS.formStart)
+    }
     const target = event.target as Input
     const counter = form.querySelector<HTMLElement>(`[data-count-for="${target.name}"]`)
     if (counter) counter.textContent = `${target.value.trim().length} из ${LEAD_ANSWER_LIMITS[target.name as Answer].min} знаков`
@@ -121,6 +128,8 @@ function setup(form: HTMLFormElement) {
     data.set('fillMs', String(startedAt ? Math.round(performance.now() - startedAt) : 0))
     for (const key of UTM_KEYS) { const mark = params.get(key); if (mark) data.set(key, mark) }
     if (referrer) data.set('referrer', referrer)
+    const clientId = metrikaClientId()
+    if (clientId) data.set('ymClientId', clientId)
     const limit = resume.files?.length ? UPLOAD_TIMEOUT_MS : TIMEOUT_MS
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), limit)
@@ -128,6 +137,7 @@ function setup(form: HTMLFormElement) {
       const response = await fetch(ENDPOINT, { method: 'POST', body: data, signal: controller.signal })
       const result = await response.json().catch(() => null) as { ok?: boolean; error?: string; field?: string } | null
       if (response.ok && result?.ok) {
+        reachGoal(METRIKA_GOALS.leadSubmit)
         const reason = LEAD_REASONS.find((item) => item.value === value('reason'))?.label ?? ''
         const text = `Здравствуйте! Меня зовут ${value('name')}. Заявка на буткемп ${form.dataset.programTitle}: ${reason}.`
         done.querySelector<HTMLAnchorElement>('[data-telegram-link]')!.href = `${PERSONAL_TELEGRAM.url}?text=${encodeURIComponent(text)}`

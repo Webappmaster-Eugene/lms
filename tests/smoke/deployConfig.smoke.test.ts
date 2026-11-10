@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
+import { METRIKA_CSP_DOMAINS, METRIKA_FRAME_ANCESTORS } from '../../landing/src/config'
+
 function read(relative: string): string {
   return readFileSync(fileURLToPath(new URL(relative, import.meta.url)), 'utf8')
 }
@@ -228,15 +230,22 @@ describe('nginx лендинга', () => {
     expect(header('Strict-Transport-Security')).not.toContain('preload')
   })
 
-  it('CSP не разрешает чужие и встроенные скрипты', () => {
+  it('CSP не разрешает встроенные скрипты, а чужие - только Яндекс Метрики полным списком доменов', () => {
     const csp = Object.fromEntries(header('Content-Security-Policy').split(';').map((part) => {
       const [name, ...sources] = part.trim().split(/\s+/)
       return [name, sources.join(' ')]
     }))
+    const https = METRIKA_CSP_DOMAINS.map((domain) => `https://${domain}`)
+    const wss = METRIKA_CSP_DOMAINS.map((domain) => `wss://${domain}`)
     expect(csp['default-src']).toBe("'self'")
-    expect(csp['script-src']).toBe("'self'")
+    expect(csp['script-src']).toBe(["'self'", ...https].join(' '))
+    expect(csp['img-src']).toBe(["'self'", 'data:', ...https].join(' '))
+    // Домен сбора tag.js выбирает сам: 04.11.2026 на mentorcareer.ru с одним mc.yandex.ru терялись все визиты.
+    expect(csp['connect-src']).toBe(["'self'", ...https, ...wss].join(' '))
+    expect(csp['frame-src']).toBe(https.join(' '))
     expect(csp['object-src']).toBe("'none'")
-    expect(csp['frame-ancestors']).toBe("'self'")
+    expect(csp['frame-ancestors']).toBe(["'self'", ...METRIKA_FRAME_ANCESTORS.map((domain) => `https://${domain}`)].join(' '))
+    expect(https).toContain('https://mc.yandex.com')
   })
 
   it('Permissions-Policy запрещает камеру, микрофон и геолокацию', () => {

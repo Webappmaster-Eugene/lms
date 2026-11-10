@@ -114,6 +114,10 @@ export const BootcampLeads: CollectionConfig = {
         sourceField('utmContent', 'utm_content'),
         sourceField('utmTerm', 'utm_term'),
         { name: 'referrerHost', type: 'text', maxLength: 255, label: 'Сайт перехода', access: serverOnly, admin: readOnly },
+        {
+          name: 'ymClientId', type: 'text', maxLength: 30, label: 'ClientID Яндекс Метрики', access: serverOnly,
+          admin: { ...readOnly, description: 'По нему в Метрике (счётчик 114161391) можно найти визиты автора заявки. Пусто, если счётчик заблокирован или не успел загрузиться.' },
+        },
       ],
     },
     { name: 'consentVersion', type: 'text', required: true, maxLength: 40, label: 'Версия согласия и политики', access: serverOnly, admin: readOnly },

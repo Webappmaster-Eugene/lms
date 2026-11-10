@@ -5,7 +5,7 @@ import { APP_URL, LANDING_URL, LANDING_USE } from '../fixtures/env'
 import { LEAD_ANSWERS, LEAD_PDF, LEAD_PDF_NEAR_LIMIT } from '../../fixtures/bootcampLead'
 import { zipOf } from '../../fixtures/zip'
 import { ENTRY_TASKS } from '../../../src/data/bootcamp-entry/tasks'
-import { AUTHOR_PROFILES, ORGANIZATION_ID, ORGANIZATION_PROFILES } from '../../../landing/src/config'
+import { AUTHOR_PROFILES, METRIKA_ID, ORGANIZATION_ID, ORGANIZATION_PROFILES } from '../../../landing/src/config'
 import { FORMAT_PATH, GROUP_LIMIT, LAST_CLASS, LAST_CLASS_ISO, PROGRAM_PATH, START, START_ISO, WEEKS } from '../../../landing/src/data/bootcamp'
 import { INTERVIEW_QUESTIONS_TOTAL, PROGRAM_WEEKS_DETAILED, weekAnchor } from '../../../landing/src/data/bootcamp-program'
 
@@ -27,7 +27,30 @@ async function adminLeads(request: APIRequestContext, email: string) {
   const token = await adminToken(request)
   const found = await request.get(`${APP_URL}/api/bootcamp-leads?where[email][equals]=${encodeURIComponent(email)}&depth=0`, { headers: { Authorization: `JWT ${token}` } })
   expect(found.status()).toBe(200)
-  return (await found.json() as { docs: { email: string; name: string | null; submissionCount: number; source: { utmSource: string | null }; problem: string | null; resume: number | null; fillSeconds: number | null; entryTaskSentAt: string | null; entryTaskToken: string | null; entrySubmissionCount: number | null }[] }).docs
+  return (await found.json() as { docs: { email: string; name: string | null; submissionCount: number; source: { utmSource: string | null; ymClientId: string | null }; problem: string | null; resume: number | null; fillSeconds: number | null; entryTaskSentAt: string | null; entryTaskToken: string | null; entrySubmissionCount: number | null }[] }).docs
+}
+
+const CLIENT_ID = '1731234567123456789'
+
+/**
+ * Вместо Метрики - запись вызовов: tag.js вне боевого домена не грузится, а очередь страницы
+ * подхватывает уже объявленную функцию ym. getClientID отвечает сразу, как настоящий счётчик.
+ */
+async function recordMetrika(page: Page) {
+  await page.addInitScript((clientId) => {
+    const calls: unknown[][] = []
+    Object.assign(window, {
+      __ymCalls: calls,
+      ym: (...args: unknown[]) => {
+        calls.push(args.filter((arg) => typeof arg !== 'function'))
+        if (args[1] === 'getClientID' && typeof args[2] === 'function') args[2](clientId)
+      },
+    })
+  }, CLIENT_ID)
+  return {
+    goals: () => page.evaluate(() => ((window as unknown as { __ymCalls: unknown[][] }).__ymCalls).filter((call) => call[1] === 'reachGoal').map((call) => call[2])),
+    init: () => page.evaluate(() => ((window as unknown as { __ymCalls: unknown[][] }).__ymCalls).find((call) => call[1] === 'init')),
+  }
 }
 
 /** Анкета так, как её заполняет человек: подписи полей, а не имена. */
@@ -75,6 +98,27 @@ test('страница: метаданные, CSP без нарушений, а�
   expect((await request.get(`${origin}/privacy/`)).status()).toBe(200)
 })
 
+test('cookie и Метрика: уведомление до нажатия «Понятно», вне боевого домена tag.js не грузится', async ({ page }) => {
+  const external: string[] = []
+  page.on('request', (request) => { if (/mc\.yandex|webvisor/.test(request.url())) external.push(request.url()) })
+  await page.goto(PAGE)
+  const notice = page.getByRole('complementary', { name: 'Cookie и Яндекс Метрика' })
+  await expect(notice).toBeVisible()
+  await expect(notice).toContainText('Продолжая пользоваться сайтом, вы с этим соглашаетесь')
+  await expect(notice.getByRole('link', { name: 'политике обработки персональных данных' })).toHaveAttribute('href', '/privacy/#metrika')
+  await notice.getByRole('button', { name: 'Понятно' }).click()
+  await expect(notice).toBeHidden()
+
+  // Закрытое уведомление не возвращается и на других страницах буткемпа.
+  await page.goto(PROGRAM_PATH)
+  await expect(page.getByRole('complementary', { name: 'Cookie и Яндекс Метрика' })).toBeHidden()
+  // Вызовы стоят в очереди, как в официальном коде счётчика, но в Метрику с тестового адреса ничего не уходит.
+  expect(await page.evaluate(() => (window as unknown as { ym?: { a?: unknown[] } }).ym?.a?.length ?? 0)).toBeGreaterThan(0)
+  await page.goto('/privacy/#metrika')
+  await expect(page.locator('#metrika')).toHaveText('Cookie и Яндекс Метрика')
+  expect(external).toEqual([])
+})
+
 test('разметка курса: даты, размер группы и профили наставника совпадают со страницей', async ({ page }) => {
   await page.goto(PAGE)
   type Node = Record<string, unknown> & { '@type': string; '@id'?: string }
@@ -107,8 +151,10 @@ test('разметка курса: даты, размер группы и про
 
 test('форма: ошибки рядом с полями, анкета с резюме сохраняется, в конце ссылка на Telegram, повтор не плодит дубль', async ({ page, request }) => {
   const email = `lead-${Date.now()}@mail.test`
+  const metrika = await recordMetrika(page)
   await page.clock.install()
   await page.goto(`${PAGE}?utm_source=e2e&utm_medium=test`)
+  expect(await metrika.init()).toEqual([METRIKA_ID, 'init', { clickmap: true, trackLinks: true, accurateTrackBounce: true, webvisor: false }])
   const submit = page.getByRole('button', { name: 'Оставить заявку' })
 
   await submit.click()
@@ -144,9 +190,17 @@ test('форма: ошибки рядом с полями, анкета с ре�
   const href = new URL(await telegram.getAttribute('href') ?? '')
   expect(href.origin + href.pathname).toBe('https://t.me/eugene_galera')
   expect(href.searchParams.get('text')).toBe('Здравствуйте! Меня зовут Иван. Заявка на буткемп Node.js: Сменить работу или вырасти в грейде.')
+  // В ссылке имя: Метрика не записывает переход по ней, остаётся только цель.
+  await expect(telegram).toHaveClass(/\bym-disable-tracklink\b/)
+  expect(await metrika.goals()).toEqual(['lead_form_start', 'lead_submit'])
+  await page.context().route('https://t.me/**', (route) => route.fulfill({ status: 200, body: '' }))
+  const popup = page.waitForEvent('popup')
+  await telegram.click()
+  await (await popup).close()
+  expect(await metrika.goals()).toEqual(['lead_form_start', 'lead_submit', 'lead_telegram'])
 
   const [lead] = await adminLeads(request, email)
-  expect(lead).toMatchObject({ email, name: 'Иван', submissionCount: 1, source: { utmSource: 'e2e' }, telegram: '@ivan_petrov', reason: 'switch-or-grow', links: 'https://github.com/ivan' })
+  expect(lead).toMatchObject({ email, name: 'Иван', submissionCount: 1, source: { utmSource: 'e2e', ymClientId: CLIENT_ID }, telegram: '@ivan_petrov', reason: 'switch-or-grow', links: 'https://github.com/ivan' })
   expect(lead?.problem).toBe(LEAD_ANSWERS.problem)
   expect(lead?.resume).toBeTruthy()
   expect(lead?.fillSeconds).toBeGreaterThanOrEqual(20)

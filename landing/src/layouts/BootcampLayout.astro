@@ -1,7 +1,7 @@
 ---
 import '../styles/bootcamp.css'
 import { MENTOR_SITE_URL, ORGANIZATION_ID, ORGANIZATION_PROFILES, SITE_URL } from '../config'
-import { BOOTCAMP_PATH, PAGE_UPDATED } from '../data/bootcamp'
+import { BOOTCAMP_PATH, PAGE_UPDATED, PRIVACY_PATH } from '../data/bootcamp'
 
 interface Props {
   title: string
@@ -73,5 +73,10 @@ const jsonLd = {
   <body class="bootcamp">
     <a href="#main" class="skip-link">К содержимому</a>
     <slot />
+    <aside class="bc-cookie" aria-label="Cookie и Яндекс Метрика" data-cookie-notice hidden>
+      <p>Сайт использует cookie и Яндекс Метрику, чтобы считать посещения. Продолжая пользоваться сайтом, вы с этим соглашаетесь. Подробнее - в <a href={`${PRIVACY_PATH}#metrika`}>политике обработки персональных данных</a>.</p>
+      <button type="button" class="bc-cookie-ok" data-cookie-ok>Понятно</button>
+    </aside>
+    <script src="../scripts/metrika.ts"></script>
   </body>
 </html>
