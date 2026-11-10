@@ -240,6 +240,34 @@ CMS → «Буткемпы» → «Заявки на буткемп» (`/admin/c
   «Воронка буткемпа» в админке. Если они понадобятся в Метрике, загружать офлайн-конверсии по
   ClientID из заявки, а не ставить счётчик на эти страницы.
 
+## Ссылки с метками для каналов
+
+Из Telegram и приложений сайт перехода не передаётся, поэтому ссылку на буткемп в своих каналах
+давать с метками: их видят и Метрика, и заявка («Откуда пришла»), и «Воронка буткемпа» (по
+`utm_source`). Метки латиницей, маленькими буквами, без пробелов. `utm_campaign` - поток,
+`utm_content` - конкретный канал, видео или статья. На своих сайтах (mentorcareer.ru,
+nadtocheev.ru) метки не нужны: сайт перехода заявка сохраняет сама.
+
+База: `https://info.mentorcareer.ru/bootcamp/nodejs/`
+
+| Где ссылка | Метки после `?` |
+|---|---|
+| Пост в канале @captain_galera | `utm_source=telegram&utm_medium=post&utm_campaign=nodejs-2027-02&utm_content=captain_galera` |
+| Пост в канале @galera_mentor | `utm_source=telegram&utm_medium=post&utm_campaign=nodejs-2027-02&utm_content=galera_mentor` |
+| Пост в канале @eugene_vibecode | `utm_source=telegram&utm_medium=post&utm_campaign=nodejs-2027-02&utm_content=eugene_vibecode` |
+| Описание личного Telegram | `utm_source=telegram&utm_medium=profile&utm_campaign=nodejs-2027-02&utm_content=eugene_nadtocheev` |
+| Описание видео на YouTube | `utm_source=youtube&utm_medium=video&utm_campaign=nodejs-2027-02&utm_content=<id видео>` |
+| Пост VK webapp_eugene | `utm_source=vk&utm_medium=post&utm_campaign=nodejs-2027-02&utm_content=webapp_eugene` |
+| Статья на Хабре | `utm_source=habr&utm_medium=article&utm_campaign=nodejs-2027-02&utm_content=<номер статьи>` |
+| Профиль Хабр Карьеры | `utm_source=habr_career&utm_medium=profile&utm_campaign=nodejs-2027-02` |
+| Профили Solvery и GetMentor | `utm_source=solvery` или `utm_source=getmentor`, дальше `&utm_medium=profile&utm_campaign=nodejs-2027-02` |
+| Профиль GitHub | `utm_source=github&utm_medium=profile&utm_campaign=nodejs-2027-02` |
+
+Пример целиком: `https://info.mentorcareer.ru/bootcamp/nodejs/?utm_source=telegram&utm_medium=post&utm_campaign=nodejs-2027-02&utm_content=captain_galera`.
+Заявка берёт метки из адреса страницы с формой. Если человек пришёл по ссылке с метками, ушёл на
+страницу программы и вернулся к форме по ссылке сайта, в заявке меток не будет. Метрика при этом
+запомнит источник визита, а по ClientID из заявки его можно найти.
+
 ## Проверки
 
 - `tests/unit/bootcampLeads.test.ts` — разбор формы;

@@ -4,6 +4,8 @@ export const AUTHOR_URL = 'https://nadtocheev.ru'
 export const MENTOR_SITE_URL = 'https://mentorcareer.ru'
 /** Подтверждение прав в Яндекс Вебмастере: код публичный, снятие тега лишит доступа к фиду курсов. */
 export const YANDEX_VERIFICATION = '89bcbf7cedc4803e'
+/** Подтверждение прав в Bing Webmaster (аккаунт с mentorcareer.ru): код публичный, без тега сайт выпадет из кабинета. */
+export const BING_VERIFICATION = 'BDB0FADCAA3C4CCF2764A0C1F3481696'
 
 /**
  * Счётчик Яндекс Метрики страниц буткемпа (создан 10.11.2026, принимает данные только с info.mentorcareer.ru).

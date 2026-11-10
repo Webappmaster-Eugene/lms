@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 import { LANDING_URL, LANDING_USE } from '../fixtures/env'
 import { BOOTCAMP_PATH, PRICE, START, START_ISO } from '../../../landing/src/data/bootcamp'
-import { ORGANIZATION_ID, YANDEX_VERIFICATION } from '../../../landing/src/config'
+import { BING_VERIFICATION, ORGANIZATION_ID, YANDEX_VERIFICATION } from '../../../landing/src/config'
 
 /**
  * Лендинг (landing/, Astro): мета-теги, canonical, Open Graph, JSON-LD,
@@ -18,6 +18,7 @@ test('title, description, canonical, robots и язык страницы', async
   expect(response?.status()).toBe(200)
   await expect(page.locator('html')).toHaveAttribute('lang', 'ru')
   await expect(page.locator('meta[name="yandex-verification"]')).toHaveAttribute('content', YANDEX_VERIFICATION)
+  await expect(page.locator('meta[name="msvalidate.01"]')).toHaveAttribute('content', BING_VERIFICATION)
   const title = await page.title()
   expect(title.length).toBeGreaterThan(20)
   // Сниппет режется по ширине (~600px): для кириллицы это 65–70 символов.
