@@ -28,8 +28,6 @@ const lms = `${base}<body style="background:${C.deep};color:${C.sail};position:r
 const landing = `${base}<body style="background:${C.sail};color:${C.ink};position:relative">
   <div style="position:absolute;left:692px;top:92px;width:640px;border-radius:18px;overflow:hidden;background:#fff;box-shadow:0 22px 60px rgba(16,36,30,.16)">
     <img src="${dataUri('landing/public/guide/dashboard.webp', 'image/webp')}" style="display:block;width:100%">
-    <!-- На снимке интерфейса ещё прежний логотип. -->
-    <div style="position:absolute;left:4px;top:3px;width:92px;height:24px;background:#fff;display:flex;align-items:center;gap:5px;padding-left:3px">${tileMark(17)}${word(9, C.ink)}</div>
   </div>
   <div style="position:absolute;left:72px;top:64px;bottom:64px;width:580px;display:flex;flex-direction:column;justify-content:space-between">
     <div style="display:flex;align-items:center;gap:16px">${tileMark(56)}${word(25, C.ink)}</div>
