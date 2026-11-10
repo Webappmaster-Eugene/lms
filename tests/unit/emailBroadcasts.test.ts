@@ -51,7 +51,9 @@ describe('письмо рассылки', () => {
     const { html, text, subject } = broadcastEmail({ ...base, subject: 'Тема <script>', body: 'Привет <img src=x onerror=alert(1)> & "кавычки"' })
     expect(subject).toBe('Тема <script>')
     expect(html).not.toContain('<script>')
-    expect(html).not.toContain('<img')
+    // Единственная картинка - знак в шапке письма, картинка из текста рассылки не проходит.
+    expect(html.match(/<img\b/g)).toHaveLength(1)
+    expect(html).not.toContain('<img src=x')
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt; &amp; &quot;кавычки&quot;')
     expect(html).toContain('Привет, Алексей!')
     expect(text).toContain('Привет <img src=x onerror=alert(1)> & "кавычки"')

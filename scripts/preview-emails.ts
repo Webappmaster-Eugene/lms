@@ -38,8 +38,8 @@ for (const sample of samples) {
 }
 await writeFile(resolve(directory, 'index.html'), `<!DOCTYPE html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Письма MentorCareer</title>
-<style>body{margin:0;background:#f4f4f5;color:#18181b;font:16px/1.6 Arial,sans-serif}main{max-width:680px;margin:48px auto;padding:0 24px}h1{font-size:32px}li{margin:16px 0}a{color:#18181b}small{display:block;color:#52525b}</style></head>
+<style>body{margin:0;background:#edf3f0;color:#10241e;font:16px/1.6 Arial,sans-serif}main{max-width:680px;margin:48px auto;padding:0 24px}h1{font-size:32px}li{margin:16px 0}a{color:#176b56}small{display:block;color:#48605a}</style></head>
 <body><main><h1>Письма MentorCareer</h1><p>Предпросмотр шаблонов. Данные вымышленные, ссылки установки пароля и отписки не действуют.</p><ul>
-${samples.map(sample => `<li><a href="${sample.id}.html">${sample.title}</a> — <a href="${sample.id}.txt">текстовая версия</a></li>`).join('\n')}
+${samples.map(sample => `<li><a href="${sample.id}.html">${sample.title}</a> - <a href="${sample.id}.txt">текстовая версия</a></li>`).join('\n')}
 </ul><small>Чтобы проверить мобильную версию, уменьшите ширину окна браузера.</small></main></body></html>`)
 process.stdout.write(`Предпросмотр писем: ${resolve(directory, 'index.html')}\n`)

@@ -31,6 +31,16 @@ describe('письма: общие требования', () => {
   it.each(ALL_TEMPLATES)('%s — html закрыт корректно', (_name, build) => {
     expect(build().html.trimEnd().endsWith('</html>')).toBe(true)
   })
+
+  it.each(ALL_TEMPLATES)('%s — шапка в цветах знака и со знаком платформы', (_name, build) => {
+    const { html } = build()
+    // Знак берётся из /images: этот путь middleware отдаёт без входа, иначе почта получит страницу входа.
+    expect(html).toMatch(/<img src="[^"]+\/images\/pwa\/icon-192\.png"[^>]* alt=""/)
+    expect(html).toContain('bgcolor="#0E3B32"')
+    expect(html).not.toMatch(/#18181b|#27272a|#3f3f46|#f4f4f5/i)
+    // Подстановка в строке с одинарными кавычками ушла бы в письмо текстом.
+    expect(html).not.toContain('${')
+  })
 })
 
 describe('ссылка на установку пароля', () => {

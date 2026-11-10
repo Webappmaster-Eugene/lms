@@ -3,6 +3,8 @@
 import { useEffect, useId, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 
+import { BRAND_COLORS } from '@/lib/brand-mark'
+
 import { CodeBlock } from './CodeBlock'
 import { MarkdownImage } from './MarkdownImage'
 
@@ -14,6 +16,25 @@ declare global {
 
 /** Готовая сборка mermaid со своего домена (scripts/copy-mermaid.mjs): через webpack она не влезала в память сборки. */
 export const MERMAID_SCRIPT = '/mermaid/mermaid.min.js'
+
+/** Цвета знака и светлой темы платформы вместо сиреневой темы mermaid по умолчанию. */
+const MERMAID_THEME = {
+  primaryColor: '#e1efe9',
+  primaryBorderColor: BRAND_COLORS.green,
+  primaryTextColor: BRAND_COLORS.ink,
+  secondaryColor: '#fff6d1',
+  secondaryBorderColor: '#c9a21a',
+  tertiaryColor: '#f3f6f4',
+  tertiaryBorderColor: '#cad6d2',
+  lineColor: '#48605a',
+  textColor: BRAND_COLORS.ink,
+  clusterBkg: '#f3f6f4',
+  clusterBorder: '#cad6d2',
+  edgeLabelBackground: '#ffffff',
+  noteBkgColor: '#fff6d1',
+  noteBorderColor: '#c9a21a',
+  noteTextColor: BRAND_COLORS.ink,
+}
 
 let loader: Promise<Mermaid> | undefined
 // Рендер mermaid держит общее состояние: две схемы, нарисованные одновременно, мешают друг другу.
@@ -37,7 +58,15 @@ function mermaidScript(): Promise<Mermaid> {
 function loadMermaid(): Promise<Mermaid> {
   loader ??= mermaidScript().then((mermaid) => {
     // Без HTML-подписей SVG рисуется и внутри <img>: просмотр схем показывает её картинкой.
-    mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'default', htmlLabels: false, flowchart: { htmlLabels: false } })
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      // Схема лежит на белой подложке в обеих темах, поэтому цвета одни, светлые.
+      theme: 'base',
+      themeVariables: MERMAID_THEME,
+      htmlLabels: false,
+      flowchart: { htmlLabels: false },
+    })
     return mermaid
   }).catch((error: unknown) => {
     loader = undefined

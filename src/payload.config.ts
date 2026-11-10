@@ -9,6 +9,7 @@ import sharp from 'sharp'
 
 import { migrations } from './migrations'
 import { buildEmailAdapter } from '@/payload/email/transport'
+import { OG_IMAGE, SITE_DESCRIPTION, SITE_NAME } from '@/lib/site-metadata'
 import { payloadLogger, reportMigrationFailures, reportPayloadError } from '@/payload/hooks/reportPayloadError'
 import { Users } from '@/payload/collections/Users'
 import { Roadmaps } from '@/payload/collections/Roadmaps'
@@ -76,8 +77,14 @@ export default buildConfig({
     meta: {
       titleSuffix: ' - MentorCareer LMS',
       icons: [{ url: '/images/pwa/icon-32.png', sizes: '32x32', type: 'image/png' }],
+      // Без своих значений ссылка на админку в мессенджере показывает карточку «Payload App».
+      openGraph: { siteName: SITE_NAME, description: SITE_DESCRIPTION, images: [OG_IMAGE] },
     },
     components: {
+      graphics: {
+        Logo: '/components/brand/AdminBrand#AdminLogo',
+        Icon: '/components/brand/AdminBrand#AdminIcon',
+      },
       providers: ['/components/analytics/AdminActivityProvider#AdminActivityProvider'],
       beforeNavLinks: ['/components/roadmap-editor/NavLink#RoadmapEditorNavLink'],
       views: {

@@ -1,7 +1,21 @@
 import { absoluteBroadcastUrl, broadcastPlainText, parseBroadcastBody, type BroadcastInline } from '@/lib/broadcast-markup'
+import { BRAND_COLORS } from '@/lib/brand-mark'
 
 const BASE_URL = (process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000').replace(/\/+$/, '')
 const BRAND_NAME = 'MentorCareer LMS'
+
+// Серые тона подкрашены в зелёный, как токены светлой темы в globals.css: письмо выглядит частью платформы.
+const C = {
+  ...BRAND_COLORS,
+  page: '#edf3f0',
+  panel: '#eaf1ed',
+  footer: '#f7faf8',
+  border: '#d6e1db',
+  body: '#2c3f39',
+  strong: '#1b302a',
+  muted: '#48605a',
+  onDeep: '#c4dbd1',
+} as const
 
 export type EmailContent = {
   subject: string
@@ -22,30 +36,30 @@ function greeting(firstName: string): string {
 }
 
 function link(label: string, url: string): string {
-  return `<a href="${escapeHtml(url)}" style="color:#27272a;text-decoration:underline;text-underline-offset:3px;word-wrap:break-word;">${escapeHtml(label)}</a>`
+  return `<a href="${escapeHtml(url)}" style="color:${C.green};text-decoration:underline;text-underline-offset:3px;word-wrap:break-word;">${escapeHtml(label)}</a>`
 }
 
 function paragraph(content: string): string {
-  return `<p style="margin:0 0 18px;font-size:16px;line-height:1.65;color:#3f3f46;">${content}</p>`
+  return `<p style="margin:0 0 18px;font-size:16px;line-height:1.65;color:${C.body};">${content}</p>`
 }
 
 function button(label: string, url: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0;width:auto;">
-    <tr><td bgcolor="#18181b" style="border-radius:8px;text-align:center;mso-padding-alt:15px 24px;">
-      <a href="${escapeHtml(url)}" class="email-button" style="display:inline-block;padding:15px 24px;border:1px solid #18181b;border-radius:8px;color:#ffffff;font-size:16px;line-height:1.4;font-weight:bold;text-decoration:none;text-align:center;mso-padding-alt:0;">${escapeHtml(label)}</a>
+    <tr><td bgcolor="${C.green}" style="border-radius:8px;text-align:center;mso-padding-alt:15px 24px;">
+      <a href="${escapeHtml(url)}" class="email-button" style="display:inline-block;padding:15px 24px;border:1px solid ${C.green};border-radius:8px;color:#ffffff;font-size:16px;line-height:1.4;font-weight:bold;text-decoration:none;text-align:center;mso-padding-alt:0;">${escapeHtml(label)}</a>
     </td></tr>
   </table>`
 }
 
 function notice(content: string): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0;">
-    <tr><td bgcolor="#f4f4f5" style="padding:18px 20px;border-radius:8px;font-size:14px;line-height:1.65;color:#52525b;">${content}</td></tr>
+    <tr><td bgcolor="${C.panel}" style="padding:18px 20px;border-radius:8px;font-size:14px;line-height:1.65;color:${C.muted};">${content}</td></tr>
   </table>`
 }
 
 function fallbackLink(url: string): string {
-  return `<p style="margin:0 0 22px;font-size:13px;line-height:1.65;color:#52525b;">Если кнопка не открывается, скопируйте ссылку в браузер:<br>
-    <a href="${escapeHtml(url)}" style="color:#52525b;text-decoration:underline;word-break:break-all;overflow-wrap:anywhere;">${escapeHtml(url)}</a>
+  return `<p style="margin:0 0 22px;font-size:13px;line-height:1.65;color:${C.muted};">Если кнопка не открывается, скопируйте ссылку в браузер:<br>
+    <a href="${escapeHtml(url)}" style="color:${C.muted};text-decoration:underline;word-break:break-all;overflow-wrap:anywhere;">${escapeHtml(url)}</a>
   </p>`
 }
 
@@ -63,8 +77,8 @@ function resultCard(title: string, description: string, points: number): string 
   const bonus = reward(points)
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;table-layout:fixed;">
     <tr><td bgcolor="#fffbeb" style="padding:22px;border-left:4px solid #b77913;border-radius:0 8px 8px 0;word-wrap:break-word;overflow-wrap:anywhere;">
-      <h2 style="margin:0 0 10px;font-size:21px;line-height:1.4;font-weight:bold;color:#18181b;">${escapeHtml(title)}</h2>
-      <p style="margin:0;font-size:15px;line-height:1.65;color:#52525b;">${escapeHtml(description)}</p>
+      <h2 style="margin:0 0 10px;font-size:21px;line-height:1.4;font-weight:bold;color:${C.ink};">${escapeHtml(title)}</h2>
+      <p style="margin:0;font-size:15px;line-height:1.65;color:${C.muted};">${escapeHtml(description)}</p>
       ${bonus ? `<p style="margin:16px 0 0;font-size:19px;line-height:1.4;font-weight:bold;color:#854d0e;">${escapeHtml(bonus)}</p>` : ''}
     </td></tr>
   </table>`
@@ -86,7 +100,7 @@ function layout(preview: string, title: string, content: string, footer = DEFAUL
   <style>
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
-    a:focus-visible { outline:3px solid #b77913; outline-offset:4px; }
+    a:focus-visible { outline:3px solid ${C.green}; outline-offset:4px; }
     @media only screen and (max-width:600px) {
       .email-outer { padding:16px 10px !important; }
       .email-content { padding:28px 22px !important; }
@@ -96,22 +110,27 @@ function layout(preview: string, title: string, content: string, footer = DEFAUL
     }
   </style>
 </head>
-<body style="margin:0;padding:0;width:100%;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+<body style="margin:0;padding:0;width:100%;background-color:${C.page};font-family:Arial,Helvetica,sans-serif;">
   <div class="email-preheader" aria-hidden="true" style="display:none;max-height:0;max-width:0;overflow:hidden;opacity:0;mso-hide:all;">${escapeHtml(preview)}</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#f4f4f5">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${C.page}">
     <tr><td align="center" class="email-outer" style="padding:36px 16px;">
       <!--[if mso]><table role="presentation" width="600" align="center"><tr><td><![endif]-->
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="max-width:600px;border:1px solid #e4e4e7;border-radius:12px;table-layout:fixed;">
-        <tr><td class="email-header" bgcolor="#18181b" style="padding:28px 36px;border-radius:11px 11px 0 0;border-bottom:3px solid #b77913;">
-          <a href="${escapeHtml(BASE_URL)}" style="font-size:25px;line-height:1.2;font-weight:bold;letter-spacing:-0.6px;color:#ffffff;text-decoration:none;">MentorCareer</a>
-          <p style="margin:7px 0 0;font-size:13px;line-height:1.5;color:#d4d4d8;">Платформа обучения</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="max-width:600px;border:1px solid ${C.border};border-radius:12px;table-layout:fixed;">
+        <tr><td class="email-header" bgcolor="${C.deep}" style="padding:28px 36px;border-radius:11px 11px 0 0;border-bottom:3px solid ${C.sun};">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            <td style="padding-right:14px;vertical-align:middle;"><a href="${escapeHtml(BASE_URL)}"><img src="${escapeHtml(BASE_URL)}/images/pwa/icon-192.png" width="44" height="44" alt="" style="display:block;border:0;"></a></td>
+            <td style="vertical-align:middle;">
+              <a href="${escapeHtml(BASE_URL)}" style="font-size:25px;line-height:1.2;font-weight:bold;letter-spacing:-0.6px;color:#ffffff;text-decoration:none;">MentorCareer</a>
+              <p style="margin:4px 0 0;font-size:13px;line-height:1.5;color:${C.onDeep};">Платформа обучения</p>
+            </td>
+          </tr></table>
         </td></tr>
         <tr><td class="email-content" style="padding:36px;word-wrap:break-word;overflow-wrap:anywhere;">
-          <h1 class="email-title" style="margin:0 0 24px;font-size:30px;line-height:1.2;letter-spacing:-0.6px;font-weight:bold;color:#18181b;">${escapeHtml(title)}</h1>
+          <h1 class="email-title" style="margin:0 0 24px;font-size:30px;line-height:1.2;letter-spacing:-0.6px;font-weight:bold;color:${C.ink};">${escapeHtml(title)}</h1>
           ${content}
-          <p style="margin:30px 0 0;padding-top:22px;border-top:1px solid #e4e4e7;font-size:14px;line-height:1.6;color:#52525b;">До встречи на платформе,<br><strong style="color:#27272a;">Команда MentorCareer</strong></p>
+          <p style="margin:30px 0 0;padding-top:22px;border-top:1px solid ${C.border};font-size:14px;line-height:1.6;color:${C.muted};">До встречи на платформе,<br><strong style="color:${C.strong};">Команда MentorCareer</strong></p>
         </td></tr>
-        <tr><td class="email-content" bgcolor="#fafafa" style="padding:22px 36px;border-top:1px solid #e4e4e7;border-radius:0 0 11px 11px;font-size:12px;line-height:1.7;color:#52525b;">
+        <tr><td class="email-content" bgcolor="${C.footer}" style="padding:22px 36px;border-top:1px solid ${C.border};border-radius:0 0 11px 11px;font-size:12px;line-height:1.7;color:${C.muted};">
           ${footer}
         </td></tr>
       </table>
@@ -157,8 +176,8 @@ export function inviteEmail(firstName: string, address: string, token: string, c
     'Ваше обучение начинается здесь',
     `${paragraph(escapeHtml(greeting(firstName)))}
     ${paragraph('Администратор создал для вас аккаунт MentorCareer. Осталось задать пароль - после этого вы сможете открыть назначенные вам учебные материалы.')}
-    ${notice(`<strong style="color:#27272a;">Ваш логин</strong><br><span style="word-break:break-all;">${escapeHtml(address)}</span>`)}
-    <ol style="margin:0 0 18px;padding-left:22px;font-size:15px;line-height:1.7;color:#3f3f46;">${steps.map(step => `<li style="padding:0 0 8px 4px;">${escapeHtml(step)}</li>`).join('')}</ol>
+    ${notice(`<strong style="color:${C.strong};">Ваш логин</strong><br><span style="word-break:break-all;">${escapeHtml(address)}</span>`)}
+    <ol style="margin:0 0 18px;padding-left:22px;font-size:15px;line-height:1.7;color:${C.body};">${steps.map(step => `<li style="padding:0 0 8px 4px;">${escapeHtml(step)}</li>`).join('')}</ol>
     ${button('Задать пароль', url)}
     ${paragraph('<strong>Ссылка действует 7 дней и используется один раз.</strong> Выберите пароль, который не используете в других сервисах.')}
     ${fallbackLink(url)}
@@ -178,7 +197,7 @@ export function resetPasswordEmail(firstName: string, token: string): EmailConte
     `${paragraph(escapeHtml(greeting(firstName)))}
     ${paragraph('Мы получили запрос на восстановление доступа к вашему аккаунту MentorCareer. Нажмите кнопку и задайте новый пароль, чтобы вернуться к обучению.')}
     ${button('Восстановить пароль', url)}
-    ${notice('<strong style="color:#27272a;">Ссылка действует 1 час и используется один раз.</strong><br>Не пересылайте это письмо и не сообщайте ссылку другим людям.')}
+    ${notice(`<strong style="color:${C.strong};">Ссылка действует 1 час и используется один раз.</strong><br>Не пересылайте это письмо и не сообщайте ссылку другим людям.`)}
     ${fallbackLink(url)}
     ${paragraph(`Ссылка больше не действует? ${link('Запросите новую ссылку', `${BASE_URL}/forgot-password`)}.`)}
     ${paragraph('<strong>Не запрашивали восстановление?</strong> Просто проигнорируйте это письмо. Ваш текущий пароль останется прежним, пока вы сами не зададите новый.')}`,
@@ -241,7 +260,7 @@ function broadcastInlineHtml(nodes: BroadcastInline[]): string {
   return nodes.map((node) => {
     if (node.type === 'text') return escapeHtml(node.value)
     if (node.type === 'break') return '<br>'
-    if (node.type === 'bold') return `<strong style="color:#27272a;">${broadcastInlineHtml(node.children)}</strong>`
+    if (node.type === 'bold') return `<strong style="color:${C.strong};">${broadcastInlineHtml(node.children)}</strong>`
     return link(node.label, node.url)
   }).join('')
 }
@@ -311,7 +330,7 @@ export function bootcampLeadEmail({ id, address, name, program, source, telegram
     `Заявка от ${address} ждёт проверки анкеты.`,
     'Новая заявка на буткемп',
     `${paragraph(intro)}
-    ${notice(rows.map(([title, value]) => `<strong style="color:#27272a;">${escapeHtml(title)}</strong><br><span style="white-space:pre-wrap;overflow-wrap:anywhere;">${escapeHtml(value)}</span>`).join('<br><br>'))}
+    ${notice(rows.map(([title, value]) => `<strong style="color:${C.strong};">${escapeHtml(title)}</strong><br><span style="white-space:pre-wrap;overflow-wrap:anywhere;">${escapeHtml(value)}</span>`).join('<br><br>'))}
     ${button('Открыть заявку', url)}
     ${fallbackLink(url)}`,
     `${intro}\n\n${rows.map(([title, value]) => `${title}: ${value}`).join('\n\n')}\n\nОткрыть заявку: ${url}`,

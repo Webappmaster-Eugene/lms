@@ -2,8 +2,9 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { headers } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowLeft, Award } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 
+import { BrandMark } from '@/components/brand/BrandMark'
 import { CertificateActions } from '@/components/certificate/CertificateActions'
 import { getPayload } from '@/lib/payload'
 import { formatDate } from '@/lib/utils'
@@ -46,10 +47,9 @@ export default async function CertificatePage({ params }: Props) {
 
       <CertificateActions />
 
-      <article className="rounded-2xl border-2 border-warning/40 bg-card p-5 text-center sm:p-12 print:border-black print:bg-white print:text-black">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-warning/10 print:bg-transparent">
-          <Award className="h-9 w-9 text-warning print:text-black" aria-hidden="true" />
-        </div>
+      <article className="rounded-2xl border-2 border-primary/30 bg-card p-5 text-center sm:p-12 print:border-black print:bg-white print:text-black">
+        {/* Знак печатается в цвете: это подпись организации, а не украшение. */}
+        <BrandMark size={64} className="mx-auto print:[print-color-adjust:exact]" />
         <p className="mt-6 text-sm uppercase tracking-[0.2em] text-muted-foreground print:text-black">
           Сертификат MentorCareer
         </p>

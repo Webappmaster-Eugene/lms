@@ -5,10 +5,76 @@
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
-html[data-theme='dark'] {
-  --theme-elevation-0: #09090b;
-  --theme-elevation-50: #18181b;
-  --theme-elevation-100: #27272a;
+// Шкалы Payload перекрашены в зелёный, как серые токены платформы в globals.css: так админка
+// в обеих темах выглядит частью MentorCareer. Светлота ступеней взята у Payload, поэтому
+// контраст его компонентов почти не меняется. Цвета знака - src/lib/brand-mark.ts, правила - docs/brand.md.
+html:root {
+  --color-base-0: #ffffff;
+  --color-base-50: #f3f7f6;
+  --color-base-100: #e8eeec;
+  --color-base-150: #d9e1df;
+  --color-base-200: #cad6d2;
+  --color-base-250: #bccac6;
+  --color-base-300: #acbeb9;
+  --color-base-350: #9eb2ad;
+  --color-base-400: #8ea69f;
+  --color-base-450: #7f9b93;
+  --color-base-500: #718f87;
+  --color-base-550: #648078;
+  --color-base-600: #59716a;
+  --color-base-650: #4d615c;
+  --color-base-700: #41534e;
+  --color-base-750: #324640;
+  --color-base-800: #263833;
+  --color-base-850: #1b2925;
+  --color-base-900: #0f1916;
+  --color-base-950: #050908;
+  --color-base-1000: #000000;
+
+  --color-success-50: #edf9f5;
+  --color-success-100: #def4ee;
+  --color-success-150: #c8ece2;
+  --color-success-200: #b4e5d7;
+  --color-success-250: #9adbc9;
+  --color-success-300: #80d2bb;
+  --color-success-350: #64c9ac;
+  --color-success-400: #45be9c;
+  --color-success-450: #3aa486;
+  --color-success-500: #36997d;
+  --color-success-550: #2f856d;
+  --color-success-600: #2b7963;
+  --color-success-650: #266c58;
+  --color-success-700: #246653;
+  --color-success-750: #205a4a;
+  --color-success-800: #1c5041;
+  --color-success-850: #184639;
+  --color-success-900: #14392f;
+  --color-success-950: #102d25;
+}
+
+.btn--style-primary:not(.btn--disabled) {
+  --bg-color: #176b56;
+  --hover-bg: #0e3b32;
+  --color: #ffffff;
+  --hover-color: #ffffff;
+}
+
+html[data-theme='dark'] .btn--style-primary:not(.btn--disabled) {
+  --bg-color: #93d7b5;
+  --hover-bg: #b4e5cd;
+  --color: #0e3b32;
+  --hover-color: #0e3b32;
+}
+
+.admin-brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  &__name {
+    height: 26px;
+    color: var(--theme-text);
+  }
 }
 
 .platform-admin-links {
