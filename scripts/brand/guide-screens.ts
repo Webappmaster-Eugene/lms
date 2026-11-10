@@ -17,6 +17,7 @@ import sharp from 'sharp'
 
 import { CONTENT, USERS } from '../../tests/e2e/fixtures/data'
 import { APP_URL } from '../../tests/e2e/fixtures/env'
+import { markPoint, patchSteps, type Point } from './screen-steps'
 
 const OUT = 'landing/public/guide'
 const SCREENS_JSON = 'landing/src/data/screens.json'
@@ -133,16 +134,9 @@ async function prepareStudent(page: Page) {
   await page.waitForLoadState('networkidle')
 }
 
-async function center(page: Page, target: Locator, width: number, height: number) {
-  const box = await target.boundingBox()
-  if (!box) throw new Error(`Нет элемента для метки на ${page.url()}: ${target}`)
-  const round = (value: number) => Math.round(value * 100) / 100
-  return { x: round(((box.x + box.width / 2) / width) * 100), y: round(((box.y + box.height / 2) / height) * 100) }
-}
-
 const browser = await chromium.launch(process.env.BRAND_BROWSER ? { executablePath: process.env.BRAND_BROWSER } : { channel: 'chrome' })
 const screens = JSON.parse(readFileSync(SCREENS_JSON, 'utf8')) as Record<string, { width: number; height: number }>
-const hotspots: Record<string, { x: number; y: number }[]> = {}
+const hotspots: Record<string, Point[]> = {}
 mkdirSync(OUT, { recursive: true })
 
 try {
@@ -176,7 +170,7 @@ try {
     const file = path.join(OUT, `${name}.webp`)
     writeFileSync(file, await sharp(png).webp({ quality: 82 }).toBuffer())
     screens[name] = { width, height: shot.height }
-    if (shot.targets) hotspots[name] = await Promise.all(shot.targets(page).map((target) => center(page, target, width, shot.height)))
+    if (shot.targets) hotspots[name] = await Promise.all(shot.targets(page).map((target) => markPoint(page, target, width, shot.height)))
     process.stdout.write(`${file}\n`)
     await context.close()
   }
@@ -184,26 +178,6 @@ try {
   await browser.close()
 }
 
-/** Координаты меток живут рядом с текстом шагов в guide.ts: заменяем их по порядку внутри главы снимка. */
-function patchGuide(source: string): string {
-  let result = source
-  for (const [name, points] of Object.entries(hotspots)) {
-    const start = result.indexOf(`screen: '${name}'`)
-    const stepsStart = result.indexOf('steps: [', start)
-    const stepsEnd = result.indexOf('\n    ],', stepsStart)
-    if (start < 0 || stepsStart < 0 || stepsEnd < 0) throw new Error(`В ${GUIDE_TS} нет шагов снимка ${name}`)
-    let index = 0
-    const steps = result.slice(stepsStart, stepsEnd).replace(/x: [\d.]+, y: [\d.]+/g, () => {
-      const point = points[index++]
-      if (!point) throw new Error(`У снимка ${name} меток меньше, чем шагов`)
-      return `x: ${point.x}, y: ${point.y}`
-    })
-    if (index !== points.length) throw new Error(`У снимка ${name} ${points.length} меток, а шагов ${index}`)
-    result = result.slice(0, stepsStart) + steps + result.slice(stepsEnd)
-  }
-  return result
-}
-
 writeFileSync(SCREENS_JSON, `${JSON.stringify(screens, null, 2)}\n`)
-writeFileSync(GUIDE_TS, patchGuide(readFileSync(GUIDE_TS, 'utf8')))
+writeFileSync(GUIDE_TS, patchSteps(readFileSync(GUIDE_TS, 'utf8'), hotspots, GUIDE_TS))
 process.stdout.write(`${SCREENS_JSON}\n${GUIDE_TS}\n`)

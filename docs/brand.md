@@ -22,8 +22,8 @@
 меток в `landing/src/data/guide.ts`. После него нужен `og.ts`: картинка лендинга для соцсетей
 построена на снимке дашборда. Переснимать после заметной смены интерфейса, иначе инструкция
 показывает не ту платформу, что видит ученик. Два снимка кабинета на странице буткемпа
-(`landing/public/bootcamp/path/bc-lms-*.webp`) показывают настоящий курс с прода, их снимают
-отдельно, см. `docs/bootcamp-leads.md`.
+(`landing/public/bootcamp/path/bc-lms-*.webp`) показывают настоящий курс с прода, их снимает
+`scripts/brand/bootcamp-screens.ts` временной учёткой, см. `docs/bootcamp-leads.md`.
 
 Письма (`src/payload/emails/templates.ts`) и админка Payload (`src/app/(payload)/custom.scss`,
 логотип и значок из `src/components/brand/AdminBrand.tsx`) тоже в цветах знака. Схемы mermaid в
