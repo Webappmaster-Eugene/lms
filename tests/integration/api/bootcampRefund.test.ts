@@ -198,10 +198,11 @@ describe('возврат через API Робокассы', () => {
 
   it('отказ Робокассы объясняется, возврат не записывается', async () => {
     const lead = await paidByRobokassa()
-    robokassa.create = { status: 200, body: { success: false, message: 'NotEnoughOperationFunds', requestId: null } }
+    // Так Робокасса ответила 11.11.2026 на сумму больше оплаченной: 400 и код в message.
+    robokassa.create = { status: 400, body: { success: false, message: 'NotEnoughOperationFunds', requestId: null } }
     const response = await act(lead.id, { action: 'refund', amount: '45000', reason: 'Отказ' })
     expect(response.status).toBe(409)
-    expect(((await response.json()) as { error: string }).error).toContain('на балансе магазина не хватает денег')
+    expect(((await response.json()) as { error: string }).error).toContain('уже вернули в кабинете Робокассы')
     expect(await refundsOf(lead.id)).toHaveLength(0)
     expect((await reload(lead.id)).status).toBe('paid')
   })

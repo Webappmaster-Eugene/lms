@@ -13,7 +13,7 @@ describe('возврат: форма', () => {
   })
 
   it('отказы Робокассы объясняются и подсказывают, что делать', () => {
-    expect(refundRejectionText('NotEnoughOperationFunds')).toMatch(/баланс.*Верните сумму поменьше/s)
+    expect(refundRejectionText('NotEnoughOperationFunds')).toMatch(/уже вернули в кабинете.*отметьте возврат вручную.*балансе магазина.*верните сумму поменьше/s)
     expect(refundRejectionText('NoAccess')).toMatch(/пароль №3.*отметьте возврат вручную/s)
     expect(refundRejectionText('Что-то новое')).toBe('Робокасса отказала в возврате: Что-то новое')
     expect(refundStatusLabel('processing')).toBe('Выполняется')
