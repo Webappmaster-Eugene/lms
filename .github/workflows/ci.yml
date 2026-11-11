@@ -31,6 +31,8 @@ env:
   # эталоны скриншотов сняты именно в нём (scripts/visual-docker.mjs).
   PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
 
+# node-version во всех джобах точный: со строкой «22» setup-node на своих раннерах берёт
+# Node из кеша (22.23.3), а лендинг на Astro 7.4.10 требует не ниже 22.23.4.
 jobs:
   quality:
     name: lint · typecheck · unit
@@ -41,7 +43,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.4
           cache: pnpm
       - run: node scripts/ci-install.mjs pnpm install --frozen-lockfile
       - run: pnpm lint
@@ -60,7 +62,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.4
           cache: pnpm
       - run: node scripts/ci-install.mjs pnpm install --frozen-lockfile
       - run: node --test trainer-runtime/tests/*.test.mjs
@@ -90,7 +92,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.4
           cache: pnpm
       - run: node scripts/ci-install.mjs pnpm install --frozen-lockfile
       - run: pnpm test:integration
@@ -119,7 +121,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.4
           cache: pnpm
       - uses: actions/cache@v4
         with:
@@ -161,7 +163,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.4
           cache: pnpm
       - uses: actions/cache@v4
         with:
