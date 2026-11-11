@@ -40,9 +40,13 @@ RUN --mount=type=cache,id=lms-pnpm-store,target=/pnpm-store \
 # Копируется каталог пакета ИЗ СТОРА pnpm целиком: рядом с самим пакетом там
 # лежат и его зависимости (isolated-vm подгружает node-gyp-build уже в рантайме).
 # Ключ -L разыменовывает символьные ссылки — в рантайм-образе .pnpm не будет.
+# SDK payload 3.91 импортирует ajv, а зависимости самого ajv (fast-deep-equal и др.)
+# лежат рядом с ним, а не рядом с payload: копируем их до payload, чтобы его версии
+# пакетов перезаписали совпадающие.
 RUN mkdir -p /runtime-deps \
     && cp -RL node_modules/.pnpm/isolated-vm@*/node_modules/. /runtime-deps/ \
     && cp -RL node_modules/.pnpm/typescript@*/node_modules/. /runtime-deps/ \
+    && cp -RL "$(dirname "$(readlink -f node_modules/.pnpm/payload@*/node_modules/ajv)")/." /runtime-deps/ \
     && cp -RL node_modules/.pnpm/payload@*/node_modules/. /runtime-deps/ \
     && rm -f /runtime-deps/isolated-vm/*.tgz
 
@@ -99,8 +103,10 @@ ENV SENTRY_RELEASE=${SENTRY_RELEASE} \
 
 # Source maps удаляет и плагин Sentry, но публичными они стали бы при его сбое:
 # .next/static раздаётся без входа, поэтому удаляем их здесь ещё раз.
+# --webpack: Turbopack (по умолчанию в Next 16) из-за чтения файлов по динамическому
+# пути трассирует весь проект и кладёт в standalone исходники, тесты и документацию.
 RUN --mount=type=secret,id=sentry_auth_token,required=false \
-    SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" npx next build \
+    SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" npx next build --webpack \
     && find .next/static -name '*.map' -delete
 
 # ──────────────────────────────────────────────

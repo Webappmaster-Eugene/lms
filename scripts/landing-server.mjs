@@ -80,7 +80,9 @@ function proxyLead(req, res) {
     return res.end()
   }
   const upstream = httpRequest(new URL('/api/bootcamp/leads', APP_URL), { method: 'POST', headers: { ...req.headers, 'x-forwarded-host': req.headers.host } }, (answer) => {
-    res.writeHead(answer.statusCode ?? 502, { 'Content-Type': answer.headers['content-type'] ?? 'application/json', ...SECURITY_HEADERS, 'Cache-Control': 'no-store' })
+    // nginx отдаёт Content-Encoding от LMS как есть; без него сжатый Next 16 ответ браузер не разберёт.
+    const encoding = answer.headers['content-encoding']
+    res.writeHead(answer.statusCode ?? 502, { 'Content-Type': answer.headers['content-type'] ?? 'application/json', ...(encoding ? { 'Content-Encoding': encoding } : {}), ...SECURITY_HEADERS, 'Cache-Control': 'no-store' })
     answer.pipe(res)
   })
   upstream.on('error', (error) => {

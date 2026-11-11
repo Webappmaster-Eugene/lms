@@ -51,7 +51,9 @@ test.describe('заголовки безопасности', () => {
     expect(directive(headers['content-security-policy'], 'frame-ancestors')).toEqual(["'none'"])
     expect(headers['accept-ch']).toBe('Sec-CH-Prefers-Color-Scheme')
     expect(headers['critical-ch']).toBe('Sec-CH-Prefers-Color-Scheme')
-    expect((headers.vary ?? '').split(',').map((value) => value.trim().toLowerCase())).toContain('sec-ch-prefers-color-scheme')
+    // Next 16 заменяет Vary страниц своим набором для RSC, и Vary от Payload теряется.
+    // Это безопасно, пока админку не кеширует ни браузер, ни прокси.
+    expect(headers['cache-control']).toContain('no-store')
   })
 
   test('Monaco, шрифт и service worker сохраняют кеш и защиту без Critical-CH повторов', async ({ request }) => {

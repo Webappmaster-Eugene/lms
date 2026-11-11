@@ -57,7 +57,9 @@ async function readableMediaWhere(payload: Payload, req: PayloadRequest, filenam
     })))
   })
   const adapter = payload.db as unknown as ReadAdapter
-  const transactionId = await req.transactionID
+  // Dataloader Payload после выборки связей оставляет в запросе transactionID: null.
+  // С 3.91 так приходит payload.auth пользователя с аватаром: это «без транзакции».
+  const transactionId = (await req.transactionID) ?? undefined
   const db = transactionId === undefined ? adapter.drizzle : adapter.sessions[transactionId]?.db
   if (!db) throw new Error('Media reference access requires PostgreSQL')
   const result = await db.execute(sql`

@@ -150,7 +150,8 @@ describe('история уроков и независимые места ос�
     const tree = await createCourseTree(payload, { lessons: 1 })
     uploadedLessons.push(tree.lessons[0].id)
     const upload = async () => {
-      const bytes = Buffer.from('00000018667479706d703432000000006d7034326d703431', 'hex')
+      // ftyp и пустой mdat: с 3.90 Payload проверяет структуру MP4, один ftyp он отклоняет
+      const bytes = Buffer.from('00000018667479706d703432000000006d7034326d703431000000086d646174', 'hex')
       const media = await payload.create({ collection: 'media', data: { alt: 'Тестовая запись' }, file: { data: bytes, mimetype: 'video/mp4', name: `${uid('history-video')}.mp4`, size: bytes.length } })
       uploadedFiles.push(media.id)
       return media

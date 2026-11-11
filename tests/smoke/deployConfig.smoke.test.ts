@@ -282,10 +282,12 @@ describe('режим сборки Next', () => {
     // Сборщик на Raspberry Pi не выдерживает этот шаг по памяти. Пропуск допустим, пока
     // те же проверки стоят в smoke и CI: если их оттуда убрать, ошибка типов уедет в прод.
     expect(DOCKERFILE).toMatch(/^ENV LMS_SKIP_BUILD_CHECKS=1$/m)
-    expect(DOCKERFILE.indexOf('ENV LMS_SKIP_BUILD_CHECKS=1')).toBeLessThan(DOCKERFILE.search(/npx next build(?: \\)?$/m))
+    expect(DOCKERFILE.indexOf('ENV LMS_SKIP_BUILD_CHECKS=1')).toBeLessThan(DOCKERFILE.search(/npx next build --webpack(?: \\)?$/m))
     expect(NEXT_CONFIG).toMatch(/const skipBuildChecks = process\.env\.LMS_SKIP_BUILD_CHECKS === '1'/)
     expect(NEXT_CONFIG).toMatch(/typescript:\s*\{\s*ignoreBuildErrors:\s*skipBuildChecks\s*\}/)
-    expect(NEXT_CONFIG).toMatch(/eslint:\s*\{\s*ignoreDuringBuilds:\s*skipBuildChecks\s*\}/)
+    // Next 16 не запускает линтер в `next build`: ключа eslint в конфиге больше нет,
+    // линтер остаётся только в smoke и CI.
+    expect(NEXT_CONFIG).not.toMatch(/eslint:\s*\{/)
     expect(PACKAGE.scripts.smoke).toMatch(/pnpm lint && pnpm typecheck/)
     const ci = read('../../.github/workflows/ci.yml')
     expect(ci).toMatch(/run: pnpm lint/)
@@ -365,7 +367,7 @@ describe('Sentry', () => {
 
   it('source maps удаляются из образа после загрузки, и ещё раз — на случай сбоя плагина', () => {
     expect(NEXT_CONFIG).toMatch(/deleteSourcemapsAfterUpload: true/)
-    expect(DOCKERFILE).toMatch(/npx next build \\\n\s*&& find \.next\/static -name '\*\.map' -delete/)
+    expect(DOCKERFILE).toMatch(/npx next build --webpack \\\n\s*&& find \.next\/static -name '\*\.map' -delete/)
   })
 })
 

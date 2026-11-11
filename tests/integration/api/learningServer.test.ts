@@ -194,6 +194,17 @@ describe('профиль: аватар', () => {
     expect((await getProfileDTO(payload, { ...stale, avatar: null })).avatar).toBeNull()
   })
 
+  it('вход ученика с аватаром проходит: права на медиа считаются и при transactionID: null', async () => {
+    const student = await createStudent(payload)
+    const own = await upload(student)
+    await payload.update({ collection: 'users', id: student.id, data: { avatar: own.id }, overrideAccess: true })
+    // payload.auth грузит пользователя с аватаром через dataloader, тот оставляет в запросе
+    // transactionID: null, а затем на том же запросе считаются права всех коллекций.
+    const { user, permissions } = await payload.auth({ headers: new Headers({ Authorization: `JWT ${await login(payload, student)}` }) })
+    expect(user?.id).toBe(student.id)
+    expect(permissions.collections?.media?.read).toBeTruthy()
+  })
+
   it('сбой базы при чтении аватара не скрывается: профиль отвечает ошибкой', async () => {
     const student = await createStudent(payload)
     const own = await upload(student)

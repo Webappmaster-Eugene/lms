@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "predev": "node scripts/copy-monaco.mjs && node scripts/copy-mermaid.mjs && node scripts/build-harness.mjs",
-    "build": "sh scripts/heavy.sh next build",
+    "build": "sh scripts/heavy.sh next build --webpack",
     "prebuild": "node scripts/copy-monaco.mjs && node scripts/copy-mermaid.mjs && node scripts/build-harness.mjs",
     "start": "next start",
     "lint": "sh scripts/heavy.sh eslint .",
@@ -77,11 +77,11 @@
     "@opentelemetry/sdk-metrics": "2.11.0",
     "@opentelemetry/sdk-node": "^0.222.0",
     "@opentelemetry/semantic-conventions": "^1.43.0",
-    "@payloadcms/db-postgres": "3.89.0",
-    "@payloadcms/email-nodemailer": "3.89.0",
-    "@payloadcms/next": "3.89.0",
-    "@payloadcms/richtext-lexical": "3.89.0",
-    "@payloadcms/ui": "3.89.0",
+    "@payloadcms/db-postgres": "3.91.0",
+    "@payloadcms/email-nodemailer": "3.91.0",
+    "@payloadcms/next": "3.91.0",
+    "@payloadcms/richtext-lexical": "3.91.0",
+    "@payloadcms/ui": "3.91.0",
     "@sentry/nextjs": "11.4.0",
     "@xyflow/react": "^12.11.6",
     "clsx": "2.1.1",
@@ -95,10 +95,10 @@
     "mermaid": "11.17.2",
     "monaco-editor": "0.55.1",
     "mpegts.js": "^1.8.2",
-    "next": "15.3.9",
+    "next": "16.4.6",
     "next-themes": "0.4.6",
-    "nodemailer": "9.1.1",
-    "payload": "3.89.0",
+    "nodemailer": "10.2.1",
+    "payload": "3.91.0",
     "pdfjs-dist": "6.3.289",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -109,21 +109,21 @@
     "remark-parse": "11.0.0",
     "require-in-the-middle": "8.0.1",
     "server-only": "^0.0.1",
-    "sharp": "0.33.5",
+    "sharp": "0.35.5",
     "shiki": "3.23.0",
     "tailwind-merge": "3.6.0",
     "typescript": "5.9.3",
     "unified": "11.0.5",
     "web-push": "^3.6.7",
     "web-vitals": "^6.2.3",
-    "zod": "4.6.2"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
     "@electric-sql/pglite": "0.5.10",
     "@eslint/js": "^9.39.5",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@next/eslint-plugin-next": "15.3.9",
+    "@next/eslint-plugin-next": "16.4.6",
     "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "4.3.3",
     "@tailwindcss/typography": "0.5.20",
@@ -156,5 +156,21 @@
   },
   "engines": {
     "node": ">=22.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "protobufjs@<7.6.1": "^7.6.1",
+      "@grpc/grpc-js@<1.14.5": "^1.14.5",
+      "dompurify@<3.4.17": "3.4.17",
+      "undici@>=7.0.0 <7.30.1": "7.30.1",
+      "fast-uri@>=3.0.0 <3.1.9": "3.1.9",
+      "source-map-js@<1.2.2": "1.2.2",
+      "happy-dom@<=21.0.3": "21.0.4",
+      "esbuild@<0.28.1": "0.28.1",
+      "brace-expansion@>=5.0.0 <5.0.11": "5.0.13",
+      "immutable@>=4.0.0 <4.3.9": "4.3.9",
+      "lodash@<4.18.0": "4.18.1",
+      "systeminformation@>=5.0.0 <5.33.16": "5.33.19"
+    }
   }
 }
