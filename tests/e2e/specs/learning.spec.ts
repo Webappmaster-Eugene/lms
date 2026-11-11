@@ -293,7 +293,10 @@ test('«Сохранить» урок и задачу: они в «Сохран�
   )
   await page.getByRole('button', { name: `Убрать «${third.title}» из сохранённого` }).click()
   await page.getByRole('button', { name: `Убрать «${CONTENT.task.title}» из сохранённого` }).click()
-  await expect(page.getByText(/Здесь пока пусто/)).toBeVisible()
+  const empty = page.getByRole('main').getByText(/Здесь пока пусто/)
+  await expect(empty).toBeVisible()
   await page.reload()
-  await expect(page.getByText(/Здесь пока пусто/)).toBeVisible()
+  // Next 16 дописывает потоковый кусок страницы скрытым блоком вне main и переносит его не сразу:
+  // на медленном CI текст на миг есть в двух местах.
+  await expect(empty).toBeVisible()
 })
