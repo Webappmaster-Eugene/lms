@@ -138,3 +138,24 @@ describe('сохранение авторизации на 30 дней', () => {
     await handleEndpoints({ config, request: new Request('http://lms.test/api/users/logout', { method: 'POST', headers: { Authorization: `JWT ${loggedIn.token}` } }) })
   })
 })
+
+describe('пароли, сохранённые до Payload 3.91', () => {
+  it('пользователь со старым хешем входит, и хеш переводится на новый формат', async () => {
+    const { pbkdf2Sync, randomBytes } = await import('node:crypto')
+    const user = await createStudent(payload)
+    // Так хешировал Payload 3.89: на проде все пароли в этом формате до первого входа.
+    const salt = randomBytes(32).toString('hex')
+    const hash = pbkdf2Sync(user.password, salt, 25000, 512, 'sha256').toString('hex')
+    await payload.db.updateOne({ collection: 'users', id: user.id, data: { hash, salt } })
+    const attempt = (password: string) => handleEndpoints({
+      config,
+      request: new Request('http://lms.test/api/users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: user.email, password }) }),
+    })
+
+    expect((await attempt('Wrong-Passw0rd!')).status).toBe(401)
+    expect((await attempt(user.password)).status).toBe(200)
+    const stored = await payload.db.findOne<{ id: number; hash: string }>({ collection: 'users', where: { id: { equals: user.id } }, select: { hash: true } })
+    expect(stored?.hash).toMatch(/^pbkdf2-sha256-v1:/)
+    expect((await attempt(user.password)).status).toBe(200)
+  })
+})

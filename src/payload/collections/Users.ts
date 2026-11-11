@@ -8,7 +8,7 @@ import { isAdmin } from '@/payload/access/isAdmin'
 import { auditLearningAccessMode } from '@/payload/hooks/learningAccessMode'
 import { lockLearningModeChange, lockLearningUserDelete } from '@/payload/hooks/learningAccessLock'
 import { captureRawCollectionPatch } from '@/payload/hooks/rawCollectionPatch'
-import { createLearningAccessPolicy, normalizeLearningLoginIdentity, reflectLearningAccessPolicy } from '@/payload/hooks/learningAccessPolicy'
+import { captureLoginPassword, createLearningAccessPolicy, normalizeLearningLoginIdentity, reflectLearningAccessPolicy } from '@/payload/hooks/learningAccessPolicy'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import { filterRevokedAuthSessions, revokeAuthenticatedSessions } from '@/payload/hooks/authSessionRevocations'
 import { lockSdkAuthOperation } from '@/payload/hooks/lockSdkAuthOperation'
@@ -57,7 +57,7 @@ export const Users: CollectionConfig = {
     group: 'Пользователи',
   },
   hooks: {
-    beforeOperation: [rejectForeignLoginOrigin, captureRawCollectionPatch, captureProfileCredentials, lockSdkAuthOperation],
+    beforeOperation: [rejectForeignLoginOrigin, captureRawCollectionPatch, captureProfileCredentials, captureLoginPassword, lockSdkAuthOperation],
     beforeLogin: [normalizeLearningLoginIdentity],
     afterLogin: [recordStudentLogin, noteBootcampFirstLogin],
     beforeChange: [lockLearningModeChange, protectProfileCredentials, validateStudentAvatar],

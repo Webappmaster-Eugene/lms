@@ -1,8 +1,9 @@
-import { AuthenticationError, type CollectionAfterChangeHook, type CollectionAfterReadHook, type CollectionBeforeLoginHook, type PayloadRequest } from 'payload'
+import { AuthenticationError, type CollectionAfterChangeHook, type CollectionAfterReadHook, type CollectionBeforeLoginHook, type CollectionBeforeOperationHook, type PayloadRequest } from 'payload'
 
 import { learningRelationId } from '@/lib/learning-access'
 import { clearAuthoritativeLearningMode, getAuthoritativeLearningPolicy, type AuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import { invalidateLearningAccess } from '@/server/learning-access'
+import { verifyPassword } from '@/payload/hooks/protectProfileCredentials'
 
 const auditActors = new WeakMap<PayloadRequest, Map<number, number>>()
 
@@ -57,9 +58,24 @@ export const reflectLearningAccessPolicy: CollectionAfterReadHook = async ({ doc
   return doc
 }
 
+const loginPasswords = new WeakMap<PayloadRequest, string>()
+
+/** Пароль входа нужен beforeLogin: отличить перехеширование Payload от смены пароля. */
+export const captureLoginPassword: CollectionBeforeOperationHook = ({ operation, args, req }) => {
+  if (operation !== 'login') return
+  const password = (args as { data?: { password?: unknown } }).data?.password
+  if (typeof password === 'string') loginPasswords.set(req, password)
+}
+
 export const normalizeLearningLoginIdentity: CollectionBeforeLoginHook = async ({ user, req }) => {
   const current = await req.payload.db.findOne({ collection: 'users', where: { id: { equals: user.id } }, req })
-  if (!current || ('isActive' in current && current.isActive === false) || !('hash' in current) || !('salt' in current) || current.hash !== user.hash || current.salt !== user.salt || !('email' in current) || current.email !== user.email) throw new AuthenticationError(req.t)
+  if (!current || ('isActive' in current && current.isActive === false) || !('hash' in current) || !('salt' in current) || !('email' in current) || current.email !== user.email) throw new AuthenticationError(req.t)
+  if (current.hash !== user.hash || current.salt !== user.salt) {
+    // Payload 3.91 до beforeLogin в той же транзакции заменяет хеш старого формата новым.
+    // Тот же пароль подходит к новому хешу, а при смене пароля во время входа - нет.
+    const password = loginPasswords.get(req)
+    if (!password || !(await verifyPassword({ ...current, id: user.id }, password))) throw new AuthenticationError(req.t)
+  }
   clearAuthoritativeLearningMode(req)
   const actual = await getAuthoritativeLearningPolicy(req.payload, user.id, req)
   return { ...user, role: actual.role, learningAccessMode: actual.mode, learningCatalogVisibility: actual.catalogVisibility, trainerAccessMode: actual.trainerMode, guidesAccessMode: actual.guidesMode }

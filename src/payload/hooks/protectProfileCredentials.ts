@@ -22,7 +22,7 @@ export const captureProfileCredentials: CollectionBeforeOperationHook = ({ opera
 }
 
 /** Resolve from the runtime app root: bundlers embed a build-host path in import.meta.url. */
-async function verifyPassword(doc: Record<string, unknown> & { id: number | string }, password: string): Promise<boolean> {
+export async function verifyPassword(doc: Record<string, unknown> & { id: number | string }, password: string): Promise<boolean> {
   // Native import prevents Webpack from replacing require.resolve with a numeric module ID.
   const { createRequire } = await import(/* webpackIgnore: true */ 'node:module')
   const sdkURL = new URL('./auth/strategies/local/authenticate.js', pathToFileURL(createRequire(join(process.cwd(), 'package.json')).resolve('payload')))
