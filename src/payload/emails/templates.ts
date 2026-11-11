@@ -490,6 +490,30 @@ export function bootcampPaymentReceivedEmail({ name, program, amount, invoice, t
   )
 }
 
+type BootcampRefundEmailInput = { name: string | null, program: string, amount: string, viaRobokassa: boolean, replyable: boolean }
+
+/** Ученику: деньги за буткемп возвращены, доступы закрыты (возврат через Робокассу или отмеченный вручную). */
+export function bootcampRefundEmail({ name, program, amount, viaRobokassa, replyable }: BootcampRefundEmailInput): EmailContent {
+  const intro = `Мы вернули ${amount} за буткемп ${program}.`
+  const money = viaRobokassa
+    ? 'Деньги придут тем же способом, которым вы платили. Обычно это занимает несколько дней, точный срок зависит от вашего банка. Чек об оплате мы скорректируем в «Мой налог».'
+    : 'Деньги отправлены способом, о котором мы договорились в переписке. Чек об оплате мы скорректируем в «Мой налог».'
+  const access = 'Доступ к курсу буткемпа в учебном кабинете и к GitLab курса закрыт.'
+  const reply = replyLine(replyable)
+  return email(
+    `Возврат за буткемп ${program}`,
+    `Мы вернули ${amount}, доступы к буткемпу закрыты.`,
+    'Деньги возвращены',
+    `${paragraph(escapeHtml(bootcampHello(name)))}
+    ${paragraph(escapeHtml(intro))}
+    ${paragraph(escapeHtml(money))}
+    ${notice(escapeHtml(access))}
+    ${reply ? paragraph(escapeHtml(reply)) : ''}`,
+    `${bootcampHello(name)}\n\n${intro}\n\n${money}\n\n${access}${reply ? `\n\n${reply}` : ''}`,
+    bootcampFooter,
+  )
+}
+
 type BootcampPaymentTeamEmailInput = { id: number | string, address: string, amount: string, invoice: number, method: string, test: boolean }
 
 /** Команде: пришла оплата буткемпа. */

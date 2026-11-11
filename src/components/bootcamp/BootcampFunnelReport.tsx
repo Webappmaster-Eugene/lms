@@ -49,7 +49,7 @@ export function BootcampFunnelReport({ report, filter, programs, action }: Props
       <dl className="bootcamp-funnel__summary">
         <div><dt>Заявок за период</dt><dd>{leads.count}</dd></div>
         <div><dt>Оплатили</dt><dd>{paid?.count ?? 0}</dd><small>{share(paid?.fromLeads ?? null)} от заявок</small></div>
-        <div><dt>Оплачено за период</dt><dd>{formatRubles(report.revenue.kopecks)}</dd><small>оплат: {report.revenue.payments}</small></div>
+        <div><dt>Оплачено за период</dt><dd>{formatRubles(report.revenue.kopecks)}</dd><small>оплат: {report.revenue.payments}{report.revenue.refunds > 0 ? `, возвращено ${formatRubles(report.revenue.refundedKopecks)} (возвратов: ${report.revenue.refunds})` : ''}</small></div>
         <div><dt>Средний результат входного задания</dt><dd>{report.entryScore === null ? 'нет данных' : `${Math.round(report.entryScore * 100)} %`}</dd><small>доля пройденных тестов</small></div>
       </dl>
 

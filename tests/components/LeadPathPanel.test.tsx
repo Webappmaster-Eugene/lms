@@ -26,6 +26,9 @@ const state = (extra: Record<string, unknown> = {}, leadExtra: Record<string, un
   defaults: { firstName: 'Иван', lastName: 'Петров', username: 'ivan', group: 'nodejs-bootcamp', amount: '45000', dueDays: 7 },
   paymentsEnabled: true,
   paymentsTest: false,
+  refunds: [],
+  refund: { available: false, viaApi: false, left: '0', note: null },
+  offerUrl: 'https://info.test/bootcamp/nodejs/offer/',
   events: [{ id: 1, type: 'solution_submitted', label: 'Решение отправлено', message: 'Решение входного задания: 19 из 19 тестов', actor: null, at }],
   ...extra,
 })
@@ -118,6 +121,53 @@ describe('панель «Путь заявки»', () => {
     render(<LeadPathPanel />)
     await userEvent.click(await screen.findByRole('button', { name: 'Зачислить' }))
     expect(screen.getByLabelText(/Логин GitLab/)).toHaveValue('ivan-p')
+  })
+
+  it('возврат: сумма из остатка, причина обязательна в форме, ссылка на оферту и список возвратов', async () => {
+    const paidLead = { status: 'enrolled', statusLabel: 'Зачислен', admittedAt: at, paidAt: at, amount: '45 000 ₽' }
+    const refundState = state({ refund: { available: true, viaApi: true, left: '45000', note: null } }, paidLead)
+    const processing = state({
+      refund: { available: true, viaApi: true, left: '18000', note: null },
+      refunds: [{ id: 3, amount: '27 000 ₽', status: 'processing', statusLabel: 'Выполняется', method: 'robokassa', reason: 'Отказ после 8-й недели', createdAt: at, finishedAt: null }],
+    }, paidLead)
+    fetchMock.mockResolvedValueOnce(Response.json(refundState)).mockResolvedValueOnce(Response.json(processing))
+    render(<LeadPathPanel />)
+    expect(await screen.findByText('6. Возврат денег')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'оферты' })).toHaveAttribute('href', 'https://info.test/bootcamp/nodejs/offer/')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Вернуть деньги' }))
+    const amount = screen.getByLabelText(/Сумма возврата/)
+    expect(amount).toHaveValue('45000')
+    await userEvent.clear(amount)
+    await userEvent.type(amount, '27000')
+    await userEvent.type(screen.getByLabelText(/Причина/), 'Отказ после 8-й недели')
+    expect(screen.getByText(/заблокирует учётку GitLab и отправит письмо на ivan@mail.test/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Да, вернуть деньги' }))
+
+    const list = await screen.findByRole('list', { name: 'Возвраты' })
+    expect(list).toHaveTextContent('Возврат 27 000 ₽: выполняется, через Робокассу')
+    const [, init] = fetchMock.mock.calls[1] as [string, RequestInit]
+    expect(JSON.parse(String(init.body))).toMatchObject({ action: 'refund', amount: '27000', reason: 'Отказ после 8-й недели' })
+  })
+
+  it('оплата мимо Робокассы: только отметка возврата вручную и пояснение почему', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json(state({ refund: { available: true, viaApi: false, left: '45000', note: 'Оплата отмечена вручную, мимо Робокассы: верните деньги тем же способом и отметьте возврат.' } },
+      { status: 'paid', statusLabel: 'Оплачен', admittedAt: at, paidAt: at, amount: '45 000 ₽' })))
+    render(<LeadPathPanel />)
+    expect(await screen.findByText(/мимо Робокассы/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Вернуть деньги' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Отметить возврат вручную' }))
+    expect(screen.getByRole('button', { name: 'Да, отметить возврат' })).toBeInTheDocument()
+  })
+
+  it('деньги возвращены до зачисления: зачислять нельзя, кнопки «Зачислить» нет', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json(state({
+      refunds: [{ id: 4, amount: '45 000 ₽', status: 'done', statusLabel: 'Выполнен', method: 'manual', reason: 'Отказ до старта', createdAt: at, finishedAt: at }],
+    }, { status: 'refunded', statusLabel: 'Деньги возвращены', admittedAt: at, paidAt: at, amount: '45 000 ₽' })))
+    render(<LeadPathPanel />)
+    expect(await screen.findByText(/Деньги возвращены до зачисления: зачислять нельзя/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Зачислить' })).not.toBeInTheDocument()
+    expect(screen.getByRole('list', { name: 'Возвраты' })).toHaveTextContent('выполнен, отмечен вручную')
   })
 
   it('без Робокассы предупреждает, что оплату отмечают вручную', async () => {

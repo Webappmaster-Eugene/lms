@@ -118,6 +118,7 @@ export interface Config {
     'bootcamp-lead-resumes': BootcampLeadResume;
     'bootcamp-enrollments': BootcampEnrollment;
     'bootcamp-payments': BootcampPayment;
+    'bootcamp-refunds': BootcampRefund;
     'bootcamp-lead-events': BootcampLeadEvent;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
@@ -177,6 +178,7 @@ export interface Config {
     'bootcamp-lead-resumes': BootcampLeadResumesSelect<false> | BootcampLeadResumesSelect<true>;
     'bootcamp-enrollments': BootcampEnrollmentsSelect<false> | BootcampEnrollmentsSelect<true>;
     'bootcamp-payments': BootcampPaymentsSelect<false> | BootcampPaymentsSelect<true>;
+    'bootcamp-refunds': BootcampRefundsSelect<false> | BootcampRefundsSelect<true>;
     'bootcamp-lead-events': BootcampLeadEventsSelect<false> | BootcampLeadEventsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -1926,7 +1928,8 @@ export interface BootcampLead {
     | 'enrolled'
     | 'preparation'
     | 'rejected'
-    | 'withdrawn';
+    | 'withdrawn'
+    | 'refunded';
   /**
    * Отмечается вручную: после отправки формы кандидату предлагают написать в личку.
    */
@@ -2109,6 +2112,12 @@ export interface BootcampEnrollment {
   finishedAt?: string | null;
   lmsSignedInAt?: string | null;
   gitlabSignedInAt?: string | null;
+  /**
+   * После возврата денег: исполнитель в VM GitLab блокирует учётку.
+   */
+  revokeRequestedAt?: string | null;
+  revokedAt?: string | null;
+  revokeError?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -2143,6 +2152,31 @@ export interface BootcampPayment {
   failReturnAt?: string | null;
   comment?: string | null;
   markedBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Возвраты через API Робокассы и отмеченные вручную. Выполненный возврат закрывает ученику курс методичек и GitLab.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-refunds".
+ */
+export interface BootcampRefund {
+  id: number;
+  lead: number | BootcampLead;
+  payment: number | BootcampPayment;
+  amountKopecks: number;
+  status: 'processing' | 'done' | 'cancelled';
+  method: 'robokassa' | 'manual';
+  reason: string;
+  /**
+   * GUID из API возвратов. У отмеченного вручную пусто.
+   */
+  requestId?: string | null;
+  robokassaLabel?: string | null;
+  requestedBy?: (number | null) | User;
+  checkedAt?: string | null;
+  finishedAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -2182,7 +2216,12 @@ export interface BootcampLeadEvent {
     | 'lms_signed_in'
     | 'gitlab_signed_in'
     | 'gitlab_event'
-    | 'weekly_summary';
+    | 'weekly_summary'
+    | 'refund_requested'
+    | 'refunded'
+    | 'refund_cancelled'
+    | 'access_revoked'
+    | 'refund_alert';
   message: string;
   /**
    * Пусто - событие системы или кандидата.
@@ -2363,6 +2402,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'bootcamp-payments';
         value: number | BootcampPayment;
+      } | null)
+    | ({
+        relationTo: 'bootcamp-refunds';
+        value: number | BootcampRefund;
       } | null)
     | ({
         relationTo: 'bootcamp-lead-events';
@@ -3515,6 +3558,9 @@ export interface BootcampEnrollmentsSelect<T extends boolean = true> {
   finishedAt?: T;
   lmsSignedInAt?: T;
   gitlabSignedInAt?: T;
+  revokeRequestedAt?: T;
+  revokedAt?: T;
+  revokeError?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3540,6 +3586,25 @@ export interface BootcampPaymentsSelect<T extends boolean = true> {
   failReturnAt?: T;
   comment?: T;
   markedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-refunds_select".
+ */
+export interface BootcampRefundsSelect<T extends boolean = true> {
+  lead?: T;
+  payment?: T;
+  amountKopecks?: T;
+  status?: T;
+  method?: T;
+  reason?: T;
+  requestId?: T;
+  robokassaLabel?: T;
+  requestedBy?: T;
+  checkedAt?: T;
+  finishedAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

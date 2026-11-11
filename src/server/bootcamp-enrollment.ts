@@ -57,6 +57,9 @@ export type EnrollmentView = {
   finishedAt: string | null
   lmsSignedInAt: string | null
   gitlabSignedInAt: string | null
+  revokeRequestedAt: string | null
+  revokedAt: string | null
+  revokeError: string | null
 }
 
 export function enrollmentView(doc: BootcampEnrollment): EnrollmentView {
@@ -79,6 +82,9 @@ export function enrollmentView(doc: BootcampEnrollment): EnrollmentView {
     finishedAt: doc.finishedAt ?? null,
     lmsSignedInAt: doc.lmsSignedInAt ?? null,
     gitlabSignedInAt: doc.gitlabSignedInAt ?? null,
+    revokeRequestedAt: doc.revokeRequestedAt ?? null,
+    revokedAt: doc.revokedAt ?? null,
+    revokeError: doc.revokeError ?? null,
   }
 }
 
@@ -127,6 +133,7 @@ export async function startEnrollment(payload: Payload, admin: User, leadId: num
   const lead = await findLead(payload, leadId)
   if (!lead) throw new EnrollmentInputError('Заявка не найдена', 404)
   if (!lead.paidAt) throw new EnrollmentInputError('Зачислить можно только после оплаты: её подтверждает Робокасса или кнопка «Отметить оплату вручную»', 409)
+  if (lead.status === 'refunded') throw new EnrollmentInputError('Деньги по заявке возвращены: зачислять нельзя', 409)
   if (await enrollmentOfLead(payload, leadId)) throw new EnrollmentInputError('По этой заявке уже есть зачисление, его ход виден в панели', 409)
   const taken = await payload.find({ collection: 'bootcamp-enrollments', where: { gitlabUsername: { equals: input.username } }, limit: 1, depth: 0, overrideAccess: true })
   if (taken.docs[0]) throw new EnrollmentInputError(`Логин ${input.username} уже у другого зачисления (${taken.docs[0].email})`, 409)
@@ -217,10 +224,12 @@ export async function startEnrollment(payload: Payload, admin: User, leadId: num
 
 /** Упавшее зачисление снова в очередь: исполнитель повторит только шаги GitLab, сделанные пропустит. */
 export async function retryEnrollment(payload: Payload, admin: User, id: number): Promise<EnrollmentView> {
-  const result = await db(payload).execute(sql`update bootcamp_enrollments set status = 'queued', error = null, queued_at = now(), started_at = null, finished_at = null, attempts = 0, updated_at = now() where id = ${id} and status = 'failed' returning id`)
+  // После возврата денег зачисление не повторяется: исполнитель заново выдал бы доступ.
+  const result = await db(payload).execute(sql`update bootcamp_enrollments set status = 'queued', error = null, queued_at = now(), started_at = null, finished_at = null, attempts = 0, updated_at = now() where id = ${id} and status = 'failed' and revoke_requested_at is null returning id`)
   if (rows(result).length === 0) {
     const exists = await payload.findByID({ collection: 'bootcamp-enrollments', id, depth: 0, overrideAccess: true, disableErrors: true })
-    throw new EnrollmentInputError(exists ? 'Повторить можно только зачисление с ошибкой' : 'Зачисление не найдено', exists ? 409 : 404)
+    if (!exists) throw new EnrollmentInputError('Зачисление не найдено', 404)
+    throw new EnrollmentInputError(exists.revokeRequestedAt ? 'Деньги по заявке возвращены: повторять зачисление нельзя' : 'Повторить можно только зачисление с ошибкой', 409)
   }
   const doc = await payload.findByID({ collection: 'bootcamp-enrollments', id, depth: 0, overrideAccess: true })
   const actor = [admin.firstName, admin.lastName].filter(Boolean).join(' ') || admin.email
@@ -245,6 +254,8 @@ export type ClaimResult = {
   job: WorkerJob | null
   watch: { id: number, gitlabUserId: number }[]
   webhook: { url: string, token: string } | null
+  /** После возврата денег: учётки GitLab, которые исполнитель блокирует. Старый исполнитель поле не читает. */
+  revoke: { id: number, gitlabUserId: number, username: string }[]
 }
 
 /** Исполнитель берёт одно задание. Взятое и брошенное (исполнитель упал) через 10 минут можно взять снова. */
@@ -273,16 +284,23 @@ export async function claimEnrollment(payload: Payload): Promise<ClaimResult> {
   const since = new Date(Date.now() - WATCH_DAYS * 86_400_000).toISOString()
   const watching = await payload.find({
     collection: 'bootcamp-enrollments',
-    where: { and: [{ status: { equals: 'done' } }, { gitlabUserId: { exists: true } }, { gitlabSignedInAt: { exists: false } }, { finishedAt: { greater_than: since } }] },
+    where: { and: [{ status: { equals: 'done' } }, { gitlabUserId: { exists: true } }, { gitlabSignedInAt: { exists: false } }, { finishedAt: { greater_than: since } }, { revokeRequestedAt: { exists: false } }] },
     limit: 50,
     depth: 0,
     overrideAccess: true,
   })
   const token = gitlabWebhookToken()
+  // Задание, упавшее до создания учётки GitLab, блокировать нечем: закрываем отметку сразу.
+  await db(payload).execute(sql`update bootcamp_enrollments set revoked_at = now(), updated_at = now() where revoke_requested_at is not null and revoked_at is null and gitlab_user_id is null and status in ('done', 'failed')`)
+  const revoking = rows<{ id: number, gitlab_user_id: number, gitlab_username: string }>(await db(payload).execute(sql`
+    select id, gitlab_user_id, gitlab_username from bootcamp_enrollments
+    where revoke_requested_at is not null and revoked_at is null and revoke_error is null and gitlab_user_id is not null and status <> 'running'
+    order by revoke_requested_at, id limit 20`))
   return {
     job,
     watch: watching.docs.flatMap((doc) => typeof doc.gitlabUserId === 'number' ? [{ id: doc.id, gitlabUserId: doc.gitlabUserId }] : []),
     webhook: token ? { url: adminLink('/api/bootcamp/gitlab-events'), token } : null,
+    revoke: revoking.map((row) => ({ id: Number(row.id), gitlabUserId: Number(row.gitlab_user_id), username: row.gitlab_username })),
   }
 }
 
@@ -334,7 +352,8 @@ export async function reportEnrollment(payload: Payload, id: number, report: Wor
   })
   if (report.status === 'done') {
     // Точечно: сохранение заявки целиком затёрло бы отметки оплаты, которые пишутся параллельно.
-    await db(payload).execute(sql`update bootcamp_leads set status = 'enrolled', updated_at = now() where id = ${relationId(updated.lead)}`)
+    // Возврат денег, пришедший посреди задания, этап не теряет: учётку потом заблокирует исполнитель.
+    await db(payload).execute(sql`update bootcamp_leads set status = 'enrolled', updated_at = now() where id = ${relationId(updated.lead)} and status <> 'refunded'`)
     await journal(payload, { lead: relationId(updated.lead), type: 'enrolled', message: `Зачислен: проект ${updated.gitlabProjectUrl ?? updated.gitlabUsername}` })
     void notifyAdmins({
       title: `Зачислен: ${updated.email}`,

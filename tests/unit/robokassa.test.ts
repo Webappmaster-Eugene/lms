@@ -1,14 +1,18 @@
-import { createHash } from 'node:crypto'
+import { createHash, createHmac } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
   buildPaymentUrl,
+  createRefund,
   fetchOperationState,
+  fetchRefundState,
   formatExpirationDate,
   formatOutSum,
   noticeSignatureBase,
   parseOutSum,
   paymentSignatureBase,
+  refundJwt,
+  refundPayload,
   resultResponse,
   robokassaConfig,
   signatureHash,
@@ -42,10 +46,17 @@ describe('робокасса: конфиг', () => {
 
   it('читает значения, тест и хеш по умолчанию sha256', () => {
     const vars = { ROBOKASSA_MERCHANT_LOGIN: 'a', ROBOKASSA_PASSWORD1: 'b', ROBOKASSA_PASSWORD2: 'c', ROBOKASSA_TEST_PASSWORD1: 't1', ROBOKASSA_TEST_PASSWORD2: 't2' }
-    expect(robokassaConfig(env(vars))).toEqual({ merchantLogin: 'a', password1: 'b', password2: 'c', isTest: false, hash: 'sha256' })
-    expect(robokassaConfig(env({ ...vars, ROBOKASSA_IS_TEST: 'true', ROBOKASSA_HASH: 'MD5' }))).toEqual({ merchantLogin: 'a', password1: 't1', password2: 't2', isTest: true, hash: 'md5' })
+    expect(robokassaConfig(env(vars))).toEqual({ merchantLogin: 'a', password1: 'b', password2: 'c', isTest: false, hash: 'sha256', password3: null })
+    expect(robokassaConfig(env({ ...vars, ROBOKASSA_IS_TEST: 'true', ROBOKASSA_HASH: 'MD5' }))).toEqual({ merchantLogin: 'a', password1: 't1', password2: 't2', isTest: true, hash: 'md5', password3: null })
     expect(robokassaConfig(env({ ...vars, ROBOKASSA_IS_TEST: '1' }))?.isTest).toBe(true)
     expect(robokassaConfig(env({ ...vars, ROBOKASSA_IS_TEST: '0' }))?.password1).toBe('b')
+  })
+
+  it('пароль 3 для API возвратов - только в боевом режиме: у API нет тестового', () => {
+    const vars = { ROBOKASSA_MERCHANT_LOGIN: 'a', ROBOKASSA_PASSWORD1: 'b', ROBOKASSA_PASSWORD2: 'c', ROBOKASSA_PASSWORD3: ' p3 ', ROBOKASSA_TEST_PASSWORD1: 't1', ROBOKASSA_TEST_PASSWORD2: 't2' }
+    expect(robokassaConfig(env(vars))?.password3).toBe('p3')
+    expect(robokassaConfig(env({ ...vars, ROBOKASSA_IS_TEST: '1' }))?.password3).toBeNull()
+    expect(robokassaConfig(env({ ...vars, ROBOKASSA_PASSWORD3: '  ' }))?.password3).toBeNull()
   })
 
   it('тестовый режим без тестовых паролей - оплата не подключена, боевые пароли не подставляются', () => {
@@ -248,5 +259,64 @@ describe('робокасса: OpStateExt', () => {
     expect((error as Error).message).toBe('Не удалось связаться с Робокассой')
     const slow = vi.fn(async () => { throw new DOMException('timeout', 'TimeoutError') }) as unknown as typeof fetch
     await expect(fetchOperationState(config, 7, slow)).rejects.toThrow('10 секунд')
+  })
+})
+
+describe('робокасса: API возвратов', () => {
+  const OP = 'OPKEY-1'
+  const REQUEST = '68cd7fa6-1338-4745-ba5c-28d16cbcdb3d'
+  const input = { opKey: OP, amountKopecks: 4_500_000, paidKopecks: 4_500_000, itemName: 'Буткемп Node.js' }
+  const json = (body: unknown, status = 200) => vi.fn(async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch
+  const decode = (part: string) => JSON.parse(Buffer.from(part, 'base64url').toString('utf8')) as Record<string, unknown>
+
+  it('полный возврат: без RefundSum, позиция целиком', () => {
+    expect(refundPayload(input)).toEqual({
+      OpKey: OP,
+      InvoiceItems: [{ Name: 'Буткемп Node.js', Quantity: 1, Cost: 45000, Tax: 'none', PaymentMethod: 'full_payment', PaymentObject: 'service' }],
+    })
+  })
+
+  it('частичный: сумма и количество при прежней цене, как в кабинете (96,60 из 100 - 0,966)', () => {
+    expect(refundPayload({ ...input, amountKopecks: 9_660, paidKopecks: 10_000 })).toMatchObject({ RefundSum: 96.6, InvoiceItems: [{ Quantity: 0.966, Cost: 100 }] })
+    expect(refundPayload({ ...input, amountKopecks: 2_700_000 })).toMatchObject({ RefundSum: 27000, InvoiceItems: [{ Quantity: 0.6, Cost: 45000 }] })
+    expect(() => refundPayload({ ...input, amountKopecks: 4_500_001 })).toThrow('не больше оплаченной')
+    expect(() => refundPayload({ ...input, amountKopecks: 0 })).toThrow()
+  })
+
+  it('JWT: HS256 на пароле 3, payload компактным JSON', () => {
+    const token = refundJwt('secret3', refundPayload(input))
+    const [head, body, signature] = token.split('.')
+    expect(decode(head)).toEqual({ alg: 'HS256', typ: 'JWT' })
+    expect(decode(body)).toEqual(refundPayload(input))
+    expect(Buffer.from(body, 'base64url').toString('utf8')).not.toMatch(/\s"|":\s/)
+    expect(signature).toBe(createHmac('sha256', 'secret3').update(`${head}.${body}`).digest('base64url'))
+  })
+
+  it('создание: тело - JWT строкой JSON, ответ - номер заявки', async () => {
+    const fetchImpl = json({ success: true, message: null, requestId: REQUEST })
+    expect(await createRefund('secret3', input, fetchImpl)).toEqual({ ok: true, requestId: REQUEST })
+    const [url, init] = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('https://services.robokassa.ru/RefundService/Refund/Create')
+    expect(init.method).toBe('POST')
+    const token = JSON.parse(String(init.body)) as string
+    expect(token.split('.')).toHaveLength(3)
+    expect(String(init.body)).not.toContain('secret3')
+  })
+
+  it('отказы Робокассы - результат, а не исключение; сбой связи - исключение', async () => {
+    expect(await createRefund('secret3', input, json({ success: false, message: 'NotEnoughOperationFunds', requestId: null }))).toEqual({ ok: false, message: 'NotEnoughOperationFunds' })
+    expect(await createRefund('secret3', input, json({ success: false, message: 'Signature key is not exists or partner have not access to API', requestId: null }, 401))).toEqual({ ok: false, message: 'NoAccess' })
+    await expect(createRefund('secret3', input, json({}, 500))).rejects.toThrow('кодом 500')
+    const down = vi.fn(async () => { throw new TypeError('fetch failed') }) as unknown as typeof fetch
+    await expect(createRefund('secret3', input, down)).rejects.toThrow('Не удалось связаться с Робокассой')
+  })
+
+  it('состояние заявки: finished, processing, canceled и неизвестное', async () => {
+    expect(await fetchRefundState(REQUEST, json({ requestId: REQUEST, amount: 96.6, label: 'finished' }))).toEqual({ label: 'finished', rawLabel: 'finished', amountKopecks: 9660 })
+    expect((await fetchRefundState(REQUEST, json({ requestId: REQUEST, amount: 1, label: 'processing' }))).label).toBe('processing')
+    expect((await fetchRefundState(REQUEST, json({ requestId: REQUEST, amount: 1, label: 'canceled' }))).label).toBe('canceled')
+    expect((await fetchRefundState(REQUEST, json({ requestId: REQUEST, amount: 1, label: 'weird' })))).toMatchObject({ label: 'unknown', rawLabel: 'weird' })
+    await expect(fetchRefundState(REQUEST, json({ message: 'Id is invalid or request id does not exist' }, 400))).rejects.toThrow('request id does not exist')
+    await expect(fetchRefundState('not-a-guid', json({}))).rejects.toThrow('GUID')
   })
 })

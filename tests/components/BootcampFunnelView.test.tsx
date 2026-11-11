@@ -31,7 +31,7 @@ const report: FunnelReport = {
     median: step.key === 'submitted' ? 2.5 * 86_400_000 : null,
   })),
   entryScore: 0.82,
-  revenue: { kopecks: 9_000_000, payments: 2 },
+  revenue: { kopecks: 9_000_000, payments: 2, refundedKopecks: 0, refunds: 0 },
   sources: [
     { key: 'utm:telegram', label: 'telegram', leads: 7, submitted: 4, admitted: 3, paid: 2, enrolled: 2 },
     { key: 'direct', label: 'прямой заход', leads: 3, submitted: 2, admitted: 1, paid: 0, enrolled: 0 },

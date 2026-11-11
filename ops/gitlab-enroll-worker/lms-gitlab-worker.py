@@ -11,6 +11,7 @@ API GitLab от имени root. Токен root не покидает VM: LMS �
 расхождения с обычными настройками показывает, но не исправляет.
 
 Раз в 5 минут исполнитель проверяет, вошли ли недавно зачисленные в GitLab впервые.
+После возврата денег LMS отдаёт вместе с заданием список учёток, которые надо заблокировать.
 Только стандартная библиотека: в VM GitLab нет Node и pip.
 """
 import datetime
@@ -281,12 +282,33 @@ def check_first_sign_in(watch):
             log('зачисление %s: первый вход в GitLab %s' % (item['id'], user['last_sign_in_at']))
 
 
+def revoke_gitlab(items):
+    """Возврат денег: учётка блокируется, проект остаётся (его история нужна для разбора споров)."""
+    for item in items:
+        path = '/api/internal/bootcamp-enrollments/%s/revoked' % item['id']
+        try:
+            user = gl('GET', '/users/%s' % item['gitlabUserId'], allow404=True)
+            if user is None:
+                log('возврат %s: учётки GitLab %s уже нет' % (item['id'], item['username']))
+            elif user.get('username') != item['username']:
+                raise StepError('учётка GitLab %s принадлежит %s, а не %s: блокировать не стал' % (item['gitlabUserId'], user.get('username'), item['username']))
+            elif user.get('state') != 'blocked':
+                gl('POST', '/users/%s/block' % item['gitlabUserId'])
+                log('возврат %s: учётка GitLab %s заблокирована' % (item['id'], item['username']))
+            lms('POST', path, {'ok': True})
+        except StepError as error:
+            log('возврат %s: %s' % (item['id'], error))
+            lms('POST', path, {'error': str(error)})
+
+
 def main():
     log('исполнитель зачислений запущен, LMS %s' % LMS_URL)
     last_watch = 0.0
     while True:
         try:
             claim = lms('POST', '/api/internal/bootcamp-enrollments/claim')
+            if claim.get('revoke'):
+                revoke_gitlab(claim['revoke'])
             if claim.get('job'):
                 Job(claim['job'], claim.get('webhook')).run()
                 continue

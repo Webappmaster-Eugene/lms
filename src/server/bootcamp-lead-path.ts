@@ -17,10 +17,12 @@ import {
 import { EnrollmentInputError, type EnrollmentInput } from '@/lib/bootcamp-enrollment'
 import { ENTRY_TASK_MAX_SUBMISSIONS, formatEntryTaskDate } from '@/lib/bootcamp-entry-task'
 import { leadStatusLabel } from '@/lib/bootcamp-leads'
+import { refundStatusLabel, type RefundStatus } from '@/lib/bootcamp-refunds'
 import { logger } from '@/lib/telemetry'
 import { bootcampAdmittedEmail, bootcampDecisionEmail, emailBaseUrl } from '@/payload/emails/templates'
 import { leadEnrollmentState, startEnrollment, type EnrollmentView } from '@/server/bootcamp-enrollment'
 import { sendEntryTask } from '@/server/bootcamp-entry-task'
+import { refundAvailability } from '@/server/bootcamp-refund'
 import { actorName, inTransaction, journal, leadAdminLink, recordLeadEvent, rowsOf, txDb } from '@/server/bootcamp-lead-events'
 import { assertKnownStreamGroup, programNames, requireProgram } from '@/server/bootcamp-programs'
 import { contactReplyTo } from '@/server/contact-reply-to'
@@ -77,6 +79,7 @@ function changed(result: unknown): void {
 
 export type LeadPathEvent = { id: number, type: string, label: string, message: string, actor: string | null, at: string }
 export type LeadPathPayment = { id: number, amount: string, status: string, method: string, isTest: boolean, paidAt: string | null, createdAt: string, paymentMethod: string | null }
+export type LeadPathRefund = { id: number, amount: string, status: RefundStatus, statusLabel: string, method: string, reason: string, createdAt: string, finishedAt: string | null }
 
 export type LeadPathState = {
   lead: {
@@ -107,6 +110,10 @@ export type LeadPathState = {
   }
   admission: AdmissionDraft | null
   payments: LeadPathPayment[]
+  refunds: LeadPathRefund[]
+  /** Можно ли вернуть деньги и сколько; viaApi - через API Робокассы, иначе только отметкой. */
+  refund: { available: boolean, viaApi: boolean, left: string, note: string | null }
+  offerUrl: string
   enrollment: EnrollmentView | null
   defaults: { firstName: string, lastName: string, username: string, group: string, amount: string, dueDays: number }
   paymentsEnabled: boolean
@@ -118,8 +125,10 @@ export async function leadPathState(payload: Payload, leadId: number): Promise<L
   const lead = await findLead(payload, leadId)
   const program = await requireProgram(payload, lead.program)
   const base = await leadEnrollmentState(payload, leadId)
-  const [payments, events] = await Promise.all([
+  const [payments, refunds, refund, events] = await Promise.all([
     payload.find({ collection: 'bootcamp-payments', where: { lead: { equals: leadId } }, sort: '-createdAt', limit: 20, depth: 0, overrideAccess: true }),
+    payload.find({ collection: 'bootcamp-refunds', where: { lead: { equals: leadId } }, sort: '-createdAt', limit: 20, depth: 0, overrideAccess: true }),
+    refundAvailability(payload, lead),
     // depth 1 нужен ради имени администратора; без select к каждому событию подтянулась бы вся заявка с кодом решения.
     payload.find({ collection: 'bootcamp-lead-events', where: { lead: { equals: leadId } }, select: { type: true, message: true, actor: true, createdAt: true }, sort: '-createdAt', limit: 100, depth: 1, overrideAccess: true }),
   ])
@@ -163,6 +172,18 @@ export async function leadPathState(payload: Payload, leadId: number): Promise<L
       createdAt: doc.createdAt,
       paymentMethod: doc.paymentMethod ?? doc.incCurrLabel ?? null,
     })),
+    refunds: refunds.docs.map((doc) => ({
+      id: doc.id,
+      amount: formatRubles(doc.amountKopecks),
+      status: doc.status,
+      statusLabel: refundStatusLabel(doc.status),
+      method: doc.method,
+      reason: doc.reason,
+      createdAt: doc.createdAt,
+      finishedAt: doc.finishedAt ?? null,
+    })),
+    refund: { available: refund.available, viaApi: refund.viaApi, left: String(refund.leftKopecks / 100), note: refund.note },
+    offerUrl: program.offerUrl,
     enrollment: base.enrollment,
     defaults: { ...base.defaults, amount: String(program.priceKopecks / 100), dueDays: program.paymentDueDays },
     paymentsEnabled: config !== null,

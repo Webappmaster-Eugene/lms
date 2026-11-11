@@ -64,9 +64,14 @@ async function enroll(leadId: number, finishedDaysAgo: number, gitlabDaysAgo: nu
   await db().execute(sql`update bootcamp_enrollments set status = 'done', finished_at = ${ago(finishedDaysAgo)}, gitlab_signed_in_at = ${gitlabDaysAgo === null ? null : ago(gitlabDaysAgo)} where id = ${enrollment.id}`)
 }
 
-async function pay(leadId: number, paidDaysAgo: number, isTest = false) {
+async function pay(leadId: number, paidDaysAgo: number, isTest = false): Promise<number> {
   const payment = await payload.create({ collection: 'bootcamp-payments', data: { lead: leadId, amountKopecks: 4_500_000, status: 'pending', method: 'robokassa', isTest }, overrideAccess: true })
   await db().execute(sql`update bootcamp_payments set status = 'paid', paid_at = ${ago(paidDaysAgo)} where id = ${payment.id}`)
+  return payment.id
+}
+
+async function refund(leadId: number, paymentId: number, amountKopecks: number, status: 'done' | 'processing' | 'cancelled', finishedAt: ReturnType<typeof sql> | null) {
+  await db().execute(sql`insert into bootcamp_refunds (lead_id, payment_id, amount_kopecks, status, method, reason, finished_at, created_at, updated_at) values (${leadId}, ${paymentId}, ${amountKopecks}, ${status}, 'manual', 'фикстура', ${finishedAt ?? sql`null`}, now(), now())`)
 }
 
 async function event(leadId: number, type: string, daysAgo: number, data: Record<string, unknown> | null = null) {
@@ -80,8 +85,12 @@ describe('воронка буткемпа', () => {
     const full = await lead(source)
     await db().execute(sql`update bootcamp_leads set created_at = ${ago(10)}, entry_submitted_at = ${ago(9)}, entry_passed = 8, entry_total = 10, admitted_at = ${ago(8)}, paid_at = ${ago(7)}, status = 'enrolled' where id = ${full.id}`)
     await event(full.id, 'admitted', 8)
-    await pay(full.id, 7)
+    const fullPayment = await pay(full.id, 7)
     await enroll(full.id, 7 - 1 / 24, 6)
+    // Выполненный возврат считается, выполняющийся и отменённый - нет.
+    await refund(full.id, fullPayment, 2_000_000, 'done', ago(1))
+    await refund(full.id, fullPayment, 500_000, 'processing', null)
+    await refund(full.id, fullPayment, 700_000, 'cancelled', ago(1))
     await event(full.id, 'gitlab_event', 5, { event: 'Merge Request Hook' })
     await event(full.id, 'gitlab_event', 5.5, { event: 'Pipeline Hook' })
     // Оплатил тестовой картой: в «Оплатили» не попадает.
@@ -112,7 +121,7 @@ describe('воронка буткемпа', () => {
     expect(step('enrolled').median).toBeCloseTo(DAY / 24, -3)
     expect(step('mr').median).toBeCloseTo(DAY, -3)
     expect(report.entryScore).toBeCloseTo((0.8 + 1 + 1) / 3, 5)
-    expect(report.revenue).toEqual({ kopecks: 4_500_000, payments: 1 })
+    expect(report.revenue).toEqual({ kopecks: 4_500_000, payments: 1, refundedKopecks: 2_000_000, refunds: 1 })
     expect(report.sources.find((item) => item.key === `utm:${source}`)).toEqual({ key: `utm:${source}`, label: source, leads: 4, submitted: 3, admitted: 3, paid: 1, enrolled: 2 })
 
     const all = await bootcampFunnel(payload, parseFunnelFilter({ period: 'all', source: `utm:${source}` }, new Date()))
@@ -162,7 +171,7 @@ describe('тестовые заявки', () => {
 
     const report = await bootcampFunnel(payload, parseFunnelFilter({ period: '7', source: `utm:${source}` }, new Date()))
     expect(report.steps.map((item) => item.count)).toEqual([1, 0, 0, 0, 0, 0, 0])
-    expect(report.revenue).toEqual({ kopecks: 0, payments: 0 })
+    expect(report.revenue).toEqual({ kopecks: 0, payments: 0, refundedKopecks: 0, refunds: 0 })
     expect(report.sources.find((item) => item.key === `utm:${source}`)?.leads).toBe(1)
 
     const withTest = await actionQueue(payload)
@@ -204,6 +213,7 @@ describe('итоги недели в Telegram', () => {
     await db().execute(sql`insert into bootcamp_lead_events (lead_id, type, message, created_at, updated_at) values (${first.id}, 'admitted', 'фикстура', ${at('2020-02-27T10:00:00Z')}, now())`)
     const payment = await payload.create({ collection: 'bootcamp-payments', data: { lead: first.id, amountKopecks: 4_500_000, status: 'pending', method: 'manual' }, overrideAccess: true })
     await db().execute(sql`update bootcamp_payments set status = 'paid', paid_at = ${at('2020-02-28T10:00:00Z')} where id = ${payment.id}`)
+    await db().execute(sql`insert into bootcamp_refunds (lead_id, payment_id, amount_kopecks, status, method, reason, finished_at, created_at, updated_at) values (${first.id}, ${payment.id}, 2000000, 'done', 'manual', 'фикстура', ${at('2020-02-29T10:00:00Z')}, now(), now())`)
     // Тестовая оплата и заявка следующей недели в сводку не попадают.
     const test = await payload.create({ collection: 'bootcamp-payments', data: { lead: second.id, amountKopecks: 100, status: 'pending', method: 'robokassa', isTest: true }, overrideAccess: true })
     await db().execute(sql`update bootcamp_payments set status = 'paid', paid_at = ${at('2020-02-28T11:00:00Z')} where id = ${test.id}`)
@@ -214,13 +224,14 @@ describe('итоги недели в Telegram', () => {
     expect(await sendWeeklySummary(payload, new Date(monday.getTime() + 60_000))).toBe(0)
     await vi.waitFor(() => expect(summaries(NODEJS)).toHaveLength(1))
     const [text] = summaries(NODEJS)
-    expect(text.split('\n').slice(0, 6)).toEqual([
+    expect(text.split('\n').slice(0, 7)).toEqual([
       'Буткемп Node.js: итоги недели 24 февраля - 1 марта',
       'Новых заявок: 2',
       'Прислали решение: 1',
       'Допущены: 1',
       'Оплатили: 1 на 45 000 ₽',
       'Зачислены: 0',
+      'Вернули деньги: 1 на 20 000 ₽',
     ])
     expect(text).toMatch(/Ждут вашего действия сейчас: \d+|Заявок, которые ждут вашего действия, нет/)
     expect(text).toContain('/admin/bootcamp-funnel?program=nodejs')
@@ -254,25 +265,26 @@ describe('программы ведутся отдельно', () => {
     for (const [leadId, amount] of [[mine.id, 7_000_000], [other.id, 4_500_000]]) {
       const payment = await payload.create({ collection: 'bootcamp-payments', data: { lead: leadId, amountKopecks: amount, status: 'pending', method: 'manual' }, overrideAccess: true })
       await db().execute(sql`update bootcamp_payments set status = 'paid', paid_at = ${ago(2)} where id = ${payment.id}`)
+      if (leadId === mine.id) await refund(leadId, payment.id, 1_000_000, 'done', ago(1))
     }
     const report = (params: Record<string, string>) => bootcampFunnel(payload, parseFunnelFilter({ period: '7', source: `utm:${source}`, ...params }, new Date(), [key, 'nodejs']))
 
     const python = await report({ program: key })
     expect(python.steps.find((item) => item.key === 'leads')?.count).toBe(1)
     expect(python.steps.find((item) => item.key === 'paid')?.count).toBe(1)
-    expect(python.revenue).toEqual({ kopecks: 7_000_000, payments: 1 })
+    expect(python.revenue).toEqual({ kopecks: 7_000_000, payments: 1, refundedKopecks: 1_000_000, refunds: 1 })
     expect(python.sources.find((item) => item.key === `utm:${source}`)?.leads).toBe(1)
     expect(python.queue.map((item) => item.id)).toEqual([mine.id])
     expect(python.queueTotal).toBe(1)
     expect(python.queueElsewhere).toBeGreaterThanOrEqual(1)
 
     const nodejs = await report({ program: 'nodejs' })
-    expect(nodejs.revenue).toEqual({ kopecks: 4_500_000, payments: 1 })
+    expect(nodejs.revenue).toEqual({ kopecks: 4_500_000, payments: 1, refundedKopecks: 0, refunds: 0 })
     expect(nodejs.queue.some((item) => item.id === mine.id)).toBe(false)
     expect(nodejs.queue.find((item) => item.id === other.id)?.program).toBe('nodejs')
 
     const all = await report({ program: '' })
-    expect(all.revenue).toEqual({ kopecks: 11_500_000, payments: 2 })
+    expect(all.revenue).toEqual({ kopecks: 11_500_000, payments: 2, refundedKopecks: 1_000_000, refunds: 1 })
     expect(all.queue.filter((item) => [mine.id, other.id].includes(item.id))).toHaveLength(2)
     expect(all.queueElsewhere).toBe(0)
   })

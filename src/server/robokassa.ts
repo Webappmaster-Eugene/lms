@@ -1,5 +1,5 @@
 import 'server-only'
-import { createHash, timingSafeEqual } from 'node:crypto'
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 
 /**
  * Робокасса: ссылка на оплату, проверка ResultURL/SuccessURL и сверка через OpStateExt.
@@ -14,6 +14,8 @@ export type RobokassaConfig = {
   password2: string
   isTest: boolean
   hash: RobokassaHash
+  /** Подпись JWT API возвратов. У API нет тестового режима, поэтому в тестовом режиме магазина - null. */
+  password3?: string | null
 }
 
 const PAY_URL = 'https://auth.robokassa.ru/Merchant/Index.aspx'
@@ -40,7 +42,8 @@ export function robokassaConfig(env: NodeJS.ProcessEnv = process.env): Robokassa
   if (hash !== 'md5' && hash !== 'sha256') {
     throw new Error('ROBOKASSA_HASH должен быть md5 или sha256')
   }
-  return { merchantLogin, password1, password2, isTest, hash }
+  const password3 = isTest ? null : env.ROBOKASSA_PASSWORD3?.trim() || null
+  return { merchantLogin, password1, password2, isTest, hash, password3 }
 }
 
 export function signatureHash(hash: RobokassaHash, text: string): string {
@@ -298,4 +301,90 @@ export async function fetchOperationState(
     ...(tag(info, 'OpKey') ? { opKey: tag(info, 'OpKey') as string } : {}),
     ...(tag(info, 'IncCurrLabel') ? { incCurrLabel: tag(info, 'IncCurrLabel') as string } : {}),
   }
+}
+
+const REFUND_API = 'https://services.robokassa.ru/RefundService/Refund'
+const REFUND_TIMEOUT_MS = 15_000
+const REFUND_REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export type RefundInput = {
+  opKey: string
+  /** Сколько вернуть. */
+  amountKopecks: number
+  /** Сколько было оплачено по этой операции: от него считается позиция чека. */
+  paidKopecks: number
+  /** Позиция чека оплаты (строка чека программы). */
+  itemName: string
+}
+
+/**
+ * Тело заявки на возврат. Частичный возврат кабинет Робокассы оформляет уменьшением количества
+ * позиции при прежней цене (10.11.2026: 96,60 из 100 ₽ - количество 0,966), так и здесь.
+ * RefundSum при полном возврате не передаётся (документация API возвратов).
+ */
+export function refundPayload(input: RefundInput): Record<string, unknown> {
+  if (!Number.isSafeInteger(input.amountKopecks) || input.amountKopecks <= 0 || input.amountKopecks > input.paidKopecks) {
+    throw new Error('Сумма возврата должна быть больше нуля и не больше оплаченной')
+  }
+  const full = input.amountKopecks === input.paidKopecks
+  const quantity = full ? 1 : Math.round((input.amountKopecks / input.paidKopecks) * 1_000_000) / 1_000_000
+  return {
+    OpKey: input.opKey,
+    ...(full ? {} : { RefundSum: input.amountKopecks / 100 }),
+    InvoiceItems: [{ Name: input.itemName.slice(0, MAX_ITEM_NAME), Quantity: quantity, Cost: input.paidKopecks / 100, Tax: 'none', PaymentMethod: 'full_payment', PaymentObject: 'service' }],
+  }
+}
+
+/** JWT для API возвратов: HS256 с ключом Password3, payload компактным JSON. */
+export function refundJwt(password3: string, body: Record<string, unknown>): string {
+  const part = (value: unknown) => Buffer.from(JSON.stringify(value), 'utf8').toString('base64url')
+  const signingInput = `${part({ alg: 'HS256', typ: 'JWT' })}.${part(body)}`
+  return `${signingInput}.${createHmac('sha256', password3).update(signingInput).digest('base64url')}`
+}
+
+export type RefundCreateResult = { ok: true, requestId: string } | { ok: false, message: string }
+
+async function refundCall(url: string, init: RequestInit, fetchImpl: typeof fetch): Promise<{ status: number, data: Record<string, unknown> | null }> {
+  let response: Response
+  try {
+    response = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(REFUND_TIMEOUT_MS) })
+  } catch (error) {
+    const timeout = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
+    throw new Error(timeout ? 'Робокасса не ответила за 15 секунд' : 'Не удалось связаться с Робокассой')
+  }
+  const data = await response.json().catch(() => null) as Record<string, unknown> | null
+  return { status: response.status, data: data && typeof data === 'object' && !Array.isArray(data) ? data : null }
+}
+
+/**
+ * Заявка на возврат по завершённой операции. Отказ Робокассы - результат (ok: false) с её
+ * текстом, сбой связи - исключение: тогда неизвестно, создана ли заявка.
+ */
+export async function createRefund(password3: string, input: RefundInput, fetchImpl: typeof fetch = fetch): Promise<RefundCreateResult> {
+  const { status, data } = await refundCall(`${REFUND_API}/Create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(refundJwt(password3, refundPayload(input))),
+  }, fetchImpl)
+  const requestId = typeof data?.requestId === 'string' ? data.requestId : ''
+  if (data?.success === true && REFUND_REQUEST_ID.test(requestId)) return { ok: true, requestId }
+  if (status === 401) return { ok: false, message: 'NoAccess' }
+  if (typeof data?.message === 'string' && data.message) return { ok: false, message: data.message.slice(0, 300) }
+  throw new Error(`Робокасса ответила на заявку на возврат кодом ${status} без пояснения`)
+}
+
+export type RefundStateLabel = 'finished' | 'processing' | 'canceled'
+export type RefundState = { label: RefundStateLabel | 'unknown', rawLabel: string, amountKopecks: number | null }
+
+/** Состояние заявки на возврат: finished - выполнен, processing - выполняется, canceled - отменён в кабинете. */
+export async function fetchRefundState(requestId: string, fetchImpl: typeof fetch = fetch): Promise<RefundState> {
+  if (!REFUND_REQUEST_ID.test(requestId)) throw new Error('Номер заявки на возврат - GUID')
+  const { status, data } = await refundCall(`${REFUND_API}/GetState?id=${encodeURIComponent(requestId)}`, { method: 'GET' }, fetchImpl)
+  if (status !== 200 || !data || typeof data.label !== 'string') {
+    throw new Error(typeof data?.message === 'string' ? `Робокасса: ${data.message.slice(0, 200)}` : `Робокасса ответила на запрос состояния возврата кодом ${status}`)
+  }
+  const rawLabel = data.label
+  const label = rawLabel === 'finished' || rawLabel === 'processing' || rawLabel === 'canceled' ? rawLabel : 'unknown'
+  const amount = typeof data.amount === 'number' ? data.amount : Number(data.amount)
+  return { label, rawLabel: rawLabel.slice(0, 40), amountKopecks: Number.isFinite(amount) ? Math.round(amount * 100) : null }
 }

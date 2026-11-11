@@ -94,6 +94,8 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   'bootcamp-enrollments': () => ({ lead: 0, email: `${uid('enr')}@mail.test`.toLowerCase(), firstName: 'Имя', lastName: 'Фамилия', gitlabUsername: uid('enr').toLowerCase().replace(/[^a-z0-9-]/g, '-'), streamGroup: 'nodejs-bootcamp', status: 'queued' }),
   // Заявку создаёт makeValid; без заявки платёж не бывает.
   'bootcamp-payments': () => ({ lead: 0, amountKopecks: 4_500_000, status: 'pending', method: 'robokassa' }),
+  // Заявку и оплату создаёт makeValid: возврата без оплаты не бывает.
+  'bootcamp-refunds': () => ({ lead: 0, payment: 0, amountKopecks: 100_000, status: 'done', method: 'manual', reason: 'Фикстура возврата' }),
   // Событие без заявки - системное: тревога Робокассы, у которой нет заявки.
   'bootcamp-lead-events': () => ({ type: 'payment_alert', message: 'Фикстура журнала' }),
 }
@@ -161,8 +163,11 @@ export async function makeValid(payload: Payload, slug: string, ctx: FixtureCont
     data.achievement = (await payload.create({ collection: 'achievements', data: { title: uid('achievement'), description: 'Тестовое достижение', criteriaType: 'lesson_count', criteriaValue: 1000000, isActive: false } })).id
   }
   if (slug === 'certificates') data.relatedEntity = uid('certificate-entity')
-  if (slug === 'bootcamp-enrollments' || slug === 'bootcamp-payments') {
+  if (slug === 'bootcamp-enrollments' || slug === 'bootcamp-payments' || slug === 'bootcamp-refunds') {
     data.lead = (await payload.create({ collection: 'bootcamp-leads', data: VALID['bootcamp-leads'](ctx) as never, overrideAccess: true })).id
+  }
+  if (slug === 'bootcamp-refunds') {
+    data.payment = (await payload.create({ collection: 'bootcamp-payments', data: { ...VALID['bootcamp-payments'](ctx), lead: data.lead, status: 'paid' } as never, overrideAccess: true })).id
   }
   if (slug === 'email-broadcast-deliveries') {
     data.broadcast = (await payload.create({ collection: 'email-broadcasts', data: VALID['email-broadcasts'](ctx) as never })).id

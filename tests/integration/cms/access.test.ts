@@ -40,6 +40,7 @@ const MATRIX: Record<string, Matrix> = {
   'bootcamp-enrollments': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'admin' },
   // Оплаты и журнал заявок пишет только сервер; удалить нельзя никому: это учёт денег и история решений.
   'bootcamp-payments': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
+  'bootcamp-refunds': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'bootcamp-lead-events': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'learning-access-audit': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'learning-access-policies': { create: 'nobody', read: 'own', update: 'nobody', delete: 'nobody' },
@@ -97,6 +98,7 @@ const PATCH: Record<string, Record<string, unknown>> = {
   'bootcamp-leads': { note: 'Обновлено' },
   'bootcamp-enrollments': { error: 'Обновлено' },
   'bootcamp-payments': { comment: 'Обновлено' },
+  'bootcamp-refunds': { reason: 'Обновлено' },
   'bootcamp-lead-events': { message: 'Обновлено' },
   'learning-access-audit': { effect: 'deny' },
   'learning-access-policies': { mode: 'all' },

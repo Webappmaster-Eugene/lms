@@ -55,5 +55,8 @@ export const BootcampEnrollments: CollectionConfig = {
     { name: 'finishedAt', type: 'date', label: 'Закончено', admin: { ...readOnly, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' } } },
     { name: 'lmsSignedInAt', type: 'date', label: 'Первый вход в LMS', admin: { ...readOnly, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' } } },
     { name: 'gitlabSignedInAt', type: 'date', label: 'Первый вход в GitLab', admin: { ...readOnly, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' } } },
+    { name: 'revokeRequestedAt', type: 'date', label: 'Доступы закрываются', admin: { ...readOnly, position: 'sidebar', description: 'После возврата денег: исполнитель в VM GitLab блокирует учётку.', date: { pickerAppearance: 'dayAndTime' } } },
+    { name: 'revokedAt', type: 'date', label: 'Учётка GitLab заблокирована', admin: { ...readOnly, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' } } },
+    { name: 'revokeError', type: 'textarea', maxLength: 2000, label: 'Ошибка блокировки в GitLab', admin: readOnly },
   ],
 }

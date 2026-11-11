@@ -20,6 +20,7 @@ export const BOOTCAMP_LEAD_STATUSES = [
   { value: 'preparation', label: 'Нужна подготовка' },
   { value: 'rejected', label: 'Отказ' },
   { value: 'withdrawn', label: 'Отозвана' },
+  { value: 'refunded', label: 'Деньги возвращены' },
 ] as const
 export type BootcampLeadStatus = (typeof BOOTCAMP_LEAD_STATUSES)[number]['value']
 export const leadStatusLabel = (status: string | null | undefined) => BOOTCAMP_LEAD_STATUSES.find((item) => item.value === status)?.label ?? status ?? 'нет'

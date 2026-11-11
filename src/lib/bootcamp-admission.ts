@@ -141,6 +141,11 @@ export const LEAD_EVENT_TYPES = [
   { value: 'gitlab_signed_in', label: 'Первый вход в GitLab' },
   { value: 'gitlab_event', label: 'GitLab' },
   { value: 'weekly_summary', label: 'Итоги недели в Telegram' },
+  { value: 'refund_requested', label: 'Возврат запрошен' },
+  { value: 'refunded', label: 'Деньги возвращены' },
+  { value: 'refund_cancelled', label: 'Возврат отменён' },
+  { value: 'access_revoked', label: 'Доступы закрыты' },
+  { value: 'refund_alert', label: 'Тревога по возврату' },
 ] as const
 export type LeadEventType = (typeof LEAD_EVENT_TYPES)[number]['value']
 export const leadEventLabel = (type: string) => LEAD_EVENT_TYPES.find((item) => item.value === type)?.label ?? type

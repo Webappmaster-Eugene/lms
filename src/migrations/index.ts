@@ -53,6 +53,7 @@ import * as migration_20261105_133159_bootcamp_lead_application from './20261105
 import * as migration_20261109_065651_reply_templates from './20261109_065651_reply_templates';
 import * as migration_20261109_120000_bootcamp_offer_12_weeks from './20261109_120000_bootcamp_offer_12_weeks';
 import * as migration_20261110_085441_bootcamp_lead_metrika_client_id from './20261110_085441_bootcamp_lead_metrika_client_id';
+import * as migration_20261111_071030_bootcamp_refunds from './20261111_071030_bootcamp_refunds';
 
 export const migrations = [
   {
@@ -329,5 +330,10 @@ export const migrations = [
     up: migration_20261110_085441_bootcamp_lead_metrika_client_id.up,
     down: migration_20261110_085441_bootcamp_lead_metrika_client_id.down,
     name: '20261110_085441_bootcamp_lead_metrika_client_id',
+  },
+  {
+    up: migration_20261111_071030_bootcamp_refunds.up,
+    down: migration_20261111_071030_bootcamp_refunds.down,
+    name: '20261111_071030_bootcamp_refunds'
   },
 ];

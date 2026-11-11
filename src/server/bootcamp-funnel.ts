@@ -34,7 +34,7 @@ const SOURCE = sql`case when coalesce(l.source_utm_source, '') <> '' then 'utm:'
 const cohort = (filter: FunnelFilter) => sql`
   select l.id, l.created_at, l.entry_submitted_at, l.entry_passed, l.entry_total, ${SOURCE} as source,
     coalesce(l.admitted_at, adm.at) as admitted_at,
-    (l.admitted_at is not null or adm.at is not null or l.status in ('admitted', 'paid', 'enrolled') or en.id is not null) as admitted,
+    (l.admitted_at is not null or adm.at is not null or l.status in ('admitted', 'paid', 'enrolled', 'refunded') or en.id is not null) as admitted,
     pay.at as paid_at,
     case when en.status = 'done' then coalesce(en.finished_at, en.updated_at) end as enrolled_at,
     en.gitlab_signed_in_at as gitlab_at,
@@ -57,7 +57,8 @@ export type FunnelQueueItem = { id: number, email: string, name: string | null, 
 export type FunnelReport = {
   steps: FunnelStep[]
   entryScore: number | null
-  revenue: { kopecks: number, payments: number }
+  /** Оплаты и выполненные возвраты периода: возврат считается по дню, когда деньги вернулись. */
+  revenue: { kopecks: number, payments: number, refundedKopecks: number, refunds: number }
   sources: FunnelSource[]
   queue: FunnelQueueItem[]
   queueTotal: number
@@ -128,12 +129,20 @@ export async function bootcampFunnel(payload: Payload, filter: FunnelFilter): Pr
       and (${iso(filter.from)}::timestamptz is null or p.paid_at >= ${iso(filter.from)}::timestamptz) and p.paid_at < ${iso(filter.to)}::timestamptz
       and (${filter.source}::text is null or ${SOURCE} = ${filter.source}::text)`))
 
+  const [refunded] = rowsOf<{ kopecks: string | null, refunds: string }>(await db(payload).execute(sql`
+    select sum(r.amount_kopecks) as kopecks, count(*) as refunds
+    from bootcamp_refunds r join bootcamp_leads l on l.id = r.lead_id
+    where r.status = 'done' and not coalesce(l.is_test, false)
+      and (${filter.program}::text is null or l.program = ${filter.program}::text)
+      and (${iso(filter.from)}::timestamptz is null or r.finished_at >= ${iso(filter.from)}::timestamptz) and r.finished_at < ${iso(filter.to)}::timestamptz
+      and (${filter.source}::text is null or ${SOURCE} = ${filter.source}::text)`))
+
   const { queue, total: queueTotal } = await actionQueue(payload, { program: filter.program })
   const queueElsewhere = filter.program === null ? 0 : (await actionQueue(payload)).total - queueTotal
   return {
     steps,
     entryScore: stats?.entry_score === null || stats?.entry_score === undefined ? null : Number(stats.entry_score),
-    revenue: { kopecks: num(money?.kopecks), payments: num(money?.payments) },
+    revenue: { kopecks: num(money?.kopecks), payments: num(money?.payments), refundedKopecks: num(refunded?.kopecks), refunds: num(refunded?.refunds) },
     sources,
     queue,
     queueTotal,
@@ -157,7 +166,7 @@ export async function actionQueue(payload: Payload, { withTest = true, program =
           when l.status = 'admitted' and l.paid_at is null and l.payment_due_at < now() then 'payment_expired'
           when l.status = 'paid' and en.id is null then 'not_enrolled'
           when en.status = 'failed' then 'enrollment_failed'
-          when l.next_action_at <= now() and l.status not in ('enrolled', 'rejected', 'withdrawn') then 'next_action'
+          when l.next_action_at <= now() and l.status not in ('enrolled', 'rejected', 'withdrawn', 'refunded') then 'next_action'
         end as reason,
         case
           when l.status in ('new', 'contacted', 'diagnostic') and l.entry_submitted_at is not null then l.entry_submitted_at
@@ -177,7 +186,7 @@ export async function actionQueue(payload: Payload, { withTest = true, program =
   }
 }
 
-export type WeekActivity = { leads: number, submitted: number, admitted: number, paid: number, paidKopecks: number, enrolled: number }
+export type WeekActivity = { leads: number, submitted: number, admitted: number, paid: number, paidKopecks: number, enrolled: number, refunds: number, refundedKopecks: number }
 
 export async function weekActivity(payload: Payload, window: SummaryWindow, program: string): Promise<WeekActivity> {
   const from = window.from.toISOString()
@@ -186,15 +195,19 @@ export async function weekActivity(payload: Payload, window: SummaryWindow, prog
   const [row] = rowsOf<Record<keyof WeekActivity, string | null>>(await db(payload).execute(sql`
     with counted as (select id, created_at, entry_submitted_at from bootcamp_leads where program = ${program} and not coalesce(is_test, false)),
     paid as (select p.amount_kopecks from bootcamp_payments p join counted on counted.id = p.lead_id
-      where p.status = 'paid' and not coalesce(p.is_test, false) and p.paid_at >= ${from}::timestamptz and p.paid_at < ${to}::timestamptz)
+      where p.status = 'paid' and not coalesce(p.is_test, false) and p.paid_at >= ${from}::timestamptz and p.paid_at < ${to}::timestamptz),
+    refunded as (select r.amount_kopecks from bootcamp_refunds r join counted on counted.id = r.lead_id
+      where r.status = 'done' and r.finished_at >= ${from}::timestamptz and r.finished_at < ${to}::timestamptz)
     select
       (select count(*) from counted where created_at >= ${from}::timestamptz and created_at < ${to}::timestamptz) as leads,
       (select count(*) from counted where entry_submitted_at >= ${from}::timestamptz and entry_submitted_at < ${to}::timestamptz) as submitted,
       (select count(distinct e.lead_id) from bootcamp_lead_events e join counted on counted.id = e.lead_id where e.type = 'admitted' and e.created_at >= ${from}::timestamptz and e.created_at < ${to}::timestamptz) as admitted,
       (select count(*) from paid) as paid,
       (select sum(amount_kopecks) from paid) as "paidKopecks",
+      (select count(*) from refunded) as refunds,
+      (select sum(amount_kopecks) from refunded) as "refundedKopecks",
       (select count(*) from bootcamp_enrollments en join counted on counted.id = en.lead_id where en.status = 'done' and en.finished_at >= ${from}::timestamptz and en.finished_at < ${to}::timestamptz) as enrolled`))
-  return { leads: num(row?.leads), submitted: num(row?.submitted), admitted: num(row?.admitted), paid: num(row?.paid), paidKopecks: num(row?.paidKopecks), enrolled: num(row?.enrolled) }
+  return { leads: num(row?.leads), submitted: num(row?.submitted), admitted: num(row?.admitted), paid: num(row?.paid), paidKopecks: num(row?.paidKopecks), enrolled: num(row?.enrolled), refunds: num(row?.refunds), refundedKopecks: num(row?.refundedKopecks) }
 }
 
 export const FUNNEL_ADMIN_PATH = '/admin/bootcamp-funnel'
@@ -233,7 +246,7 @@ async function sendProgramSummary(payload: Payload, program: FunnelProgram, wind
     if (sent.length > 0) return false
     const week = await weekActivity(payload, window, program.key)
     const { total: waiting } = await actionQueue(payload, { withTest: false, program: program.key })
-    const quiet = week.leads + week.submitted + week.admitted + week.paid + week.enrolled + waiting === 0
+    const quiet = week.leads + week.submitted + week.admitted + week.paid + week.enrolled + week.refunds + waiting === 0
     if (quiet && !program.isActive) return false
     const lines = [
       `Новых заявок: ${week.leads}`,
@@ -241,8 +254,9 @@ async function sendProgramSummary(payload: Payload, program: FunnelProgram, wind
       `Допущены: ${week.admitted}`,
       week.paid > 0 ? `Оплатили: ${week.paid} на ${formatRubles(week.paidKopecks)}` : 'Оплат не было',
       `Зачислены: ${week.enrolled}`,
+      week.refunds > 0 ? `Вернули деньги: ${week.refunds} на ${formatRubles(week.refundedKopecks)}` : null,
       waiting > 0 ? `Ждут вашего действия сейчас: ${waiting}` : 'Заявок, которые ждут вашего действия, нет',
-    ]
+    ].filter((line): line is string => line !== null)
     await recordLeadEvent(payload, req, {
       lead: null,
       type: 'weekly_summary',

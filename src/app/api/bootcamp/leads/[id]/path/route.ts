@@ -1,8 +1,10 @@
 import { parseAdmissionInput, parseDueDays, parseManualPayment, parseMessage } from '@/lib/bootcamp-admission'
 import { EnrollmentInputError, parseEnrollmentInput } from '@/lib/bootcamp-enrollment'
+import { parseRefundInput } from '@/lib/bootcamp-refunds'
 import { adminRequest, handleRoute, routeId, routeResponse } from '@/server/bootcamp-enrollment-routes'
 import { admissionDefaults, admitLead, cancelAdmission, decideLead, enrollPaidLead, extendEntryTask, leadPathState, reopenLead, resendPaymentLink } from '@/server/bootcamp-lead-path'
 import { markPaidManually } from '@/server/bootcamp-payment'
+import { markRefundedManually, requestRefund } from '@/server/bootcamp-refund'
 import { readRequestJson } from '@/server/read-json-body'
 
 export const dynamic = 'force-dynamic'
@@ -39,6 +41,14 @@ export async function POST(request: Request, { params }: Props) {
         return routeResponse(await leadPathState(payload, leadId))
       }
       case 'enroll': return routeResponse(await enrollPaidLead(payload, user, leadId, parseEnrollmentInput(body)))
+      case 'refund': {
+        await requestRefund(payload, user, leadId, parseRefundInput(body))
+        return routeResponse(await leadPathState(payload, leadId))
+      }
+      case 'mark-refunded': {
+        await markRefundedManually(payload, user, leadId, parseRefundInput(body))
+        return routeResponse(await leadPathState(payload, leadId))
+      }
       default: throw new EnrollmentInputError('Неизвестное действие')
     }
   })

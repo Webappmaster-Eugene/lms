@@ -9,10 +9,12 @@ import { EnrollmentSteps, formatEnrollmentTime as at } from './EnrollmentSteps'
 
 import './enrollment-admin.scss'
 
-type Action = 'admit' | 'prepare' | 'reject' | 'withdraw' | 'reopen' | 'extend-entry-task' | 'resend-payment' | 'cancel-admission' | 'mark-paid' | 'enroll'
+type Action = 'admit' | 'prepare' | 'reject' | 'withdraw' | 'reopen' | 'extend-entry-task' | 'resend-payment' | 'cancel-admission' | 'mark-paid' | 'enroll' | 'refund' | 'mark-refunded'
 type Fields = Record<string, string>
 
 const POLL_MS = 4000
+// Состояние возврата планировщик спрашивает у Робокассы раз в минуту: чаще перечитывать незачем.
+const REFUND_POLL_MS = 30_000
 const DECISION = ['new', 'contacted', 'diagnostic']
 const CLOSED = ['preparation', 'rejected', 'withdrawn']
 
@@ -54,11 +56,14 @@ export function LeadPathPanel() {
   }, [id, reload])
 
   const enrollmentStatus = state?.enrollment?.status
+  const revoking = Boolean(state?.enrollment?.revokeRequestedAt && !state.enrollment.revokedAt && !state.enrollment.revokeError)
+  const refundPending = Boolean(state?.refunds.some((refund) => refund.status === 'processing'))
   useEffect(() => {
-    if (enrollmentStatus !== 'queued' && enrollmentStatus !== 'running') return
-    const timer = window.setInterval(() => setReload((value) => value + 1), POLL_MS)
+    const busyEnrollment = enrollmentStatus === 'queued' || enrollmentStatus === 'running' || revoking
+    if (!busyEnrollment && !refundPending) return
+    const timer = window.setInterval(() => setReload((value) => value + 1), busyEnrollment ? POLL_MS : REFUND_POLL_MS)
     return () => window.clearInterval(timer)
-  }, [enrollmentStatus])
+  }, [enrollmentStatus, revoking, refundPending])
 
   if (id === undefined || id === null) return null
   if (!state) return <div className="enrollment">{error ? <p className="enrollment__error" role="alert">{error}</p> : <p className="enrollment__hint">Загружаем путь заявки…</p>}</div>
@@ -148,10 +153,21 @@ export function LeadPathPanel() {
       {confirm('Да, отметить оплату', 'Дальше как при оплате через Робокассу: письма и автозачисление.')}
     </>,
     enroll: <><div className="enrollment__grid">{enrollFields()}</div>{confirm('Да, зачислить', `На ${lead.email} уйдут приглашение в LMS и ссылка для пароля GitLab.`)}</>,
+    refund: <>
+      <div className="enrollment__grid">{input('amount', 'Сумма возврата, ₽', `Не больше ${state.refund.left} ₽`)}</div>
+      {input('reason', 'Причина', 'Останется в журнале заявки, ученик её не увидит', 'textarea')}
+      {confirm('Да, вернуть деньги', `Робокасса вернёт деньги туда, откуда платили. Больше баланса магазина она не вернёт: комиссия за оплату уже удержана. Когда возврат выполнится, LMS снимет курс методичек, заблокирует учётку GitLab и отправит письмо на ${lead.email}.`)}
+    </>,
+    'mark-refunded': <>
+      <div className="enrollment__grid">{input('amount', 'Сколько вернули, ₽', `Не больше ${state.refund.left} ₽`)}</div>
+      {input('reason', 'Причина и как вернули', 'Например: отказ после 3-й недели, возврат в кабинете Робокассы 11.11', 'textarea')}
+      {confirm('Да, отметить возврат', `Сначала верните деньги в кабинете Робокассы или переводом. После отметки LMS сразу снимет курс методичек, заблокирует учётку GitLab и отправит письмо на ${lead.email}.`)}
+    </>,
   }
   const shown = (action: Action) => form?.action === action ? forms[action] : null
 
   const decided = !DECISION.includes(lead.status)
+  const refunded = lead.status === 'refunded'
   const paid = Boolean(lead.paidAt)
   const paidPayments = state.payments.filter((payment) => payment.status === 'paid')
   // Тестовой картой может «оплатить» кто угодно: такую оплату без зачисления можно снять.
@@ -244,8 +260,19 @@ export function LeadPathPanel() {
               {enrollment.lmsUserId && <Link href={`/admin/collections/users/${enrollment.lmsUserId}`}>Учётка LMS</Link>}
               <Link href={`/admin/collections/bootcamp-enrollments/${enrollment.id}`}>Карточка зачисления</Link>
             </p>
-            {enrollment.status === 'failed' && <div className="enrollment__actions">{button(busy ? 'Ставим в очередь…' : 'Повторить шаги GitLab', () => void retry(enrollment.id))}<span className="enrollment__hint">Сделанные шаги исполнитель пропустит.</span></div>}
+            {enrollment.revokeRequestedAt && (
+              <p className={enrollment.revokeError ? 'enrollment__error' : 'enrollment__hint'} role={enrollment.revokeError ? 'alert' : undefined}>
+                {enrollment.revokedAt
+                  ? `Доступы закрыты после возврата денег ${at(enrollment.revokedAt)}.`
+                  : enrollment.revokeError
+                    ? `Учётку GitLab заблокировать не удалось: ${enrollment.revokeError} Заблокируйте её в GitLab вручную.`
+                    : 'Возврат денег: исполнитель в VM GitLab блокирует учётку, обычно за полминуты.'}
+              </p>
+            )}
+            {enrollment.status === 'failed' && !refunded && <div className="enrollment__actions">{button(busy ? 'Ставим в очередь…' : 'Повторить шаги GitLab', () => void retry(enrollment.id))}<span className="enrollment__hint">Сделанные шаги исполнитель пропустит.</span></div>}
           </>
+        ) : refunded ? (
+          <p className="enrollment__hint">Деньги возвращены до зачисления: зачислять нельзя.</p>
         ) : paid ? (
           <>
             <p className="enrollment__hint">{testOnly
@@ -264,6 +291,29 @@ export function LeadPathPanel() {
           {' '}MR, CI и вердикты проверки появляются в истории.
         </p>
       </Step>
+
+      {(state.refund.available || state.refunds.length > 0) && (
+        <Step title="6. Возврат денег" done={state.refunds.some((refund) => refund.status === 'done')}>
+          {state.refund.available && <p className="enrollment__hint">Можно вернуть до {state.refund.left} ₽. Сумму считайте по разделу «Отказ от обучения и возврат денег» <a href={state.offerUrl} target="_blank" rel="noreferrer">оферты</a>.{state.refund.note ? ` ${state.refund.note}` : ''}</p>}
+          {state.refund.available && !form && (
+            <div className="enrollment__actions">
+              {state.refund.viaApi && button('Вернуть деньги', () => open('refund', { amount: state.refund.left, reason: '' }))}
+              {button('Отметить возврат вручную', () => open('mark-refunded', { amount: state.refund.left, reason: '' }))}
+            </div>
+          )}
+          {state.refunds.length > 0 && (
+            <ul className="lead-path__list" aria-label="Возвраты">
+              {state.refunds.map((refund) => (
+                <li key={refund.id}>
+                  <Link href={`/admin/collections/bootcamp-refunds/${refund.id}`}>Возврат {refund.amount}</Link>
+                  {`: ${refund.statusLabel.toLowerCase()}${refund.method === 'manual' ? ', отмечен вручную' : ', через Робокассу'}, ${at(refund.finishedAt ?? refund.createdAt)}. ${refund.reason}`}
+                </li>
+              ))}
+            </ul>
+          )}
+          {shown('refund')}{shown('mark-refunded')}
+        </Step>
+      )}
 
       {error && <p className="enrollment__error" role="alert">{error}</p>}
 
