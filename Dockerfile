@@ -80,9 +80,10 @@ ENV NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL}
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Limit Node.js heap to prevent OOM kills on memory-constrained build servers.
-# Next.js + Payload CMS compilation is very memory-intensive.
-ENV NODE_OPTIONS=--max-old-space-size=2048
+# Лимит кучи Node для сборки. Прод собирает с source maps для GlitchTip, и next 16
+# (webpack) на 2048 МБ падает по памяти (11.11.2026: проходит при 3072, пик 3,3 ГБ).
+# Сборка идёт в VM прода (16 ГБ), 4096 оставляет запас. Воспроизведение - с SENTRY_*.
+ENV NODE_OPTIONS=--max-old-space-size=4096
 
 # Линтер и проверка типов уже прошли до push (`pnpm smoke`, CI). На сборщике под
 # эмуляцией этот шаг занимал ~40 минут и исчерпывал память: 13.10.2026 сборщик завис
