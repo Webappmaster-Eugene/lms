@@ -14,7 +14,7 @@ RUN npm run build
 # ──────────────────────────────────────────────
 # Stage 2: runtime — nginx serves static files
 # ──────────────────────────────────────────────
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.30-alpine AS runtime
 
 # Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf
