@@ -7,11 +7,16 @@ import path from 'node:path'
 import sharp from 'sharp'
 import { BRAND_COLORS as C, BRAND_TILE_RADIUS, MARK_LARGE, MARK_SMALL, type BrandCut } from '../../src/lib/brand-mark'
 
-type Tile = { cut: BrandCut; radius: number; scale?: number; size: number }
+type Palette = { tile: string; oars: string; bow: string }
+type Tile = { cut: BrandCut; radius: number; scale?: number; size: number; palette?: Palette }
 
-function tile({ cut, radius, scale = 1, size }: Tile): string {
+const PLATFORM: Palette = { tile: C.deep, oars: C.sail, bow: C.sun }
+// Админка на жёлтой плитке: вкладку админки не спутать с вкладкой платформы даже в 16 px.
+const ADMIN: Palette = { tile: C.sun, oars: C.deep, bow: C.green }
+
+function tile({ cut, radius, scale = 1, size, palette = PLATFORM }: Tile): string {
   const shift = (1 - scale) * 256
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="${size}" height="${size}"><rect width="512" height="512" rx="${radius}" fill="${C.deep}"/><g transform="translate(${shift} ${shift}) scale(${scale})"><path d="${cut.oars.join('')}" fill="${C.sail}"/><path d="${cut.bow}" fill="${C.sun}"/></g></svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="${size}" height="${size}"><rect width="512" height="512" rx="${radius}" fill="${palette.tile}"/><g transform="translate(${shift} ${shift}) scale(${scale})"><path d="${cut.oars.join('')}" fill="${palette.oars}"/><path d="${cut.bow}" fill="${palette.bow}"/></g></svg>`
 }
 
 // Рисуем сразу в итоговом размере: уменьшение большого снимка размывает вертикали на 16 px.
@@ -36,15 +41,15 @@ function ico(images: { size: number; data: Buffer }[]): Buffer {
   return Buffer.concat([header, ...images.map(({ data }) => data)])
 }
 
-const small = (size: number) => png(tile({ cut: MARK_SMALL, radius: BRAND_TILE_RADIUS.small, size }))
-const large = (size: number) => png(tile({ cut: MARK_LARGE, radius: BRAND_TILE_RADIUS.large, size }))
+const small = (size: number, palette?: Palette) => png(tile({ cut: MARK_SMALL, radius: BRAND_TILE_RADIUS.small, size, palette }))
+const large = (size: number, palette?: Palette) => png(tile({ cut: MARK_LARGE, radius: BRAND_TILE_RADIUS.large, size, palette }))
 // Android вписывает маскируемую иконку в круг радиусом 40%, iOS сам скругляет и заливает прозрачное чёрным.
-const fullBleed = (size: number, scale: number) => sharp(Buffer.from(tile({ cut: MARK_LARGE, radius: 0, scale, size }))).removeAlpha().png({ compressionLevel: 9 }).toBuffer()
+const fullBleed = (size: number, scale: number, palette?: Palette) => sharp(Buffer.from(tile({ cut: MARK_LARGE, radius: 0, scale, size, palette }))).removeAlpha().png({ compressionLevel: 9 }).toBuffer()
 // Значок уведомления Android рисует только по прозрачности: плитка стала бы белым квадратом.
 const badge = (size: number) => png(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="${size}" height="${size}"><path d="${MARK_SMALL.oars.join('')}${MARK_SMALL.bow}" fill="#fff"/></svg>`)
 
-async function favicon() {
-  return ico(await Promise.all([{ size: 16, data: await small(16) }, { size: 32, data: await small(32) }, { size: 48, data: await large(48) }]))
+async function favicon(palette?: Palette) {
+  return ico(await Promise.all([{ size: 16, data: await small(16, palette) }, { size: 32, data: await small(32, palette) }, { size: 48, data: await large(48, palette) }]))
 }
 
 function write(file: string, data: Buffer) {
@@ -60,7 +65,11 @@ const files: Record<string, Buffer> = {
   'public/images/pwa/maskable-512.png': await fullBleed(512, 0.9),
   'public/images/pwa/apple-touch-icon.png': await fullBleed(180, 1),
   'public/images/pwa/badge-96.png': await badge(96),
-  'src/app/favicon.ico': await favicon(),
+  'public/images/admin/icon-32.png': await small(32, ADMIN),
+  'public/images/admin/apple-touch-icon.png': await fullBleed(180, 1, ADMIN),
+  // Не в src/app: файловую иконку Next вставляет на все страницы, и в админке вкладка была бы зелёной.
+  'public/favicon.ico': await favicon(),
+  'public/images/admin/favicon.ico': await favicon(ADMIN),
   'landing/public/favicon.ico': await favicon(),
   'landing/public/favicon-32.png': await small(32),
   'landing/public/apple-touch-icon.png': await fullBleed(180, 1),

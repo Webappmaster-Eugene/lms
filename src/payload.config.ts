@@ -76,8 +76,14 @@ export default buildConfig({
       baseDir: path.resolve(dirname),
     },
     meta: {
-      titleSuffix: ' - MentorCareer LMS',
-      icons: [{ url: '/images/pwa/icon-32.png', sizes: '32x32', type: 'image/png' }],
+      // Своя подпись и жёлтая иконка: вкладку админки не спутать с вкладкой платформы.
+      // Корневой шаблон заголовка допишет « - MentorCareer LMS» сам: «Ученики - Админка - MentorCareer LMS».
+      titleSuffix: '- Админка',
+      icons: [
+        { rel: 'icon', url: '/images/admin/favicon.ico', sizes: '16x16 32x32 48x48', type: 'image/x-icon' },
+        { rel: 'icon', url: '/images/admin/icon-32.png', sizes: '32x32', type: 'image/png' },
+        { rel: 'apple-touch-icon', url: '/images/admin/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+      ],
       // Без своих значений ссылка на админку в мессенджере показывает карточку «Payload App».
       openGraph: { siteName: SITE_NAME, description: SITE_DESCRIPTION, images: [OG_IMAGE] },
     },
@@ -86,6 +92,8 @@ export default buildConfig({
         Logo: '/components/brand/AdminBrand#AdminLogo',
         Icon: '/components/brand/AdminBrand#AdminIcon',
       },
+      beforeLogin: ['/components/brand/AdminLoginNotice#AdminLoginNotice'],
+      afterLogin: ['/components/brand/AdminLoginNotice#AdminLoginStudentLink'],
       providers: ['/components/analytics/AdminActivityProvider#AdminActivityProvider'],
       beforeNavLinks: ['/components/roadmap-editor/NavLink#RoadmapEditorNavLink'],
       views: {

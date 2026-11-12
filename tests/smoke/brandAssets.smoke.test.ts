@@ -22,6 +22,8 @@ describe('файлы знака', () => {
     ['public/images/pwa/maskable-512.png', 512],
     ['public/images/pwa/apple-touch-icon.png', 180],
     ['public/images/pwa/badge-96.png', 96],
+    ['public/images/admin/icon-32.png', 32],
+    ['public/images/admin/apple-touch-icon.png', 180],
     ['landing/public/favicon-32.png', 32],
     ['landing/public/apple-touch-icon.png', 180],
     ['landing/public/logo.png', 512],
@@ -30,7 +32,7 @@ describe('файлы знака', () => {
     expect({ width, height, format }).toEqual({ width: size, height: size, format: 'png' })
   })
 
-  it.each(['src/app/favicon.ico', 'landing/public/favicon.ico'])('%s содержит 16, 32 и 48 px', (path) => {
+  it.each(['public/favicon.ico', 'public/images/admin/favicon.ico', 'landing/public/favicon.ico'])('%s содержит 16, 32 и 48 px', (path) => {
     expect(icoSizes(path)).toEqual([16, 32, 48])
   })
 
@@ -40,7 +42,7 @@ describe('файлы знака', () => {
   })
 
   // Прозрачное iOS заливает чёрным, а Android обрезает маской по краю плитки: альфа-канала быть не должно.
-  it.each(['public/images/pwa/apple-touch-icon.png', 'public/images/pwa/maskable-512.png', 'landing/public/apple-touch-icon.png'])('%s без альфа-канала', async (path) => {
+  it.each(['public/images/pwa/apple-touch-icon.png', 'public/images/admin/apple-touch-icon.png', 'public/images/pwa/maskable-512.png', 'landing/public/apple-touch-icon.png'])('%s без альфа-канала', async (path) => {
     expect((await sharp(path).metadata()).hasAlpha).toBe(false)
   })
 

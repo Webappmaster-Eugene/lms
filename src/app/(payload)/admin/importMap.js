@@ -33,6 +33,8 @@ import { LeadPathPanel as LeadPathPanel_505dc711e7aa771eeb48a2f18200ced3 } from 
 import { EnrollmentProgressField as EnrollmentProgressField_375df25925f8453f06d864f495f2f5ed } from '../../../components/bootcamp/EnrollmentProgressField'
 import { AdminIcon as AdminIcon_173465beeb578f188bf288462038de17 } from '../../../components/brand/AdminBrand'
 import { AdminLogo as AdminLogo_173465beeb578f188bf288462038de17 } from '../../../components/brand/AdminBrand'
+import { AdminLoginStudentLink as AdminLoginStudentLink_ca5e7e852490fcf8a7f838e3a1f14ca4 } from '../../../components/brand/AdminLoginNotice'
+import { AdminLoginNotice as AdminLoginNotice_ca5e7e852490fcf8a7f838e3a1f14ca4 } from '../../../components/brand/AdminLoginNotice'
 import { RoadmapEditorNavLink as RoadmapEditorNavLink_f543dd02c2a139dbdd43078f7bfc45ce } from '../../../components/roadmap-editor/NavLink'
 import { AdminActivityProvider as AdminActivityProvider_51efc6cd3b75e18d34a4901e7d4dc858 } from '../../../components/analytics/AdminActivityProvider'
 import { StudentAnalyticsView as StudentAnalyticsView_11a6f208e64acffcd4c11171f3d5bde8 } from '../../../components/student-analytics/StudentAnalyticsView'
@@ -78,6 +80,8 @@ export const importMap = {
   "/components/bootcamp/EnrollmentProgressField#EnrollmentProgressField": EnrollmentProgressField_375df25925f8453f06d864f495f2f5ed,
   "/components/brand/AdminBrand#AdminIcon": AdminIcon_173465beeb578f188bf288462038de17,
   "/components/brand/AdminBrand#AdminLogo": AdminLogo_173465beeb578f188bf288462038de17,
+  "/components/brand/AdminLoginNotice#AdminLoginStudentLink": AdminLoginStudentLink_ca5e7e852490fcf8a7f838e3a1f14ca4,
+  "/components/brand/AdminLoginNotice#AdminLoginNotice": AdminLoginNotice_ca5e7e852490fcf8a7f838e3a1f14ca4,
   "/components/roadmap-editor/NavLink#RoadmapEditorNavLink": RoadmapEditorNavLink_f543dd02c2a139dbdd43078f7bfc45ce,
   "/components/analytics/AdminActivityProvider#AdminActivityProvider": AdminActivityProvider_51efc6cd3b75e18d34a4901e7d4dc858,
   "/components/student-analytics/StudentAnalyticsView#StudentAnalyticsView": StudentAnalyticsView_11a6f208e64acffcd4c11171f3d5bde8,

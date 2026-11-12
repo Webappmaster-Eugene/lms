@@ -24,7 +24,7 @@ test.describe('аноним', () => {
     test(`${path} → редирект на /login с возвратом`, async ({ page }) => {
       await page.goto(path)
       await expect(page).toHaveURL((url) => url.pathname === '/login' && url.searchParams.get('redirect') === path)
-      await expect(page.getByRole('heading', { name: 'MentorCareer LMS' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Вход для учеников' })).toBeVisible()
     })
   }
 
@@ -42,6 +42,19 @@ test.describe('аноним', () => {
       expect(response?.status(), path).toBe(200)
       await expect(page).toHaveURL(new RegExp(`${path}$`))
     }
+  })
+
+  // Владелец путал вкладки входа: у админки своя иконка, подпись вкладки и заголовок.
+  test('вход в админку не похож на вход ученика и ведёт к нему ссылкой', async ({ page }) => {
+    await page.goto('/admin/login')
+    await expect(page.getByRole('heading', { name: 'Вход для администратора', level: 1 })).toBeVisible()
+    await expect(page).toHaveTitle(/ - Админка - MentorCareer LMS$/)
+    // Только жёлтые иконки: общий /favicon.ico вкладка взяла бы для 16 px.
+    const icons = await page.locator('link[rel="icon"]').evaluateAll((links) => links.map((link) => new URL(link.getAttribute('href') ?? '', location.href).pathname))
+    expect(icons).toEqual(['/images/admin/favicon.ico', '/images/admin/icon-32.png'])
+    await page.getByRole('link', { name: 'Вход для учеников' }).click()
+    await expect(page).toHaveURL(/\/login$/)
+    await expect(page.getByRole('heading', { name: 'Вход для учеников', level: 1 })).toBeVisible()
   })
 
   test('подделанная cookie не пускает внутрь: страница без данных пользователя', async ({ page, context }) => {
