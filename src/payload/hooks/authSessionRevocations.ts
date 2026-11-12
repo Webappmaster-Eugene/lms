@@ -3,6 +3,8 @@ import { sql } from '@payloadcms/db-postgres'
 import { APIError, Forbidden, type CollectionAfterLogoutHook, type CollectionAfterReadHook, type Payload, type PayloadRequest } from 'payload'
 
 import { collectAllPages } from '@/lib/paginate'
+import { sessionSurvivesFreeze } from '@/lib/account-freeze'
+import { getAccountFreeze } from '@/server/account-freeze'
 
 type Executor = { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }
 type SessionsAdapter = { sessions?: Record<string | number, { db: Executor } | undefined> }
@@ -82,6 +84,16 @@ export const filterRevokedAuthSessions: CollectionAfterReadHook = async ({ doc, 
     return doc
   }
   if (!Array.isArray(doc.sessions) || doc.sessions.length === 0) return doc
+  // Замороженный ученик анонимен на всех маршрутах. Сессии, открытые до заморозки, не оживают и после неё.
+  if (doc.role !== 'admin') {
+    const freeze = await getAccountFreeze(req.payload, Number(doc.id), req)
+    if (freeze.active) {
+      doc.sessions = []
+      return doc
+    }
+    doc.sessions = doc.sessions.filter((session: { createdAt?: string | null }) => sessionSurvivesFreeze(session, freeze.cutoff))
+    if (doc.sessions.length === 0) return doc
+  }
   const ids: string[] = doc.sessions.flatMap((session: { id?: unknown }) => typeof session.id === 'string' ? [session.id] : [])
   if (!ids.length) return doc
   const revoked = await revokedHashes(req.payload, req, Number(doc.id), ids)

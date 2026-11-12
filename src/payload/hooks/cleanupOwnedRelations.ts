@@ -16,7 +16,7 @@ function cleanupDependents(
   return async ({ req, id }) => {
     for (const { collection, field } of dependents) {
       try {
-        const capability = collection === 'learning-access-policies' ? 'syncLearningAccessPolicy' : collection === 'auth-session-revocations' ? 'syncAuthSessionRevocations' : collection === 'student-session-telemetry' || collection === 'student-learning-events' ? 'syncStudentAnalytics' : collection === 'web-vitals-reports' ? 'syncWebVitals' : null
+        const capability = collection === 'learning-access-policies' ? 'syncLearningAccessPolicy' : collection === 'auth-session-revocations' ? 'syncAuthSessionRevocations' : collection === 'account-freezes' ? 'syncAccountFreezes' : collection === 'student-session-telemetry' || collection === 'student-learning-events' ? 'syncStudentAnalytics' : collection === 'web-vitals-reports' ? 'syncWebVitals' : null
         const previousCapability = capability ? req.context[capability] : undefined
         if (capability) req.context[capability] = true
         try {
@@ -41,6 +41,7 @@ export const cleanupUserRelations = cleanupDependents('пользователь'
   { collection: 'student-learning-events', field: 'user' },
   { collection: 'student-session-telemetry', field: 'user' },
   { collection: 'auth-session-revocations', field: 'user' },
+  { collection: 'account-freezes', field: 'user' },
   { collection: 'learning-access-policies', field: 'user' },
   { collection: 'learning-access-grants', field: 'user' },
   { collection: 'lesson-learning-states', field: 'user' },

@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { CredentialsNotice, NewStudentForm, StudentCard } from '@/components/learning-access/StudentPanel'
 import type { StudentDetails } from '@/components/learning-access/contracts'
 
-const details: StudentDetails = { student: { id: 7, email: 'rost@example.test', firstName: 'Ростислав', lastName: 'Ученик', telegram: null, isActive: true }, impact: { progress: 3, certificates: 1, comments: 2, notes: 0, rules: 4, points: 50, blockers: [] } }
+const noFreeze = { active: false, since: null, endsAt: null, frozenUntil: null, reason: null, note: null, plannedAt: '2027-05-12T09:00:00.000Z' }
+const details: StudentDetails = { student: { id: 7, email: 'rost@example.test', firstName: 'Ростислав', lastName: 'Ученик', telegram: null, isActive: true, isTestStudent: false, freeze: noFreeze }, impact: { progress: 3, certificates: 1, comments: 2, notes: 0, rules: 4, points: 50, blockers: [] } }
 let current: StudentDetails
 let failure: { error: string; status: number } | null
 const requests: { url: string; method: string; body: unknown }[] = []
@@ -97,11 +98,86 @@ describe('карточка ученика', () => {
     await waitFor(() => expect(props.onCredentials).toHaveBeenCalledWith({ email: 'rost@example.test', password: 'Pass2word345abc' }))
   })
 
-  it('отключает и включает', async () => {
+  it('замораживает на выбранный срок с причиной и заметкой', async () => {
+    const user = userEvent.setup()
+    const props = card()
+    expect(await screen.findByText('Доступ до 12.05.2027')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Заморозить' }))
+    const form = screen.getByRole('form', { name: 'Заморозка аккаунта' })
+    await user.click(within(form).getByLabelText('6 месяцев'))
+    await user.selectOptions(within(form).getByLabelText('Причина'), 'не выходит на связь')
+    await user.type(within(form).getByLabelText('Заметка для себя'), 'Не отвечает с октября')
+    await user.click(within(form).getByRole('button', { name: 'Заморозить аккаунт' }))
+    await waitFor(() => expect(props.onChanged).toHaveBeenCalled())
+    expect(requests[0]).toMatchObject({ url: '/api/manage/students/7/freeze', method: 'POST', body: { action: 'freeze', term: '6m', reason: 'no-contact', note: 'Не отвечает с октября' } })
+  })
+
+  it('заморозка до даты отправляет дату, бессрочная - без даты', async () => {
     const user = userEvent.setup()
     card()
-    await user.click(await screen.findByRole('button', { name: 'Отключить' }))
-    await waitFor(() => expect(requests[0]).toMatchObject({ method: 'PATCH', body: { isActive: false } }))
+    await user.click(await screen.findByRole('button', { name: 'Заморозить' }))
+    const form = screen.getByRole('form', { name: 'Заморозка аккаунта' })
+    await user.click(within(form).getByLabelText('До даты'))
+    const until = within(form).getByLabelText('Разморозить')
+    await user.clear(until)
+    await user.type(until, '2030-01-15')
+    await user.click(within(form).getByRole('button', { name: 'Заморозить аккаунт' }))
+    await waitFor(() => expect(requests[0]).toMatchObject({ body: { action: 'freeze', term: 'date', until: '2030-01-15' } }))
+    await user.click(screen.getByRole('button', { name: 'Заморозить' }))
+    await user.click(within(screen.getByRole('form', { name: 'Заморозка аккаунта' })).getByLabelText('Бессрочно, до разморозки'))
+    await user.click(screen.getByRole('button', { name: 'Заморозить аккаунт' }))
+    await waitFor(() => expect(requests[1]?.body).toEqual({ action: 'freeze', term: 'forever', reason: 'vacation', note: '' }))
+  })
+
+  it('показывает заморозку и размораживает с новой плановой датой', async () => {
+    current = { ...details, student: { ...details.student, freeze: { active: true, since: '2026-11-01T09:00:00.000Z', endsAt: null, frozenUntil: null, reason: 'no-contact', note: 'Пропал', plannedAt: null } } }
+    const user = userEvent.setup()
+    card()
+    expect(await screen.findByText('Заморожен бессрочно, не выходит на связь. Войти не сможет.')).toBeInTheDocument()
+    expect(screen.getByText('Пропал')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Отключить' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Разморозить' }))
+    const form = screen.getByRole('form', { name: 'Разморозка аккаунта' })
+    await user.click(within(form).getByLabelText(/Через год/))
+    await user.click(within(form).getByRole('button', { name: 'Разморозить аккаунт' }))
+    await waitFor(() => expect(requests[0]).toMatchObject({ url: '/api/manage/students/7/freeze', body: { action: 'unfreeze', next: '1y' } }))
+  })
+
+  it('срок, за которым начнётся плановая заморозка, объясняет, что ученик останется замороженным', async () => {
+    current = { ...details, student: { ...details.student, freeze: { active: true, since: '2026-11-01T09:00:00.000Z', endsAt: '2027-08-01T09:00:00.000Z', frozenUntil: null, reason: 'vacation', note: null, plannedAt: '2027-05-12T09:00:00.000Z' } } }
+    card()
+    expect(await screen.findByText('Заморожен до 01.08.2027, отпуск. Войти не сможет. Потом заморозка продлится бессрочно: к этому дню истечёт срок доступа.')).toBeInTheDocument()
+  })
+
+  it('переносит и снимает плановую заморозку', async () => {
+    const user = userEvent.setup()
+    card()
+    await user.click(await screen.findByRole('button', { name: 'Изменить срок доступа' }))
+    const form = screen.getByRole('form', { name: 'Плановая заморозка' })
+    const date = within(form).getByLabelText('Доступ до') as HTMLInputElement
+    expect(date.value).toBe('2027-05-12')
+    await user.clear(date)
+    await user.type(date, '2027-09-01')
+    await user.click(within(form).getByRole('button', { name: 'Сохранить дату' }))
+    await waitFor(() => expect(requests[0]).toMatchObject({ body: { action: 'plan', date: '2027-09-01' } }))
+    await user.click(screen.getByRole('button', { name: 'Изменить срок доступа' }))
+    await user.click(screen.getByRole('button', { name: 'Без плановой заморозки' }))
+    await waitFor(() => expect(requests[1]).toMatchObject({ body: { action: 'plan', date: null } }))
+  })
+
+  it('отмечает тестового ученика', async () => {
+    const user = userEvent.setup()
+    card()
+    await user.click(await screen.findByRole('checkbox', { name: /Тестовый ученик/ }))
+    await waitFor(() => expect(requests[0]).toMatchObject({ url: '/api/manage/students/7', method: 'PATCH', body: { isTestStudent: true } }))
+  })
+
+  it('отключённую раньше учётку можно только включить', async () => {
+    current = { ...details, student: { ...details.student, isActive: false } }
+    const user = userEvent.setup()
+    card()
+    await user.click(await screen.findByRole('button', { name: 'Включить' }))
+    await waitFor(() => expect(requests[0]).toMatchObject({ method: 'PATCH', body: { isActive: true } }))
   })
 
   it('удаление требует ввода почты и показывает последствия', async () => {

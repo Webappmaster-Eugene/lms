@@ -4,6 +4,7 @@ import { buildGuideAccess, type GuidesAccessMode } from '@/lib/guide-access'
 import { learningGrantIsActive, learningRelationId, type LearningGrant } from '@/lib/learning-access'
 import { collectAllPages } from '@/lib/paginate'
 import { logger } from '@/lib/telemetry'
+import { frozenUserIds } from '@/server/account-freeze'
 
 type GrantRow = LearningGrant & { id: number; user: unknown }
 type Recipient = { id: number; role: string; guidesAccessMode: GuidesAccessMode; isActive: boolean }
@@ -16,10 +17,11 @@ async function students(payload: Payload, req: PayloadRequest, ids?: number[]): 
     collectAllPages(({ page, limit }) => payload.find({ collection: 'learning-access-policies', where: ids ? { user: { in: ids } } : undefined, select: { user: true, role: true, guidesMode: true }, depth: 0, sort: 'id', page, limit, overrideAccess: true, req }), { label: 'политики доступа для уведомления о гайде' }),
   ])
   const byUser = new Map(policies.map((policy) => [learningRelationId(policy.user), policy]))
+  const frozen = await frozenUserIds(payload, ids ?? users.map((user) => user.id), req)
   return users.flatMap((user) => {
     const policy = byUser.get(user.id)
     const role = policy ? policy.role : user.role
-    if (role === 'admin' || user.isActive !== true) return []
+    if (role === 'admin' || user.isActive !== true || frozen.has(user.id)) return []
     const mode = (policy ? policy.guidesMode : user.guidesAccessMode) === 'all' ? 'all' : 'assigned'
     return [{ id: user.id, role: 'student', guidesAccessMode: mode, isActive: true }]
   })

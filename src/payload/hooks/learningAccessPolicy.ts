@@ -1,9 +1,11 @@
-import { AuthenticationError, type CollectionAfterChangeHook, type CollectionAfterReadHook, type CollectionBeforeLoginHook, type CollectionBeforeOperationHook, type PayloadRequest } from 'payload'
+import { APIError, AuthenticationError, type CollectionAfterChangeHook, type CollectionAfterReadHook, type CollectionBeforeLoginHook, type CollectionBeforeOperationHook, type PayloadRequest } from 'payload'
 
 import { learningRelationId } from '@/lib/learning-access'
 import { clearAuthoritativeLearningMode, getAuthoritativeLearningPolicy, type AuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import { invalidateLearningAccess } from '@/server/learning-access'
 import { verifyPassword } from '@/payload/hooks/protectProfileCredentials'
+import { frozenLoginMessage } from '@/lib/account-freeze'
+import { getAccountFreeze } from '@/server/account-freeze'
 
 const auditActors = new WeakMap<PayloadRequest, Map<number, number>>()
 
@@ -78,5 +80,10 @@ export const normalizeLearningLoginIdentity: CollectionBeforeLoginHook = async (
   }
   clearAuthoritativeLearningMode(req)
   const actual = await getAuthoritativeLearningPolicy(req.payload, user.id, req)
+  // Пароль Payload уже проверил: причину отказа видит только владелец учётки. Откат транзакции снимает и новую сессию.
+  if (actual.role !== 'admin') {
+    const freeze = await getAccountFreeze(req.payload, user.id, req)
+    if (freeze.active) throw new APIError(frozenLoginMessage(freeze.frozenUntil), 403)
+  }
   return { ...user, role: actual.role, learningAccessMode: actual.mode, learningCatalogVisibility: actual.catalogVisibility, trainerAccessMode: actual.trainerMode, guidesAccessMode: actual.guidesMode }
 }

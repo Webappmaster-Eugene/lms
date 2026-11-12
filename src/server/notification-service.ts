@@ -15,6 +15,7 @@ import { deliveryOutcome } from '@/lib/notification-policy'
 import { sendEncryptedPush, vapidConfiguration } from '@/server/push-transport'
 import { collectAllPages } from '@/lib/paginate'
 import { readVideoPositions } from '@/lib/learning-state'
+import { frozenUserIds } from '@/server/account-freeze'
 
 export class NotificationError extends Error {
   constructor(message: string, readonly status = 400) { super(message) }
@@ -160,8 +161,11 @@ export async function runNotificationJobs(payload: Payload): Promise<{ skipped: 
   try {
     const users = await payload.find({ collection: 'users', where: { and: [{ id: { greater_than: job.userCursor ?? 0 } }, { role: { equals: 'student' } }, { isActive: { not_equals: false } }] }, sort: 'id', limit: 100, depth: 0, overrideAccess: true })
     let processedUser = job.userCursor ?? 0
+    // Замороженному напоминать бесполезно: войти он не сможет. Push ему и так отменит проверка сессии.
+    const frozen = await frozenUserIds(payload, users.docs.map((user) => user.id))
     for (const user of users.docs) {
       if (Date.now() >= deadline - 15_000) break
+      if (frozen.has(user.id)) { processedUser = user.id; continue }
       await transact(payload, async (req) => {
         await lock(req, user.id)
         const prefs = await getNotificationPreferences(req, user.id)

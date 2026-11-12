@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { assertModeValues, mergeRules, parseArgs, parseTarget, readAdminCredentials, resolveBaseUrl, StudentsCliError } from '../../scripts/lms-students.mjs'
+import { assertModeValues, freezeBody, freezeLine, mergeRules, parseArgs, parseTarget, readAdminCredentials, resolveBaseUrl, StudentsCliError } from '../../scripts/lms-students.mjs'
 
 type MergedRule = { effect: string; target: { relationTo: string; value: number } }
 const rule = (relationTo: string, value: number, effect = 'allow', extra = {}) => ({ id: value, target: { relationTo, value }, effect, startsAt: null, expiresAt: null, note: '', ...extra })
@@ -89,5 +89,38 @@ describe('учётка администратора', () => {
 
   it('без файла называет, что задать, не падая необъяснимо', () => {
     expect(() => readAdminCredentials({ LMS_INFO_FILE: '/nonexistent/info.txt' }, '/')).toThrow('LMS_ADMIN_EMAIL')
+  })
+})
+
+describe('заморозка из командной строки', () => {
+  const body = (command: string, argv: string[]) => freezeBody(command, parseArgs(argv).options)
+
+  it('по умолчанию месяц и отпуск; срок, дата, причина и заметка передаются как на экране', () => {
+    expect(body('freeze', ['a@b.c'])).toEqual({ action: 'freeze', term: '1m', reason: 'vacation' })
+    expect(body('freeze', ['a@b.c', '--for', 'forever', '--reason', 'no-contact', '--note', 'Пропал'])).toEqual({ action: 'freeze', term: 'forever', reason: 'no-contact', note: 'Пропал' })
+    expect(body('freeze', ['a@b.c', '--until', '2027-01-15'])).toEqual({ action: 'freeze', term: 'date', until: '2027-01-15', reason: 'vacation' })
+  })
+
+  it('неверные значения отклоняются до входа на прод', () => {
+    expect(() => body('freeze', ['--for', '2w'])).toThrow(StudentsCliError)
+    expect(() => body('freeze', ['--for', '1m', '--until', '2027-01-15'])).toThrow(StudentsCliError)
+    expect(() => body('freeze', ['--until', '15.01.2027'])).toThrow(StudentsCliError)
+    expect(() => body('freeze', ['--reason', 'term'])).toThrow(StudentsCliError)
+    expect(() => body('unfreeze', ['--next', 'soon'])).toThrow(StudentsCliError)
+    expect(() => body('plan', [])).toThrow(StudentsCliError)
+  })
+
+  it('разморозка и плановая дата', () => {
+    expect(body('unfreeze', [])).toEqual({ action: 'unfreeze', next: '6m' })
+    expect(body('unfreeze', ['--next', 'none'])).toEqual({ action: 'unfreeze', next: 'none' })
+    expect(body('plan', ['--date', '2027-05-12'])).toEqual({ action: 'plan', date: '2027-05-12' })
+    expect(body('plan', ['--date', 'none'])).toEqual({ action: 'plan', date: null })
+  })
+
+  it('строка состояния', () => {
+    const freeze = { active: false, since: null, endsAt: null, frozenUntil: null, reason: null, note: null, plannedAt: '2027-05-12T09:00:00.000Z' }
+    expect(freezeLine({ isTestStudent: false, freeze })).toBe('Доступ до 12.05.2027')
+    expect(freezeLine({ isTestStudent: true, freeze: { ...freeze, plannedAt: null } })).toBe('Доступ без срока, тестовый ученик')
+    expect(freezeLine({ isTestStudent: false, freeze: { ...freeze, active: true, endsAt: '2026-12-11T21:00:00.000Z', frozenUntil: '2026-12-11T21:00:00.000Z', reason: 'vacation' } })).toBe('Заморожен до 12.12.2026 (vacation)')
   })
 })

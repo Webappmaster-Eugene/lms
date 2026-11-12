@@ -3,14 +3,16 @@ import { APIError, commitTransaction, createLocalReq, initTransaction, killTrans
 
 import { AssignmentInputError, type CreatedStudent, type StudentCredentials, type StudentDetails, type StudentImpact, type StudentProfile } from '@/components/learning-access/contracts'
 import { revokeUserSessions } from '@/payload/hooks/authSessionRevocations'
+import { addMoscowMonths, FREEZE_TERMS, freezeReasons, moscowDayStart, type FreezeReason, type FreezeTerm } from '@/lib/account-freeze'
+import { createFreeze, deletePlannedFreezes, endActiveFreezes, getAccountFreeze, planAutomaticFreeze } from '@/server/account-freeze'
 import { lockLearningAccess, transactionDb } from '@/payload/hooks/learningAccessLock'
 import { generateStudentPassword } from '@/server/student-password'
 import type { User } from '@/payload-types'
 
-type StudentFields = { email?: string; firstName?: string; lastName?: string; telegram?: string | null; isActive?: boolean }
+type StudentFields = { email?: string; firstName?: string; lastName?: string; telegram?: string | null; isActive?: boolean; isTestStudent?: boolean }
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const select = { email: true, firstName: true, lastName: true, telegram: true, isActive: true, role: true, totalPoints: true } as const
-type StudentDoc = Pick<User, 'id' | 'email' | 'firstName' | 'lastName' | 'telegram' | 'isActive' | 'role' | 'totalPoints'>
+const select = { email: true, firstName: true, lastName: true, telegram: true, isActive: true, isTestStudent: true, role: true, totalPoints: true } as const
+type StudentDoc = Pick<User, 'id' | 'email' | 'firstName' | 'lastName' | 'telegram' | 'isActive' | 'isTestStudent' | 'role' | 'totalPoints'>
 
 function name(value: unknown, label: string): string {
   if (typeof value !== 'string' || !value.trim() || value.trim().length > 100) throw new AssignmentInputError(`Укажите ${label} длиной до 100 символов`)
@@ -38,11 +40,27 @@ function readFields(raw: unknown, partial: boolean): StudentFields {
     if (typeof input.isActive !== 'boolean') throw new AssignmentInputError('Проверьте признак активности')
     fields.isActive = input.isActive
   }
+  if (partial && input.isTestStudent !== undefined) {
+    if (typeof input.isTestStudent !== 'boolean') throw new AssignmentInputError('Проверьте признак тестового ученика')
+    fields.isTestStudent = input.isTestStudent
+  }
   return fields
 }
 
-function profile(doc: StudentDoc): StudentProfile {
-  return { id: doc.id, email: doc.email, firstName: doc.firstName, lastName: doc.lastName, telegram: doc.telegram ?? null, isActive: doc.isActive !== false }
+async function profile(payload: Payload, doc: StudentDoc, req: PayloadRequest): Promise<StudentProfile> {
+  const freeze = await getAccountFreeze(payload, doc.id, req)
+  return {
+    id: doc.id, email: doc.email, firstName: doc.firstName, lastName: doc.lastName, telegram: doc.telegram ?? null, isActive: doc.isActive !== false, isTestStudent: doc.isTestStudent === true,
+    freeze: {
+      active: freeze.active !== null,
+      since: freeze.active?.startsAt ?? null,
+      endsAt: freeze.active?.endsAt ?? null,
+      frozenUntil: freeze.frozenUntil,
+      reason: freeze.active?.reason ?? null,
+      note: freeze.active?.note ?? null,
+      plannedAt: freeze.planned?.startsAt ?? null,
+    },
+  }
 }
 
 async function readStudent(payload: Payload, id: number, req: PayloadRequest): Promise<StudentDoc> {
@@ -91,7 +109,7 @@ export async function createStudent(payload: Payload, user: User, headers: Heade
       overrideAccess: false,
       req,
     })
-    return { student: profile(doc as StudentDoc), credentials: { email: doc.email, password } }
+    return { student: await profile(payload, doc as StudentDoc, req), credentials: { email: doc.email, password } }
   } catch (error) {
     if (duplicateEmail(error)) throw new AssignmentInputError('Такая почта уже занята другим аккаунтом', 409)
     throw error
@@ -107,8 +125,8 @@ async function studentImpact(payload: Payload, id: number, points: number): Prom
     payload.count({ collection: 'interview-recordings', where: { and: [{ owner: { equals: id } }, { category: { equals: 'personal' } }] }, overrideAccess: true }),
   ])
   const blockers = [
-    ...(enrollments.totalDocs ? ['Ученик зачислен на буткемп: при удалении его учётка в GitLab и зачисление останутся без связи. Отключите аккаунт.'] : []),
-    ...(recordings.totalDocs ? ['У ученика есть личные записи собеседований: файлы остались бы без владельца. Отключите аккаунт.'] : []),
+    ...(enrollments.totalDocs ? ['Ученик зачислен на буткемп: при удалении его учётка в GitLab и зачисление останутся без связи. Заморозьте аккаунт.'] : []),
+    ...(recordings.totalDocs ? ['У ученика есть личные записи собеседований: файлы остались бы без владельца. Заморозьте аккаунт.'] : []),
   ]
   return { progress, certificates, comments, notes, rules, points, blockers }
 }
@@ -116,7 +134,7 @@ async function studentImpact(payload: Payload, id: number, points: number): Prom
 export async function studentDetails(payload: Payload, user: User, headers: Headers, id: number): Promise<StudentDetails> {
   const req = await createLocalReq({ user, req: { headers } }, payload)
   const doc = await readStudent(payload, id, req)
-  return { student: profile(doc), impact: await studentImpact(payload, id, doc.totalPoints ?? 0) }
+  return { student: await profile(payload, doc, req), impact: await studentImpact(payload, id, doc.totalPoints ?? 0) }
 }
 
 export async function updateStudent(payload: Payload, user: User, headers: Headers, id: number, raw: unknown): Promise<StudentProfile> {
@@ -130,7 +148,7 @@ export async function updateStudent(payload: Payload, user: User, headers: Heade
       // Отключение только прячет сессии при чтении: без отзыва обратное включение оживило бы старые входы.
       if (fields.isActive === false && before.isActive !== false) await revokeUserSessions(req, id, await activeSessionIds(req, id))
       await payload.update({ collection: 'users', id, data: fields, overrideAccess: false, req })
-      return profile(await readStudent(payload, id, req))
+      return profile(payload, await readStudent(payload, id, req), req)
     })
   } catch (error) {
     if (duplicateEmail(error)) throw new AssignmentInputError('Такая почта уже занята другим аккаунтом', 409)
@@ -158,6 +176,66 @@ export async function deleteStudent(payload: Payload, user: User, headers: Heade
   const { blockers } = await studentImpact(payload, id, doc.totalPoints ?? 0)
   if (blockers.length) throw new AssignmentInputError(blockers[0], 409)
   await payload.delete({ collection: 'users', id, overrideAccess: false, req })
+}
+
+type FreezeChange =
+  | { action: 'freeze'; endsAt: string | null; reason: FreezeReason; note: string | null }
+  | { action: 'unfreeze'; nextMonths: number | null }
+  | { action: 'plan'; startsAt: string | null }
+
+const NEXT_FREEZE = { '6m': 6, '1y': 12, none: null } as const
+
+function futureDay(value: unknown, label: string): string {
+  const iso = typeof value === 'string' ? moscowDayStart(value) : null
+  if (!iso) throw new AssignmentInputError(`Укажите ${label} в формате ГГГГ-ММ-ДД`)
+  if (Date.parse(iso) <= Date.now()) throw new AssignmentInputError(`${label[0].toUpperCase()}${label.slice(1)} должна быть позже сегодняшнего дня`)
+  return iso
+}
+
+function readFreezeChange(raw: unknown): FreezeChange {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new AssignmentInputError('Проверьте параметры заморозки')
+  const input = raw as Record<string, unknown>
+  if (input.action === 'freeze') {
+    const term = input.term
+    const months = typeof term === 'string' && Object.hasOwn(FREEZE_TERMS, term) ? FREEZE_TERMS[term as FreezeTerm] : undefined
+    if (term !== 'date' && months === undefined) throw new AssignmentInputError('Выберите срок заморозки')
+    const endsAt = term === 'date' ? futureDay(input.until, 'дату разморозки') : months ? addMoscowMonths(Date.now(), months) : null
+    if (typeof input.reason !== 'string' || !freezeReasons.includes(input.reason as FreezeReason)) throw new AssignmentInputError('Выберите причину заморозки')
+    if (input.note !== undefined && input.note !== null && (typeof input.note !== 'string' || input.note.length > 500)) throw new AssignmentInputError('Заметка - до 500 символов')
+    const note = typeof input.note === 'string' && input.note.trim() ? input.note.trim() : null
+    return { action: 'freeze', endsAt, reason: input.reason as FreezeReason, note }
+  }
+  if (input.action === 'unfreeze') {
+    if (typeof input.next !== 'string' || !Object.hasOwn(NEXT_FREEZE, input.next)) throw new AssignmentInputError('Выберите, когда заморозить снова')
+    return { action: 'unfreeze', nextMonths: NEXT_FREEZE[input.next as keyof typeof NEXT_FREEZE] }
+  }
+  if (input.action === 'plan') return { action: 'plan', startsAt: input.date === null ? null : futureDay(input.date, 'дату заморозки') }
+  throw new AssignmentInputError('Неизвестное действие с заморозкой')
+}
+
+/**
+ * Заморозить сейчас, разморозить или назначить дату плановой заморозки. Сессии не отзываются:
+ * всё, что открыто до заморозки, отбрасывает проверка сессий (cutoff), и после разморозки оно не оживает.
+ */
+export async function changeStudentFreeze(payload: Payload, user: User, headers: Headers, id: number, raw: unknown): Promise<StudentProfile> {
+  const change = readFreezeChange(raw)
+  const req = await createLocalReq({ user, req: { headers } }, payload)
+  return transaction(req, async () => {
+    await lockStudent(req, id)
+    await readStudent(payload, id, req)
+    if (change.action === 'freeze') {
+      await endActiveFreezes(req, id, user.id)
+      await createFreeze(req, id, { startsAt: new Date().toISOString(), endsAt: change.endsAt, reason: change.reason, note: change.note, createdBy: user.id })
+    } else if (change.action === 'unfreeze') {
+      if (!await endActiveFreezes(req, id, user.id)) throw new AssignmentInputError('Ученик не заморожен', 409)
+      await deletePlannedFreezes(req, id)
+      if (change.nextMonths !== null) await planAutomaticFreeze(req, id, addMoscowMonths(Date.now(), change.nextMonths), user.id)
+    } else {
+      await deletePlannedFreezes(req, id)
+      if (change.startsAt) await planAutomaticFreeze(req, id, change.startsAt, user.id)
+    }
+    return profile(payload, await readStudent(payload, id, req), req)
+  })
 }
 
 /** Текст ошибки для администратора. Подробности остаются в журнале, а тело ответа пароля не содержит. */

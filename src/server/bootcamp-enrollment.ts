@@ -27,6 +27,7 @@ import { actorName, journal } from '@/server/bootcamp-lead-events'
 import { assertKnownStreamGroup, requireProgram } from '@/server/bootcamp-programs'
 import { gitlabWebhookToken } from '@/server/bootcamp-worker-auth'
 import type { BootcampEnrollment, BootcampLead, User } from '@/payload-types'
+import { getAccountFreeze } from '@/server/account-freeze'
 
 // Исполнитель, пропавший посреди задания, отдаёт его через 10 минут; после пяти попыток задание считается упавшим.
 const LEASE_MINUTES = 10
@@ -154,13 +155,15 @@ export async function startEnrollment(payload: Payload, admin: User, leadId: num
     let user: User
     if (existing) {
       if (existing.isActive === false) throw new EnrollmentInputError('Учётка LMS с этой почтой отключена: включите её или разберитесь вручную', 409)
+      if ((await getAccountFreeze(payload, existing.id, req)).active) throw new EnrollmentInputError('Учётка LMS с этой почтой заморожена: разморозьте её на экране «Ученики и доступы» и зачислите снова', 409)
       user = existing
       accountNote = existing.role === 'admin' ? 'учётка уже была, это администратор' : 'учётка уже была, приглашение не отправлялось'
     } else {
       // Пароль никто не узнаёт: ученик задаёт свой по ссылке из приглашения.
       user = await payload.create({
         collection: 'users',
-        data: { email: lead.email, firstName: input.firstName, lastName: input.lastName, role: 'student', password: randomBytes(24).toString('base64url') },
+        // Учётка по тестовой заявке - тестовый ученик: правило «заморозка через 6 месяцев» её не касается.
+        data: { email: lead.email, firstName: input.firstName, lastName: input.lastName, role: 'student', password: randomBytes(24).toString('base64url'), isTestStudent: lead.isTest === true },
         overrideAccess: false,
         req,
       })

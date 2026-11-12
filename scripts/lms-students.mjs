@@ -9,6 +9,9 @@
  *   pnpm students allow|deny|remove <почта|id> <цель>... [--dry-run]
  *   pnpm students mode <почта|id> [--access all|assigned] [--catalog catalog|assigned] [--trainer all|assigned|disabled] [--guides all|assigned] [--dry-run]
  *   pnpm students password|disable|enable <почта|id> [--dry-run]
+ *   pnpm students freeze <почта|id> [--for 1m|3m|6m|1y|forever | --until ГГГГ-ММ-ДД] [--reason vacation|left|no-contact|other] [--note текст] [--dry-run]
+ *   pnpm students unfreeze <почта|id> [--next 6m|1y|none] [--dry-run]
+ *   pnpm students plan <почта|id> --date ГГГГ-ММ-ДД|none [--dry-run]
  *   pnpm students delete <почта|id> --confirm <почта> [--dry-run]
  *
  * Цели: roadmap:<slug> course:<slug> section:<id> lesson:<slug> topic:<nodeId>
@@ -69,7 +72,7 @@ export function assertModeValues(options) {
 export function parseArgs(argv) {
   const positional = []
   const options = { allow: [], deny: [] }
-  const valued = new Set(['allow', 'deny', 'access', 'catalog', 'trainer', 'guides', 'confirm'])
+  const valued = new Set(['allow', 'deny', 'access', 'catalog', 'trainer', 'guides', 'confirm', 'for', 'until', 'reason', 'note', 'next', 'date'])
   const flags = new Set(['dry-run', 'courses'])
   for (let index = 0; index < argv.length; index += 1) {
     const item = argv[index]
@@ -84,6 +87,45 @@ export function parseArgs(argv) {
     else options[name] = value
   }
   return { positional, options }
+}
+
+const FREEZE_TERMS = ['1m', '3m', '6m', '1y', 'forever']
+const FREEZE_REASONS = ['vacation', 'left', 'no-contact', 'other']
+const NEXT_FREEZE = ['6m', '1y', 'none']
+const DAY = /^\d{4}-\d{2}-\d{2}$/
+
+/** Тело запроса заморозки для POST /api/manage/students/<id>/freeze. Проверяет значения до входа на прод. */
+export function freezeBody(command, options) {
+  if (command === 'freeze') {
+    if (options.for !== undefined && options.until !== undefined) throw new StudentsCliError('Укажите --for или --until, не оба')
+    if (options.until !== undefined && !DAY.test(options.until)) throw new StudentsCliError('--until в формате ГГГГ-ММ-ДД')
+    const term = options.until !== undefined ? 'date' : options.for ?? '1m'
+    if (term !== 'date' && !FREEZE_TERMS.includes(term)) throw new StudentsCliError(`--for: ${FREEZE_TERMS.join(', ')}`)
+    const reason = options.reason ?? 'vacation'
+    if (!FREEZE_REASONS.includes(reason)) throw new StudentsCliError(`--reason: ${FREEZE_REASONS.join(', ')}`)
+    return { action: 'freeze', term, ...(term === 'date' ? { until: options.until } : {}), reason, ...(options.note ? { note: options.note } : {}) }
+  }
+  if (command === 'unfreeze') {
+    const next = options.next ?? '6m'
+    if (!NEXT_FREEZE.includes(next)) throw new StudentsCliError(`--next: ${NEXT_FREEZE.join(', ')}`)
+    return { action: 'unfreeze', next }
+  }
+  if (command === 'plan') {
+    if (options.date !== 'none' && !DAY.test(options.date ?? '')) throw new StudentsCliError('--date ГГГГ-ММ-ДД или none')
+    return { action: 'plan', date: options.date === 'none' ? null : options.date }
+  }
+  throw new StudentsCliError(`Не команда заморозки: ${command}`)
+}
+
+const day = (iso) => new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Moscow' }).format(new Date(iso))
+
+/** Строка состояния заморозки, как на экране «Ученики и доступы». */
+export function freezeLine(student) {
+  const freeze = student.freeze
+  const test = student.isTestStudent ? ', тестовый ученик' : ''
+  if (!freeze) return ''
+  if (freeze.active) return `Заморожен ${freeze.endsAt ? `до ${day(freeze.endsAt)}` : 'бессрочно'}${freeze.reason ? ` (${freeze.reason})` : ''}${freeze.endsAt && freeze.frozenUntil !== freeze.endsAt ? `, потом ${freeze.frozenUntil ? `до ${day(freeze.frozenUntil)}` : 'бессрочно'}` : ''}${test}`
+  return `${freeze.plannedAt ? `Доступ до ${day(freeze.plannedAt)}` : 'Доступ без срока'}${test}`
 }
 
 /** На одну цель одно правило: новое действие меняет прежнее, сохраняя его id и комментарий. */
@@ -207,7 +249,7 @@ async function run(api, command, positional, options) {
     const search = positional.join(' ')
     for (let page = 1, more = true; more; page += 1) {
       const result = await api.request(`${accessUrl}?kind=students&page=${page}&search=${encodeURIComponent(search)}`)
-      for (const student of result.docs) console.log(`${student.id} ${student.title}${student.active === false ? ' [отключён]' : ''}`)
+      for (const student of result.docs) console.log(`${student.id} ${student.title}${student.active === false ? ' [отключён]' : ''}${student.frozen ? ' [заморожен]' : ''}`)
       more = result.hasNextPage
     }
     return
@@ -218,6 +260,7 @@ async function run(api, command, positional, options) {
     const snapshot = await loadSnapshot(api, student.id)
     const details = await api.request(`/api/manage/students/${student.id}`)
     console.log(`${student.id} ${student.firstName} ${student.lastName} <${student.email}>${details.student.isActive ? '' : ' [отключён]'}`)
+    console.log(freezeLine(details.student))
     printSnapshot(snapshot)
     printAccess(await previewAccess(api, snapshot), options.courses === true)
     return
@@ -286,6 +329,15 @@ async function run(api, command, positional, options) {
     console.log(`${command === 'disable' ? 'Отключён' : 'Включён'}: ${student.email}`)
     return
   }
+  if (command === 'freeze' || command === 'unfreeze' || command === 'plan') {
+    need(1, `${command} <почта|id>`)
+    const body = freezeBody(command, options)
+    const student = await findStudent(api, positional[0])
+    if (dryRun) { console.log(`Для ${student.email} отправил бы ${JSON.stringify(body)}`); return }
+    const { student: updated } = await api.request(`/api/manage/students/${student.id}/freeze`, { method: 'POST', body })
+    console.log(`${updated.email}: ${freezeLine(updated)}`)
+    return
+  }
   if (command === 'delete') {
     need(1, 'delete <почта|id> --confirm <почта>')
     const student = await findStudent(api, positional[0])
@@ -300,7 +352,7 @@ async function run(api, command, positional, options) {
   }
 }
 
-export const COMMANDS = ['list', 'show', 'create', 'allow', 'deny', 'remove', 'mode', 'password', 'disable', 'enable', 'delete']
+export const COMMANDS = ['list', 'show', 'create', 'allow', 'deny', 'remove', 'mode', 'password', 'disable', 'enable', 'freeze', 'unfreeze', 'plan', 'delete']
 
 async function main() {
   const [command, ...rest] = process.argv.slice(2)
@@ -308,6 +360,7 @@ async function main() {
   if (!COMMANDS.includes(command)) throw new StudentsCliError(`Неизвестная команда «${command ?? ''}». Команды: ${COMMANDS.join(', ')}`)
   const { positional, options } = parseArgs(rest)
   assertModeValues(options)
+  if (command === 'freeze' || command === 'unfreeze' || command === 'plan') freezeBody(command, options)
   const baseUrl = resolveBaseUrl(process.env.LMS_BASE_URL)
   if (baseUrl !== PROD_URL) console.error(`Адрес не прод: ${baseUrl}`)
   const api = client(baseUrl)

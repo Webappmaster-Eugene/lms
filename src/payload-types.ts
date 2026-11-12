@@ -83,6 +83,7 @@ export interface Config {
     'learning-access-audit': LearningAccessAudit;
     'learning-access-policies': LearningAccessPolicy;
     'auth-session-revocations': AuthSessionRevocation;
+    'account-freezes': AccountFreeze;
     achievements: Achievement;
     'user-achievements': UserAchievement;
     'points-transactions': PointsTransaction;
@@ -143,6 +144,7 @@ export interface Config {
     'learning-access-audit': LearningAccessAuditSelect<false> | LearningAccessAuditSelect<true>;
     'learning-access-policies': LearningAccessPoliciesSelect<false> | LearningAccessPoliciesSelect<true>;
     'auth-session-revocations': AuthSessionRevocationsSelect<false> | AuthSessionRevocationsSelect<true>;
+    'account-freezes': AccountFreezesSelect<false> | AccountFreezesSelect<true>;
     achievements: AchievementsSelect<false> | AchievementsSelect<true>;
     'user-achievements': UserAchievementsSelect<false> | UserAchievementsSelect<true>;
     'points-transactions': PointsTransactionsSelect<false> | PointsTransactionsSelect<true>;
@@ -256,6 +258,10 @@ export interface User {
    * Отключение блокирует новый вход и действующие сессии аккаунта, а также скрывает его из лидерборда.
    */
   isActive?: boolean | null;
+  /**
+   * Учётка для проверок: автоматическая заморозка через 6 месяцев её не касается. Заморозки ставятся на экране «Ученики и доступы».
+   */
+  isTestStudent?: boolean | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -1221,6 +1227,31 @@ export interface AuthSessionRevocation {
   user: number | User;
   sessionHash: string;
   expiresAt: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Замораживают и размораживают на экране «Ученики и доступы». Здесь только история.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "account-freezes".
+ */
+export interface AccountFreeze {
+  id: number;
+  user: number | User;
+  startsAt: string;
+  /**
+   * Пусто - бессрочно, до разморозки.
+   */
+  endsAt?: string | null;
+  reason: 'vacation' | 'left' | 'no-contact' | 'term' | 'other';
+  /**
+   * Плановая заморозка по сроку доступа: правило «через 6 месяцев после создания учётки» или дата с экрана учеников. Флажок «Тестовый ученик» её снимает.
+   */
+  automatic?: boolean | null;
+  note?: string | null;
+  createdBy?: (number | null) | User;
+  endedBy?: (number | null) | User;
   updatedAt: string;
   createdAt: string;
 }
@@ -2471,6 +2502,7 @@ export interface UsersSelect<T extends boolean = true> {
   bio?: T;
   totalPoints?: T;
   isActive?: T;
+  isTestStudent?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -2873,6 +2905,22 @@ export interface AuthSessionRevocationsSelect<T extends boolean = true> {
   user?: T;
   sessionHash?: T;
   expiresAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "account-freezes_select".
+ */
+export interface AccountFreezesSelect<T extends boolean = true> {
+  user?: T;
+  startsAt?: T;
+  endsAt?: T;
+  reason?: T;
+  automatic?: T;
+  note?: T;
+  createdBy?: T;
+  endedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }

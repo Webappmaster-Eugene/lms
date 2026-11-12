@@ -17,6 +17,7 @@ export const ADMIN_NAV_GROUPS = [
       { href: '/admin/collections/users', label: 'Ученики и администраторы' },
       { href: '/admin/collections/learning-access-grants', label: 'Правила доступа' },
       { href: '/admin/collections/learning-access-audit', label: 'Журнал назначений' },
+      { href: '/admin/collections/account-freezes', label: 'Заморозки аккаунтов' },
     ],
   },
   {

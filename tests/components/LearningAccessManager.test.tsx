@@ -11,8 +11,8 @@ let saveStatus = 409
 let snapshotError: { error: string; code: string } | null = null
 const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
   const address = new URL(String(url), 'http://localhost')
-  if (address.pathname === '/api/manage/students' && init?.method === 'POST') return Response.json({ student: { id: 35, email: 'new@example.test', firstName: 'Другой', lastName: 'Ученик', telegram: null, isActive: true }, credentials: { email: 'new@example.test', password: 'Pass2word345abc' } }, { status: 201 })
-  if (address.pathname.startsWith('/api/manage/students/')) return Response.json({ student: { id: 34, email: 'alexander@example.test', firstName: 'Александр', lastName: 'Студент', telegram: null, isActive: true }, impact: { progress: 0, certificates: 0, comments: 0, notes: 0, rules: 0, points: 0, blockers: [] } })
+  if (address.pathname === '/api/manage/students' && init?.method === 'POST') return Response.json({ student: { id: 35, email: 'new@example.test', firstName: 'Другой', lastName: 'Ученик', telegram: null, isActive: true, isTestStudent: false, freeze: { active: false, since: null, endsAt: null, frozenUntil: null, reason: null, note: null, plannedAt: null } }, credentials: { email: 'new@example.test', password: 'Pass2word345abc' } }, { status: 201 })
+  if (address.pathname.startsWith('/api/manage/students/')) return Response.json({ student: { id: 34, email: 'alexander@example.test', firstName: 'Александр', lastName: 'Студент', telegram: null, isActive: true, isTestStudent: false, freeze: { active: false, since: null, endsAt: null, frozenUntil: null, reason: null, note: null, plannedAt: null } }, impact: { progress: 0, certificates: 0, comments: 0, notes: 0, rules: 0, points: 0, blockers: [] } })
   if (address.searchParams.get('kind') === 'catalog') return Response.json({ roadmaps: [], nodes: [], courses: [], sections: [] })
   if (init?.method === 'PUT') {
     saved = JSON.parse(String(init.body)) as Record<string, unknown>

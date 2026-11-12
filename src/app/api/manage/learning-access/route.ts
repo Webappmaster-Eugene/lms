@@ -10,6 +10,7 @@ import { collectAllPages } from '@/lib/paginate'
 import { lockLearningAccess } from '@/payload/hooks/learningAccessLock'
 import type { AccessCatalog } from '@/lib/learning-access-edit'
 import { assertSameOrigin, authenticateManager } from '@/server/manage-auth'
+import { frozenUserIds } from '@/server/account-freeze'
 
 const response = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } })
 const pageSize = 25
@@ -189,7 +190,8 @@ export async function GET(request: Request) {
     if (kind === 'students') {
       const where: Where = { and: [{ role: { equals: 'student' } }, ...(search ? [{ or: [{ firstName: { contains: search } }, { lastName: { contains: search } }, { email: { contains: search } }] }] : [])] }
       const result = await payload.find({ collection: 'users', where, page, limit: pageSize, sort: 'id', depth: 0, select: { firstName: true, lastName: true, email: true, isActive: true }, overrideAccess: false, req })
-      return response({ docs: result.docs.map((student) => ({ id: student.id, title: `${student.firstName} ${student.lastName} (${student.email})`, active: student.isActive !== false })), page, hasNextPage: result.hasNextPage })
+      const frozen = await frozenUserIds(payload, result.docs.map((student) => student.id), req)
+      return response({ docs: result.docs.map((student) => ({ id: student.id, title: `${student.firstName} ${student.lastName} (${student.email})`, active: student.isActive !== false, frozen: frozen.has(student.id) })), page, hasNextPage: result.hasNextPage })
     }
     if (kind === 'catalog') return response(await accessCatalog(payload, req))
     if (kind === 'lessons') {

@@ -17,6 +17,7 @@ import { sendInviteEmail } from '@/payload/hooks/sendNotification'
 import { cleanupUserRelations } from '@/payload/hooks/cleanupOwnedRelations'
 import { recordStudentLogin, recordStudentLogout } from '@/server/student-analytics'
 import { noteBootcampFirstLogin } from '@/payload/hooks/bootcampFirstLogin'
+import { planFreezeForNewStudent, syncTestStudentFreezes } from '@/payload/hooks/accountFreeze'
 
 type ForgotPasswordArgs = {
   token?: string
@@ -61,7 +62,7 @@ export const Users: CollectionConfig = {
     beforeLogin: [normalizeLearningLoginIdentity],
     afterLogin: [recordStudentLogin, noteBootcampFirstLogin],
     beforeChange: [lockLearningModeChange, protectProfileCredentials, validateStudentAvatar],
-    afterChange: [createLearningAccessPolicy, sendInviteEmail, auditLearningAccessMode],
+    afterChange: [createLearningAccessPolicy, planFreezeForNewStudent, syncTestStudentFreezes, sendInviteEmail, auditLearningAccessMode],
     afterRead: [reflectLearningAccessPolicy, filterRevokedAuthSessions],
     afterLogout: [revokeAuthenticatedSessions, recordStudentLogout],
     beforeDelete: [lockLearningUserDelete, cleanupUserRelations],
@@ -189,6 +190,20 @@ export const Users: CollectionConfig = {
       admin: {
         position: 'sidebar',
         description: 'Отключение блокирует новый вход и действующие сессии аккаунта, а также скрывает его из лидерборда.',
+      },
+    },
+    {
+      name: 'isTestStudent',
+      type: 'checkbox',
+      defaultValue: false,
+      label: 'Тестовый ученик',
+      access: {
+        create: canAdministerUsers,
+        update: canAdministerUsers,
+      },
+      admin: {
+        position: 'sidebar',
+        description: 'Учётка для проверок: автоматическая заморозка через 6 месяцев её не касается. Заморозки ставятся на экране «Ученики и доступы».',
       },
     },
   ],

@@ -12,6 +12,7 @@ import { broadcastEmail, emailBaseUrl } from '@/payload/emails/templates'
 import { broadcastErrorLabel, broadcastSendOutcome, MAX_BROADCAST_ATTEMPTS } from '@/server/broadcasts/delivery-outcome'
 import { createUnsubscribeToken } from '@/server/broadcasts/unsubscribe-token'
 import { contactReplyTo } from '@/server/contact-reply-to'
+import { frozenUserIds } from '@/server/account-freeze'
 
 export class BroadcastError extends Error {
   constructor(message: string, readonly status = 400) { super(message) }
@@ -131,16 +132,17 @@ export async function resolveBroadcastAudience(payload: Payload, broadcast: Pick
   const selected = broadcast.audience === 'selected' ? [...new Set((broadcast.recipients ?? []).map(relationId))] : null
   if (selected && selected.length === 0) return { userIds: [], excluded: 0 }
   const where: Where = selected ? { id: { in: selected } } : { role: { equals: 'student' } }
-  const [users, optedOut] = await Promise.all([
+  const [users, optedOut, frozen] = await Promise.all([
     collectAllPages(
       ({ page, limit }) => payload.find({ collection: 'users', where, select: { email: true, isActive: true }, sort: 'id', depth: 0, overrideAccess: true, req, page, limit }),
       { label: 'получатели рассылки' },
     ),
     optedOutUsers(payload, req),
+    frozenUserIds(payload, selected, req),
   ])
-  const userIds = users.filter((user) => eligible(user) && !optedOut.has(user.id)).map((user) => user.id)
-  // Для «всех учеников» отключённые аккаунты — не исключение, а не аудитория вовсе.
-  const audienceSize = selected ? selected.length : users.filter((user) => user.isActive !== false).length
+  const userIds = users.filter((user) => eligible(user) && !optedOut.has(user.id) && !frozen.has(user.id)).map((user) => user.id)
+  // Для «всех учеников» отключённые и замороженные аккаунты — не исключение, а не аудитория вовсе.
+  const audienceSize = selected ? selected.length : users.filter((user) => user.isActive !== false && !frozen.has(user.id)).length
   return { userIds, excluded: Math.max(0, audienceSize - userIds.length) }
 }
 
@@ -325,8 +327,10 @@ export async function runEmailBroadcastJobs(payload: Payload, { deadline = Date.
       ])
       const source = broadcast.docs[0]
       const user = users.docs[0]
+      // Заморозка могла начаться после запуска рассылки: такой ученик пропускается как неактивный.
+      const frozenNow = user ? (await frozenUserIds(payload, [user.id])).has(user.id) : false
       const skip = source?.status !== 'sending' ? 'cancelled'
-        : !user || user.isActive === false ? 'inactive'
+        : !user || user.isActive === false || frozenNow ? 'inactive'
           : !user.email?.includes('@') ? 'no_email'
             : preferences.docs[0]?.emailBroadcastsEnabled === false ? 'unsubscribed' : null
       let sendError: unknown = null

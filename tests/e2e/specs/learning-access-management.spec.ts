@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { CONTENT } from '../fixtures/data'
 import { APP_URL, storageStateOf } from '../fixtures/env'
@@ -102,6 +102,73 @@ test('администратор создаёт ученика, открывае
     await expect(page.getByText('Ученик удалён.')).toBeVisible()
     created = false
     expect((await learner.request.post(`${APP_URL}/api/users/login`, { data: { email, password } })).status()).toBe(401)
+  } finally {
+    if (created) {
+      const found = await (await admin.request.get(`${APP_URL}/api/users?where[email][equals]=${encodeURIComponent(email)}&depth=0`)).json() as { docs: { id: number }[] }
+      for (const doc of found.docs) await admin.request.delete(`${APP_URL}/api/users/${doc.id}`)
+    }
+    await learner.close()
+    await admin.close()
+  }
+})
+
+test('заморозка: ученик выходит и видит причину при входе, предупреждение за две недели, разморозка пускает снова', async ({ browser }) => {
+  const admin = await browser.newContext({ extraHTTPHeaders: { Origin: APP_URL }, storageState: storageStateOf('admin') })
+  const learner = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+  const email = `freeze-${Date.now()}@lms.test`
+  let created = false
+  const signIn = async (studentPage: Page, password: string) => {
+    await studentPage.goto('/login')
+    await studentPage.getByLabel('Email').fill(email)
+    await studentPage.getByLabel('Пароль').fill(password)
+    await studentPage.getByRole('button', { name: 'Войти' }).click()
+  }
+  try {
+    const page = await admin.newPage()
+    await page.goto('/admin/learning-access')
+    await page.getByRole('button', { name: 'Новый ученик' }).click()
+    const form = page.getByRole('form', { name: 'Новый ученик' })
+    await form.getByLabel('Почта (логин)').fill(email)
+    await form.getByLabel('Имя').fill('Зоя')
+    await form.getByLabel('Фамилия').fill('Морозова')
+    await form.getByRole('button', { name: 'Создать ученика' }).click()
+    const text = await page.getByRole('region', { name: 'Логин и пароль ученика' }).getByLabel('Текст для отправки ученику').inputValue()
+    created = true
+    const password = /Пароль: (\S+)/.exec(text)?.[1] as string
+    const card = page.getByRole('region', { name: 'Карточка ученика' })
+    await expect(card.getByText(/^Доступ до \d{2}\.\d{2}\.\d{4}$/)).toBeVisible()
+
+    // Плановая заморозка завтра: ученик видит предупреждение с просьбой написать наставнику.
+    await card.getByRole('button', { name: 'Изменить срок доступа' }).click()
+    const plan = card.getByRole('form', { name: 'Плановая заморозка' })
+    const tomorrow = await plan.getByLabel('Доступ до').getAttribute('min') as string
+    await plan.getByLabel('Доступ до').fill(tomorrow)
+    await plan.getByRole('button', { name: 'Сохранить дату' }).click()
+    await expect(card.getByText(`Доступ до ${tomorrow.split('-').reverse().join('.')}`)).toBeVisible()
+    const studentPage = await learner.newPage()
+    await signIn(studentPage, password)
+    await expect(studentPage.getByRole('complementary', { name: 'Срок доступа' })).toContainText('напишите наставнику')
+
+    await card.getByRole('button', { name: 'Заморозить' }).click()
+    const freeze = card.getByRole('form', { name: 'Заморозка аккаунта' })
+    await freeze.getByLabel('Бессрочно, до разморозки').check()
+    await freeze.getByLabel('Причина').selectOption('no-contact')
+    await freeze.getByRole('button', { name: 'Заморозить аккаунт' }).click()
+    await expect(card.getByText('Заморожен бессрочно, не выходит на связь. Войти не сможет.')).toBeVisible()
+    await expect(page.getByRole('complementary', { name: 'Выбор ученика' }).getByText('Заморожен', { exact: true })).toBeVisible()
+
+    await studentPage.reload()
+    await expect(studentPage).toHaveURL(/\/login/)
+    expect((await (await learner.request.get(`${APP_URL}/api/users/me`)).json()).user).toBeNull()
+    await signIn(studentPage, password)
+    await expect(studentPage.getByText('Доступ к платформе приостановлен. Чтобы продолжить обучение, напишите наставнику.')).toBeVisible()
+
+    await card.getByRole('button', { name: 'Разморозить' }).click()
+    await card.getByRole('form', { name: 'Разморозка аккаунта' }).getByRole('button', { name: 'Разморозить аккаунт' }).click()
+    await expect(card.getByText(/^Доступ до \d{2}\.\d{2}\.\d{4}$/)).toBeVisible()
+    await signIn(studentPage, password)
+    await expect(studentPage).not.toHaveURL(/\/login/)
+    await expect(studentPage.getByRole('complementary', { name: 'Срок доступа' })).toHaveCount(0)
   } finally {
     if (created) {
       const found = await (await admin.request.get(`${APP_URL}/api/users?where[email][equals]=${encodeURIComponent(email)}&depth=0`)).json() as { docs: { id: number }[] }

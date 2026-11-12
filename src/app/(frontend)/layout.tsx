@@ -21,6 +21,9 @@ import { getTrainerAccess } from '@/server/trainer-access'
 import { getGuideAccess } from '@/server/guide-access'
 import { getBootcamps } from '@/server/bootcamps'
 import { ErrorReportingUser } from '@/components/errors/ErrorReportingUser'
+import { FreezeBanner } from '@/components/layout/FreezeBanner'
+import { getAccountFreeze } from '@/server/account-freeze'
+import { freezeNoticeDue } from '@/lib/account-freeze'
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -36,11 +39,13 @@ export default async function FrontendLayout({ children }: { children: React.Rea
   const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login')
   const isAdmin = user.role === 'admin'
-  const [trainerEnabled, guidesEnabled, bootcampEnabled] = await Promise.all([
+  const [trainerEnabled, guidesEnabled, bootcampEnabled, freeze] = await Promise.all([
     getTrainerAccess(payload, user, req).then((access) => access.hasAccess),
     getGuideAccess(payload, user, req).then((access) => access.hasAccess),
     getBootcamps(payload, user, req).then((bootcamps) => bootcamps.length > 0),
+    isAdmin ? null : getAccountFreeze(payload, user.id, req),
   ])
+  const freezeNotice = freeze && freezeNoticeDue(freeze) ? freeze.planned?.startsAt ?? null : null
 
   return (
     <html lang="ru" suppressHydrationWarning>
@@ -64,6 +69,7 @@ export default async function FrontendLayout({ children }: { children: React.Rea
                 <div className="flex min-w-0 flex-1 flex-col lg:ml-64 print:ml-0">
                   <div className="contents print:hidden">
                     <Header trainerEnabled={trainerEnabled} />
+                    {freezeNotice && <FreezeBanner startsAt={freezeNotice} />}
                   </div>
                   <main className="flex-1 overflow-x-hidden px-[max(1rem,env(safe-area-inset-left),env(safe-area-inset-right))] py-6 lg:px-8">{children}</main>
                   <div className="contents print:hidden">

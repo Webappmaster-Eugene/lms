@@ -1,4 +1,5 @@
 import { learningRelationId, learningTargetCollections, type LearningTargetCollection } from '@/lib/learning-access'
+import type { FreezeReason } from '@/lib/account-freeze'
 
 export const maximumLearningRules = 300
 export type AssignmentRule = {
@@ -16,11 +17,16 @@ export type GuidesMode = 'all' | 'assigned'
 export type AssignmentInput = { userId: number; mode: 'all' | 'assigned'; catalogVisibility?: CatalogVisibility; trainerMode?: TrainerMode; guidesMode?: GuidesMode; revision: string; rules: AssignmentRule[] }
 export type RuleLesson = { id: number; title: string; course: number; section: number | null; isPublished: boolean }
 export type AssignmentSnapshot = AssignmentInput & { catalogVisibility: CatalogVisibility; trainerMode: TrainerMode; guidesMode: GuidesMode; student: { id: number; title: string }; ruleLessons?: RuleLesson[] }
-export type AssignmentOption = { id: number; title: string; published?: boolean; parentId?: number | null; active?: boolean; lesson?: RuleLesson }
+export type AssignmentOption = { id: number; title: string; published?: boolean; parentId?: number | null; active?: boolean; frozen?: boolean; lesson?: RuleLesson }
 export type AssignmentOptions = { docs: AssignmentOption[]; page: number; hasNextPage: boolean }
 export type AssignmentPreview = { courses: { id: number; title: string; access: 'full' | 'partial' | 'closed'; visible: boolean }[]; page: number; hasNextPage: boolean; availableCount: number; totalCount: number; hiddenCount: number; trainer: { tasks: { id: number; title: string; access: 'open' | 'closed'; visible: boolean }[]; page: number; hasNextPage: boolean; availableCount: number; totalCount: number }; guides: { items: { id: number; title: string; access: 'open' | 'closed' }[]; availableCount: number; totalCount: number } }
 
-export type StudentProfile = { id: number; email: string; firstName: string; lastName: string; telegram: string | null; isActive: boolean }
+/**
+ * Заморозка на карточке ученика. endsAt - конец текущего периода, frozenUntil - до когда ученик
+ * заморожен с учётом следующих периодов (null при active - бессрочно); plannedAt - ближайшая плановая.
+ */
+export type StudentFreeze = { active: boolean; since: string | null; endsAt: string | null; frozenUntil: string | null; reason: FreezeReason | null; note: string | null; plannedAt: string | null }
+export type StudentProfile = { id: number; email: string; firstName: string; lastName: string; telegram: string | null; isActive: boolean; isTestStudent: boolean; freeze: StudentFreeze }
 /** blockers: почему удаление запрещено. Остальное показывается как последствия удаления. */
 export type StudentImpact = { progress: number; certificates: number; comments: number; notes: number; rules: number; points: number; blockers: string[] }
 export type StudentDetails = { student: StudentProfile; impact: StudentImpact }

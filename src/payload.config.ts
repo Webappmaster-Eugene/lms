@@ -24,6 +24,7 @@ import { LearningAccessGrants } from '@/payload/collections/LearningAccessGrants
 import { LearningAccessAudit } from '@/payload/collections/LearningAccessAudit'
 import { LearningAccessPolicies } from '@/payload/collections/LearningAccessPolicies'
 import { AuthSessionRevocations } from '@/payload/collections/AuthSessionRevocations'
+import { AccountFreezes } from '@/payload/collections/AccountFreezes'
 import { UserProgress } from '@/payload/collections/UserProgress'
 import { Achievements } from '@/payload/collections/Achievements'
 import { UserAchievements } from '@/payload/collections/UserAchievements'
@@ -134,6 +135,7 @@ export default buildConfig({
     LearningAccessAudit,
     LearningAccessPolicies,
     AuthSessionRevocations,
+    AccountFreezes,
     Achievements,
     UserAchievements,
     PointsTransactions,
