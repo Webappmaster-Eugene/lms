@@ -420,14 +420,29 @@ describe('курс другого роадмапа в теме', () => {
   const strict = { ...student, learningCatalogVisibility: 'assigned' as const }
   const everyone = { id: 7, role: 'student', learningAccessMode: 'all' as const }
 
-  it('назначение на чужую тему или карту открывает курс целиком и только его', () => {
+  it('назначение на чужую тему открывает курс целиком и только его', () => {
     expect(resolve([], shared).canAccessCourse(10)).toBe(false)
-    for (const grants of [[grant('roadmap-nodes', 200)], [grant('roadmaps', 2)]]) {
-      const policy = resolve(grants, shared)
-      expect(policy.canAccessCourse(10)).toBe(true)
-      expect(policy.canAccessLessonMetadata(metadata.lessons[0])).toBe(true)
-      expect(policy.canAccessCourse(11)).toBe(false)
-    }
+    const policy = resolve([grant('roadmap-nodes', 200)], shared)
+    expect(policy.canAccessCourse(10)).toBe(true)
+    expect(policy.canAccessLessonMetadata(metadata.lessons[0])).toBe(true)
+    expect(policy.canAccessCourse(11)).toBe(false)
+  })
+
+  it('назначение на карту не открывает курсы других карт в её темах', () => {
+    const policy = resolve([grant('roadmaps', 2)], shared)
+    expect(policy.canAccessCourse(10)).toBe(false)
+    expect(policy.canAccessLessonMetadata(metadata.lessons[0])).toBe(false)
+    expect(policy.canAccessCourse(20)).toBe(true)
+    expect(policy.accessibleCourseIds).not.toContain(10)
+    const strictPolicy = buildLearningAccess(strict, [grant('roadmaps', 2)], shared)
+    expect(strictPolicy.canBrowseCourse(10)).toBe(false)
+    expect(strictPolicy.canBrowseRoadmap(1)).toBe(false)
+    // Своя карта курса и прямое назначение по-прежнему открывают его.
+    expect(resolve([grant('roadmaps', 2), grant('roadmaps', 1)], shared).canAccessCourse(10)).toBe(true)
+    expect(resolve([grant('roadmaps', 2), grant('courses', 10)], shared).canAccessCourse(10)).toBe(true)
+    // Курс своей карты в «Дополнительных курсах темы» открывается картой, как и раньше.
+    const ownShared = { ...shared, nodes: [...shared.nodes, { id: 205, roadmap: 1, sharedCourses: [10] }] }
+    expect(resolve([grant('roadmaps', 1)], ownShared).canAccessCourse(10)).toBe(true)
   })
 
   it('запрет в чужой теме или карте не отнимает курс в его роадмапе', () => {

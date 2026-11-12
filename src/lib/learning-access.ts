@@ -146,10 +146,9 @@ export function buildLearningAccess(
     }
     // Курс «только по назначению» (платный поток) открывает лишь назначение на него
     // самого или его тему: доступ ко всей карте и режим «все курсы» его не касаются.
-    if (!course.assignedOnly) {
-      decision ??= effect('roadmaps', learningRelationId(course.roadmap) ?? -1)
-      if (!decision && shared.some((node) => effect('roadmaps', learningRelationId(node.roadmap) ?? -1) === 'allow')) decision = 'allow'
-    }
+    // Карта открывает только свои курсы. Курс другой карты в её теме по умолчанию закрыт
+    // (решение владельца 12.11.2026): его открывает назначение на сам курс, эту тему или его карту.
+    if (!course.assignedOnly) decision ??= effect('roadmaps', learningRelationId(course.roadmap) ?? -1)
     courseEffects.set(course.id, Boolean(user) && (decision ? decision === 'allow' : mode === 'all' && !course.assignedOnly))
   }
   const sectionAllowed = (section: LearningSectionMetadata) => {

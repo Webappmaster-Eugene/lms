@@ -88,13 +88,16 @@ describe('доступ через тему другого роадмапа', () 
     expect((await rest('GET', `/lessons/${map.lessons[0].id}`, { token })).status).toBe(404)
   })
 
-  it('назначение на чужую карту открывает курс, запрет в ней не отнимает выданный курс', async () => {
+  it('назначение на карту не открывает курс другой карты в её теме, запрет в ней не отнимает выданный курс', async () => {
     const home = await createCourseTree(payload, { lessons: 1 })
     const map = await createCourseTree(payload, { lessons: 1 })
     const node = await topic(map.roadmap.id, { sharedCourses: [home.course.id] })
-    const byRoadmap = await createStudent(payload, { learningAccessMode: 'assigned' })
+    const byRoadmap = await createStudent(payload, { learningAccessMode: 'assigned', learningCatalogVisibility: 'assigned' })
     await assign(byRoadmap, 'roadmaps', map.roadmap.id)
-    expect(await canAccessLesson(payload, byRoadmap, home.lessons[0].id)).toBe(true)
+    const token = await login(payload, byRoadmap)
+    expect(await canAccessLesson(payload, byRoadmap, home.lessons[0].id)).toBe(false)
+    expect((await rest('GET', `/lessons/${home.lessons[0].id}`, { token })).status).toBe(404)
+    expect(await canAccessLesson(payload, byRoadmap, map.lessons[0].id)).toBe(true)
 
     const byCourse = await createStudent(payload, { learningAccessMode: 'assigned' })
     await assign(byCourse, 'courses', home.course.id)

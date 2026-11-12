@@ -90,8 +90,9 @@ describe('состояния дерева берутся из политики �
     expect(evaluateAccess(input([rule('courses', 11, 'allow', { startsAt: '2027-01-01T00:00:00Z' })])).course(11)).toBe('closed')
   })
 
-  it('курс чужой карты открывается её назначением', () => {
-    expect(evaluateAccess(input([rule('roadmaps', 2)])).course(11)).toBe('full')
+  it('курс другой карты в теме открывает назначение темы, но не всей карты', () => {
+    expect(evaluateAccess(input([rule('roadmaps', 2)])).course(11)).toBe('closed')
+    expect(evaluateAccess(input([rule('roadmap-nodes', 20)])).course(11)).toBe('full')
   })
 
   it('совпадает с buildLearningAccess по доступности курсов и уроков', () => {
@@ -177,10 +178,15 @@ describe('отметка в дереве', () => {
     expect(summary(rules)).toEqual(['allow roadmaps:1', 'deny roadmap-nodes:10', 'allow courses:11'])
   })
 
-  it('курс, открытый чужой картой, закрывается запретом', () => {
-    const rules = changed(toggleAccess(input([rule('roadmaps', 2)]), course(11), 'closed'))
-    expect(summary(rules)).toEqual(['allow roadmaps:2', 'deny courses:11'])
+  it('курс, открытый темой другой карты, закрывается запретом', () => {
+    const rules = changed(toggleAccess(input([rule('roadmap-nodes', 20)]), course(11), 'closed'))
+    expect(summary(rules)).toEqual(['allow roadmap-nodes:20', 'deny courses:11'])
     expect(evaluateAccess(input(rules)).course(11)).toBe('closed')
+  })
+
+  it('назначение карты не требует запрета на курсы других карт в её темах', () => {
+    const rules = changed(toggleAccess(input([rule('roadmaps', 2)]), course(11), 'closed'))
+    expect(summary(rules)).toEqual(['allow roadmaps:2'])
   })
 
   it('буткемп и платный курс открываются своей отметкой', () => {
