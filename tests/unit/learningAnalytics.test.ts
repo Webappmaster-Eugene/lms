@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  activityDayKey, compareStudents, daysLabel, daysSince, formatMinutes, median, moscowDay, parsePeriod, parseStudentFilter, parseStudentSort,
-  periodStartDay, share, studentState, weekStarts, type StudentRow,
+  activityDayKey, biggestDrop, compareStudents, daysLabel, daysSince, formatMinutes, median, moscowDay, parsePeriod, parseStudentFilter, parseStudentSort,
+  periodStartDay, share, stuckLesson, studentState, weekStarts, type StudentRow,
 } from '@/lib/learning-analytics'
 
 const now = Date.parse('2026-11-13T12:00:00.000Z')
@@ -102,5 +102,19 @@ describe('сортировка таблицы', () => {
     const frozen = row(4, { freeze: { until: null, reason: null } })
     const soon = row(5, { accessUntil: '2027-03-13T10:00:00.000Z' })
     expect([never, soon, frozen].sort((a, b) => compareStudents('access', false, a, b)).map((item) => item.id)).toEqual([4, 5, 1])
+  })
+})
+
+describe('курсы: где останавливаются и где бросают', () => {
+  it('ученик стоит на первом непройденном уроке, даже если прошёл что-то дальше', () => {
+    expect(stuckLesson([1, 2, 3], new Set([1, 3]))).toBe(2)
+    expect(stuckLesson([1, 2, 3], new Set([1, 2, 3]))).toBeNull()
+    expect(stuckLesson([1, 2, 3], new Set())).toBeNull()
+  })
+
+  it('выделяется урок с самым большим падением числа прошедших', () => {
+    expect(biggestDrop([10, 9, 4, 3])).toBe(2)
+    expect(biggestDrop([5, 5, 5])).toBeNull()
+    expect(biggestDrop([])).toBeNull()
   })
 })

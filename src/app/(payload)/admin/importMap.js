@@ -38,6 +38,7 @@ import { AdminLoginNotice as AdminLoginNotice_ca5e7e852490fcf8a7f838e3a1f14ca4 }
 import { RoadmapEditorNavLink as RoadmapEditorNavLink_f543dd02c2a139dbdd43078f7bfc45ce } from '../../../components/roadmap-editor/NavLink'
 import { AdminActivityProvider as AdminActivityProvider_51efc6cd3b75e18d34a4901e7d4dc858 } from '../../../components/analytics/AdminActivityProvider'
 import { StudentAnalyticsView as StudentAnalyticsView_11a6f208e64acffcd4c11171f3d5bde8 } from '../../../components/student-analytics/StudentAnalyticsView'
+import { LearningAnalyticsView as LearningAnalyticsView_02054ef67003effcda5c0b6cf7df3482 } from '../../../components/learning-analytics/LearningAnalyticsView'
 import { LearningAccessView as LearningAccessView_32d6e9d9289175ae877220009edf96ef } from '../../../components/learning-access/LearningAccessView'
 import { BootcampFunnelView as BootcampFunnelView_08784ce14008c5b77bd059f3b8bbfa57 } from '../../../components/bootcamp/BootcampFunnelView'
 import { default as default_cc2a8468c40f2307839da27cb613e1b4 } from '../../../components/roadmap-editor/RoadmapEditorView'
@@ -85,6 +86,7 @@ export const importMap = {
   "/components/roadmap-editor/NavLink#RoadmapEditorNavLink": RoadmapEditorNavLink_f543dd02c2a139dbdd43078f7bfc45ce,
   "/components/analytics/AdminActivityProvider#AdminActivityProvider": AdminActivityProvider_51efc6cd3b75e18d34a4901e7d4dc858,
   "/components/student-analytics/StudentAnalyticsView#StudentAnalyticsView": StudentAnalyticsView_11a6f208e64acffcd4c11171f3d5bde8,
+  "/components/learning-analytics/LearningAnalyticsView#LearningAnalyticsView": LearningAnalyticsView_02054ef67003effcda5c0b6cf7df3482,
   "/components/learning-access/LearningAccessView#LearningAccessView": LearningAccessView_32d6e9d9289175ae877220009edf96ef,
   "/components/bootcamp/BootcampFunnelView#BootcampFunnelView": BootcampFunnelView_08784ce14008c5b77bd059f3b8bbfa57,
   "/components/roadmap-editor/RoadmapEditorView#default": default_cc2a8468c40f2307839da27cb613e1b4,

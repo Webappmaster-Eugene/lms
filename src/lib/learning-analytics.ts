@@ -179,3 +179,63 @@ export function compareStudents(sort: StudentSort, descending: boolean, left: St
   const order = typeof a === 'string' && typeof b === 'string' ? a.localeCompare(b, 'ru-RU') : Number(a) - Number(b)
   return descending ? -order : order
 }
+
+export type CourseRow = {
+  id: number
+  title: string
+  href: string
+  roadmap: string | null
+  lessons: number
+  /** Ученики, которым курс открыт по политике доступа. */
+  access: number
+  started: number
+  completed: number
+  /** Медиана прогресса среди начавших, в процентах. */
+  medianProgress: number | null
+  period: { minutes: number; lessons: number; active: number }
+  questions: number
+  stuckAt: { title: string; href: string; students: number } | null
+}
+
+export type RoadmapRow = {
+  id: number
+  title: string
+  href: string
+  courses: number
+  lessons: number
+  access: number
+  started: number
+  completed: number
+  medianProgress: number | null
+  period: { minutes: number; active: number }
+}
+
+export type CoursesOverview = {
+  period: AnalyticsPeriod
+  roadmap: number | null
+  students: number
+  roadmaps: RoadmapRow[]
+  courses: CourseRow[]
+  /** Открыты ученикам, но никто не начал. */
+  unopened: { id: number; title: string; href: string; access: number }[]
+}
+
+export type LessonFunnelRow = { id: number; title: string; href: string; position: number; completed: number; viewed: number; videoEnded: number; questions: number; notes: number; drop: boolean }
+export type CourseDetail = { id: number; title: string; href: string; started: number; lessons: LessonFunnelRow[] }
+
+/** Первый непройденный урок программы - на нём ученик и стоит; у закончившего и не начавшего такого нет. */
+export function stuckLesson(ordered: readonly number[], done: ReadonlySet<number>): number | null {
+  if (!ordered.some((id) => done.has(id))) return null
+  return ordered.find((id) => !done.has(id)) ?? null
+}
+
+/** Урок, после которого прошедших стало меньше всего относительно предыдущего; без падения - null. */
+export function biggestDrop(completed: readonly number[]): number | null {
+  let index: number | null = null
+  let largest = 0
+  for (let position = 1; position < completed.length; position += 1) {
+    const drop = completed[position - 1] - completed[position]
+    if (drop > largest) { largest = drop; index = position }
+  }
+  return index
+}

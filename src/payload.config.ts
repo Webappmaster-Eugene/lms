@@ -103,6 +103,10 @@ export default buildConfig({
           Component: '/components/student-analytics/StudentAnalyticsView#StudentAnalyticsView',
           path: '/student-analytics',
         },
+        learningAnalytics: {
+          Component: '/components/learning-analytics/LearningAnalyticsView#LearningAnalyticsView',
+          path: '/learning-analytics',
+        },
         learningAccess: {
           Component: '/components/learning-access/LearningAccessView#LearningAccessView',
           path: '/learning-access',

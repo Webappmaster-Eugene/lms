@@ -115,3 +115,12 @@
 }
 
 html[data-theme='dark'] .student-analytics { --series-1: #3987e5; }
+
+.learning-analytics {
+  &__controls { margin: 24px 0 8px; }
+  & &__stuck { white-space: normal; min-width: 180px; }
+  &__unopened { list-style: none; margin: 12px 0; padding: 0; columns: 2 320px; column-gap: 32px; }
+  &__unopened li { break-inside: avoid; margin: 0 0 8px; }
+  &__unopened small { display: inline; }
+  .student-analytics__table tbody tr[data-drop='true'] { background: color-mix(in srgb, var(--theme-warning-500, #b9770e) 12%, transparent); }
+}

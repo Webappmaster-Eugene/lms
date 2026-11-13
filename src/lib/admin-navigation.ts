@@ -13,6 +13,7 @@ export const ADMIN_NAV_GROUPS = [
     label: 'Аналитика',
     items: [
       { href: '/admin/student-analytics', label: 'Ученики' },
+      { href: '/admin/learning-analytics', label: 'Курсы и роадмапы' },
       { href: '/admin/bootcamp-funnel', label: 'Воронка буткемпа' },
     ],
   },
