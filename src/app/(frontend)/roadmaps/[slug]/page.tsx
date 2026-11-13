@@ -92,6 +92,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
   const visibleCourses = content.courses.filter((course) => course.isPublished && access.canBrowseCourse(course.id) && (resolveRelationId(course.roadmap) === String(roadmap.id) || visibleSharedCourses.has(course.id)))
     .sort((first, second) => rankCourse(first) - rankCourse(second) || (first.order ?? 0) - (second.order ?? 0) || first.id - second.id)
   const courseIds = visibleCourses.map((c) => String(c.id))
+  const ownCourseIds = new Set(visibleCourses.filter((course) => resolveRelationId(course.roadmap) === String(roadmap.id)).map((course) => String(course.id)))
 
   const [loadedLessonDocs, sectionDocs, progressDocs, extrasByNode] = await Promise.all([
     courseIds.length > 0
@@ -236,8 +237,13 @@ export default async function RoadmapDetailPage({ params }: Props) {
 
   // Итого
   const totalLessons = coursesWithProgress.reduce((s, c) => s + c.totalLessons, 0)
-  const completedTotal = coursesWithProgress.reduce((s, c) => s + c.completedCount, 0)
-  const overallPercent = totalLessons > 0 ? Math.round((completedTotal / totalLessons) * 100) : 0
+  // Процент и «Все курсы пройдены» - только по своим курсам карты, как бонус и сертификат:
+  // курсы других карт в её темах в программу не входят.
+  const ownCourses = coursesWithProgress.filter((course) => ownCourseIds.has(course.id))
+  const ownLessons = ownCourses.reduce((s, c) => s + c.totalLessons, 0)
+  const ownCompleted = ownCourses.reduce((s, c) => s + c.completedCount, 0)
+  const overallPercent = ownLessons > 0 ? Math.round((ownCompleted / ownLessons) * 100) : 0
+  const allDone = ownLessons > 0 && ownCompleted === ownLessons && ownCourses.every((course) => course.accessibleLessons === course.totalLessons)
   const nextStep = pickSequentialNextStep(coursesWithProgress.filter((course) => course.accessAllowed))
 
   // Трансформация в формат ReactFlow
@@ -312,7 +318,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
 
       <NextStepCard
         nextStep={nextStep}
-        allDone={totalLessons > 0 && accessibleLessons.size === totalLessons && completedTotal === totalLessons}
+        allDone={allDone}
         assignedOnly={access.catalogVisibility === 'assigned'}
       />
 

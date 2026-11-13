@@ -99,9 +99,12 @@ export default async function RoadmapsPage() {
   ])
 
   const completed = new Set(progressDocs.map((p) => relationId(p.lesson)))
-  const stats = new Map<number, { courses: number; lessons: number; done: number }>()
+  const homeRoadmap = new Map(courseDocs.map((c) => [c.id, relationId(c.roadmap)]))
+  // Число курсов и уроков - всё, что видно на карте. Процент и статус - только по своим курсам карты,
+  // как бонус и сертификат: курсы других карт в её темах в программу не входят.
+  const stats = new Map<number, { courses: number; lessons: number; ownLessons: number; ownDone: number }>()
   const statsFor = (id: number) => {
-    const current = stats.get(id) ?? { courses: 0, lessons: 0, done: 0 }
+    const current = stats.get(id) ?? { courses: 0, lessons: 0, ownLessons: 0, ownDone: 0 }
     stats.set(id, current)
     return current
   }
@@ -111,10 +114,13 @@ export default async function RoadmapsPage() {
   }
   for (const lesson of lessonDocs) {
     if (!access.canBrowseLessonMetadata(lesson)) continue
-    for (const roadmapId of roadmapsOfCourse.get(relationId(lesson.course)) ?? []) {
+    const courseId = relationId(lesson.course)
+    for (const roadmapId of roadmapsOfCourse.get(courseId) ?? []) {
       const entry = statsFor(roadmapId)
       entry.lessons += 1
-      if (completed.has(lesson.id)) entry.done += 1
+      if (roadmapId !== homeRoadmap.get(courseId)) continue
+      entry.ownLessons += 1
+      if (completed.has(lesson.id)) entry.ownDone += 1
     }
   }
 
@@ -129,9 +135,9 @@ export default async function RoadmapsPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {roadmapDocs.filter((roadmap) => access.canBrowseRoadmap(roadmap.id)).map((roadmap) => {
-          const { courses = 0, lessons = 0, done = 0 } = stats.get(roadmap.id) ?? {}
-          const percent = lessons > 0 ? Math.round((done / lessons) * 100) : 0
-          const status = done === 0 ? 'Не начат' : done === lessons ? 'Пройден' : 'В процессе'
+          const { courses = 0, lessons = 0, ownLessons = 0, ownDone = 0 } = stats.get(roadmap.id) ?? {}
+          const percent = ownLessons > 0 ? Math.round((ownDone / ownLessons) * 100) : 0
+          const status = ownDone === 0 ? 'Не начат' : ownDone === ownLessons ? 'Пройден' : 'В процессе'
           const description = lexicalPlainText(roadmap.description)
           return (
             <Link
