@@ -56,6 +56,7 @@ import * as migration_20261110_085441_bootcamp_lead_metrika_client_id from './20
 import * as migration_20261111_071030_bootcamp_refunds from './20261111_071030_bootcamp_refunds';
 import * as migration_20261111_131554_payload_391 from './20261111_131554_payload_391';
 import * as migration_20261112_161557_account_freezes from './20261112_161557_account_freezes';
+import * as migration_20261113_054229_analytics_activity_days from './20261113_054229_analytics_activity_days';
 
 export const migrations = [
   {
@@ -346,6 +347,11 @@ export const migrations = [
   {
     up: migration_20261112_161557_account_freezes.up,
     down: migration_20261112_161557_account_freezes.down,
-    name: '20261112_161557_account_freezes'
+    name: '20261112_161557_account_freezes',
+  },
+  {
+    up: migration_20261113_054229_analytics_activity_days.up,
+    down: migration_20261113_054229_analytics_activity_days.down,
+    name: '20261113_054229_analytics_activity_days'
   },
 ];

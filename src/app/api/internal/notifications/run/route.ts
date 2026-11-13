@@ -6,6 +6,7 @@ import { cleanupStudentAnalytics } from '@/server/student-analytics'
 import { cleanupWebVitals } from '@/server/web-vitals'
 import { runEmailBroadcastJobs } from '@/server/broadcasts/service'
 import { runBootcampSchedule } from '@/server/bootcamp-schedule'
+import { sendInactiveDigest } from '@/server/analytics-digests'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -45,6 +46,13 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     logger.error('Bootcamp schedule failed', error)
+  }
+
+  // Ученики без активности 14 дней - сводка наставнику по понедельникам.
+  try {
+    if (await sendInactiveDigest(payload)) logger.info('Inactive students digest sent')
+  } catch (error) {
+    logger.error('Inactive students digest failed', error)
   }
 
   // Рассылки идут и при сбое напоминаний: у них своя аренда и свои письма, а сбой

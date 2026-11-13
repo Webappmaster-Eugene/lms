@@ -1,3 +1,5 @@
+import type { StudentLearning } from '@/lib/learning-analytics'
+
 export const studentEventTypes = ['login', 'logout', 'page_view', 'lesson_view', 'lesson_completed', 'trainer_completed', 'achievement_unlocked', 'certificate_issued'] as const
 export type StudentEventType = typeof studentEventTypes[number]
 export type AnalyticsTarget = { id: number; title: string; href: string | null }
@@ -42,6 +44,8 @@ export type StudentAnalyticsSnapshot = {
   performance?: { windowDays: 30; metrics: { name: 'LCP' | 'INP' | 'CLS'; sampleCount: number; p75: number | null }[] }
   sessions: { docs: StudentSessionDTO[]; page: number; hasNextPage: boolean; totalDocs: number }
   events: { docs: StudentEventDTO[]; page: number; hasNextPage: boolean; totalDocs: number }
+  /** Только у учеников: назначенное обучение, заморозка и активность по неделям. */
+  learning?: StudentLearning
 }
 export class StudentAnalyticsError extends Error {
   constructor(message: string, readonly status = 400) { super(message) }

@@ -1,4 +1,6 @@
 .student-analytics {
+  // Один ряд на графике - синий из проверенной палитры, свой шаг для тёмной темы.
+  --series-1: #2a78d6;
   color: var(--theme-text);
   margin: 0 auto;
   max-width: 1600px;
@@ -9,6 +11,7 @@
   p { max-width: 78ch; line-height: 1.6; }
   a { color: var(--theme-text); text-underline-offset: 3px; overflow-wrap: anywhere; }
   button, input, select { font: inherit; }
+  select { padding: 9px 10px; color: var(--theme-text); background: var(--theme-input-bg, var(--theme-elevation-0)); border: 1px solid var(--theme-elevation-300); border-radius: 4px; }
   input { width: 100%; min-width: 0; padding: 10px 12px; color: var(--theme-text); background: var(--theme-input-bg, var(--theme-elevation-0)); border: 1px solid var(--theme-elevation-300); border-radius: 4px; }
   label { display: flex; flex-direction: column; gap: 7px; }
   button { cursor: pointer; color: var(--theme-text); background: var(--theme-elevation-100); border: 1px solid var(--theme-elevation-300); border-radius: 4px; padding: 9px 12px; }
@@ -16,13 +19,54 @@
   button:disabled { cursor: default; opacity: .5; }
   :is(button,input,a,summary):focus-visible { outline: 2px solid var(--theme-text); outline-offset: 3px; }
   small { display: block; font-size: 13px; line-height: 1.5; color: var(--theme-elevation-650); }
-  &__layout { display: grid; grid-template-columns: minmax(210px, 260px) minmax(0, 1fr); gap: 32px; margin-top: 32px; }
-  &__finder { padding-right: 24px; border-right: 1px solid var(--theme-elevation-200); min-width: 0; }
-  &__students, &__sessions, &__timeline { list-style: none; margin: 16px 0; padding: 0; }
-  &__students { max-height: calc(100dvh - 280px); overflow-y: auto; }
-  &__students li { margin: 7px 0; }
-  &__students button { width: 100%; text-align: left; overflow-wrap: anywhere; }
-  &__students button[aria-pressed='true'] { border-color: var(--theme-text); box-shadow: inset 3px 0 var(--theme-text); }
+  &__layout { margin-top: 40px; padding-top: 28px; border-top: 1px solid var(--theme-elevation-200); }
+  &__filters { display: flex; flex-direction: column; gap: 16px; margin: 24px 0 18px; }
+  &__chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  &__chips button { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 7px 14px; }
+  &__chips button[aria-pressed='true'] { background: var(--theme-text); color: var(--theme-bg); border-color: var(--theme-text); }
+  &__count { font-variant-numeric: tabular-nums; font-size: 13px; opacity: .75; }
+  &__controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+  &__controls label { font-size: 13px; }
+  &__controls label:nth-child(2) { flex: 1 1 240px; max-width: 360px; }
+  // Специфичнее общего «.student-analytics label»: флажок стоит в строку с подписью.
+  & &__check { flex-direction: row; align-items: center; gap: 8px; padding-bottom: 10px; }
+  & &__check input { width: auto; }
+  &__table-wrap { overflow-x: auto; border: 1px solid var(--theme-elevation-200); border-radius: 6px; }
+  &__table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  &__table th, &__table td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--theme-elevation-150); }
+  &__table td small, &__table th small { margin-top: 2px; }
+  &__table thead th { font-size: 13px; font-weight: 600; background: var(--theme-elevation-50); }
+  &__table td { white-space: nowrap; }
+  &__table thead button { padding: 0; border: 0; background: none; font-weight: 600; text-align: left; }
+  &__table thead button:hover:not(:disabled) { background: none; text-decoration: underline; }
+  &__table tbody th { min-width: 200px; max-width: 280px; font-weight: 400; overflow-wrap: anywhere; }
+  &__table tbody tr[data-selected='true'] { background: var(--theme-elevation-100); }
+  &__table--compact { margin-top: 12px; }
+  &__table--compact th, &__table--compact td { padding: 8px 12px; }
+  // Специфичнее общего «.student-analytics button»: имя - ссылка-кнопка, а не плашка.
+  & &__name { display: block; width: 100%; padding: 0; border: 0; border-radius: 0; background: none; text-align: left; }
+  & &__name:hover:not(:disabled) { background: none; text-decoration: underline; }
+  & &__name[aria-pressed='true'] strong { text-decoration: underline; }
+  &__badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  &__badges > span { font-size: 12px; line-height: 1.4; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--theme-elevation-300); }
+  &__badges > span[data-tone='frozen'] { border-color: var(--theme-elevation-800); font-weight: 600; }
+  &__badges > span[data-tone='warning'] { border-color: var(--theme-warning-500, #b9770e); background: color-mix(in srgb, var(--theme-warning-500, #b9770e) 14%, transparent); }
+  &__badges > span[data-tone='muted'] { color: var(--theme-elevation-650); }
+  &__learning { list-style: none; margin: 12px 0 24px; padding: 0; display: grid; gap: 18px; }
+  &__learning h3 { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-bottom: 4px; }
+  &__progress { display: flex; align-items: center; gap: 12px; margin: 6px 0; font-size: 14px; }
+  &__bar { flex: 0 0 160px; height: 8px; border-radius: 4px; background: var(--theme-elevation-150); overflow: hidden; }
+  &__bar > span { display: block; height: 100%; border-radius: 4px; background: var(--series-1); }
+  &__chart { max-width: 760px; }
+  &__chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  &__tooltip { min-height: 1.6em; margin: 0 0 8px; font-size: 14px; }
+  &__grid { stroke: var(--theme-elevation-150); stroke-width: 1; }
+  &__axis { fill: var(--theme-elevation-650); font-size: 11px; }
+  &__value { fill: var(--theme-text); font-size: 11px; font-weight: 600; }
+  &__mark { fill: var(--series-1); }
+  &__column { outline: none; cursor: default; }
+  &__column[data-active='true'] .student-analytics__mark { filter: brightness(1.15); }
+  &__column:focus-visible rect { stroke: var(--theme-text); stroke-width: 2; }
   &__report { min-width: 0; }
   &__student-heading { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; margin-bottom: 24px; }
   &__student-heading p { margin: 0; overflow-wrap: anywhere; }
@@ -59,9 +103,7 @@
   details { margin: 18px 0; }
   summary { cursor: pointer; padding: 8px 0; }
   @media (max-width: 800px) {
-    &__layout { grid-template-columns: 1fr; gap: 24px; }
-    &__finder { padding-right: 0; padding-bottom: 20px; border-right: 0; border-bottom: 1px solid var(--theme-elevation-200); }
-    &__students { max-height: 190px; overflow-y: auto; }
+    &__bar { flex-basis: 96px; }
     &__timeline li { grid-template-columns: 1fr; gap: 6px; }
     &__device-details { grid-template-columns: 1fr; }
     &__performance { grid-template-columns: 1fr; }
@@ -71,3 +113,5 @@
     &__status { padding-left: 8px; }
   }
 }
+
+html[data-theme='dark'] .student-analytics { --series-1: #3987e5; }

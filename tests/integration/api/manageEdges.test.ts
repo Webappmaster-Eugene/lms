@@ -49,19 +49,19 @@ afterAll(async () => {
 })
 
 describe('GET /api/manage/student-analytics — список учеников и ошибки', () => {
-  it('администратор ищет учеников по имени и получает только безопасные поля', async () => {
+  it('администратор ищет учеников по имени и получает только безопасные поля, без администраторов', async () => {
     const inactive = await createStudent(payload, { firstName: `Ученик${marker}`, lastName: 'Отключённый', isActive: false })
     const response = await analyticsGET(get(`manage/student-analytics?kind=students&search=${marker}`))
     expect(response.status).toBe(200)
     expect(response.headers.get('Cache-Control')).toBe('private, no-store')
-    const body = await response.json() as { docs: Record<string, unknown>[]; page: number; hasNextPage: boolean }
+    const body = await response.json() as { docs: Record<string, unknown>[]; page: number; hasNextPage: boolean; totalDocs: number }
     expect(body.page).toBe(1)
     expect(body.hasNextPage).toBe(false)
     expect(body.docs).toEqual(expect.arrayContaining([
-      { id: student.id, title: `Ученик${marker} Поиска`, email: student.email, isActive: true, role: 'student' },
-      { id: inactive.id, title: `Ученик${marker} Отключённый`, email: inactive.email, isActive: false, role: 'student' },
-      expect.objectContaining({ id: admin.id, role: 'admin' }),
+      expect.objectContaining({ id: student.id, title: `Ученик${marker} Поиска`, email: student.email, state: 'learning' }),
+      expect.objectContaining({ id: inactive.id, title: `Ученик${marker} Отключённый`, email: inactive.email, state: 'disabled' }),
     ]))
+    expect(body.docs.some((doc) => doc.id === admin.id)).toBe(false)
     expect(JSON.stringify(body)).not.toMatch(/hash|salt|sessions|password/)
     const empty = await (await analyticsGET(get(`manage/student-analytics?kind=students&search=${marker}&page=2`))).json() as { docs: unknown[] }
     expect(empty.docs).toEqual([])

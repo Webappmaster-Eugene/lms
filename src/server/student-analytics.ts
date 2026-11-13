@@ -14,6 +14,7 @@ import { lookupGeoIp } from '@/server/geoip'
 import { getUserWebVitals } from '@/server/web-vitals'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import { coursePath } from '@/lib/course-path'
+import { activityDayKey, moscowDay } from '@/lib/learning-analytics'
 
 const DAY = 86_400_000
 const PAGE_SIZE = 25
@@ -31,13 +32,39 @@ async function lockUser(req: PayloadRequest, userId: number) {
   await db.execute(sql`select id from users where id = ${userId} for update`)
 }
 
-async function event(req: PayloadRequest, userId: number, input: EventInput) {
+/** Возвращает, записано ли новое событие: повтор того же ключа ничего не меняет. */
+async function event(req: PayloadRequest, userId: number, input: EventInput): Promise<boolean> {
   const eventKey = createHash('sha256').update(`${userId}:${input.type}:${input.key}`).digest('hex')
   const existing = await req.payload.find({ collection: 'student-learning-events', where: { eventKey: { equals: eventKey } }, limit: 1, depth: 0, overrideAccess: true, req })
-  if (existing.docs[0]) return
+  if (existing.docs[0]) return false
   const data = { ...input }
   delete (data as Partial<EventInput>).key
   await req.payload.create({ collection: 'student-learning-events', data: { ...data, eventKey, user: userId, at: new Date().toISOString() }, req: analyticsReq(req), overrideAccess: true, depth: 0 })
+  return true
+}
+
+type ActivityDelta = { minutes?: number; lessonsCompleted?: number; trainerSolved?: number }
+
+/**
+ * Дневная сводка пополняется в транзакции события: откат события откатывает и минуту.
+ * Upsert одним запросом - два процесса приложения не создадут двух строк одного дня.
+ */
+async function bumpActivityDay(req: PayloadRequest, userId: number, courseId: number | null, delta: ActivityDelta) {
+  const transactionID = await req.transactionID
+  const db = transactionID === undefined ? undefined : (req.payload.db as unknown as Adapter).sessions?.[transactionID]?.db
+  if (!db) throw new Error('Student analytics requires a database transaction')
+  const day = moscowDay()
+  const minutes = delta.minutes ?? 0
+  const lessons = delta.lessonsCompleted ?? 0
+  const tasks = delta.trainerSolved ?? 0
+  await db.execute(sql`
+    insert into student_activity_days (key, user_id, day, course_id, minutes, lessons_completed, trainer_solved)
+    values (${activityDayKey(userId, day, courseId)}, ${userId}, ${day}, ${courseId}, ${minutes}, ${lessons}, ${tasks})
+    on conflict (key) do update set
+      minutes = student_activity_days.minutes + excluded.minutes,
+      lessons_completed = student_activity_days.lessons_completed + excluded.lessons_completed,
+      trainer_solved = student_activity_days.trainer_solved + excluded.trainer_solved,
+      updated_at = now()`)
 }
 
 async function location(headers: Headers) {
@@ -114,7 +141,9 @@ export const recordStudentDomainEvent: CollectionAfterChangeHook = async ({ doc,
     const course = id(lesson.course)
     if (course !== null) input.course = course
   }
-  await event(req, userId, input)
+  const recorded = await event(req, userId, input)
+  if (recorded && input.type === 'lesson_completed') await bumpActivityDay(req, userId, input.course ?? null, { lessonsCompleted: 1 })
+  if (recorded && input.type === 'trainer_completed') await bumpActivityDay(req, userId, null, { trainerSolved: 1 })
   return doc
 }
 
@@ -154,8 +183,9 @@ export async function recordStudentActivity(payload: Payload, user: User, header
     const sessionHash = authSessionHash(sid)
     const existing = (await payload.find({ collection: 'student-session-telemetry', where: { sessionHash: { equals: sessionHash } }, req, overrideAccess: true, depth: 0, limit: 1 })).docs[0]
     const now = Date.now()
-    // Tabs and route changes cannot fill the event log faster than once per minute per session.
-    if (existing?.path && now - Date.parse(existing.lastSeenAt) < 60_000) { await commitTransaction(req); return { recorded: false } }
+    // Сигнал вкладки идёт раз в 60 с, но таймер дрожит: порог 50 с не теряет минуты, а минутный
+    // ключ события ниже не даёт посчитать одну минуту дважды.
+    if (existing?.path && now - Date.parse(existing.lastSeenAt) < 50_000) { await commitTransaction(req); return { recorded: false } }
     const target = await observedTarget(req, user, input.path)
     const at = new Date(now).toISOString()
     const currentLocation = await location(headers)
@@ -163,7 +193,8 @@ export async function recordStudentActivity(payload: Payload, user: User, header
     const currentGeo = currentLocation.ip || !existing ? currentLocation : { ip: existing.ip, ipExpiresAt: existing.ipExpiresAt, countryCode: existing.countryCode, country: existing.country, region: existing.region, city: existing.city, geoSource: existing.geoSource }
     const data = { user: user.id, sessionHash, firstSeenAt: session.createdAt ?? at, lastSeenAt: at, expiresAt: session.expiresAt, ...incomingDevice, ...currentGeo, ...input, ...target, endedAt: null, lastEventAt: at }
     const telemetry = existing ? await payload.update({ collection: 'student-session-telemetry', id: existing.id, data, req: analyticsReq(req), overrideAccess: true, depth: 0 }) : await payload.create({ collection: 'student-session-telemetry', data, req: analyticsReq(req), overrideAccess: true, depth: 0 })
-    await event(req, user.id, { type: target.lesson ? 'lesson_view' : 'page_view', source: 'observed', key: `${sessionHash}:${Math.floor(now / 60_000)}`, session: telemetry.id, path: input.path, ...(target.course ? { course: target.course } : {}), ...(target.lesson ? { lesson: target.lesson } : {}) })
+    const counted = await event(req, user.id, { type: target.lesson ? 'lesson_view' : 'page_view', source: 'observed', key: `${sessionHash}:${Math.floor(now / 60_000)}`, session: telemetry.id, path: input.path, ...(target.course ? { course: target.course } : {}), ...(target.lesson ? { lesson: target.lesson } : {}) })
+    if (counted) await bumpActivityDay(req, user.id, target.course, { minutes: 1 })
     await commitTransaction(req)
     return { recorded: true }
   } catch (error) { await killTransaction(req); throw error }

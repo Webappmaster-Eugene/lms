@@ -49,6 +49,8 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   'auth-session-revocations': (ctx) => ({ user: ctx.studentId, sessionHash: createHash('sha256').update(uid('session-fixture')).digest('hex'), expiresAt: new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString() }),
   'student-session-telemetry': (ctx) => ({ user: ctx.studentId, sessionHash: createHash('sha256').update(uid('telemetry')).digest('hex'), firstSeenAt: new Date().toISOString(), lastSeenAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString(), device: 'desktop', browser: 'Chromium', os: 'Linux' }),
   'student-learning-events': (ctx) => ({ user: ctx.studentId, eventKey: uid('learning-event'), type: 'lesson_completed', source: 'server', at: new Date().toISOString() }),
+  'student-activity-days': (ctx) => ({ user: ctx.studentId, key: uid('activity-day').slice(0, 40), day: '2026-11-13', minutes: 1, lessonsCompleted: 0, trainerSolved: 0 }),
+  'admin-digests': () => ({ kind: 'inactive-students', period: uid('digest-week').slice(0, 40) }),
   'web-vitals-reports': (ctx) => ({ user: ctx.studentId, sessionHash: createHash('sha256').update(uid('vitals-session')).digest('hex'), reportKey: createHash('sha256').update(uid('vitals-report')).digest('hex'), name: 'LCP', value: 1000, routeTemplate: '/courses', reportedAt: new Date().toISOString() }),
   'lesson-learning-states': (ctx) => ({ user: ctx.studentId, lesson: ctx.lessonId, lastViewedAt: new Date().toISOString() }),
   'user-progress': (ctx) => ({ user: ctx.studentId, lesson: ctx.lessonId }),

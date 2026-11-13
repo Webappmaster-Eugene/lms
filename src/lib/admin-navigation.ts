@@ -4,16 +4,22 @@ export const ADMIN_SHORTCUTS = [
   { href: '/admin/roadmap-editor', label: 'Редактор роадмапов' },
   { href: '/admin/collections/users', label: 'Ученики и администраторы' },
   { href: '/admin/learning-access', label: 'Ученики и доступы' },
-  { href: '/admin/student-analytics', label: 'Аналитика пользователей' },
+  { href: '/admin/student-analytics', label: 'Аналитика учеников' },
   { href: '/admin/questions', label: 'Вопросы учеников' },
 ] as const
 
 export const ADMIN_NAV_GROUPS = [
   {
+    label: 'Аналитика',
+    items: [
+      { href: '/admin/student-analytics', label: 'Ученики' },
+      { href: '/admin/bootcamp-funnel', label: 'Воронка буткемпа' },
+    ],
+  },
+  {
     label: 'Доступ учеников',
     items: [
       { href: '/admin/learning-access', label: 'Ученики и доступы' },
-      { href: '/admin/student-analytics', label: 'Аналитика пользователей' },
       { href: '/admin/collections/users', label: 'Ученики и администраторы' },
       { href: '/admin/collections/learning-access-grants', label: 'Правила доступа' },
       { href: '/admin/collections/learning-access-audit', label: 'Журнал назначений' },

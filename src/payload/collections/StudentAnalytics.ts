@@ -37,6 +37,24 @@ export const StudentSessionTelemetry: CollectionConfig = {
   ],
 }
 
+/**
+ * Дневная сводка: минуты с открытой вкладкой и прохождения по ученику, дню и курсу. В отличие
+ * от событий она не чистится через 90 дней: из неё строятся графики и «время на курсе».
+ */
+export const StudentActivityDays: CollectionConfig = {
+  slug: 'student-activity-days', lockDocuments: false, admin: infrastructure, access: closed, hooks: guards,
+  indexes: [{ fields: ['user', 'day'] }, { fields: ['course', 'day'] }],
+  fields: [
+    { name: 'key', type: 'text', required: true, unique: true, maxLength: 40 },
+    { name: 'user', type: 'relationship', relationTo: 'users', required: true, index: true },
+    { name: 'day', type: 'text', required: true, maxLength: 10, index: true },
+    { name: 'course', type: 'relationship', relationTo: 'courses' },
+    { name: 'minutes', type: 'number', required: true, defaultValue: 0, min: 0 },
+    { name: 'lessonsCompleted', type: 'number', required: true, defaultValue: 0, min: 0 },
+    { name: 'trainerSolved', type: 'number', required: true, defaultValue: 0, min: 0 },
+  ],
+}
+
 export const StudentLearningEvents: CollectionConfig = {
   slug: 'student-learning-events', lockDocuments: false, admin: infrastructure, access: closed,
   hooks: { ...guards, beforeChange: [({ data, req, operation }) => { if (req.context.syncStudentAnalytics !== true || operation !== 'create') throw new Forbidden(req.t); return data }] },

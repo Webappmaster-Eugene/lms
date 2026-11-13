@@ -49,6 +49,8 @@ const MATRIX: Record<string, Matrix> = {
   'account-freezes': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'student-session-telemetry': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
   'student-learning-events': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
+  'student-activity-days': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
+  'admin-digests': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
   'web-vitals-reports': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
   achievements: CONTENT,
   'interview-rooms': { create: 'nobody', read: 'member', update: 'nobody', delete: 'nobody' },
@@ -108,6 +110,8 @@ const PATCH: Record<string, Record<string, unknown>> = {
   'account-freezes': { note: 'Обновлено' },
   'student-session-telemetry': { device: 'phone' },
   'student-learning-events': { source: 'observed' },
+  'student-activity-days': { minutes: 2 },
+  'admin-digests': { summary: 'Обновлено' },
   'web-vitals-reports': { value: 2000 },
   achievements: { pointsReward: 7 },
   'interview-rooms': { title: 'обновлено' },
@@ -190,7 +194,7 @@ async function ownedDoc(slug: string, overrides: Record<string, unknown> = {}): 
   if (['user-progress', 'notes', 'comments'].includes(slug)) data.lesson = ctx.lessonId
   // Пара (user, task) уникальна — под каждый документ своя задача.
   if (slug === 'user-trainer-progress') data.task = (await createSumTask(payload)).id
-  const doc = await payload.create({ collection: slug as CollectionSlug, data: data as never, ...(slug === 'learning-access-grants' ? { user: admin } : {}), context: { skipHooks: true, ...(slug === 'auth-session-revocations' ? { syncAuthSessionRevocations: true } : {}), ...(slug === 'account-freezes' ? { syncAccountFreezes: true } : {}), ...(['student-session-telemetry', 'student-learning-events'].includes(slug) ? { syncStudentAnalytics: true } : {}), ...(slug === 'web-vitals-reports' ? { syncWebVitals: true } : {}) } })
+  const doc = await payload.create({ collection: slug as CollectionSlug, data: data as never, ...(slug === 'learning-access-grants' ? { user: admin } : {}), context: { skipHooks: true, ...(slug === 'auth-session-revocations' ? { syncAuthSessionRevocations: true } : {}), ...(slug === 'account-freezes' ? { syncAccountFreezes: true } : {}), ...(['student-session-telemetry', 'student-learning-events', 'student-activity-days'].includes(slug) ? { syncStudentAnalytics: true } : {}), ...(slug === 'admin-digests' ? { syncAdminDigests: true } : {}), ...(slug === 'web-vitals-reports' ? { syncWebVitals: true } : {}) } })
   return doc.id as number
 }
 

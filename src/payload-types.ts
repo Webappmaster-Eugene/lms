@@ -101,6 +101,8 @@ export interface Config {
     'email-broadcast-deliveries': EmailBroadcastDelivery;
     'student-session-telemetry': StudentSessionTelemetry;
     'student-learning-events': StudentLearningEvent;
+    'student-activity-days': StudentActivityDay;
+    'admin-digests': AdminDigest;
     'web-vitals-reports': WebVitalsReport;
     certificates: Certificate;
     streaks: Streak;
@@ -162,6 +164,8 @@ export interface Config {
     'email-broadcast-deliveries': EmailBroadcastDeliveriesSelect<false> | EmailBroadcastDeliveriesSelect<true>;
     'student-session-telemetry': StudentSessionTelemetrySelect<false> | StudentSessionTelemetrySelect<true>;
     'student-learning-events': StudentLearningEventsSelect<false> | StudentLearningEventsSelect<true>;
+    'student-activity-days': StudentActivityDaysSelect<false> | StudentActivityDaysSelect<true>;
+    'admin-digests': AdminDigestsSelect<false> | AdminDigestsSelect<true>;
     'web-vitals-reports': WebVitalsReportsSelect<false> | WebVitalsReportsSelect<true>;
     certificates: CertificatesSelect<false> | CertificatesSelect<true>;
     streaks: StreaksSelect<false> | StreaksSelect<true>;
@@ -1587,6 +1591,34 @@ export interface StudentLearningEvent {
   achievementId?: number | null;
   certificateId?: number | null;
   path?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "student-activity-days".
+ */
+export interface StudentActivityDay {
+  id: number;
+  key: string;
+  user: number | User;
+  day: string;
+  course?: (number | null) | Course;
+  minutes: number;
+  lessonsCompleted: number;
+  trainerSolved: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "admin-digests".
+ */
+export interface AdminDigest {
+  id: number;
+  kind: 'inactive-students' | 'bootcamp-lagging';
+  period: string;
+  summary?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -3183,6 +3215,32 @@ export interface StudentLearningEventsSelect<T extends boolean = true> {
   achievementId?: T;
   certificateId?: T;
   path?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "student-activity-days_select".
+ */
+export interface StudentActivityDaysSelect<T extends boolean = true> {
+  key?: T;
+  user?: T;
+  day?: T;
+  course?: T;
+  minutes?: T;
+  lessonsCompleted?: T;
+  trainerSolved?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "admin-digests_select".
+ */
+export interface AdminDigestsSelect<T extends boolean = true> {
+  kind?: T;
+  period?: T;
+  summary?: T;
   updatedAt?: T;
   createdAt?: T;
 }

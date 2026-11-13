@@ -37,7 +37,8 @@ import { NotificationPreferences, PushSubscriptions, NotificationDeliveries, Not
 import { EmailBroadcasts, EmailBroadcastDeliveries } from '@/payload/collections/EmailBroadcasts'
 import { bootstrapInterviewDirections } from '@/server/interviews/bootstrap'
 import { bootstrapDefaultAchievements } from '@/lib/default-achievements'
-import { StudentSessionTelemetry, StudentLearningEvents } from '@/payload/collections/StudentAnalytics'
+import { StudentSessionTelemetry, StudentLearningEvents, StudentActivityDays } from '@/payload/collections/StudentAnalytics'
+import { AdminDigests } from '@/payload/collections/AdminDigests'
 import { WebVitalsReports } from '@/payload/collections/WebVitalsReports'
 import { Certificates } from '@/payload/collections/Certificates'
 import { Streaks } from '@/payload/collections/Streaks'
@@ -153,6 +154,8 @@ export default buildConfig({
     EmailBroadcastDeliveries,
     StudentSessionTelemetry,
     StudentLearningEvents,
+    StudentActivityDays,
+    AdminDigests,
     WebVitalsReports,
     Certificates,
     Streaks,
