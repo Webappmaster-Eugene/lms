@@ -14,6 +14,7 @@ import type { Where } from 'payload'
 import { getLearningAccess } from '@/server/learning-access'
 import { coursePath } from '@/lib/course-path'
 import { HELP_LINK } from '@/components/access/LockedSection'
+import { completionPercent, formatPercent, progressBarStyle } from '@/lib/progress-percent'
 
 export const metadata: Metadata = {
   title: 'Дашборд',
@@ -179,7 +180,7 @@ export default async function DashboardPage() {
     const courseLessonIds = courseLessons.allIds.get(cId) ?? []
     const totalLessons = courseLessonIds.length
     const completedCount = courseLessonIds.filter((id) => completedLessonIds.has(id)).length
-    const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0
+    const progressPercent = completionPercent(completedCount, totalLessons)
 
     return {
       id: cId,
@@ -323,12 +324,12 @@ export default async function DashboardPage() {
                 <div className="mt-3 space-y-1">
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>{course.completedCount}/{course.totalLessons}</span>
-                    <span>{course.progressPercent}%</span>
+                    <span>{formatPercent(course.progressPercent)}</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-muted">
                     <div
                       className="h-full rounded-full bg-primary transition-all"
-                      style={{ width: `${course.progressPercent}%` }}
+                      style={progressBarStyle(course.progressPercent)}
                     />
                   </div>
                 </div>

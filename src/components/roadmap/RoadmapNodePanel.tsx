@@ -8,6 +8,7 @@ import { NodeCourseList } from './NodeCourseList'
 import { NodeExtraList } from './NodeExtraList'
 import { STAGE_TITLES } from './stage-colors'
 import type { RoadmapNodeData } from './types'
+import { formatPercent } from '@/lib/progress-percent'
 
 const STATUS_TEXT: Record<RoadmapNodeData['status'], string> = {
   locked: 'Закрыта',
@@ -72,7 +73,7 @@ export function RoadmapNodePanel({ data, onClose, managementRoadmapId, nodeId }:
 
       {data.totalLessons > 0 && (
         <p className="mt-3 text-sm text-foreground">
-          Пройдено {data.completedLessons} из {data.totalLessons} уроков · {data.progressPercent}%
+          Пройдено {data.completedLessons} из {data.totalLessons} уроков · {formatPercent(data.progressPercent)}
         </p>
       )}
 

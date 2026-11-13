@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 
-import { barStyle, daysLabel, formatMinutes, formatPercent, share, type StudentLearning, type WeekActivity } from '@/lib/learning-analytics'
+import { daysLabel, formatMinutes, share, type StudentLearning, type WeekActivity } from '@/lib/learning-analytics'
+import { formatPercent, progressBarStyle } from '@/lib/progress-percent'
 import { StudentBadges, formatDate } from './StudentsTable'
 
 const shortDate = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', timeZone: 'UTC' })
@@ -12,9 +13,9 @@ const weekDate = (week: string, format: Intl.DateTimeFormat) => format.format(ne
 
 function Progress({ done, total, label }: { done: number; total: number; label: string }) {
   const value = share(done, total)
-  const percent = formatPercent(value)
+  const percent = value === null ? null : formatPercent(value)
   return <div className="student-analytics__progress">
-    <span className="student-analytics__bar" aria-hidden="true"><span style={barStyle(value)} /></span>
+    <span className="student-analytics__bar" aria-hidden="true"><span style={progressBarStyle(value)} /></span>
     <span>{label}: {done} из {total}{percent !== null ? ` (${percent})` : ''}</span>
   </div>
 }

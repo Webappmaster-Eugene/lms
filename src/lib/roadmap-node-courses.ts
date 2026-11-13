@@ -7,6 +7,8 @@
  * прогресс по всем вместе.
  */
 
+import { completionPercent } from '@/lib/progress-percent'
+
 export type NodeCourse = {
   id: string
   slug: string
@@ -74,7 +76,7 @@ export function summarizeNode(
 
   const totalLessons = courses.reduce((sum, c) => sum + c.totalLessons, 0)
   const completedLessons = courses.reduce((sum, c) => sum + c.completedCount, 0)
-  const progressPercent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
+  const progressPercent = completionPercent(completedLessons, totalLessons)
 
   let status: NodeStatus = 'available'
   if (courses.length > 0) {

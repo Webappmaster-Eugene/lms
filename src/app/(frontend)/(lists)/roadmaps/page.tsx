@@ -11,6 +11,7 @@ import { redirect } from 'next/navigation'
 import { getLearningAccess } from '@/server/learning-access'
 import { getLearningCatalog, sharedRoadmapsByCourse } from '@/server/learning-catalog'
 import { notBootcamp } from '@/lib/course-path'
+import { completionPercent, formatPercent, progressBarStyle } from '@/lib/progress-percent'
 
 export const metadata: Metadata = {
   title: 'Роадмапы',
@@ -136,7 +137,7 @@ export default async function RoadmapsPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {roadmapDocs.filter((roadmap) => access.canBrowseRoadmap(roadmap.id)).map((roadmap) => {
           const { courses = 0, lessons = 0, ownLessons = 0, ownDone = 0 } = stats.get(roadmap.id) ?? {}
-          const percent = ownLessons > 0 ? Math.round((ownDone / ownLessons) * 100) : 0
+          const percent = completionPercent(ownDone, ownLessons)
           const status = ownDone === 0 ? 'Не начат' : ownDone === ownLessons ? 'Пройден' : 'В процессе'
           const description = lexicalPlainText(roadmap.description)
           return (
@@ -163,14 +164,15 @@ export default async function RoadmapsPage() {
                 <div
                   className="h-2 flex-1 overflow-hidden rounded-full bg-secondary"
                   role="progressbar"
-                  aria-valuenow={percent}
+                  aria-valuenow={Math.round(percent)}
+                  aria-valuetext={formatPercent(percent)}
                   aria-valuemin={0}
                   aria-valuemax={100}
                   aria-label={`Прогресс роадмапа «${roadmap.title}»`}
                 >
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
+                  <div className="h-full rounded-full bg-primary" style={progressBarStyle(percent)} />
                 </div>
-                <span className="text-sm font-medium text-foreground">{percent}%</span>
+                <span className="text-sm font-medium text-foreground">{formatPercent(percent)}</span>
               </div>
             </Link>
           )

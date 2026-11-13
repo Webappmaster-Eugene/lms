@@ -71,24 +71,10 @@ export function plural(count: number, forms: { one: string; few: string; many: s
 }
 export const daysLabel = (count: number) => plural(count, { one: 'день', few: 'дня', many: 'дней' })
 
-/** Доля в процентах без округления, его делает formatPercent; при пустом знаменателе - null, а не 0. */
+/** Доля в процентах без округления (подпись - formatPercent из progress-percent); при пустом знаменателе - null, а не 0. */
 export function share(part: number, whole: number): number | null {
   return whole > 0 ? (part / whole) * 100 : null
 }
-
-/**
- * Подпись процента. Округление прячет крайние случаи: 3 урока из 631 давали «0%», будто ученик не начинал,
- * а 630 из 631 - «100%», будто закончил. Поэтому начатое меньше 1% и почти законченное подписаны отдельно.
- */
-export function formatPercent(value: number | null): string | null {
-  if (value === null || !Number.isFinite(value)) return null
-  if (value > 0 && value < 1) return 'меньше 1%'
-  if (value > 99 && value < 100) return '99%'
-  return `${Math.round(value)}%`
-}
-
-/** Ширина полоски прогресса: начатое видно сразу, даже когда доля меньше пикселя. */
-export const barStyle = (value: number | null) => ({ width: `${value ?? 0}%`, minWidth: value !== null && value > 0 ? 4 : undefined })
 
 /** Медиана набора чисел; пустой набор - null. */
 export function median(values: readonly number[]): number | null {

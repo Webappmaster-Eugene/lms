@@ -23,6 +23,7 @@ import Link from 'next/link'
 import { ArrowLeft, ArrowRight, PartyPopper, Pencil, Settings } from 'lucide-react'
 import { RoadmapExplorer } from '@/components/roadmap/RoadmapExplorer'
 import type { GraphEdge, AnyRoadmapNode, NodeCourse, NodeExtra } from '@/components/roadmap/types'
+import { completionPercent, formatPercent, progressBarStyle } from '@/lib/progress-percent'
 import type {
   RoadmapNode as PayloadRoadmapNode,
   RoadmapEdge as PayloadRoadmapEdge,
@@ -231,7 +232,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
       completedCount,
       isCompleted,
       prerequisitesMet,
-      progressPercent: totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0,
+      progressPercent: completionPercent(completedCount, totalLessons),
     }
   })
 
@@ -242,7 +243,7 @@ export default async function RoadmapDetailPage({ params }: Props) {
   const ownCourses = coursesWithProgress.filter((course) => ownCourseIds.has(course.id))
   const ownLessons = ownCourses.reduce((s, c) => s + c.totalLessons, 0)
   const ownCompleted = ownCourses.reduce((s, c) => s + c.completedCount, 0)
-  const overallPercent = ownLessons > 0 ? Math.round((ownCompleted / ownLessons) * 100) : 0
+  const overallPercent = completionPercent(ownCompleted, ownLessons)
   const allDone = ownLessons > 0 && ownCompleted === ownLessons && ownCourses.every((course) => course.accessibleLessons === course.totalLessons)
   const nextStep = pickSequentialNextStep(coursesWithProgress.filter((course) => course.accessAllowed))
 
@@ -305,12 +306,12 @@ export default async function RoadmapDetailPage({ params }: Props) {
         <div className="mt-4 max-w-md">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">{access.catalogVisibility === 'assigned' ? 'Прогресс назначенного обучения' : 'Общий прогресс'}</span>
-            <span className="font-medium text-foreground">{overallPercent}%</span>
+            <span className="font-medium text-foreground">{formatPercent(overallPercent)}</span>
           </div>
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-secondary">
             <div
               className="h-full rounded-full bg-primary transition-all duration-500"
-              style={{ width: `${overallPercent}%` }}
+              style={progressBarStyle(overallPercent)}
             />
           </div>
         </div>

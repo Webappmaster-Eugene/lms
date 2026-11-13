@@ -253,6 +253,13 @@ describe('оглавление курса', () => {
     expect(screen.getAllByText(/1\s*\/\s*3|1 из 3/).length).toBeGreaterThan(0)
   })
 
+  it('в большом курсе первые уроки дают «меньше 1%», а не «0%»', () => {
+    render(<CourseSidebar {...props} totalLessons={631} totalCompleted={3} />)
+
+    expect(screen.getAllByText('меньше 1%').length).toBeGreaterThan(0)
+    for (const bar of screen.getAllByRole('progressbar', { hidden: true })) expect(bar).toHaveAttribute('aria-valuetext', 'меньше 1%')
+  })
+
   it('пройденный урок отличается от непройденного', () => {
     render(<CourseSidebar {...props} currentLessonId="l1" />)
 

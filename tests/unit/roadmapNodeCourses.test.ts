@@ -69,6 +69,13 @@ describe('состояние узла по его курсам', () => {
     expect(summary.status).toBe('in-progress')
   })
 
+  it('прогресс не округляется до нуля: 3 урока из 631 - начатая тема', () => {
+    const summary = summarizeNode(course({ id: '1', totalLessons: 631, completedCount: 3 }), [])
+
+    expect(summary.progressPercent).toBeCloseTo((3 / 631) * 100, 5)
+    expect(summary.status).toBe('in-progress')
+  })
+
   it('тема считается пройденной, только когда пройдены все её курсы', () => {
     const done = summarizeNode(course({ id: '1', totalLessons: 5, completedCount: 5 }), [
       course({ id: '2', totalLessons: 3, completedCount: 3 }),

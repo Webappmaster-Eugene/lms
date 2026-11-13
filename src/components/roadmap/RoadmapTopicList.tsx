@@ -6,6 +6,7 @@ import { STAGE_ORDER, STAGE_TITLES } from './stage-colors'
 import type { GraphNode, NodeCourse, NodeStatus, RoadmapNodeData } from './types'
 import type { NodeStage } from './stage-colors'
 import Link from 'next/link'
+import { formatPercent } from '@/lib/progress-percent'
 
 const STATUS_ICON: Record<NodeStatus, typeof Circle> = {
   locked: Lock,
@@ -69,7 +70,7 @@ function TopicRow({ data, nodeId, managementRoadmapId, selected, onSelect }: { d
         </span>
         <span className="min-w-0 text-sm font-medium text-foreground [overflow-wrap:anywhere]">{data.label}</span>
         <span className="text-xs text-muted-foreground">
-          {data.comingSoon ? 'готовится' : data.totalLessons > 0 ? `${data.progressPercent}%` : ''}
+          {data.comingSoon ? 'готовится' : data.totalLessons > 0 ? formatPercent(data.progressPercent) : ''}
         </span>
         {data.isNextStep && (
           <span className="col-span-2 col-start-2 inline-flex items-center gap-1 justify-self-start rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">

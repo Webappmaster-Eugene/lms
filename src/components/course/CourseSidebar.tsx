@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { BookOpen, ChevronDown, ChevronRight, CheckCircle2, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { MobileSheet } from '@/components/layout/MobileSheet'
+import { completionPercent, formatPercent, progressBarStyle } from '@/lib/progress-percent'
 
 type Lesson = { id: string; title: string; slug: string; order: number }
 type Section = { id: string; title: string; order: number; lessons: Lesson[] }
@@ -23,7 +24,7 @@ export function CourseSidebar({ courseTitle, sections, completedLessonIds, curre
   const panelId = useId()
   const currentSectionId = sections.find((section) => section.lessons.some((lesson) => lesson.id === currentLessonId))?.id
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(currentSectionId ? [currentSectionId] : []))
-  const progress = totalLessons > 0 ? Math.min(100, Math.max(0, Math.round(totalCompleted / totalLessons * 100))) : 0
+  const progress = completionPercent(totalCompleted, totalLessons)
 
   function toggleSection(sectionId: string) {
     setExpandedSections((previous) => {
@@ -39,11 +40,11 @@ export function CourseSidebar({ courseTitle, sections, completedLessonIds, curre
       <div className="border-b border-border p-4">
         <p className="mb-3 break-words text-sm font-semibold text-foreground">{courseTitle}</p>
         <div className="mb-2 flex items-center justify-between gap-3 text-xs">
-          <span className="font-medium text-primary">{progress}%</span>
+          <span className="font-medium text-primary">{formatPercent(progress)}</span>
           <span className="text-muted-foreground">{totalCompleted}/{totalLessons} уроков</span>
         </div>
-        <div role="progressbar" aria-label={assignedOnly ? 'Прогресс назначенных уроков' : 'Прогресс курса'} aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} className="h-1.5 overflow-hidden rounded-full bg-muted">
-          <div className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
+        <div role="progressbar" aria-label={assignedOnly ? 'Прогресс назначенных уроков' : 'Прогресс курса'} aria-valuenow={Math.round(progress)} aria-valuetext={formatPercent(progress)} aria-valuemin={0} aria-valuemax={100} className="h-1.5 overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full bg-primary" style={progressBarStyle(progress)} />
         </div>
       </div>
       <nav aria-label="Уроки курса" className="p-2">

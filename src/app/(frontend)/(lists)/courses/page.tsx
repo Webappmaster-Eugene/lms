@@ -9,6 +9,7 @@ import { getLearningAccess } from '@/server/learning-access'
 import { getLearningCatalog, sharedRoadmapsByCourse } from '@/server/learning-catalog'
 import { getBootcamps } from '@/server/bootcamps'
 import { notBootcamp } from '@/lib/course-path'
+import { completionPercent } from '@/lib/progress-percent'
 
 export const metadata: Metadata = {
   title: 'Курсы',
@@ -104,7 +105,7 @@ export default async function CoursesListPage() {
     const courseLessonIds = lessonsByCourse.get(cId) ?? []
     const totalLessons = courseLessonIds.length
     const completedCount = courseLessonIds.filter((id) => completedLessonIds.has(id)).length
-    const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0
+    const progressPercent = completionPercent(completedCount, totalLessons)
 
     const roadmapId = typeof course.roadmap === 'object' ? course.roadmap?.id : course.roadmap
     const roadmap = roadmapDocs.find((item) => item.id === roadmapId)

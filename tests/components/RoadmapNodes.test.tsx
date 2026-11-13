@@ -102,6 +102,15 @@ describe('карточка темы', () => {
     expect(handles.map((h) => h.dataset.handleType).sort()).toEqual(['source', 'target'])
   })
 
+  it('начатая тема меньше 1% не выглядит нулём: подпись и видимая полоска', () => {
+    renderNode(RoadmapTopicNode, { status: 'in-progress', totalLessons: 631, completedLessons: 3, progressPercent: (3 / 631) * 100 })
+
+    expect(screen.getByText('меньше 1%')).toBeInTheDocument()
+    const bar = screen.getByRole('progressbar', { name: 'Прогресс темы «Глубокий React»' })
+    expect(bar).toHaveAttribute('aria-valuetext', 'меньше 1%')
+    expect((bar.firstElementChild as HTMLElement).style.minWidth).toBe('4px')
+  })
+
   it('цвет статуса виден в классах — по нему ученик отличает пройденное', () => {
     const { container: completed } = renderNode(RoadmapTopicNode, { status: 'completed' })
     const { container: available } = renderNode(RoadmapTopicNode, { status: 'available' })

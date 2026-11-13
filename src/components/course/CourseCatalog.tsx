@@ -9,6 +9,7 @@ import { cn, pluralize } from '@/lib/utils'
 import { boundedQueryText, CATALOG_PAGE_SIZE, positiveQueryInteger, queryHref } from '@/lib/shared-url'
 import { ShareButton } from '@/components/ui/ShareButton'
 import { useUrlSearchText } from '@/hooks/use-url-search-text'
+import { formatPercent, progressBarStyle } from '@/lib/progress-percent'
 
 export type CatalogCourse = {
   id: string
@@ -204,12 +205,12 @@ export function CourseCatalog({ courses }: { courses: CatalogCourse[] }) {
                   <span>
                     {course.completedCount}/{course.totalLessons}
                   </span>
-                  <span>{course.progressPercent}%</span>
+                  <span>{formatPercent(course.progressPercent)}</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-muted">
                   <div
                     className="h-full rounded-full bg-primary transition-all"
-                    style={{ width: `${course.progressPercent}%` }}
+                    style={progressBarStyle(course.progressPercent)}
                   />
                 </div>
               </div>

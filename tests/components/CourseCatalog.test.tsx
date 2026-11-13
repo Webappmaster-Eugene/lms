@@ -76,6 +76,14 @@ describe('каталог', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Весь каталог' }))
     expect(screen.getAllByRole('link')).toHaveLength(3)
   })
+  it('начатый курс меньше 1% подписан «меньше 1%», а не «0%»', () => {
+    render(<CourseCatalog courses={[course('big', { title: 'Большой курс', totalLessons: 631, completedCount: 3, progressPercent: (3 / 631) * 100 })]} />)
+
+    const card = screen.getByRole('link', { name: /Большой курс/ })
+    expect(card).toHaveTextContent('меньше 1%')
+    expect(card).not.toHaveTextContent('0%')
+  })
+
   it('фильтр «В процессе» оставляет начатые курсы', async () => {
     render(<CourseCatalog courses={courses} />)
 

@@ -13,6 +13,7 @@ import { nextLesson, orderCourseLessons } from '@/lib/roadmap-next-step'
 import { RichText } from '@payloadcms/richtext-lexical/react'
 import { protectCourseSourceLinks } from '@/lib/lesson-video-source'
 import { coursePath } from '@/lib/course-path'
+import { completionPercent, formatPercent, progressBarStyle } from '@/lib/progress-percent'
 
 export type CourseArea = 'courses' | 'bootcamp'
 
@@ -150,7 +151,7 @@ export async function CourseDetail({ slug, area }: { slug: string; area: CourseA
 
   const totalLessons = lessonDocs.length
   const completedCount = lessonDocs.filter((l) => completedLessonIds.has(String(l.id))).length
-  const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0
+  const progressPercent = completionPercent(completedCount, totalLessons)
   // До первого урока ученику нужна оценка курса целиком — она уже есть в шапке.
   const timeLeft = completedCount > 0 ? remainingTime(lessonDocs, completedLessonIds) : null
 
@@ -207,14 +208,14 @@ export async function CourseDetail({ slug, area }: { slug: string; area: CourseA
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">{access.catalogVisibility === 'assigned' ? 'Прогресс назначенных уроков' : 'Прогресс'}</span>
             <span className="font-medium text-foreground">
-              {completedCount}/{totalLessons} ({progressPercent}%)
+              {completedCount}/{totalLessons} ({formatPercent(progressPercent)})
             </span>
           </div>
           {timeLeft && <p className="mt-1 text-sm text-muted-foreground">{timeLeft}</p>}
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-secondary">
             <div
               className="h-full rounded-full bg-primary transition-all duration-500"
-              style={{ width: `${progressPercent}%` }}
+              style={progressBarStyle(progressPercent)}
             />
           </div>
         </div>

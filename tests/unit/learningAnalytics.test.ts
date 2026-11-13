@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  activityDayKey, barStyle, biggestDrop, compareStudents, daysLabel, daysSince, formatMinutes, formatPercent, median, moscowDay, parsePeriod, parseStudentFilter, parseStudentSort,
+  activityDayKey, biggestDrop, compareStudents, daysLabel, daysSince, formatMinutes, median, moscowDay, parsePeriod, parseStudentFilter, parseStudentSort,
   periodStartDay, share, stuckLesson, studentState, weekStarts, type StudentRow,
 } from '@/lib/learning-analytics'
 
@@ -73,23 +73,6 @@ describe('числа на экране', () => {
     expect(median([])).toBeNull()
     expect(median([5, 1, 3])).toBe(3)
     expect(median([4, 1, 3, 2])).toBe(2.5)
-  })
-
-  it('процент: начатое меньше 1% не выглядит нулём, почти законченное - сотней', () => {
-    expect(formatPercent(share(3, 631))).toBe('меньше 1%')
-    expect(formatPercent(share(0, 631))).toBe('0%')
-    expect(formatPercent(share(1, 97))).toBe('1%')
-    expect(formatPercent(share(1, 3))).toBe('33%')
-    expect(formatPercent(share(630, 631))).toBe('99%')
-    expect(formatPercent(share(631, 631))).toBe('100%')
-    expect(formatPercent(share(1, 0))).toBeNull()
-    expect(formatPercent(Number.NaN)).toBeNull()
-  })
-
-  it('полоска прогресса видна с первого урока', () => {
-    expect(barStyle(share(3, 631))).toEqual({ width: `${(3 / 631) * 100}%`, minWidth: 4 })
-    expect(barStyle(0)).toEqual({ width: '0%', minWidth: undefined })
-    expect(barStyle(null)).toEqual({ width: '0%', minWidth: undefined })
   })
 
   it('неизвестные параметры запроса дают значения по умолчанию', () => {

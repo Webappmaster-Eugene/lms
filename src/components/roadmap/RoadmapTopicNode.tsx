@@ -4,6 +4,7 @@ import type { NodeExtra, RoadmapNodeData } from './types'
 import { RoadmapIcon } from './RoadmapIcon'
 import { getNodeClasses } from './stage-colors'
 import { cn } from '@/lib/utils'
+import { formatPercent, progressBarStyle } from '@/lib/progress-percent'
 
 /** Краткое содержание темы; полная программа открывается в панели по клику. */
 export function RoadmapTopicNode({ data }: NodeProps) {
@@ -104,19 +105,20 @@ export function RoadmapTopicNode({ data }: NodeProps) {
             <span className={classes.accent}>
               {nodeData.completedLessons}/{nodeData.totalLessons} уроков
             </span>
-            <span className="font-medium tabular-nums">{nodeData.progressPercent}%</span>
+            <span className="font-medium tabular-nums">{formatPercent(nodeData.progressPercent)}</span>
           </div>
           <div
             role="progressbar"
             aria-label={`Прогресс темы «${nodeData.label}»`}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-valuenow={nodeData.progressPercent}
+            aria-valuenow={Math.round(nodeData.progressPercent)}
+            aria-valuetext={formatPercent(nodeData.progressPercent)}
             className="mt-2 h-1 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10"
           >
             <div
               className={cn('h-full rounded-full', isCompleted ? 'bg-success' : 'bg-info')}
-              style={{ width: `${nodeData.progressPercent}%` }}
+              style={progressBarStyle(nodeData.progressPercent)}
             />
           </div>
         </div>

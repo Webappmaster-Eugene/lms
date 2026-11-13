@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowRight, CheckCircle2, Lock } from 'lucide-react'
 
 import type { NodeCourse } from './types'
+import { completionPercent, formatPercent, progressBarStyle } from '@/lib/progress-percent'
 
 /**
  * Курсы темы с действием для каждого: продолжить с конкретного урока, открыть
@@ -12,7 +13,7 @@ export function NodeCourseList({ courses }: { courses: NodeCourse[] }) {
   return (
     <ul className="space-y-3">
       {courses.map((course) => {
-        const percent = course.totalLessons > 0 ? Math.round((course.completedLessons / course.totalLessons) * 100) : 0
+        const percent = completionPercent(course.completedLessons, course.totalLessons)
         const isCompleted = course.totalLessons > 0 && course.completedLessons === course.totalLessons
         const isBlocked = course.blockedBy.length > 0
         const accessDenied = course.accessAllowed === false
@@ -39,14 +40,15 @@ export function NodeCourseList({ courses }: { courses: NodeCourse[] }) {
             <div
               className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-secondary"
               role="progressbar"
-              aria-valuenow={percent}
+              aria-valuenow={Math.round(percent)}
+              aria-valuetext={formatPercent(percent)}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-label={`Прогресс курса «${course.title}»`}
             >
               <div
                 className={`h-full rounded-full ${isCompleted ? 'bg-success' : 'bg-primary'}`}
-                style={{ width: `${percent}%` }}
+                style={progressBarStyle(percent)}
               />
             </div>
 
