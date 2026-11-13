@@ -5,12 +5,14 @@ import type { Payload } from 'payload'
 import { relationId } from '@/lib/relation-id'
 import { adminLink, excerpt, notifyAdmins, type AdminEvent } from '@/server/admin-telegram'
 import { journal } from '@/server/bootcamp-lead-events'
+import { recordSubmission } from '@/server/bootcamp-submissions'
 import type { BootcampEnrollment } from '@/payload-types'
 
 /**
  * События проекта ученика из GitLab (вебхук ставит исполнитель при зачислении) - в Telegram
  * наставнику: MR открыт, обновлён, слит или закрыт, CI MR прошёл или упал, вердикт
  * проверки недели и комментарии ученика. Свои комментарии наставника не пересылаются.
+ * Те же события ведут учёт сдач недель для экрана «Учёба буткемпа» (bootcamp-submissions).
  */
 
 type Json = Record<string, unknown>
@@ -87,6 +89,8 @@ export async function handleGitlabEvent(payload: Payload, event: string | null, 
   const enrollment = await enrollmentOfProject(payload, obj(data.project))
   if (!enrollment) return 'ignored'
   const student = enrollment.gitlabUsername
+  const note = obj(data.object_attributes)
+  await recordSubmission(payload, enrollment, event, data, event === 'Note Hook' && str(note.noteable_type) === 'MergeRequest' && isBot(obj(data.user)))
   const message = event === 'Merge Request Hook' ? mergeRequestEvent(student, data)
     : event === 'Pipeline Hook' ? pipelineEvent(student, data)
       : event === 'Note Hook' ? noteEvent(student, enrollment, data)

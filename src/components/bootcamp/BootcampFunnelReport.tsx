@@ -23,6 +23,7 @@ export function BootcampFunnelReport({ report, filter, programs, action }: Props
       <header>
         <h1>Воронка буткемпа</h1>
         <p>Заявки программы, пришедшие за выбранный период, и сколько из них дошло до каждого шага. Деньги считаются по дате оплаты. Заявки с отметкой «Тестовая заявка» и тестовые оплаты Робокассы не учитываются.</p>
+        <p>Как зачисленные сдают недели - на странице <Link href="/admin/bootcamp-progress">«Учёба буткемпа»</Link>.</p>
       </header>
 
       <form className="bootcamp-funnel__filter" method="get" action={action}>

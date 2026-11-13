@@ -16,7 +16,7 @@ function cleanupDependents(
   return async ({ req, id }) => {
     for (const { collection, field } of dependents) {
       try {
-        const capability = collection === 'learning-access-policies' ? 'syncLearningAccessPolicy' : collection === 'auth-session-revocations' ? 'syncAuthSessionRevocations' : collection === 'account-freezes' ? 'syncAccountFreezes' : collection === 'student-session-telemetry' || collection === 'student-learning-events' || collection === 'student-activity-days' ? 'syncStudentAnalytics' : collection === 'web-vitals-reports' ? 'syncWebVitals' : null
+        const capability = collection === 'learning-access-policies' ? 'syncLearningAccessPolicy' : collection === 'auth-session-revocations' ? 'syncAuthSessionRevocations' : collection === 'account-freezes' ? 'syncAccountFreezes' : collection === 'student-session-telemetry' || collection === 'student-learning-events' || collection === 'student-activity-days' ? 'syncStudentAnalytics' : collection === 'web-vitals-reports' ? 'syncWebVitals' : collection === 'bootcamp-week-submissions' ? 'syncBootcampSubmissions' : null
         const previousCapability = capability ? req.context[capability] : undefined
         if (capability) req.context[capability] = true
         try {
@@ -64,6 +64,11 @@ export const cleanupUserRelations = cleanupDependents('пользователь'
   { collection: 'interview-rooms', field: 'owner' },
   // owner_id NOT NULL при ON DELETE SET NULL: без этой строки удаление ученика падает
   { collection: 'interview-analysis-usage', field: 'owner' },
+])
+
+/** Сдачи недель зачисления: без них удаление ошибочного зачисления упиралось бы в NOT NULL */
+export const cleanupEnrollmentRelations = cleanupDependents('зачисление', [
+  { collection: 'bootcamp-week-submissions', field: 'enrollment' },
 ])
 
 /** Журнал доставки рассылки: без него удаление рассылки упиралось бы в NOT NULL */

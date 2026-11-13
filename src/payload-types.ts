@@ -120,6 +120,8 @@ export interface Config {
     'bootcamp-entry-tasks': BootcampEntryTask;
     'bootcamp-lead-resumes': BootcampLeadResume;
     'bootcamp-enrollments': BootcampEnrollment;
+    'bootcamp-streams': BootcampStream;
+    'bootcamp-week-submissions': BootcampWeekSubmission;
     'bootcamp-payments': BootcampPayment;
     'bootcamp-refunds': BootcampRefund;
     'bootcamp-lead-events': BootcampLeadEvent;
@@ -183,6 +185,8 @@ export interface Config {
     'bootcamp-entry-tasks': BootcampEntryTasksSelect<false> | BootcampEntryTasksSelect<true>;
     'bootcamp-lead-resumes': BootcampLeadResumesSelect<false> | BootcampLeadResumesSelect<true>;
     'bootcamp-enrollments': BootcampEnrollmentsSelect<false> | BootcampEnrollmentsSelect<true>;
+    'bootcamp-streams': BootcampStreamsSelect<false> | BootcampStreamsSelect<true>;
+    'bootcamp-week-submissions': BootcampWeekSubmissionsSelect<false> | BootcampWeekSubmissionsSelect<true>;
     'bootcamp-payments': BootcampPaymentsSelect<false> | BootcampPaymentsSelect<true>;
     'bootcamp-refunds': BootcampRefundsSelect<false> | BootcampRefundsSelect<true>;
     'bootcamp-lead-events': BootcampLeadEventsSelect<false> | BootcampLeadEventsSelect<true>;
@@ -2186,6 +2190,72 @@ export interface BootcampEnrollment {
   createdAt: string;
 }
 /**
+ * Календарь потока для экрана «Учёба буткемпа»: неделя считается просроченной, если к её сроку наставник не слил MR недели.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-streams".
+ */
+export interface BootcampStream {
+  id: number;
+  /**
+   * Например, «Поток 1, февраль 2027».
+   */
+  title: string;
+  /**
+   * Ключ программы буткемпа, например nodejs.
+   */
+  program: string;
+  /**
+   * Та же, что «Группа потока в GitLab» в зачислении: по ней ученики попадают в поток.
+   */
+  gitlabGroup: string;
+  startsAt: string;
+  /**
+   * Срок - к началу следующей пары встреч. Неделя без срока в план не входит.
+   */
+  weeks?:
+    | {
+        week: number;
+        dueAt: string;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Заполняется само по событиям GitLab. Неделя принята, когда наставник слил MR.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-week-submissions".
+ */
+export interface BootcampWeekSubmission {
+  id: number;
+  enrollment: number | BootcampEnrollment;
+  week: number;
+  mrIid: number;
+  title?: string | null;
+  mrUrl?: string | null;
+  branch?: string | null;
+  /**
+   * Последнее открытие: после переоткрытия - его время.
+   */
+  openedAt?: string | null;
+  lastCommitAt?: string | null;
+  pipelineStatus?: ('success' | 'failed') | null;
+  pipelineAt?: string | null;
+  verdict?: ('passed' | 'failed' | 'not-run' | 'infra') | null;
+  checksPassed?: number | null;
+  checksTotal?: number | null;
+  attempt?: number | null;
+  verdictAt?: string | null;
+  mergedAt?: string | null;
+  closedAt?: string | null;
+  reviewAlertAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * Номер записи - номер счёта в Робокассе. Каждый переход к оплате создаёт новую запись, оплачена из них обычно одна.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2462,6 +2532,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'bootcamp-enrollments';
         value: number | BootcampEnrollment;
+      } | null)
+    | ({
+        relationTo: 'bootcamp-streams';
+        value: number | BootcampStream;
       } | null)
     | ({
         relationTo: 'bootcamp-payments';
@@ -3669,6 +3743,51 @@ export interface BootcampEnrollmentsSelect<T extends boolean = true> {
   revokeRequestedAt?: T;
   revokedAt?: T;
   revokeError?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-streams_select".
+ */
+export interface BootcampStreamsSelect<T extends boolean = true> {
+  title?: T;
+  program?: T;
+  gitlabGroup?: T;
+  startsAt?: T;
+  weeks?:
+    | T
+    | {
+        week?: T;
+        dueAt?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bootcamp-week-submissions_select".
+ */
+export interface BootcampWeekSubmissionsSelect<T extends boolean = true> {
+  enrollment?: T;
+  week?: T;
+  mrIid?: T;
+  title?: T;
+  mrUrl?: T;
+  branch?: T;
+  openedAt?: T;
+  lastCommitAt?: T;
+  pipelineStatus?: T;
+  pipelineAt?: T;
+  verdict?: T;
+  checksPassed?: T;
+  checksTotal?: T;
+  attempt?: T;
+  verdictAt?: T;
+  mergedAt?: T;
+  closedAt?: T;
+  reviewAlertAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -41,8 +41,8 @@ export async function POST(request: Request) {
   // Буткемп: напоминания об оплате, истечение срока, сверка с Робокассой, итоги недели. Сбой не мешает остальному.
   try {
     const bootcamp = await runBootcampSchedule(payload)
-    if (bootcamp.reminders || bootcamp.expired || bootcamp.reviewAlerts || bootcamp.reconciled || bootcamp.weeklySummary) {
-      logger.info('Bootcamp schedule completed', { 'bootcamp.reminders': bootcamp.reminders, 'bootcamp.expired': bootcamp.expired, 'bootcamp.review_alerts': bootcamp.reviewAlerts, 'bootcamp.reconciled': bootcamp.reconciled, 'bootcamp.weekly_summary': bootcamp.weeklySummary })
+    if (bootcamp.reminders || bootcamp.expired || bootcamp.reviewAlerts || bootcamp.reconciled || bootcamp.weeklySummary || bootcamp.submissionReviews || bootcamp.laggingDigest) {
+      logger.info('Bootcamp schedule completed', { 'bootcamp.reminders': bootcamp.reminders, 'bootcamp.expired': bootcamp.expired, 'bootcamp.review_alerts': bootcamp.reviewAlerts, 'bootcamp.reconciled': bootcamp.reconciled, 'bootcamp.weekly_summary': bootcamp.weeklySummary, 'bootcamp.submission_reviews': bootcamp.submissionReviews, 'bootcamp.lagging_digest': bootcamp.laggingDigest })
     }
   } catch (error) {
     logger.error('Bootcamp schedule failed', error)

@@ -41,6 +41,8 @@ const MATRIX: Record<string, Matrix> = {
   // Оплаты и журнал заявок пишет только сервер; удалить нельзя никому: это учёт денег и история решений.
   'bootcamp-payments': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'bootcamp-refunds': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
+  'bootcamp-streams': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
+  'bootcamp-week-submissions': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'bootcamp-lead-events': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'learning-access-audit': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'learning-access-policies': { create: 'nobody', read: 'own', update: 'nobody', delete: 'nobody' },
@@ -103,6 +105,8 @@ const PATCH: Record<string, Record<string, unknown>> = {
   'bootcamp-enrollments': { error: 'Обновлено' },
   'bootcamp-payments': { comment: 'Обновлено' },
   'bootcamp-refunds': { reason: 'Обновлено' },
+  'bootcamp-streams': { title: 'Обновлено' },
+  'bootcamp-week-submissions': { title: 'Обновлено' },
   'bootcamp-lead-events': { message: 'Обновлено' },
   'learning-access-audit': { effect: 'deny' },
   'learning-access-policies': { mode: 'all' },
@@ -194,7 +198,7 @@ async function ownedDoc(slug: string, overrides: Record<string, unknown> = {}): 
   if (['user-progress', 'notes', 'comments'].includes(slug)) data.lesson = ctx.lessonId
   // Пара (user, task) уникальна — под каждый документ своя задача.
   if (slug === 'user-trainer-progress') data.task = (await createSumTask(payload)).id
-  const doc = await payload.create({ collection: slug as CollectionSlug, data: data as never, ...(slug === 'learning-access-grants' ? { user: admin } : {}), context: { skipHooks: true, ...(slug === 'auth-session-revocations' ? { syncAuthSessionRevocations: true } : {}), ...(slug === 'account-freezes' ? { syncAccountFreezes: true } : {}), ...(['student-session-telemetry', 'student-learning-events', 'student-activity-days'].includes(slug) ? { syncStudentAnalytics: true } : {}), ...(slug === 'admin-digests' ? { syncAdminDigests: true } : {}), ...(slug === 'web-vitals-reports' ? { syncWebVitals: true } : {}) } })
+  const doc = await payload.create({ collection: slug as CollectionSlug, data: data as never, ...(slug === 'learning-access-grants' ? { user: admin } : {}), context: { skipHooks: true, ...(slug === 'auth-session-revocations' ? { syncAuthSessionRevocations: true } : {}), ...(slug === 'account-freezes' ? { syncAccountFreezes: true } : {}), ...(['student-session-telemetry', 'student-learning-events', 'student-activity-days'].includes(slug) ? { syncStudentAnalytics: true } : {}), ...(slug === 'admin-digests' ? { syncAdminDigests: true } : {}), ...(slug === 'bootcamp-week-submissions' ? { syncBootcampSubmissions: true } : {}), ...(slug === 'web-vitals-reports' ? { syncWebVitals: true } : {}) } })
   return doc.id as number
 }
 

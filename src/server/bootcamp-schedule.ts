@@ -6,6 +6,7 @@ import type { Payload } from 'payload'
 import { formatRubles, paymentPath, PAYMENT_REMINDER_BEFORE_DAYS, REVIEW_ALERT_AFTER_DAYS } from '@/lib/bootcamp-admission'
 import { formatEntryTaskDate } from '@/lib/bootcamp-entry-task'
 import { sendWeeklySummary } from '@/server/bootcamp-funnel'
+import { sendBootcampLaggingDigest, submissionReviewAlerts } from '@/server/bootcamp-progress'
 import { logger } from '@/lib/telemetry'
 import { bootcampPaymentReminderEmail, emailBaseUrl } from '@/payload/emails/templates'
 import { journal, leadAdminLink, rowsOf } from '@/server/bootcamp-lead-events'
@@ -32,10 +33,10 @@ const RECONCILE_BATCH = 20
 
 let running = false
 
-export type BootcampScheduleResult = { reminders: number, expired: number, reviewAlerts: number, reconciled: number, refunds: number, weeklySummary: number }
+export type BootcampScheduleResult = { reminders: number, expired: number, reviewAlerts: number, reconciled: number, refunds: number, weeklySummary: number, submissionReviews: number, laggingDigest: number }
 
 export async function runBootcampSchedule(payload: Payload): Promise<BootcampScheduleResult> {
-  const result: BootcampScheduleResult = { reminders: 0, expired: 0, reviewAlerts: 0, reconciled: 0, refunds: 0, weeklySummary: 0 }
+  const result: BootcampScheduleResult = { reminders: 0, expired: 0, reviewAlerts: 0, reconciled: 0, refunds: 0, weeklySummary: 0, submissionReviews: 0, laggingDigest: 0 }
   if (running) return result
   running = true
   try {
@@ -45,6 +46,8 @@ export async function runBootcampSchedule(payload: Payload): Promise<BootcampSch
     result.reconciled = await reconcile(payload)
     result.refunds = await checkRefunds(payload)
     result.weeklySummary = await sendWeeklySummary(payload)
+    result.submissionReviews = await submissionReviewAlerts(payload)
+    result.laggingDigest = await sendBootcampLaggingDigest(payload)
   } finally {
     running = false
   }

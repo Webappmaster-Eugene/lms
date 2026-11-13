@@ -100,6 +100,10 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   'bootcamp-payments': () => ({ lead: 0, amountKopecks: 4_500_000, status: 'pending', method: 'robokassa' }),
   // Заявку и оплату создаёт makeValid: возврата без оплаты не бывает.
   'bootcamp-refunds': () => ({ lead: 0, payment: 0, amountKopecks: 100_000, status: 'done', method: 'manual', reason: 'Фикстура возврата' }),
+  // Группа уникальна: по ней ученики попадают в поток.
+  'bootcamp-streams': () => ({ title: 'Поток фикстуры', program: 'nodejs', gitlabGroup: uid('stream').toLowerCase().replace(/[^a-z0-9-]/g, '-'), startsAt: '2027-02-12T21:00:00.000Z', weeks: [{ week: 1, dueAt: '2027-02-20T21:00:00.000Z' }] }),
+  // Зачисление (с заявкой) создаёт makeValid: сдача без ученика не бывает.
+  'bootcamp-week-submissions': () => ({ enrollment: 0, week: 1, mrIid: 1, branch: 'week-01' }),
   // Событие без заявки - системное: тревога Робокассы, у которой нет заявки.
   'bootcamp-lead-events': () => ({ type: 'payment_alert', message: 'Фикстура журнала' }),
 }
@@ -169,6 +173,10 @@ export async function makeValid(payload: Payload, slug: string, ctx: FixtureCont
   if (slug === 'certificates') data.relatedEntity = uid('certificate-entity')
   if (slug === 'bootcamp-enrollments' || slug === 'bootcamp-payments' || slug === 'bootcamp-refunds') {
     data.lead = (await payload.create({ collection: 'bootcamp-leads', data: VALID['bootcamp-leads'](ctx) as never, overrideAccess: true })).id
+  }
+  if (slug === 'bootcamp-week-submissions') {
+    const lead = await payload.create({ collection: 'bootcamp-leads', data: VALID['bootcamp-leads'](ctx) as never, overrideAccess: true })
+    data.enrollment = (await payload.create({ collection: 'bootcamp-enrollments', data: { ...VALID['bootcamp-enrollments'](ctx), lead: lead.id } as never, overrideAccess: true })).id
   }
   if (slug === 'bootcamp-refunds') {
     data.payment = (await payload.create({ collection: 'bootcamp-payments', data: { ...VALID['bootcamp-payments'](ctx), lead: data.lead, status: 'paid' } as never, overrideAccess: true })).id

@@ -14,6 +14,7 @@ export const ADMIN_NAV_GROUPS = [
     items: [
       { href: '/admin/student-analytics', label: 'Ученики' },
       { href: '/admin/learning-analytics', label: 'Курсы и роадмапы' },
+      { href: '/admin/bootcamp-progress', label: 'Учёба буткемпа' },
       { href: '/admin/bootcamp-funnel', label: 'Воронка буткемпа' },
     ],
   },
@@ -31,8 +32,11 @@ export const ADMIN_NAV_GROUPS = [
     label: 'Буткемпы',
     items: [
       { href: '/admin/bootcamp-funnel', label: 'Воронка буткемпа' },
+      { href: '/admin/bootcamp-progress', label: 'Учёба буткемпа' },
       { href: '/admin/collections/bootcamp-leads', label: 'Заявки на буткемп' },
       { href: '/admin/collections/bootcamp-enrollments', label: 'Зачисления' },
+      { href: '/admin/collections/bootcamp-streams', label: 'Потоки буткемпа' },
+      { href: '/admin/collections/bootcamp-week-submissions', label: 'Сдачи недель' },
       { href: '/admin/collections/bootcamp-payments', label: 'Оплаты буткемпа' },
       { href: '/admin/collections/bootcamp-refunds', label: 'Возвраты за буткемп' },
       { href: '/admin/collections/bootcamp-lead-events', label: 'Журнал заявок' },

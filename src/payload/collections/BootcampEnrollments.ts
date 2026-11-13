@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 
 import { ENROLLMENT_STATUSES } from '@/lib/bootcamp-enrollment'
 import { isAdmin } from '@/payload/access/isAdmin'
+import { cleanupEnrollmentRelations } from '@/payload/hooks/cleanupOwnedRelations'
 
 const readOnly = { readOnly: true }
 const nobody = () => false
@@ -28,6 +29,7 @@ export const BootcampEnrollments: CollectionConfig = {
     update: nobody,
     delete: isAdmin,
   },
+  hooks: { beforeDelete: [cleanupEnrollmentRelations] },
   fields: [
     { name: 'progress', type: 'ui', admin: { components: { Field: '/components/bootcamp/EnrollmentProgressField#EnrollmentProgressField' } } },
     { name: 'lead', type: 'relationship', relationTo: 'bootcamp-leads', required: true, unique: true, label: 'Заявка', admin: readOnly },

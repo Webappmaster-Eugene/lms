@@ -39,6 +39,7 @@ import { bootstrapInterviewDirections } from '@/server/interviews/bootstrap'
 import { bootstrapDefaultAchievements } from '@/lib/default-achievements'
 import { StudentSessionTelemetry, StudentLearningEvents, StudentActivityDays } from '@/payload/collections/StudentAnalytics'
 import { AdminDigests } from '@/payload/collections/AdminDigests'
+import { BootcampStreams, BootcampWeekSubmissions } from '@/payload/collections/BootcampProgress'
 import { WebVitalsReports } from '@/payload/collections/WebVitalsReports'
 import { Certificates } from '@/payload/collections/Certificates'
 import { Streaks } from '@/payload/collections/Streaks'
@@ -115,6 +116,10 @@ export default buildConfig({
           Component: '/components/bootcamp/BootcampFunnelView#BootcampFunnelView',
           path: '/bootcamp-funnel',
         },
+        bootcampProgress: {
+          Component: '/components/bootcamp/BootcampProgressView#BootcampProgressView',
+          path: '/bootcamp-progress',
+        },
         roadmapEditor: {
           Component: '/components/roadmap-editor/RoadmapEditorView',
           path: '/roadmap-editor/:segments*',
@@ -177,6 +182,8 @@ export default buildConfig({
     BootcampEntryTasks,
     BootcampLeadResumes,
     BootcampEnrollments,
+    BootcampStreams,
+    BootcampWeekSubmissions,
     BootcampPayments,
     BootcampRefunds,
     BootcampLeadEvents,

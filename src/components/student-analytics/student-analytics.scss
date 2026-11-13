@@ -124,3 +124,27 @@ html[data-theme='dark'] .student-analytics { --series-1: #3987e5; }
   &__unopened small { display: inline; }
   .student-analytics__table tbody tr[data-drop='true'] { background: color-mix(in srgb, var(--theme-warning-500, #b9770e) 12%, transparent); }
 }
+
+.bootcamp-progress {
+  &__matrix th[scope='row'] { position: sticky; left: 0; z-index: 1; background: var(--theme-bg); min-width: 190px; }
+  &__matrix tbody tr:hover th[scope='row'] { background: var(--theme-elevation-50); }
+  &__week { text-align: center; min-width: 44px; }
+  // Специфичнее общих правил ячеек таблицы: метка недели стоит по центру и занимает меньше места.
+  & &__cell { text-align: center; min-width: 44px; padding: 6px 4px; font-weight: 600; font-size: 13px; }
+  &__cell a { display: block; text-decoration: none; }
+  &__cell[data-state='accepted'] { background: color-mix(in srgb, var(--theme-success-500, #32834c) 18%, transparent); }
+  &__cell[data-state='review'] { background: color-mix(in srgb, #2a78d6 16%, transparent); }
+  &__cell[data-state='failed-check'], &__cell[data-state='ci-failed'] { background: color-mix(in srgb, var(--theme-error-500, #b54d4d) 16%, transparent); }
+  &__cell[data-state='checking'], &__cell[data-state='open'] { background: var(--theme-elevation-100); }
+  // Прошедший срок - уголок поверх цвета состояния, рамка - только ревью дольше срока ответа.
+  &__cell[data-late='true']:not([data-state='accepted']) { background-image: linear-gradient(225deg, var(--theme-error-500, #b54d4d) 7px, transparent 7px); }
+  &__cell[data-overdue='true'] { box-shadow: inset 0 0 0 2px var(--theme-error-500, #b54d4d); }
+  td[data-lag='one'] { font-weight: 600; }
+  td[data-lag='more'] { font-weight: 700; color: var(--theme-error-500, #b54d4d); }
+  &__legend { list-style: none; margin: 16px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 13px; }
+  &__legend li { display: flex; align-items: center; gap: 8px; }
+  // Специфичнее «.student-analytics__controls label:nth-child(2)»: здесь второй - флажок, его не растягиваем.
+  & .student-analytics__controls label { flex: none; max-width: none; }
+  &__streams-link { padding-bottom: 10px; }
+  & &__legend .bootcamp-progress__cell { display: inline-block; width: 20px; min-width: 20px; height: 20px; padding: 0; border-radius: 3px; border: 1px solid var(--theme-elevation-200); }
+}
