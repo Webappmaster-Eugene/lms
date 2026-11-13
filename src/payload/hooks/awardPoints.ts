@@ -6,8 +6,7 @@ import { relationId } from '@/lib/relation-id'
 import { withSpan, logger } from '@/lib/telemetry'
 import { skipHooksReq } from '@/lib/payload-req'
 import { collectAllPages } from '@/lib/paginate'
-import { isCourseCompleted, isRoadmapCompleted, roadmapsSharingCourse } from '@/lib/course-completion'
-import { getLearningAccess } from '@/server/learning-access'
+import { isCourseCompleted, isRoadmapCompleted } from '@/lib/course-completion'
 
 /**
  * Hook: начисляет баллы при отметке урока как пройденного.
@@ -111,19 +110,16 @@ async function checkCourseCompletion(
     const rawRoadmapId = typeof course.roadmap === 'object'
       ? (course.roadmap as Record<string, unknown>)?.id
       : course.roadmap
-    const ownRoadmapId = rawRoadmapId ? String(rawRoadmapId) : null
-    const roadmapIds = new Set([...(ownRoadmapId ? [ownRoadmapId] : []), ...await roadmapsSharingCourse(req, courseId)])
+    // Курс завершает только свою карту: в программу карт, где он стоит дополнительным, он не входит.
+    if (!rawRoadmapId) return
+    const roadmapId = String(rawRoadmapId)
 
     // Historical bonuses do not prove completion after new lessons are published.
-    for (const roadmapId of roadmapIds) {
-      if (!(await isRoadmapCompleted(req, userId, roadmapId))) continue
-      // Чужая карта, скрытая от ученика запретом темы, не должна всплыть в бонусе, сертификате и письме.
-      if (roadmapId !== ownRoadmapId && !(await getLearningAccess(req.payload, { id: userId }, req)).canBrowseRoadmap(Number(roadmapId))) continue
-      const roadmapBonusCreated = await safeCreateTransaction(
-        req, userId, roadmapPoints, 'roadmap_completed', roadmapId, 'Роадмап завершён',
-      )
-      if (!roadmapBonusCreated) await ensureCertificate(req, userId, roadmapId, 'roadmap')
-    }
+    if (!(await isRoadmapCompleted(req, userId, roadmapId))) return
+    const roadmapBonusCreated = await safeCreateTransaction(
+      req, userId, roadmapPoints, 'roadmap_completed', roadmapId, 'Роадмап завершён',
+    )
+    if (!roadmapBonusCreated) await ensureCertificate(req, userId, roadmapId, 'roadmap')
   })
 }
 

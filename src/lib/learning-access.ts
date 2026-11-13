@@ -16,7 +16,7 @@ export type LearningLessonMetadata = { id: number; course: unknown; section?: un
 /**
  * `guides` — только опубликованные гайды темы, `bootcamps` — буткемпы, привязанные к ней полем узла.
  * Гайды и буткемпы показывают тему без курса, но не открывают ни её курсы, ни саму карту.
- * `sharedCourses` — дополнительные курсы темы из этой или другой карты: тема показывает их как свои, они входят в программу карты.
+ * `sharedCourses` — дополнительные курсы темы из этой или другой карты: тема показывает их как свои. В программу карты для сертификата входят только её собственные курсы.
  */
 export type LearningNodeMetadata = { id: number; roadmap: unknown; nodeType?: string | null; course?: unknown; guides?: number[]; bootcamps?: number[]; sharedCourses?: unknown[] | null }
 export type LearningPolicyMetadata = {

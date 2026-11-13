@@ -157,22 +157,20 @@ describe('доступ через тему другого роадмапа', () 
 })
 
 describe('завершение карты с курсом другого роадмапа', () => {
-  it('бонус и сертификат карты ждут чужой курс, один урок завершает обе карты', async () => {
+  it('ученик с назначением карты получает её сертификат без курса другой карты', async () => {
     const home = await createCourseTree(payload, { lessons: 1 })
     const map = await createCourseTree(payload, { lessons: 1 })
     await topic(map.roadmap.id, { sharedCourses: [home.course.id] })
-    const learner = await createStudent(payload, { learningAccessMode: 'all' })
+    const learner = await createStudent(payload, { learningAccessMode: 'assigned', learningCatalogVisibility: 'assigned' })
+    await assign(learner, 'roadmaps', map.roadmap.id)
+    expect(await canAccessLesson(payload, learner, home.lessons[0].id)).toBe(false)
 
     await finish(learner, map.lessons[0].id)
-    expect(await roadmapBonuses(learner)).toEqual([])
-
-    await finish(learner, home.lessons[0].id)
-    const both = [String(home.roadmap.id), String(map.roadmap.id)].sort()
-    expect(await roadmapBonuses(learner)).toEqual(both)
-    expect(await roadmapCertificates(learner)).toEqual(both)
+    expect(await roadmapBonuses(learner)).toEqual([String(map.roadmap.id)])
+    expect(await roadmapCertificates(learner)).toEqual([String(map.roadmap.id)])
   })
 
-  it('чужой курс, пройденный раньше, закрывает карту её последним своим уроком', async () => {
+  it('урок курса другой карты завершает только его карту', async () => {
     const home = await createCourseTree(payload, { lessons: 1 })
     const map = await createCourseTree(payload, { lessons: 1 })
     await topic(map.roadmap.id, { sharedCourses: [home.course.id] })
@@ -182,6 +180,7 @@ describe('завершение карты с курсом другого роа�
     expect(await roadmapBonuses(learner)).toEqual([String(home.roadmap.id)])
     await finish(learner, map.lessons[0].id)
     expect(await roadmapBonuses(learner)).toEqual([String(home.roadmap.id), String(map.roadmap.id)].sort())
+    expect(await roadmapCertificates(learner)).toEqual([String(home.roadmap.id), String(map.roadmap.id)].sort())
   })
 
   it('чужой курс с закрытой картой или только по назначению завершению не мешает', async () => {
@@ -201,14 +200,15 @@ describe('завершение карты с курсом другого роа�
 describe('завершение карты без своих открытых курсов', () => {
   const emptyRoadmap = () => payload.create({ collection: 'roadmaps', data: { title: uid('Карта'), slug: uid('roadmap'), isPublished: true } })
 
-  it('карта только из общих курсов завершается ими', async () => {
+  it('карта только из курсов других карт ими не завершается', async () => {
     const home = await createCourseTree(payload, { lessons: 1 })
     const map = await emptyRoadmap()
     await topic(map.id, { sharedCourses: [home.course.id] })
     const learner = await createStudent(payload, { learningAccessMode: 'all' })
 
     await finish(learner, home.lessons[0].id)
-    expect(await roadmapBonuses(learner)).toEqual([String(home.roadmap.id), String(map.id)].sort())
+    expect(await roadmapBonuses(learner)).toEqual([String(home.roadmap.id)])
+    expect(await roadmapCertificates(learner)).toEqual([String(home.roadmap.id)])
   })
 
   it('карта из своих курсов только по назначению общим курсом не завершается', async () => {
