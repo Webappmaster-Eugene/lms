@@ -8,7 +8,7 @@ import type { CourseDetail, CoursesOverview } from '@/lib/learning-analytics'
 const overview: CoursesOverview = {
   period: 30, roadmap: null, students: 6,
   roadmaps: [{ id: 3, title: 'Backend Node.js', href: '/roadmaps/backend-nodejs', courses: 15, lessons: 600, access: 2, started: 2, completed: 0, medianProgress: 12, period: { minutes: 420, active: 2 } }],
-  courses: [{ id: 7, title: 'Node.js с нуля', href: '/courses/node', roadmap: 'Backend Node.js', lessons: 40, access: 2, started: 2, completed: 0, medianProgress: 30, period: { minutes: 380, lessons: 9, active: 2 }, questions: 3, stuckAt: { title: 'Event loop', href: '/lessons/event-loop', students: 2 } }],
+  courses: [{ id: 7, title: 'Node.js с нуля', href: '/courses/node', roadmap: 'Backend Node.js', lessons: 40, access: 2, started: 2, completed: 0, medianProgress: 30, period: { minutes: 380, lessons: 9, active: 2 }, questions: 3, stuckAt: { title: 'Event loop', href: '/lessons/event-loop', students: 2 } }, { id: 8, title: 'Алгоритмы', href: '/courses/algo', roadmap: 'Backend Node.js', lessons: 631, access: 2, started: 1, completed: 0, medianProgress: 0.48, period: { minutes: 30, lessons: 3, active: 1 }, questions: 0, stuckAt: null }],
   unopened: Array.from({ length: 32 }, (_, index) => ({ id: 100 + index, title: `Курс ${index + 1}`, href: `/courses/c${index}`, access: 1 })),
 }
 const detail: CourseDetail = {
@@ -34,6 +34,7 @@ describe('аналитика курсов и роадмапов', () => {
     const row = within(courses).getByRole('row', { name: /Node\.js с нуля/ })
     expect(within(row).getByRole('link', { name: 'Event loop' })).toHaveAttribute('href', '/lessons/event-loop')
     expect(within(row).getByText('6 ч 20 мин')).toBeInTheDocument()
+    expect(within(courses).getByRole('row', { name: /Алгоритмы/ })).toHaveTextContent('меньше 1%')
     const unopened = screen.getByRole('region', { name: 'Открыты, но никто не начал' })
     expect(within(unopened).getByText('Ещё 2')).toBeInTheDocument()
   })

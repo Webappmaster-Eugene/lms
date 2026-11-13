@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 import { apiFetch, readJson } from '@/lib/http-client'
-import { ANALYTICS_PERIODS, daysLabel, formatMinutes, share, type AnalyticsPeriod, type CourseDetail, type CoursesOverview } from '@/lib/learning-analytics'
+import { ANALYTICS_PERIODS, barStyle, daysLabel, formatMinutes, formatPercent, share, type AnalyticsPeriod, type CourseDetail, type CoursesOverview } from '@/lib/learning-analytics'
 import '../student-analytics/student-analytics.scss'
 
 const endpoint = '/api/manage/learning-analytics'
@@ -17,11 +17,10 @@ async function load<T>(url: string, signal: AbortSignal): Promise<T> {
   return data as T
 }
 
-const percent = (value: number | null) => value === null ? '-' : `${Math.round(value)}%`
+const percent = (value: number | null) => formatPercent(value) ?? '-'
 
 function Share({ part, whole }: { part: number; whole: number }) {
-  const value = share(part, whole)
-  return <span className="student-analytics__progress"><span className="student-analytics__bar" aria-hidden="true"><span style={{ width: `${value ?? 0}%` }} /></span><span>{part}{whole > 0 ? ` из ${whole}` : ''}</span></span>
+  return <span className="student-analytics__progress"><span className="student-analytics__bar" aria-hidden="true"><span style={barStyle(share(part, whole))} /></span><span>{part}{whole > 0 ? ` из ${whole}` : ''}</span></span>
 }
 
 function Detail({ courseId, onClose }: { courseId: number; onClose: () => void }) {

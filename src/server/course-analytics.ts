@@ -57,7 +57,13 @@ function pairs(rows: { user_id: number; lesson_id: number }[]): Map<number, Set<
   return byUser
 }
 
-const percentOf = (done: number, total: number) => total > 0 ? Math.round((done / total) * 100) : 0
+// Без округления до целых: 3 урока из 631 - это 0,48%, а не 0%. Подпись делает formatPercent на экране.
+const percentOf = (done: number, total: number) => total > 0 ? (done / total) * 100 : 0
+// Сотые убирают хвост плавающей точки (49,99999 вместо 50) и не превращают в ноль урок из нескольких тысяч.
+const medianPercent = (values: readonly number[]) => {
+  const value = median(values)
+  return value === null ? null : Math.round(value * 100) / 100
+}
 
 export async function coursesOverview(payload: Payload, req: PayloadRequest, query: { period: AnalyticsPeriod; roadmap: number | null }, now = Date.now()): Promise<CoursesOverview> {
   const students = await studentIds(payload)
@@ -114,7 +120,7 @@ export async function coursesOverview(payload: Payload, req: PayloadRequest, que
       id, title: course.title, href: coursePath({ slug: course.slug, isBootcamp: course.is_bootcamp }), roadmap: course.roadmap_title,
       lessons: ordered.length, access: withAccess.length, started: learners.length,
       completed: ordered.length > 0 ? learners.filter((user) => doneIn(user, ordered) === ordered.length).length : 0,
-      medianProgress: median(progress),
+      medianProgress: medianPercent(progress),
       period: { minutes: periodRows.reduce((sum, item) => sum + item.minutes, 0), lessons: periodRows.reduce((sum, item) => sum + item.lessons, 0), active: periodRows.filter((item) => item.minutes > 0 || item.lessons > 0).length },
       questions: questions.get(id) ?? 0,
       stuckAt: stuckMeta ? { title: stuckMeta.title, href: `/lessons/${stuckMeta.slug}`, students: stuckCount } : null,
@@ -139,7 +145,7 @@ export async function coursesOverview(payload: Payload, req: PayloadRequest, que
       id: roadmap.id, title: roadmap.title, href: `/roadmaps/${roadmap.slug}`, courses: programme.length, lessons: ordered.length,
       access: withAccess.length, started: learners.length,
       completed: ordered.length > 0 ? withAccess.filter((user) => doneIn(user, ordered) === ordered.length).length : 0,
-      medianProgress: median(withAccess.map((user) => percentOf(doneIn(user, ordered), ordered.length))),
+      medianProgress: medianPercent(withAccess.map((user) => percentOf(doneIn(user, ordered), ordered.length))),
       period: { minutes: periodRows.reduce((sum, [, item]) => sum + item.minutes, 0), active: activeUsers.size },
     })
   }

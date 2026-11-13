@@ -27,7 +27,7 @@ const overview: StudentsOverview = {
 }
 const learning: StudentLearning = {
   state: 'learning', isTestStudent: false, freeze: null, accessUntil: '2030-03-13T10:00:00.000Z', bootcamp: null, lastActivityAt: '2030-01-01T10:30:00.000Z', idleDays: 0,
-  roadmaps: [{ id: 3, title: 'Backend Node.js', href: '/roadmaps/backend-nodejs', courses: 12, started: 2, lessonsDone: 7, lessonsTotal: 140 }],
+  roadmaps: [{ id: 3, title: 'Backend Node.js', href: '/roadmaps/backend-nodejs', courses: 12, started: 2, lessonsDone: 7, lessonsTotal: 140 }, { id: 4, title: 'Frontend React', href: '/roadmaps/frontend-react', courses: 6, started: 1, lessonsDone: 3, lessonsTotal: 631 }],
   courses: [{ id: 1, title: 'Node.js', href: '/courses/node', open: true, lessonsDone: 7, lessonsTotal: 20, minutes: 135, lastActivityAt: '2030-01-01T10:30:00.000Z', stoppedAt: { title: 'Express middleware', href: '/lessons/middleware' } }],
   notStarted: 10,
   weeks: Array.from({ length: 12 }, (_, index) => ({ week: new Date(Date.UTC(2029, 9, 15 + index * 7)).toISOString().slice(0, 10), minutes: index === 11 ? 135 : index === 8 ? 300 : 0, lessons: index === 11 ? 4 : 0, tasks: index === 11 ? 1 : 0 })),
@@ -240,6 +240,9 @@ describe('аналитика ученика для администратора'
       expect(within(accessBlock).getByRole('link', { name: 'Заморозить или разморозить' })).toHaveAttribute('href', '/admin/learning-access?user=34')
       const assigned = screen.getByRole('region', { name: 'Назначенное обучение' })
       expect(within(assigned).getByText('Уроков пройдено: 7 из 140 (5%)')).toBeInTheDocument()
+      // 3 из 631 при округлении давали «0%» и пустую полоску, будто ученик не начинал.
+      const tiny = within(assigned).getByText('Уроков пройдено: 3 из 631 (меньше 1%)').closest('.student-analytics__progress')
+      expect(tiny?.querySelector<HTMLElement>('.student-analytics__bar > span')?.style.minWidth).toBe('4px')
       expect(within(assigned).getByRole('link', { name: 'Express middleware' })).toHaveAttribute('href', '/lessons/middleware')
       expect(within(assigned).getByText('Ещё не начаты: 10 из открытых курсов.')).toBeInTheDocument()
       const weeks = screen.getByRole('region', { name: 'Активность по неделям' })
