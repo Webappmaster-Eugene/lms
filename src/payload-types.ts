@@ -1954,7 +1954,7 @@ export interface BootcampProgram {
   gitlabStreamGroup: string;
   gradingProject: string;
   /**
-   * Ключ набора задач из кода (src/data/bootcamp-entry). Сейчас есть: rental-js (Три функции JavaScript про прокат). Смена набора меняет задачи и у тех, кто ещё решает.
+   * Ключ набора задач из кода (src/data/bootcamp-entry). Сейчас есть: rental-js (Три функции JavaScript про прокат); rental-frontend-js (JavaScript перед React: каталог, адрес поиска и обновление данных). Смена набора меняет задачи и у тех, кто ещё решает.
    */
   entryTaskSet: string;
   updatedAt: string;

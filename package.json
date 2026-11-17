@@ -62,7 +62,9 @@
     "codex:native-check": "node scripts/codex/native-check.mjs",
     "codex:trust": "node scripts/codex/trust.mjs",
     "test:trainer-runtime": "node scripts/test-trainer-runtime.mjs",
-    "test:integration:runtime": "sh scripts/heavy.sh node scripts/test-trainer-runtime.mjs --database"
+    "test:integration:runtime": "sh scripts/heavy.sh node scripts/test-trainer-runtime.mjs --database",
+    "bootcamp:react-next:setup": "tsx scripts/setup-react-next-bootcamp.ts",
+    "bootcamp:react-next:verify": "sh scripts/heavy.sh tsx scripts/check-react-next-bootcamp.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "4.7.0",

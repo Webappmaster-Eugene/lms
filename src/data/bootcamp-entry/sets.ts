@@ -1,4 +1,5 @@
 import { ENTRY_TASK_MINUTES, ENTRY_TASKS, type EntryTask } from '@/data/bootcamp-entry/tasks'
+import { FRONTEND_ENTRY_TASKS } from '@/data/bootcamp-entry/frontend-tasks'
 
 /**
  * Наборы входного задания. Задачи живут в коде, а не в CMS: эталонные решения рядом с
@@ -25,6 +26,14 @@ export const ENTRY_TASK_SETS: readonly EntryTaskSet[] = [
     summary: 'три небольшие функции на JavaScript',
     intro: 'три небольшие задачи на JavaScript из жизни проката инструментов',
     tasks: ENTRY_TASKS,
+  },
+  {
+    key: 'rental-frontend-js',
+    label: 'JavaScript перед React: каталог, адрес поиска и обновление данных',
+    minutes: '30-60',
+    summary: 'три небольшие функции на JavaScript про каталог и поиск',
+    intro: 'три задачи на JavaScript: фильтрация каталога, адрес поиска и обновление данных',
+    tasks: FRONTEND_ENTRY_TASKS,
   },
 ]
 
