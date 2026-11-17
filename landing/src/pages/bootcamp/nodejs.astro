@@ -32,7 +32,7 @@ const schema = [
       maximumAttendeeCapacity: GROUP_LIMIT,
       // Нагрузка на странице 20-30 часов в неделю: в разметке нижняя граница.
       courseWorkload: `PT${WEEKS * WEEKLY_HOURS}H`,
-      courseSchedule: { '@type': 'Schedule', repeatFrequency: 'P1W', repeatCount: WEEKS, byDay: ['https://schema.org/Saturday', 'https://schema.org/Sunday'], startDate: START_ISO, endDate: LAST_CLASS_ISO, scheduleTimezone: 'Europe/Moscow' },
+      courseSchedule: { '@type': 'Schedule', repeatFrequency: 'P1W', repeatCount: WEEKS, byDay: ['https://schema.org/Tuesday', 'https://schema.org/Thursday'], startTime: '20:00:00', startDate: START_ISO, endDate: LAST_CLASS_ISO, scheduleTimezone: 'Europe/Moscow' },
       instructor: { '@id': `${pageUrl}#mentor` },
     },
   },
@@ -152,7 +152,7 @@ const extraSize = (screen: string) => {
     <section class="bc-section" id="week" aria-labelledby="week-title">
       <h2 id="week-title">Как проходит неделя</h2>
       <div class="bc-two bc-two-tight">
-        <p>Календарная неделя устроена как работа над задачами в команде. В субботу двухчасовое занятие: задачи и теория обеих учебных недель пары, разбор примера и live coding. В воскресенье полтора часа: практика, вопросы и типовые ошибки прошлых работ.</p>
+        <p>Календарная неделя устроена как работа над задачами в команде. Во вторник в 20:00 по московскому времени двухчасовое занятие: задачи и теория обеих учебных недель пары, разбор примера и live coding. В четверг в 20:00 по московскому времени полтора часа: практика, вопросы и типовые ошибки прошлых работ.</p>
         <p>В будни вы читаете методички и делаете задачи в своём проекте, рекомендуемый срок сдачи - пятница. Дальше решение проходит тот же путь, что код в рабочей команде: merge request, автоматические проверки, ревью и слияние. Ниже этот путь на настоящих экранах, а расписание, сроки, пропуски и защита описаны на странице <a href={FORMAT_PATH}>«Как проходит обучение»</a>.</p>
       </div>
       <p class="bc-sample">На скриншотах демонстрационный ученик сдаёт первую неделю. <span class="note-wide">Нажмите «Показать шаги», чтобы пройти по экрану с подсказками, или «Увеличить», чтобы рассмотреть его целиком.</span><span class="note-narrow">Снимок сразу приближен к первому шагу. Чтобы перейти к следующему, нажмите стрелку над снимком или проведите по нему пальцем. Кнопка «Весь экран» откроет снимок крупно.</span></p>
@@ -296,7 +296,7 @@ const extraSize = (screen: string) => {
       <div class="bc-apply-copy">
         <h2 id="apply-title">Расскажите о себе: каждую заявку я читаю сам</h2>
         <p>Вопросов несколько, потому что мне важно понять, с чем вы пришли и подойдёт ли вам буткемп. Обычно на анкету уходит 5-10 минут. Если заявка подходит, на email придёт входное задание.</p>
-        <p>Точное время занятий сообщим до начала недели подготовки. Заявка ни к чему не обязывает, а оплаты на этой странице нет: платить нужно только после допуска, по личной ссылке из письма.</p>
+        <p>Встречаемся по вторникам и четвергам в 20:00 по московскому времени. Заявка ни к чему не обязывает, а оплаты на этой странице нет: платить нужно только после допуска, по личной ссылке из письма.</p>
       </div>
       <form class="bc-form" data-lead-form data-program={PROGRAM_KEY} data-program-title="Node.js" data-consent-version={CONSENT_VERSION} novalidate>
         <div class="bc-field">
