@@ -1,0 +1,188 @@
+---
+import ReactNextLayout from '../../layouts/ReactNextLayout.astro'
+import { AUTHOR_URL, SITE_URL, ORGANIZATION_ID } from '../../config'
+import { BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, COURSE_NAME, FACTS, FAQ, FORMAT_PATH, GROUP_LIMIT, OFFER_PATH, PAYMENT_PATH, PRICE, PRIVACY_PATH, PROGRAM_KEY, PROGRAM_PATH, PROGRAM_WEEKS, QUALITY_PATH, SAMPLE_PATH, SUMMARY, WEEKS } from '../../data/react-next-bootcamp'
+import { LEAD_ANSWER_LIMITS, LEAD_HOURS, LEAD_LINKS_MAX, LEAD_REASONS, LEAD_URGENCIES, PERSONAL_TELEGRAM } from '../../data/bootcamp-form'
+const title = 'Буткемп React + Next.js: frontend проката - MentorCareer'
+const description = 'React и Next.js с начала: два интерфейса одного сервиса проката с настоящим Node.js API. 20 недель, до 10 участников, личное ревью. 45 000 ₽ за поток.'
+const pageUrl = new URL(BOOTCAMP_PATH, SITE_URL).href
+const schema = [
+  { '@type': 'Course', '@id': `${pageUrl}#course`, name: COURSE_NAME, description: SUMMARY, url: pageUrl, inLanguage: 'ru', provider: { '@id': ORGANIZATION_ID }, educationalLevel: 'Знает JavaScript, начинает изучать React', coursePrerequisites: 'Уверенный JavaScript, основы HTML и CSS, async/await и Git', teaches: ['React', 'TypeScript', 'Next.js', 'Интеграция с Node.js API', 'Тестирование интерфейсов'], timeRequired: `P${WEEKS}W`, offers: { '@type': 'Offer', category: 'Paid', price: PRICE.value, priceCurrency: 'RUB', url: pageUrl } },
+  { '@type': 'Person', '@id': `${pageUrl}#mentor`, name: 'Евгений Надточеев', url: AUTHOR_URL, jobTitle: 'Разработчик, наставник' },
+  { '@type': 'FAQPage', '@id': `${pageUrl}#faq`, mainEntity: FAQ.map(({ question, answer }) => ({ '@type': 'Question', name: question, acceptedAnswer: { '@type': 'Answer', text: answer } })) },
+]
+---
+<ReactNextLayout title={title} description={description} schema={schema} document={false}>
+  <section class="bc-hero" aria-labelledby="hero-title">
+    <div class="bc-hero-copy">
+      <p class="bc-tape">Готовим первый поток. Дата старта пока не объявлена</p>
+      <h1 id="hero-title">Буткемп React + Next.js: два интерфейса одного продукта</h1>
+      <p class="bc-lede">Вы знаете JavaScript и основы вёрстки. За 20 учебных недель создадите рабочее приложение сотрудников на React и витрину с кабинетом клиента на Next.js. Оба подключите к настоящему backend сервиса проката из нашего Node.js-буткемпа.</p>
+      <dl class="bc-facts">{FACTS.map(({ term, value }) => <div><dt>{term}</dt><dd>{value}</dd></div>)}</dl>
+      <div class="bc-actions"><a class="bc-button" href="#program">Посмотреть программу</a><a class="bc-link" href={SAMPLE_PATH}>Пример методички</a></div>
+    </div>
+    <figure class="rn-product" aria-labelledby="product-title">
+      <h2 id="product-title">Одна бронь, два интерфейса</h2>
+      <p>Сценарий учебного проекта: клиент арендует дрель, сотрудник готовит её к выдаче.</p>
+      <div class="rn-screens">
+        <div class="rn-screen"><h3>Витрина и кабинет клиента / Next.js</h3><dl><dt>Инструмент</dt><dd>Дрель</dd><dt>Действие клиента</dt><dd>Забронировать и оплатить</dd><dt>Результат</dt><dd>Оплаченная бронь</dd></dl></div>
+        <p class="rn-shared">Один Node.js backend хранит каталог, брони, платежи и права. Оба приложения получают эти данные через API.</p>
+        <div class="rn-screen"><h3>Рабочий кабинет / React</h3><dl><dt>Сотрудник видит</dt><dd>Ту же бронь и оплату</dd><dt>Действие сотрудника</dt><dd>Выдать инструмент</dd><dt>Клиент видит</dt><dd>Инструмент выдан</dd></dl></div>
+      </div>
+      <figcaption class="rn-caption">Это схема сценария, а не снимок готового интерфейса. Интерфейсы и поведение вы реализуете сами.</figcaption>
+    </figure>
+  </section>
+
+  <section class="bc-section bc-summary" aria-labelledby="summary-title">
+    <h2 id="summary-title">Какой результат получите</h2>
+    <p>{SUMMARY}</p>
+    <p>Научитесь разбирать задачу, проектировать компоненты, подключать данные, обрабатывать загрузку и ошибки, проверять поведение тестами и объяснять решения. В конце защищаете проект и получаете паспорт навыков, показанных на собственном коде.</p>
+  </section>
+
+  <section class="bc-section" id="fit" aria-labelledby="fit-title">
+    <h2 id="fit-title">Для кого программа</h2>
+    <div class="bc-two">
+      <div><h3>Вы уверенно пишете на JavaScript</h3><p>Умеете работать с массивами и объектами, понимаете функции, модули, промисы и async/await. Можете сверстать простую страницу и сохранить изменения в Git. Опыт React не нужен, TypeScript вводим постепенно.</p></div>
+      <div><h3>Вы готовы писать и дорабатывать код</h3><p>На учёбу нужно 15-20 часов в неделю. Методичка и пример помогают начать, но основной проект вы делаете самостоятельно. Автоматические проверки, личное ревью и исправления входят в каждую неделю.</p></div>
+    </div>
+    <p>Если пока не хватает JavaScript или вёрстки, входное и подготовительное задания покажут пробелы. Программа не обещает должность middle, трудоустройство или определённый доход.</p>
+  </section>
+
+  <section class="bc-section" id="program" aria-labelledby="program-title">
+    <h2 id="program-title">От первого компонента до полного проекта</h2>
+    <table class="bc-program"><caption class="sr-only">Программа React и Next.js по учебным неделям</caption><thead><tr><th scope="col">Неделя</th><th scope="col">Тема</th><th scope="col">Задача продукта</th></tr></thead><tbody>{PROGRAM_WEEKS.map((week) => <tr><th scope="row">{week.number}</th><td><a href={`${PROGRAM_PATH}#week-${week.number}`}>{week.title}</a></td><td>{week.topic}</td></tr>)}</tbody></table>
+    <p class="bc-doc-links"><a class="bc-link" href={PROGRAM_PATH}>Программа по неделям</a><a class="bc-link" href={FORMAT_PATH}>Как проходит обучение</a></p>
+  </section>
+
+  <section class="bc-section" id="project" aria-labelledby="project-section-title">
+    <h2 id="project-section-title">Можно соединить с Node.js-буткемпом</h2>
+    <div class="bc-two"><p>На frontend-программе у вас есть готовый учебный backend. Он обрабатывает каталог, доступность инструментов, брони, оплату, выдачу и возврат. Вам не придётся одновременно осваивать React и писать сервер.</p><p>Если вы проходите Node.js-буткемп, сможете подключить свой backend с совместимым API. Получатся собственный сервер и два собственных интерфейса одного сервиса. Материалы и участие в Node.js-буткемпе оплачиваются отдельно.</p></div>
+    <a class="bc-link" href="/bootcamp/nodejs/">Посмотреть Node.js-буткемп</a>
+  </section>
+
+  <section class="bc-section" id="week" aria-labelledby="week-title">
+    <h2 id="week-title">Как вы будете работать</h2>
+    <ol class="bc-list"><li>Получаете задачу недели и читаете методичку с разобранными примерами.</li><li>Пишете решение в своём проекте, проверяете его локально и открываете merge request.</li><li>Автоматические проверки находят ошибки поведения, наставник разбирает код и решения в течение 5 дней.</li><li>Исправляете замечания, объясняете изменения и сдаёте работу.</li></ol>
+    <p>Две групповые встречи в неделю посвящены теме, практике и вопросам. Взаимное ревью, парная диагностика и обсуждение архитектуры дают опыт совместной работы. При этом у каждого свой проект: отсутствие напарника не блокирует сдачу.</p>
+    <p>ИИ использовать можно. В описании работы вы отмечаете его участие и проверку результата. На защите нужно самостоятельно объяснить код и внести изменение.</p>
+    <p class="bc-doc-links"><a class="bc-link" href={SAMPLE_PATH}>Прочитать пример методички</a><a class="bc-link" href={QUALITY_PATH}>Как проверяем работы</a></p>
+  </section>
+
+  <section class="bc-section" id="mentor" aria-labelledby="mentor-title">
+    <h2 id="mentor-title">Наставник - Евгений Надточеев</h2>
+    <p>Я веду занятия, читаю ваши merge request и разбираю решения на ревью. В первом потоке не больше {GROUP_LIMIT} участников, чтобы проверить каждую работу лично. С моим опытом и проектами можно ознакомиться на <a href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">nadtocheev.ru</a>.</p>
+  </section>
+
+  <section class="bc-section" id="payment" aria-labelledby="payment-title">
+    <h2 id="payment-title">45 000 ₽ за весь поток</h2>
+    <p>В стоимость входят занятия и записи, методички, задания, учебный backend, автоматические проверки, личное ревью, защита, итоговое техническое собеседование и паспорт навыков. За обязательную часть доплат нет.</p>
+    <p>Дата старта пока не объявлена. До оплаты вы получите даты, расписание и условия потока. Оплата будет доступна после входного задания и допуска, по личной ссылке из письма. На этой странице оплаты нет.</p>
+    <p class="bc-doc-links"><a class="bc-link" href={PAYMENT_PATH}>Оплата и возврат</a><a class="bc-link" href={OFFER_PATH}>Договор-оферта</a></p>
+  </section>
+
+  <section class="bc-section" id="faq" aria-labelledby="faq-title">
+    <h2 id="faq-title">Частые вопросы</h2>
+    <div class="bc-faq">{FAQ.map(({ question, answer }) => <details><summary>{question}</summary><p>{answer}</p></details>)}</div>
+  </section>
+
+  <section class="bc-section bc-apply" id="apply" aria-labelledby="apply-title">
+    <div class="bc-apply-copy">
+      <h2 id="apply-title">Заявка на первый поток</h2>
+      <p>Сейчас набор ещё не открыт. Когда программа начнёт принимать заявки, эта анкета поможет понять вашу подготовку и цель. Если отправка пока недоступна, введённые данные останутся в форме.</p>
+      <p>На анкету обычно уходит 5-10 минут. Заявка ни к чему не обязывает. Дату старта и расписание сообщим до оплаты.</p>
+    </div>
+      <form class="bc-form" data-lead-form data-program={PROGRAM_KEY} data-program-title="React + Next.js" data-consent-version={CONSENT_VERSION} novalidate>
+        <div class="bc-field">
+          <label for="lead-name">Имя</label>
+          <input id="lead-name" name="name" type="text" autocomplete="given-name" required maxlength="100" aria-describedby="lead-name-error" />
+          <p class="bc-error" id="lead-name-error" data-error-for="name" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-telegram">Telegram</label>
+          <p class="bc-hint" id="lead-telegram-hint">Ник, ссылка t.me или телефон. С этого аккаунта я буду ждать ваше сообщение.</p>
+          <input id="lead-telegram" name="telegram" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" required maxlength="100" aria-describedby="lead-telegram-hint lead-telegram-error" />
+          <p class="bc-error" id="lead-telegram-error" data-error-for="telegram" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-email">Email</label>
+          <input id="lead-email" name="email" type="email" autocomplete="email" inputmode="email" required maxlength="254" aria-describedby="lead-email-error" />
+          <p class="bc-error" id="lead-email-error" data-error-for="email" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-reason">С чем вы пришли?</label>
+          <select id="lead-reason" name="reason" required aria-describedby="lead-reason-error">
+            <option value="">Выберите</option>
+            {LEAD_REASONS.map(({ value, label }) => <option value={value}>{label}</option>)}
+          </select>
+          <p class="bc-error" id="lead-reason-error" data-error-for="reason" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-problem">В чём сейчас проблема?</label>
+          <p class="bc-hint" id="lead-problem-hint">Что не получается, что уже пробовали. От {LEAD_ANSWER_LIMITS.problem.min} знаков.</p>
+          <textarea id="lead-problem" name="problem" rows="5" required maxlength={LEAD_ANSWER_LIMITS.problem.max} aria-describedby="lead-problem-hint lead-problem-count lead-problem-error"></textarea>
+          <p class="bc-count" id="lead-problem-count" data-count-for="problem">0 из {LEAD_ANSWER_LIMITS.problem.min} знаков</p>
+          <p class="bc-error" id="lead-problem-error" data-error-for="problem" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-story">Ваша история</label>
+          <p class="bc-hint" id="lead-story-hint">Где работали или учились, сколько лет, какой стек, сколько откликов и собеседований. От {LEAD_ANSWER_LIMITS.story.min} знаков.</p>
+          <textarea id="lead-story" name="story" rows="5" required maxlength={LEAD_ANSWER_LIMITS.story.max} aria-describedby="lead-story-hint lead-story-count lead-story-error"></textarea>
+          <p class="bc-count" id="lead-story-count" data-count-for="story">0 из {LEAD_ANSWER_LIMITS.story.min} знаков</p>
+          <p class="bc-error" id="lead-story-error" data-error-for="story" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-goal">Какой результат будет успехом и к какому сроку?</label>
+          <textarea id="lead-goal" name="goal" rows="3" required maxlength={LEAD_ANSWER_LIMITS.goal.max} aria-describedby="lead-goal-error"></textarea>
+          <p class="bc-error" id="lead-goal-error" data-error-for="goal" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-urgency">Насколько срочно?</label>
+          <select id="lead-urgency" name="urgency" required aria-describedby="lead-urgency-error">
+            <option value="">Выберите</option>
+            {LEAD_URGENCIES.map(({ value, label }) => <option value={value}>{label}</option>)}
+          </select>
+          <p class="bc-error" id="lead-urgency-error" data-error-for="urgency" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-hours">Сколько часов в неделю готовы уделять?</label>
+          <select id="lead-hours" name="hoursPerWeek" required aria-describedby="lead-hours-error">
+            <option value="">Выберите</option>
+            {LEAD_HOURS.map(({ value, label }) => <option value={value}>{label}</option>)}
+          </select>
+          <p class="bc-error" id="lead-hours-error" data-error-for="hoursPerWeek" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-resume">Резюме <span class="bc-optional">необязательно</span></label>
+          <p class="bc-hint" id="lead-resume-hint">PDF или DOCX, до 5 МБ. Файл видит только наставник. Паспортные данные и другие лишние сведения лучше убрать.</p>
+          <input id="lead-resume" name="resume" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" aria-describedby="lead-resume-hint lead-resume-error" />
+          <p class="bc-error" id="lead-resume-error" data-error-for="resume" hidden></p>
+        </div>
+        <div class="bc-field">
+          <label for="lead-links">Ссылки <span class="bc-optional">необязательно</span></label>
+          <p class="bc-hint" id="lead-links-hint">GitHub, hh, LinkedIn, сайт. Каждую с новой строки, не больше {LEAD_LINKS_MAX}.</p>
+          <textarea id="lead-links" name="links" rows="3" maxlength="1600" autocapitalize="none" spellcheck="false" aria-describedby="lead-links-hint lead-links-error"></textarea>
+          <p class="bc-error" id="lead-links-error" data-error-for="links" hidden></p>
+        </div>
+        <div class="bc-trap" aria-hidden="true">
+          <label for="lead-website">Сайт</label>
+          <input id="lead-website" name="website" type="text" tabindex="-1" autocomplete="off" />
+        </div>
+        <div class="bc-consent">
+          <input id="lead-consent" name="consent" type="checkbox" required aria-describedby="lead-consent-error" />
+          <label for="lead-consent">Даю <a href={CONSENT_PATH} target="_blank">согласие на обработку персональных данных</a> из этой анкеты, чтобы получить ответ на заявку.</label>
+          <p class="bc-error" id="lead-consent-error" data-error-for="consent" hidden></p>
+        </div>
+        <button class="bc-button" type="submit" data-submit>Оставить заявку</button>
+        <p class="bc-form-status" data-status role="status" aria-live="polite"></p>
+        <noscript><p class="bc-form-status">Чтобы отправить заявку, включите JavaScript.</p></noscript>
+        <p class="bc-form-note">Как мы храним и удаляем данные, написано в <a href={PRIVACY_PATH} target="_blank">политике обработки персональных данных</a>.</p>
+      </form>
+      <div class="bc-done" data-done tabindex="-1" hidden>
+        <h3>Заявка сохранена</h3>
+        <p>Теперь напишите мне лично в Telegram, я Евгений Надточеев, наставник буткемпа. Так я пойму, что вам это действительно важно. Сообщение уже заполнено, останется его отправить.</p>
+        <a class="bc-button bc-telegram ym-disable-tracklink" data-telegram-link href={PERSONAL_TELEGRAM.url} target="_blank" rel="noopener">Написать в Telegram @{PERSONAL_TELEGRAM.handle}</a>
+        <p>Заявку я прочитаю сам. Если она подходит, на <strong data-done-email></strong> придёт письмо со входным заданием.</p>
+      </div>
+  </section>
+  <script src="../../scripts/bootcamp-form.ts"></script>
+</ReactNextLayout>

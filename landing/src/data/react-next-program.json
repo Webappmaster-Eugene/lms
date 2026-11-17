@@ -1,0 +1,243 @@
+{
+  "key": "react-next",
+  "id": "react-next-bootcamp",
+  "version": "react-next-bootcamp-v1",
+  "title": "React + Next.js: frontend сервиса проката",
+  "courseSlug": "react-next-bootcamp-manuals",
+  "landingPath": "/bootcamp/react-next/",
+  "priceKopecks": 4500000,
+  "groupLimit": 10,
+  "weeks": [
+    {
+      "number": 0,
+      "slug": "00-preparation",
+      "title": "Подготовка рабочего места",
+      "topic": "JavaScript, вёрстка, TypeScript, Git, Docker и первый запуск API",
+      "outcomes": [
+        "K00"
+      ],
+      "readingMinutes": 60,
+      "practiceMinutes": 300
+    },
+    {
+      "number": 1,
+      "slug": "01-components",
+      "title": "Компоненты и JSX",
+      "topic": "Семантическая карточка инструмента и композиция компонентов",
+      "outcomes": [
+        "K01"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 2,
+      "slug": "02-state",
+      "title": "Состояние и события",
+      "topic": "Выбор инструмента, события и вычисляемые значения",
+      "outcomes": [
+        "K02"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 3,
+      "slug": "03-forms",
+      "title": "Формы и проверка данных",
+      "topic": "Редактирование каталога и понятные ошибки полей",
+      "outcomes": [
+        "K03"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 4,
+      "slug": "04-effects",
+      "title": "Запросы и эффекты",
+      "topic": "Загрузка каталога, отмена запросов и гонки ответов",
+      "outcomes": [
+        "K04"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 5,
+      "slug": "05-routing",
+      "title": "Маршрутизация и URL",
+      "topic": "Фильтры, поиск, пагинация и восстановление адреса",
+      "outcomes": [
+        "K05"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 6,
+      "slug": "06-sessions",
+      "title": "Сессии и роли",
+      "topic": "Cookie, CSRF, организации и доступ сотрудников",
+      "outcomes": [
+        "K06"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 7,
+      "slug": "07-server-state",
+      "title": "Серверное состояние",
+      "topic": "Кэш запросов, мутации и обновление каталога",
+      "outcomes": [
+        "K07"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 8,
+      "slug": "08-bookings",
+      "title": "Брони и конкуренция",
+      "topic": "Доступность, создание брони и конфликт занятого экземпляра",
+      "outcomes": [
+        "K08"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 9,
+      "slug": "09-rental",
+      "title": "Выдача и возврат",
+      "topic": "Состояния брони, фотографии и операции сотрудника",
+      "outcomes": [
+        "K09"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 10,
+      "slug": "10-react-quality",
+      "title": "Качество React-приложения",
+      "topic": "Доступность, адаптивность, тесты и диагностика",
+      "outcomes": [
+        "K10"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 11,
+      "slug": "11-next-foundations",
+      "title": "Первые страницы Next.js",
+      "topic": "App Router, layouts и публичная витрина",
+      "outcomes": [
+        "K11"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 12,
+      "slug": "12-server-components",
+      "title": "Серверные и клиентские компоненты",
+      "topic": "Границы выполнения и загрузка данных из Node.js",
+      "outcomes": [
+        "K12"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 13,
+      "slug": "13-rendering",
+      "title": "Рендеринг и кэширование",
+      "topic": "Streaming, публичный кэш и актуальность данных",
+      "outcomes": [
+        "K13"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 14,
+      "slug": "14-search-seo",
+      "title": "Поиск и SEO",
+      "topic": "URL поиска, metadata, изображения и индексация",
+      "outcomes": [
+        "K14"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 15,
+      "slug": "15-customer-account",
+      "title": "Кабинет клиента",
+      "topic": "Регистрация, вступление в прокат и собственные брони",
+      "outcomes": [
+        "K15"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 16,
+      "slug": "16-payments",
+      "title": "Оплата и неопределённость",
+      "topic": "Идемпотентность, повтор запроса и неизвестный исход",
+      "outcomes": [
+        "K16"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 17,
+      "slug": "17-integration",
+      "title": "Два интерфейса одного продукта",
+      "topic": "Сквозные сценарии, изоляция организаций и отчёты",
+      "outcomes": [
+        "K17"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 18,
+      "slug": "18-delivery",
+      "title": "Безопасность и выпуск",
+      "topic": "Производительность, E2E, HTTPS и запуск полного проекта",
+      "outcomes": [
+        "K18"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 19,
+      "slug": "19-change-request",
+      "title": "Самостоятельное изменение",
+      "topic": "Реализация нового требования в обоих интерфейсах",
+      "outcomes": [
+        "K19"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    },
+    {
+      "number": 20,
+      "slug": "20-defense",
+      "title": "Защита и паспорт навыков",
+      "topic": "Защита, изменение кода и техническое собеседование",
+      "outcomes": [
+        "K20"
+      ],
+      "readingMinutes": 90,
+      "practiceMinutes": 720
+    }
+  ]
+}

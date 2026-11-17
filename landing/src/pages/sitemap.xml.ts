@@ -4,7 +4,7 @@ import { SITE_URL } from '../config'
 
 /** Генерируется при сборке: статичный файл забывали обновлять, и lastmod
  *  месяцами врал. Changefreq и priority Google игнорирует, поэтому их нет. */
-const PAGES = ['/', '/bootcamp/nodejs/', '/bootcamp/nodejs/program/', '/bootcamp/nodejs/format/', '/bootcamp/nodejs/payment/', '/bootcamp/nodejs/offer/', '/bootcamp/nodejs/quality/', '/privacy/', '/consent/'] as const
+const PAGES = ['/', '/bootcamp/nodejs/', '/bootcamp/nodejs/program/', '/bootcamp/nodejs/format/', '/bootcamp/nodejs/payment/', '/bootcamp/nodejs/offer/', '/bootcamp/nodejs/quality/', '/bootcamp/react-next/', '/bootcamp/react-next/program/', '/bootcamp/react-next/format/', '/bootcamp/react-next/payment/', '/bootcamp/react-next/offer/', '/bootcamp/react-next/quality/', '/bootcamp/react-next/sample/', '/privacy/', '/consent/'] as const
 
 export const GET: APIRoute = () => {
   const lastmod = new Date().toISOString().slice(0, 10)

@@ -1,0 +1,26 @@
+.rn-main { min-width: 0; }
+.rn-product { padding: 28px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.rn-product h2 { font-size: 23px; }
+.rn-product p { margin-top: 14px; }
+.rn-screens { display: grid; gap: 20px; margin-top: 24px; }
+.rn-screen { background: var(--page); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.rn-screen h3 { font-size: 15px; padding: 14px 16px; border-bottom: 1px solid var(--line); background: #e9f4ee; }
+.rn-screen dl { display: grid; grid-template-columns: 1fr auto; gap: 10px 16px; padding: 16px; font-size: 15px; }
+.rn-screen dt { color: var(--muted); }
+.rn-screen dd { font-weight: 700; }
+.rn-shared { padding: 14px 16px; border-left: 4px solid var(--accent); background: var(--page); font-size: 15px; }
+.rn-status { margin: 20px 0; padding: 14px 18px; border-left: 4px solid var(--tape); background: #fff9dd; }
+.rn-module-title { font-size: 18px; margin-top: 30px; }
+.rn-code { padding: 20px; overflow-x: auto; max-width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 14px; line-height: 1.6; tab-size: 2; }
+.rn-code code { white-space: pre; }
+.rn-main pre.astro-code { padding: 20px; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; line-height: 1.6; }
+.rn-main pre.astro-code code { padding: 0; background: transparent; }
+.rn-caption { font-size: 14px; color: var(--muted); }
+.rn-main .bc-program { table-layout: fixed; }
+.rn-main .bc-program tr > :first-child { width: 4.5em; }
+.rn-main .bc-program td { overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .rn-product { padding: 20px; }
+  .rn-screen dl { gap: 8px; grid-template-columns: 1fr; }
+  .rn-screen dd + dt { margin-top: 8px; }
+}

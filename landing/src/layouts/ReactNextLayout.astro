@@ -1,0 +1,21 @@
+---
+import BootcampLayout from './BootcampLayout.astro'
+import BootcampHeader from '../components/BootcampHeader.astro'
+import BootcampFooter from '../components/BootcampFooter.astro'
+import { NAVIGATION } from '../data/react-next-bootcamp'
+import '../styles/react-next-bootcamp.css'
+
+interface Props {
+  title: string
+  description: string
+  crumb?: string
+  schema?: Record<string, unknown>[]
+  document?: boolean
+}
+const { title, description, crumb, schema, document = true } = Astro.props
+---
+<BootcampLayout title={title} description={description} crumb={crumb} schema={schema} navigation={NAVIGATION} ogImage="/og.png" ogImageAlt="MentorCareer - обучение с наставником">
+  <BootcampHeader navigation={NAVIGATION} />
+  <main id="main" class:list={[document && 'bc-doc', 'rn-main']}><slot /></main>
+  <BootcampFooter navigation={NAVIGATION} />
+</BootcampLayout>

@@ -68,7 +68,7 @@ function resolveFile(pathname) {
 function duplicateRedirect(url) {
   if (/^\/index\.html(?:\?|$)/.test(url)) return `/${url.slice('/index.html'.length)}`.replace(/^\/\?$/, '/')
   if (/^\/{2,}/.test(url)) return url.replace(/^\/+/, '/')
-  const page = url.match(/^\/(bootcamp\/nodejs|bootcamp\/nodejs\/payment|bootcamp\/nodejs\/offer|bootcamp\/nodejs\/quality|bootcamp\/nodejs\/program|bootcamp\/nodejs\/format|privacy|consent)(\?.*)?$/)
+  const page = url.match(/^\/(bootcamp\/nodejs|bootcamp\/nodejs\/payment|bootcamp\/nodejs\/offer|bootcamp\/nodejs\/quality|bootcamp\/nodejs\/program|bootcamp\/nodejs\/format|bootcamp\/react-next|bootcamp\/react-next\/program|bootcamp\/react-next\/format|bootcamp\/react-next\/payment|bootcamp\/react-next\/offer|bootcamp\/react-next\/quality|bootcamp\/react-next\/sample|privacy|consent)(\?.*)?$/)
   if (page) return `/${page[1]}/${page[2] ?? ''}`
   return null
 }

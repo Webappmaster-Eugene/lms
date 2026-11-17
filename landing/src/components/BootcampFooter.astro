@@ -3,21 +3,33 @@ import { AUTHOR_URL, LMS_URL } from '../config'
 import { BOOTCAMP_PATH, CONSENT_PATH, FORMAT_PATH, OFFER_PATH, PAGE_UPDATED, PAYMENT_PATH, PRIVACY_PATH, PROGRAM_PATH, QUALITY_PATH } from '../data/bootcamp'
 import { PERSONAL_TELEGRAM } from '../data/bootcamp-form'
 import { OPERATOR } from '../data/privacy'
+import type { BootcampNavigation } from '../data/bootcamp-navigation'
+
+interface Props { navigation?: BootcampNavigation }
+const { navigation } = Astro.props
+const path = navigation?.path ?? BOOTCAMP_PATH
+const title = navigation?.title ?? 'Буткемп Node.js'
+const updated = navigation?.updated ?? PAGE_UPDATED
+const programPath = navigation?.programPath ?? PROGRAM_PATH
+const formatPath = navigation?.formatPath ?? FORMAT_PATH
+const paymentPath = navigation?.paymentPath ?? PAYMENT_PATH
+const offerPath = navigation?.offerPath ?? OFFER_PATH
+const qualityPath = navigation?.qualityPath ?? QUALITY_PATH
 ---
 <footer class="bc-footer">
   <div class="bc-footer-about">
-    <p><a href={BOOTCAMP_PATH}>MentorCareer, буткемп Node.js</a></p>
+    <p><a href={path}>MentorCareer, {title.charAt(0).toLowerCase() + title.slice(1)}</a></p>
     <!-- Исполнитель и оператор данных: закон о защите прав потребителей требует, чтобы покупатель видел, с кем имеет дело. -->
     <p>Исполнитель: {OPERATOR.name}, {OPERATOR.status}, ИНН {OPERATOR.inn}.</p>
     <p>Связь: почта <a href={`mailto:${OPERATOR.email}`}>{OPERATOR.email}</a>, Telegram <a href={PERSONAL_TELEGRAM.url} target="_blank" rel="noopener noreferrer">@{PERSONAL_TELEGRAM.handle}</a></p>
-    <p>Страница обновлена {PAGE_UPDATED.text}</p>
+    <p>Страница обновлена {updated.text}</p>
   </div>
   <nav aria-label="Ссылки в подвале">
-    <a href={PROGRAM_PATH}>Программа по неделям</a>
-    <a href={FORMAT_PATH}>Как проходит обучение</a>
-    <a href={PAYMENT_PATH}>Оплата и возврат</a>
-    <a href={OFFER_PATH}>Договор-оферта</a>
-    <a href={QUALITY_PATH}>Как мы отвечаем за качество</a>
+    <a href={programPath}>Программа по неделям</a>
+    <a href={formatPath}>Как проходит обучение</a>
+    <a href={paymentPath}>Оплата и возврат</a>
+    <a href={offerPath}>Договор-оферта</a>
+    <a href={qualityPath}>Как мы отвечаем за качество</a>
     <a href={PRIVACY_PATH}>Политика обработки персональных данных</a>
     <a href={CONSENT_PATH}>Согласие на обработку данных</a>
     <a href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">Сайт наставника nadtocheev.ru</a>

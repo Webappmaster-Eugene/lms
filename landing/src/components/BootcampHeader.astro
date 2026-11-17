@@ -1,16 +1,22 @@
 ---
 import { BOOTCAMP_PATH, FORMAT_PATH, PROGRAM_PATH } from '../data/bootcamp'
+import type { BootcampNavigation } from '../data/bootcamp-navigation'
 import BrandMark from './BrandMark.astro'
 import BrandWordmark from './BrandWordmark.astro'
 
 interface Props {
   /** На странице буткемпа кнопка ведёт к форме, на остальных — к форме на странице буткемпа. */
   cta?: string
+  navigation?: BootcampNavigation
 }
-const { cta = `${BOOTCAMP_PATH}#apply` } = Astro.props
+const { navigation, cta = `${navigation?.path ?? BOOTCAMP_PATH}#apply` } = Astro.props
+const path = navigation?.path ?? BOOTCAMP_PATH
+const title = navigation?.title ?? 'Буткемп Node.js'
+const programPath = navigation?.programPath ?? PROGRAM_PATH
+const formatPath = navigation?.formatPath ?? FORMAT_PATH
 ---
 <header class="bc-header">
-  <a class="bc-brand" href={BOOTCAMP_PATH}><BrandMark size={32} /><BrandWordmark class="bc-brand-word" /><span class="bc-brand-product">Буткемп Node.js</span></a>
-  <nav class="bc-header-nav" aria-label="Страницы буткемпа"><a href={PROGRAM_PATH}>Программа</a><a href={FORMAT_PATH}>Как проходит</a></nav>
+  <a class="bc-brand" href={path}><BrandMark size={32} /><BrandWordmark class="bc-brand-word" /><span class="bc-brand-product">{title}</span></a>
+  <nav class="bc-header-nav" aria-label="Страницы буткемпа"><a href={programPath}>Программа</a><a href={formatPath}>Как проходит</a></nav>
   <a class="bc-header-cta" href={cta}>Оставить заявку</a>
 </header>
