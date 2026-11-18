@@ -128,3 +128,8 @@ Claude auto-memory читается вживую через её MEMORY.md; те
 - Реальные даты аренды backend: `[from,to)`, день возврата не оплачивается.
   Не переносить включительность концов из старого задания Node.js на новый UI.
   Источник: bootcamp/reference/src/booking/booking-request.ts.
+- 18.11.2026 источники комплекта опубликованы в отдельных приватных GitHub-
+  репозиториях `Webappmaster-Eugene/frontend-bootcamp-content`,
+  `frontend-bootcamp-reference` и `frontend-bootcamp-starter`; ветка `main`.
+  Видимость проверена через GitHub API. Эталон и ответы в публичную LMS не входят.
+  Источник: [репозиторий материалов](https://github.com/Webappmaster-Eugene/frontend-bootcamp-content).

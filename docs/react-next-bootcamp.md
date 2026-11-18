@@ -9,6 +9,8 @@ Node.js-буткемпа: React для сотрудников, Next.js для к
 
 Комплект находится в рабочем каталоге `bootcamp/frontend/` рядом с репозиторием
 LMS. Это три отдельных Git-репозитория: `content`, `starter`, `reference`.
+Их приватные GitHub-репозитории в аккаунте `Webappmaster-Eugene`:
+`frontend-bootcamp-content`, `frontend-bootcamp-starter`, `frontend-bootcamp-reference`.
 Эталон, ответы и закрытые проверки не переносятся в публичный репозиторий LMS.
 В `content/program.json` находится программа всех недель.
 
