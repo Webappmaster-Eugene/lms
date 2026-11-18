@@ -16,7 +16,7 @@ interface Props {
   ogImageAlt?: string
 }
 
-const { title, description, schema = [], noindex = false, crumb, ogImage: ogPath = '/bootcamp/og-nodejs.png', ogImageAlt = 'Буткемп Node.js: backend сервиса проката за 12 недель, предзапись на поток' } = Astro.props
+const { title, description, schema = [], noindex = false, crumb, ogImage: ogPath = `/bootcamp/og-nodejs.png?v=${PAGE_UPDATED.iso}`, ogImageAlt = 'Буткемп Node.js: backend сервиса проката за 12 недель, предзапись на поток' } = Astro.props
 const canonicalUrl = new URL(Astro.url.pathname, SITE_URL).href
 const ogImage = new URL(ogPath, SITE_URL).href
 const jsonLd = {
