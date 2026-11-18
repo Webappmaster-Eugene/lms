@@ -133,3 +133,9 @@ Claude auto-memory читается вживую через её MEMORY.md; те
   `frontend-bootcamp-reference` и `frontend-bootcamp-starter`; ветка `main`.
   Видимость проверена через GitHub API. Эталон и ответы в публичную LMS не входят.
   Источник: [репозиторий материалов](https://github.com/Webappmaster-Eugene/frontend-bootcamp-content).
+- 18.11.2026 код программы и лендинг выкачены из `main` (первый выкат
+  `678e924`). Прочитаны 16 страниц, 5 CSS/JS-файлов, 7 редиректов и закрытые
+  API; цена React 45 000 рублей, дата старта отсутствует. Импорт методичек
+  в production выполняется отдельно через авторизованный API, после личного
+  подтверждения конкретной операции. Источник: [лендинг](https://info.mentorcareer.ru/bootcamp/react-next/)
+  и docs/react-next-bootcamp.md.
