@@ -75,9 +75,10 @@ test('«Отметить пройденным» начисляет баллы: �
   expect(text.indexOf(USERS.doer.lastName)).toBeLessThan(text.indexOf(USERS.student.lastName))
 
   await page.goto('/')
-  // Внутри региона: при потоковой отрисовке на миг есть и скрытая копия блока, строгий поиск по странице её ловит.
-  await expect(page.getByRole('region', { name: 'Статистика обучения' }).getByText('Дней подряд', { exact: true }).locator('..')).toContainText('1')
-  await expect(page.getByText('Сегодня урок уже пройден - серия 1 день подряд')).toBeVisible()
+  // Доступная область main исключает скрытые копии сегментов при потоковой отрисовке.
+  const dashboard = page.getByRole('main')
+  await expect(dashboard.getByRole('region', { name: 'Статистика обучения' }).getByText('Дней подряд', { exact: true }).locator('..')).toContainText('1')
+  await expect(dashboard.getByText('Сегодня урок уже пройден - серия 1 день подряд', { exact: true })).toBeVisible()
 })
 
 test('заметка к уроку сохраняется, переживает перезагрузку и видна среди всех заметок', async ({ page }) => {
