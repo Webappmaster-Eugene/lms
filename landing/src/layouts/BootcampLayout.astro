@@ -18,7 +18,7 @@ interface Props {
   navigation?: BootcampNavigation
 }
 
-const { title, description, schema = [], noindex = false, crumb, navigation, ogImage: ogPath = '/bootcamp/og-nodejs.png', ogImageAlt = 'Буткемп Node.js: backend сервиса проката за 12 недель, предзапись на поток' } = Astro.props
+const { title, description, schema = [], noindex = false, crumb, navigation, ogImage: ogPath = `/bootcamp/og-nodejs.png?v=${PAGE_UPDATED.iso}`, ogImageAlt = 'Буткемп Node.js: backend сервиса проката за 12 недель, предзапись на поток' } = Astro.props
 const updated = navigation?.updated ?? PAGE_UPDATED
 const bootcampTitle = navigation?.title ?? 'Буткемп Node.js'
 const bootcampPath = navigation?.path ?? BOOTCAMP_PATH

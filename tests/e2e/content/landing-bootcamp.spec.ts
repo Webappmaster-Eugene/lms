@@ -6,7 +6,7 @@ import { LEAD_ANSWERS, LEAD_PDF, LEAD_PDF_NEAR_LIMIT } from '../../fixtures/boot
 import { zipOf } from '../../fixtures/zip'
 import { ENTRY_TASKS } from '../../../src/data/bootcamp-entry/tasks'
 import { AUTHOR_PROFILES, METRIKA_ID, ORGANIZATION_ID, ORGANIZATION_PROFILES } from '../../../landing/src/config'
-import { FORMAT_PATH, GROUP_LIMIT, LAST_CLASS, LAST_CLASS_ISO, PROGRAM_PATH, START, START_ISO, WEEKS } from '../../../landing/src/data/bootcamp'
+import { FORMAT_PATH, GROUP_LIMIT, LAST_CLASS, LAST_CLASS_ISO, PRICE, PROGRAM_PATH, START, START_ISO, WEEKS } from '../../../landing/src/data/bootcamp'
 import { INTERVIEW_QUESTIONS_TOTAL, PROGRAM_WEEKS_DETAILED, weekAnchor } from '../../../landing/src/data/bootcamp-program'
 
 /**
@@ -86,7 +86,7 @@ test('страница: метаданные, CSP без нарушений, а�
   expect(description?.length ?? 0).toBeGreaterThan(70)
   expect(description?.length ?? 0).toBeLessThanOrEqual(160)
   // Предзапись: цена видна, но оплаты на странице нет.
-  await expect(page.locator('main')).toContainText('45 000 ₽ за весь поток')
+  await expect(page.locator('main')).toContainText(`${PRICE.text} за весь поток`)
   await expect(page.locator('main')).not.toContainText(/оплатить|купить/i)
   expect(problems).toEqual([])
 
