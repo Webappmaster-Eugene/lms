@@ -6,7 +6,7 @@ import type { Payload, PayloadRequest } from 'payload'
 import { formatFreezeDate } from '@/lib/account-freeze'
 import { weeklySummaryWindow } from '@/lib/bootcamp-funnel'
 import {
-  BOOTCAMP_PROGRAM_WEEKS, REVIEW_SLA_DAYS, scheduleLag, weekCell,
+  BOOTCAMP_PROGRAM_WEEKS, REVIEW_SLA_DAYS, reviewSlaDays, scheduleLag, weekCell,
   type BootcampProgressReport, type ProgressStudent, type SubmissionFacts,
 } from '@/lib/bootcamp-progress'
 import { loadPublishedProgrammeLessons } from '@/lib/course-completion'
@@ -53,7 +53,7 @@ export async function bootcampProgress(payload: Payload, req: PayloadRequest, qu
   const enrollments = rowsOf<EnrollmentRow>(await db(payload).execute(sql`
     select e.id, e.lead_id, e.first_name, e.last_name, e.gitlab_username, e.gitlab_project_url, e.lms_user_id, coalesce(l.is_test, false) as is_test
     from bootcamp_enrollments e left join bootcamp_leads l on l.id = e.lead_id
-    where e.stream_group = ${stream.gitlabGroup} and e.status = 'done' and e.revoked_at is null
+    where e.stream_group = ${stream.gitlabGroup} and coalesce(e.program, 'nodejs') = ${stream.program} and e.status = 'done' and e.revoked_at is null
     order by e.last_name, e.first_name, e.id`)).filter((row) => query.withTest || !row.is_test)
   const ids = enrollments.map((row) => Number(row.id))
   const userIds = enrollments.flatMap((row) => row.lms_user_id ? [Number(row.lms_user_id)] : [])
@@ -79,7 +79,7 @@ export async function bootcampProgress(payload: Payload, req: PayloadRequest, qu
     const items = byEnrollment.get(Number(row.id)) ?? []
     const weeks = Array.from({ length: BOOTCAMP_PROGRAM_WEEKS }, (_, index) => {
       const week = index + 1
-      return weekCell(week, items.filter((item) => Number(item.week) === week).map(facts), dueByWeek.get(week) ?? null, now)
+      return weekCell(week, items.filter((item) => Number(item.week) === week).map(facts), dueByWeek.get(week) ?? null, now, reviewSlaDays(stream.program))
     })
     const lag = scheduleLag(weeks, now)
     const submissionTimes = items.flatMap((item) => [item.opened_at, item.last_commit_at, item.pipeline_at, item.verdict_at, item.merged_at].flatMap((value) => iso(value) ?? []))
@@ -118,10 +118,10 @@ export async function bootcampProgress(payload: Payload, req: PayloadRequest, qu
   }
 }
 
-type AlertRow = { id: number; week: number; mr_url: string | null; verdict_at: string; gitlab_username: string; first_name: string; last_name: string; lead_id: number }
+type AlertRow = { id: number; week: number; mr_url: string | null; verdict_at: string; gitlab_username: string; first_name: string; last_name: string; lead_id: number; program: string | null }
 
 /**
- * Сдача ждёт ревью дольше 3 дней - одно сообщение наставнику. Отметка ставится условным UPDATE
+ * Сдача ждёт ревью дольше срока своей программы - одно сообщение наставнику. Отметка ставится условным UPDATE
  * до отправки, поэтому повторный запуск планировщика второго сообщения не шлёт. Новый вердикт
  * после новых коммитов снимает отметку: срок ответа считается заново.
  */
@@ -131,12 +131,12 @@ export async function submissionReviewAlerts(payload: Payload): Promise<number> 
     from bootcamp_enrollments e left join bootcamp_leads l on l.id = e.lead_id
     where s.enrollment_id = e.id and not coalesce(l.is_test, false)
       and s.verdict = 'passed' and s.merged_at is null and s.closed_at is null and s.review_alert_at is null
-      and s.verdict_at < now() - make_interval(days => ${REVIEW_SLA_DAYS})
+      and s.verdict_at < now() - make_interval(days => case when e.program = 'react-next' then ${reviewSlaDays('react-next')}::int else ${REVIEW_SLA_DAYS}::int end)
       and (s.last_commit_at is null or s.last_commit_at <= s.verdict_at)
-    returning s.id, s.week, s.mr_url, s.verdict_at, e.gitlab_username, e.first_name, e.last_name, e.lead_id`))
+    returning s.id, s.week, s.mr_url, s.verdict_at, e.gitlab_username, e.first_name, e.last_name, e.lead_id, e.program`))
   for (const row of due) {
     await notifyAdmins({
-      title: `Сдача ждёт ревью больше ${REVIEW_SLA_DAYS} дней: ${row.first_name} ${row.last_name}`.trim(),
+      title: `Сдача ждёт ревью больше ${reviewSlaDays(row.program)} дней: ${row.first_name} ${row.last_name}`.trim(),
       lines: [`Неделя ${Number(row.week)}, проверка пройдена ${formatFreezeDate(row.verdict_at)}`, `GitLab: ${row.gitlab_username}`],
       link: row.mr_url ?? adminLink(PROGRESS_ADMIN_PATH),
     })
@@ -171,7 +171,7 @@ export async function sendBootcampLaggingDigest(payload: Payload, now = new Date
         if (lagging.length === 0 && report.summary.waitingReview === 0) return false
         const lines = lagging.slice(0, MAX_LINES).map((student) => `${student.title} - не принято ${student.lag} из ${student.planned}: недели ${student.weeks.filter((cell) => cell.late && cell.state !== 'accepted').map((cell) => cell.week).join(', ')}`)
         if (lagging.length > MAX_LINES) lines.push(`и ещё ${lagging.length - MAX_LINES}`)
-        lines.push(report.summary.waitingReview > 0 ? `Ждут ревью: ${report.summary.waitingReview}, из них дольше ${REVIEW_SLA_DAYS} дней: ${report.summary.overdueReview}` : 'Сдач, которые ждут ревью, нет')
+        lines.push(report.summary.waitingReview > 0 ? `Ждут ревью: ${report.summary.waitingReview}, из них дольше ${reviewSlaDays(stream.program)} дней: ${report.summary.overdueReview}` : 'Сдач, которые ждут ревью, нет')
         await tx.execute(sql`update admin_digests set summary = ${lines.join('\n').slice(0, 4000)}, updated_at = now() where kind = 'bootcamp-lagging' and period = ${`${window.week}:${stream.id}`}`)
         await notifyAdminsAfterCommit(req, { title: `${stream.title}: отстают от плана ${lagging.length} из ${report.summary.students}`, lines, link: adminLink(`${PROGRESS_ADMIN_PATH}?stream=${stream.id}`) })
         return true

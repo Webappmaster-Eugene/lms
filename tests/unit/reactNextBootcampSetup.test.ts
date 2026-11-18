@@ -27,7 +27,7 @@ describe('настройка программы React + Next.js', () => {
     const { api } = fixture()
     expect(await setupReactNextBootcamp(api, true)).toEqual({ action: 'created', id: 7, isActive: false })
     expect(api.createProgram).toHaveBeenCalledWith(expect.objectContaining({
-      key: 'react-next', priceKopecks: 4_500_000, manualsCourse: course.id,
+      key: 'react-next', priceKopecks: 2_000_000, manualsCourse: course.id,
       isActive: false, entryTaskSet: 'rental-frontend-js',
     }))
     expect(api.readProgram).toHaveBeenCalledWith(7)

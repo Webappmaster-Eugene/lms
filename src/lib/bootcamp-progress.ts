@@ -4,8 +4,10 @@
  */
 
 export const BOOTCAMP_PROGRAM_WEEKS = 20
-/** Ответ на сдачу - в течение 3 дней (документ 13 плана буткемпа). */
+/** Node.js: ответ на сдачу в течение 3 дней (документ 13 плана буткемпа). */
 export const REVIEW_SLA_DAYS = 3
+export const REACT_NEXT_REVIEW_SLA_DAYS = 5
+export const reviewSlaDays = (program?: string | null): number => program === 'react-next' ? REACT_NEXT_REVIEW_SLA_DAYS : REVIEW_SLA_DAYS
 const DAY_MS = 86_400_000
 
 export const submissionVerdicts = ['passed', 'failed', 'not-run', 'infra'] as const
@@ -85,7 +87,7 @@ function submissionState(item: SubmissionFacts): { state: WeekState; since: stri
  * Неделя по всем её MR: слитый MR принимает неделю; иначе важен последний открытый, а закрытые
  * без слияния показываются, только если открытых нет.
  */
-export function weekCell(week: number, items: readonly SubmissionFacts[], dueAt: string | null, now: number = Date.now()): WeekCell {
+export function weekCell(week: number, items: readonly SubmissionFacts[], dueAt: string | null, now: number = Date.now(), reviewDays = REVIEW_SLA_DAYS): WeekCell {
   const due = dueAt ? Date.parse(dueAt) : null
   const merged = items.filter((item) => item.mergedAt).sort((left, right) => time(left.mergedAt) - time(right.mergedAt))[0]
   const open = items.filter((item) => !item.mergedAt && !(item.closedAt && time(item.closedAt) >= time(item.openedAt))).sort((left, right) => time(right.openedAt) - time(left.openedAt) || right.mrIid - left.mrIid)[0]
@@ -95,7 +97,7 @@ export function weekCell(week: number, items: readonly SubmissionFacts[], dueAt:
   const accepted = state === 'accepted'
   return {
     week, state, since, mrUrl: chosen.mrUrl, dueAt,
-    overdue: state === 'review' && since !== null && now - Date.parse(since) > REVIEW_SLA_DAYS * DAY_MS,
+    overdue: state === 'review' && since !== null && now - Date.parse(since) > reviewDays * DAY_MS,
     late: due !== null && (accepted ? Date.parse(since ?? '') > due : due <= now),
     checks: chosen.checksTotal !== null && chosen.checksPassed !== null ? `${chosen.checksPassed} из ${chosen.checksTotal}` : null,
   }

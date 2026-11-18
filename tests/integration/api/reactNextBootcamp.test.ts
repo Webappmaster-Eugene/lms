@@ -47,7 +47,7 @@ describe('React + Next.js как отдельная платная програ�
     const programs = await api.findProgram(REACT_NEXT_BOOTCAMP.key)
     expect(programs).toHaveLength(1)
     expect(programs[0]).toMatchObject({
-      manualsCourse: frontend.course.id, isActive: false, priceKopecks: 4_500_000,
+      manualsCourse: frontend.course.id, isActive: false, priceKopecks: 2_000_000,
       gitlabCourseProject: 'react-next/course', gradingProject: 'react-next-staff/grading',
       entryTaskSet: 'rental-frontend-js',
     })
@@ -105,14 +105,14 @@ describe('React + Next.js как отдельная платная програ�
       group: REACT_NEXT_BOOTCAMP.gitlabStreamGroup, accessUntil: '', amount: '', dueDays: '', comment: '',
     })).status).toBe(200)
     const admitted = await payload.findByID({ collection: 'bootcamp-leads', id: lead.id, depth: 0 })
-    expect(admitted.paymentAmountKopecks).toBe(4_500_000)
+    expect(admitted.paymentAmountKopecks).toBe(2_000_000)
     expect(await paymentPageState(payload, admitted)).toMatchObject({
       program: 'React + Next.js', offerUrl: REACT_NEXT_BOOTCAMP.offerUrl,
       landingUrl: REACT_NEXT_BOOTCAMP.landingUrl,
     })
     const before = await getLearningAccess(payload, candidate, await createLocalReq({ user: candidate }, payload))
     expect(before.canAccessCourse(frontend.course.id)).toBe(false)
-    expect((await act({ action: 'mark-paid', amount: '45000', comment: 'Локальная проверка подтверждённой оплаты' })).status).toBe(200)
+    expect((await act({ action: 'mark-paid', amount: '20000', comment: 'Локальная проверка подтверждённой оплаты' })).status).toBe(200)
     const after = await getLearningAccess(payload, candidate, await createLocalReq({ user: candidate }, payload))
     expect(after.canAccessCourse(frontend.course.id)).toBe(true)
     expect(after.canAccessCourse(node.course.id)).toBe(false)

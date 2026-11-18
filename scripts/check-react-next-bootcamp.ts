@@ -134,7 +134,7 @@ async function main() {
     const programs = await find('bootcamp-programs', 'key', 'react-next')
     assert.equal(programs.length, 1)
     assert.equal(programs[0]?.isActive, false)
-    assert.equal(programs[0]?.priceKopecks, 4_500_000)
+    assert.equal(programs[0]?.priceKopecks, 2_000_000)
     assert.equal(programs[0]?.manualsCourse, course.id)
     await importPackage('--publish')
     const published = await api('GET', `/courses/${course.id}?depth=0`)

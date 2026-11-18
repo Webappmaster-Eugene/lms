@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-import { FIRST_STREAM, parseVerdict, scheduleLag, weekCell, weekFromBranch, type SubmissionFacts } from '@/lib/bootcamp-progress'
+import { FIRST_STREAM, parseVerdict, reviewSlaDays, scheduleLag, weekCell, weekFromBranch, type SubmissionFacts } from '@/lib/bootcamp-progress'
 import { gitlabTime } from '@/server/bootcamp-submissions'
 
 const DAY = 86_400_000
@@ -17,6 +17,16 @@ const report = (headline: string, extra = 'Коммит `5d1444952459`, попы
 const mr = (extra: Partial<SubmissionFacts> = {}): SubmissionFacts => ({
   mrIid: 1, mrUrl: 'https://git.test/mr/1', openedAt: ago(6), lastCommitAt: null, pipelineStatus: null, pipelineAt: null,
   verdict: null, checksPassed: null, checksTotal: null, verdictAt: null, mergedAt: null, closedAt: null, ...extra,
+})
+
+it('React + Next ждёт ревью пять дней, Node.js и старые записи — три', () => {
+  expect(reviewSlaDays('react-next')).toBe(5)
+  expect(reviewSlaDays('nodejs')).toBe(3)
+  expect(reviewSlaDays(null)).toBe(3)
+  const submission = mr({ verdict: 'passed', verdictAt: ago(4), lastCommitAt: ago(5) })
+  expect(weekCell(1, [submission], null, now).overdue).toBe(true)
+  expect(weekCell(1, [submission], null, now, reviewSlaDays('react-next')).overdue).toBe(false)
+  expect(weekCell(1, [{ ...submission, verdictAt: ago(5.1), lastCommitAt: ago(6) }], null, now, reviewSlaDays('react-next')).overdue).toBe(true)
 })
 
 describe('неделя из ветки и вердикт бота', () => {

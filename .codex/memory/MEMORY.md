@@ -139,3 +139,12 @@ Claude auto-memory читается вживую через её MEMORY.md; те
   в production выполняется отдельно через авторизованный API, после личного
   подтверждения конкретной операции. Источник: [лендинг](https://info.mentorcareer.ru/bootcamp/react-next/)
   и docs/react-next-bootcamp.md.
+- 19.11.2026 завершён последовательный автоматизированный прогон React + Next
+  из starter: этапы 00-20, выпуск v0.20.0, полный путь на одном Node.js backend.
+  Это работа ИИ, а не подтверждение самостоятельности человека. Источник:
+  [проект тестового ученика](https://github.com/Webappmaster-Eugene/frontend-bootcamp-student-rehearsal),
+  JOURNEY.md и docs/defense-rehearsal.md этого проекта.
+- Цена 20 000 рублей подготовлена в feat/react-next-revision. Срок «12 месяцв»
+  ожидает уточнения (1-2 месяца / 12 недель / 12 месяцев). Новые условия и PDF
+  не опубликованы; production остаётся на прежнем выпуске с ценой 45 000 рублей.
+  Источник: docs/react-next-bootcamp.md и REVISION-REPORT.md репозитория материалов.

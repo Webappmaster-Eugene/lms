@@ -11,7 +11,7 @@ const page = read('src/pages/bootcamp/react-next.astro')
 describe('React + Next.js: опубликованные условия и вход в общую платформу', () => {
   it('сохраняет выбранные цену, размер группы и последовательность недель', () => {
     expect(PROGRAM_KEY).toBe('react-next')
-    expect(PRICE.value).toBe(45_000)
+    expect(PRICE.value).toBe(20_000)
     expect(GROUP_LIMIT).toBe(10)
     expect(WEEKS).toBe(20)
     expect(PROGRAM_WEEKS.map((week) => week.number)).toEqual(Array.from({ length: 21 }, (_, index) => index))
@@ -73,7 +73,7 @@ describe('React + Next.js: опубликованные условия и вхо
 
   it('оферта не исключает включённое итоговое техническое собеседование', () => {
     const offer = read('src/pages/bootcamp/react-next/offer.astro')
-    expect(OFFER_VERSION).toBe('2026-11-17')
+    expect(OFFER_VERSION).toBe('2026-11-18')
     expect(offer).toContain('Техническое собеседование по пройденной программе входит в цену')
     expect(offer).toContain('сообщаются заказчику письмом до оплаты')
     expect(JSON.stringify({ FACTS, FAQ, SUMMARY })).not.toMatch(/[—–]/)

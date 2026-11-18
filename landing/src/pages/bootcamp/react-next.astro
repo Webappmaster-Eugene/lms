@@ -4,7 +4,7 @@ import { AUTHOR_URL, SITE_URL, ORGANIZATION_ID } from '../../config'
 import { BOOTCAMP_PATH, CONSENT_PATH, CONSENT_VERSION, COURSE_NAME, FACTS, FAQ, FORMAT_PATH, GROUP_LIMIT, OFFER_PATH, PAYMENT_PATH, PRICE, PRIVACY_PATH, PROGRAM_KEY, PROGRAM_PATH, PROGRAM_WEEKS, QUALITY_PATH, SAMPLE_PATH, SUMMARY, WEEKS } from '../../data/react-next-bootcamp'
 import { LEAD_ANSWER_LIMITS, LEAD_HOURS, LEAD_LINKS_MAX, LEAD_REASONS, LEAD_URGENCIES, PERSONAL_TELEGRAM } from '../../data/bootcamp-form'
 const title = 'Буткемп React + Next.js: frontend проката - MentorCareer'
-const description = 'React и Next.js с начала: два интерфейса одного сервиса проката с настоящим Node.js API. 20 недель, до 10 участников, личное ревью. 45 000 ₽ за поток.'
+const description = 'React и Next.js с начала: два интерфейса одного сервиса проката с настоящим Node.js API. 20 недель, до 10 участников, личное ревью. 20 000 ₽ за поток.'
 const pageUrl = new URL(BOOTCAMP_PATH, SITE_URL).href
 const schema = [
   { '@type': 'Course', '@id': `${pageUrl}#course`, name: COURSE_NAME, description: SUMMARY, url: pageUrl, inLanguage: 'ru', provider: { '@id': ORGANIZATION_ID }, educationalLevel: 'Знает JavaScript, начинает изучать React', coursePrerequisites: 'Уверенный JavaScript, основы HTML и CSS, async/await и Git', teaches: ['React', 'TypeScript', 'Next.js', 'Интеграция с Node.js API', 'Тестирование интерфейсов'], timeRequired: `P${WEEKS}W`, offers: { '@type': 'Offer', category: 'Paid', price: PRICE.value, priceCurrency: 'RUB', url: pageUrl } },
@@ -74,7 +74,7 @@ const schema = [
   </section>
 
   <section class="bc-section" id="payment" aria-labelledby="payment-title">
-    <h2 id="payment-title">45 000 ₽ за весь поток</h2>
+    <h2 id="payment-title">20 000 ₽ за весь поток</h2>
     <p>В стоимость входят занятия и записи, методички, задания, учебный backend, автоматические проверки, личное ревью, защита, итоговое техническое собеседование и паспорт навыков. За обязательную часть доплат нет.</p>
     <p>Дата старта пока не объявлена. До оплаты вы получите даты, расписание и условия потока. Оплата будет доступна после входного задания и допуска, по личной ссылке из письма. На этой странице оплаты нет.</p>
     <p class="bc-doc-links"><a class="bc-link" href={PAYMENT_PATH}>Оплата и возврат</a><a class="bc-link" href={OFFER_PATH}>Договор-оферта</a></p>

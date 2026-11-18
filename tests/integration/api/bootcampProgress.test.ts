@@ -28,6 +28,7 @@ let group: string
 let streamId: number
 let enrollment: BootcampEnrollment
 let testEnrollment: BootcampEnrollment
+let frontendEnrollment: BootcampEnrollment
 const telegram: string[] = []
 
 const hook = (event: string, body: unknown) => gitlabEvents(new Request('http://lms.test/api/bootcamp/gitlab-events', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Gitlab-Event': event, 'X-Gitlab-Token': webhookToken() }, body: JSON.stringify(body) }))
@@ -44,9 +45,9 @@ function nextMonday(): Date {
   return new Date(Date.UTC(moscow.getUTCFullYear(), moscow.getUTCMonth(), moscow.getUTCDate() + daysAhead, 9, 0, 0))
 }
 
-async function enroll(username: string, user: TestUser | null, isTest = false): Promise<BootcampEnrollment> {
-  const lead = await payload.create({ collection: 'bootcamp-leads', overrideAccess: true, data: { email: `${uid('cand')}@mail.test`.toLowerCase(), name: 'Иван Петров', program: 'nodejs', status: 'enrolled', paidAt: new Date().toISOString(), consentVersion: '2026-10-26', consentAt: new Date().toISOString(), submissionCount: 1, entryTaskToken: uid('entry-token'), isTest } })
-  return payload.create({ collection: 'bootcamp-enrollments', overrideAccess: true, data: { lead: lead.id, email: lead.email, firstName: isTest ? 'Тестовый' : 'Иван', lastName: isTest ? 'Сдающий' : 'Петров', gitlabUsername: username, streamGroup: group, status: 'done', program: 'nodejs', gitlabProjectId: 800_000 + Math.floor(Math.random() * 100_000), ...(user ? { lmsUser: user.id } : {}) } })
+async function enroll(username: string, user: TestUser | null, isTest = false, program = 'nodejs'): Promise<BootcampEnrollment> {
+  const lead = await payload.create({ collection: 'bootcamp-leads', overrideAccess: true, data: { email: `${uid('cand')}@mail.test`.toLowerCase(), name: 'Иван Петров', program, status: 'enrolled', paidAt: new Date().toISOString(), consentVersion: '2026-10-26', consentAt: new Date().toISOString(), submissionCount: 1, entryTaskToken: uid('entry-token'), isTest } })
+  return payload.create({ collection: 'bootcamp-enrollments', overrideAccess: true, data: { lead: lead.id, email: lead.email, firstName: isTest ? 'Тестовый' : 'Иван', lastName: isTest ? 'Сдающий' : 'Петров', gitlabUsername: username, streamGroup: group, status: 'done', program, gitlabProjectId: 800_000 + Math.floor(Math.random() * 100_000), ...(user ? { lmsUser: user.id } : {}) } })
 }
 const project = (item: BootcampEnrollment) => ({ id: item.gitlabProjectId, path_with_namespace: `${group}/${item.gitlabUsername}`, web_url: `https://git.test/${group}/${item.gitlabUsername}` })
 
@@ -62,6 +63,8 @@ beforeAll(async () => {
   streamId = stream.id
   enrollment = await enroll(uid('gl').toLowerCase().replace(/[^a-z0-9-]/g, '-'), learner)
   testEnrollment = await enroll(uid('gt').toLowerCase().replace(/[^a-z0-9-]/g, '-'), null, true)
+  await payload.update({ collection: 'bootcamp-enrollments', id: testEnrollment.id, data: { program: null }, overrideAccess: true })
+  frontendEnrollment = await enroll(uid('front').toLowerCase().replace(/[^a-z0-9-]/g, '-'), null, false, 'react-next')
   for (const [key, value] of Object.entries(TELEGRAM)) {
     if (value === undefined) delete process.env[key]
     else process.env[key] = value
@@ -83,7 +86,7 @@ afterAll(async () => {
   }
   await db.execute(sql`delete from admin_digests where kind = 'bootcamp-lagging' and period like ${`%:${streamId}`}`)
   await payload.delete({ collection: 'bootcamp-enrollments', where: { streamGroup: { equals: group } }, overrideAccess: true })
-  for (const item of [enrollment, testEnrollment]) await payload.delete({ collection: 'bootcamp-leads', id: relationId(item.lead), overrideAccess: true })
+  for (const item of [enrollment, testEnrollment, frontendEnrollment]) await payload.delete({ collection: 'bootcamp-leads', id: relationId(item.lead), overrideAccess: true })
   await payload.delete({ collection: 'bootcamp-streams', id: streamId, overrideAccess: true })
   for (const user of [learner, admin]) if (user) await payload.delete({ collection: 'users', id: user.id })
 })
@@ -144,6 +147,27 @@ describe('сдачи недель из вебхука GitLab', () => {
 })
 
 describe('экран «Учёба буткемпа»', () => {
+  it('одна группа не смешивает программы, старые Node-зачисления без ключа остаются видимыми', async () => {
+    const report = await progress('&test=1')
+    expect(report.students.map(student => student.enrollmentId)).toContain(testEnrollment.id)
+    expect(report.students.map(student => student.enrollmentId)).not.toContain(frontendEnrollment.id)
+  })
+
+  it('React-ревью не просрочено на четвёртый день и напоминает только после пятого', async () => {
+    const now = Date.now()
+    const mr = { iid: 1, title: 'Этап 1', url: `${project(frontendEnrollment).web_url}/-/merge_requests/1`, source_branch: 'week-01' }
+    await hook('Merge Request Hook', { project: project(frontendEnrollment), user: { username: frontendEnrollment.gitlabUsername }, object_attributes: { ...mr, action: 'open', target_branch: 'main', created_at: gitlabDate(now - 7 * DAY) } })
+    await hook('Note Hook', { project: project(frontendEnrollment), user: { username: 'group_5_bot_abc', name: 'grader-bot' }, merge_request: mr, object_attributes: { noteable_type: 'MergeRequest', note: verdictNote(1, 'пройдена'), created_at: gitlabDate(now - 4 * DAY), updated_at: gitlabDate(now - 4 * DAY) } })
+    const saved = (await payload.find({ collection: 'bootcamp-week-submissions', where: { enrollment: { equals: frontendEnrollment.id } }, depth: 0 })).docs[0]
+    if (!saved) throw new Error('Нет сдачи frontend')
+    await submissionReviewAlerts(payload)
+    expect((await payload.findByID({ collection: 'bootcamp-week-submissions', id: saved.id })).reviewAlertAt).toBeNull()
+    await payload.update({ collection: 'bootcamp-week-submissions', id: saved.id, data: { verdictAt: new Date(now - 6 * DAY).toISOString(), lastCommitAt: new Date(now - 7 * DAY).toISOString() }, overrideAccess: true, context: { syncBootcampSubmissions: true } })
+    expect(await submissionReviewAlerts(payload)).toBeGreaterThanOrEqual(1)
+    await vi.waitFor(() => expect(telegram.some(text => text.startsWith('Сдача ждёт ревью больше 5 дней: Иван Петров'))).toBe(true))
+    expect((await payload.findByID({ collection: 'bootcamp-week-submissions', id: saved.id })).reviewAlertAt).not.toBeNull()
+  })
+
   it('матрица недель, отставание от сроков потока и тестовые скрыты', async () => {
     const report = await progress()
     expect(report.stream).toMatchObject({ id: streamId, gitlabGroup: group })

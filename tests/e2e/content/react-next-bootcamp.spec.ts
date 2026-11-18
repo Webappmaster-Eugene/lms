@@ -7,7 +7,7 @@ test.use(LANDING_USE)
 test('React + Next.js: страницы одной программы, честные условия и публичный пример', async ({ page }) => {
   await page.goto('/bootcamp/react-next/')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Буткемп React + Next.js: два интерфейса одного продукта')
-  await expect(page.locator('main')).toContainText('45 000 ₽ за весь поток')
+  await expect(page.locator('main')).toContainText('20 000 ₽ за весь поток')
   await expect(page.locator('main')).toContainText('до 10 человек')
   await expect(page.locator('main')).toContainText('Дата старта пока не объявлена')
   await expect(page.locator('[data-lead-form]')).toHaveAttribute('data-program', 'react-next')
