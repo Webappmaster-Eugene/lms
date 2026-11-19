@@ -1,4 +1,4 @@
-import program from '../../landing/src/data/react-next-program.json'
+import program from './react-next-calendar-data.json'
 
 /** Календарь и технические номера сдач различаются: две сдачи могут иметь один срок. */
 export function reactNextStreamDeadlines(startsAt: string): { week: number; dueAt: string }[] {

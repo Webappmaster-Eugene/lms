@@ -149,3 +149,8 @@ Claude auto-memory читается вживую через её MEMORY.md; те
   сохранены, нагрузка25-35часов/неделю. Календарь: program.json и CALENDAR.md;
   будущие React-потоки получают20сроков внутри12недель. week-NN — номер этапа.
   Источник: docs/react-next-bootcamp.md и REVISION-REPORT.md репозитория материалов.
+- Приложение и landing собираются в разных Docker-контекстах: .dockerignore
+  исключает landing из образа LMS. Серверный календарь хранится в src/lib,
+  а совпадение с данными лендинга проверяет reactNextCalendar.test.ts.
+  Серверный код не должен импортировать файлы из landing. Источник: сбой
+  сборки196c2f8, .dockerignore и src/lib/react-next-calendar.ts, 19.11.2026.
