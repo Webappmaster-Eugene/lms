@@ -147,6 +147,22 @@ describe('сдачи недель из вебхука GitLab', () => {
 })
 
 describe('экран «Учёба буткемпа»', () => {
+  it('создаёт 20 сроков React-сдач внутри 12 недель и сохраняет ручные сроки', async () => {
+    const start = '2027-01-04T17:00:00.000Z'
+    const stream = await payload.create({ collection: 'bootcamp-streams', overrideAccess: true, data: {
+      title: 'React 12 недель', program: 'react-next', gitlabGroup: uid('react-calendar'), startsAt: start,
+    } })
+    try {
+      const deadlines = stream.weeks ?? []
+      expect(deadlines).toHaveLength(20)
+      expect(new Set(deadlines.map(row => row.dueAt)).size).toBe(12)
+      expect(deadlines.at(-1)?.dueAt).toBe('2027-03-28T21:00:00.000Z')
+      const changed = await payload.update({ collection: 'bootcamp-streams', id: stream.id, overrideAccess: true,
+        data: { weeks: [{ week: 20, dueAt: '2027-03-30T17:00:00.000Z' }] } })
+      expect(changed.weeks?.map(row => row.dueAt)).toEqual(['2027-03-30T17:00:00.000Z'])
+    } finally { await payload.delete({ collection: 'bootcamp-streams', id: stream.id, overrideAccess: true }) }
+  })
+
   it('одна группа не смешивает программы, старые Node-зачисления без ключа остаются видимыми', async () => {
     const report = await progress('&test=1')
     expect(report.students.map(student => student.enrollmentId)).toContain(testEnrollment.id)

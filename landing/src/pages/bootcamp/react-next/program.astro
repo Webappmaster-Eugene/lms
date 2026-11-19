@@ -1,25 +1,31 @@
 ---
 import ReactNextLayout from '../../../layouts/ReactNextLayout.astro'
-import { BOOTCAMP_PATH, COURSE_NAME, FORMAT_PATH, PROGRAM_PATH, PROGRAM_WEEKS, SAMPLE_PATH } from '../../../data/react-next-bootcamp'
+import { BOOTCAMP_PATH, COURSE_NAME, FORMAT_PATH, PROGRAM_PATH, PROGRAM_CALENDAR, SAMPLE_PATH, WEEKLY_HOURS } from '../../../data/react-next-bootcamp'
 import { SITE_URL } from '../../../config'
-const title = 'Программа React + Next.js по неделям - MentorCareer'
-const description = '20 учебных недель React и Next.js: компоненты, формы, сессии, брони, рендеринг, кабинет клиента и оплата. Два интерфейса с одним Node.js backend.'
-const schema = [{ '@type': 'Course', name: COURSE_NAME, url: new URL(BOOTCAMP_PATH, SITE_URL).href, syllabusSections: PROGRAM_WEEKS.map((week) => ({ '@type': 'Syllabus', name: `Неделя ${week.number}. ${week.title}`, description: week.topic, url: `${new URL(PROGRAM_PATH, SITE_URL).href}#week-${week.number}` })) }]
+const title = 'Программа React + Next.js за 12 недель - MentorCareer'
+const description = '12 недель, включая подготовку: все 20 этапов React и Next.js, два интерфейса одного Node.js backend, проверки и защита.'
+const schema = [{ '@type': 'Course', name: COURSE_NAME, timeRequired: 'P12W', url: new URL(BOOTCAMP_PATH, SITE_URL).href, syllabusSections: PROGRAM_CALENDAR.map(week => ({ '@type': 'Syllabus', name: `Неделя ${week.number}. ${week.title}`, description: week.stages.map(stage => stage.topic).join('; '), url: `${new URL(PROGRAM_PATH, SITE_URL).href}#calendar-week-${week.number}` })) }]
 ---
 <ReactNextLayout title={title} description={description} crumb="Программа по неделям" schema={schema}>
-  <h1>Программа React + Next.js по неделям</h1>
-  <p class="bc-lede-doc">Неделя подготовки и 20 учебных недель. Каждая неделя добавляет проверяемую возможность в один сервис проката: сначала приложение сотрудников на React, затем витрину и кабинет клиента на Next.js.</p>
-  <p>Даты потока и расписание пока не объявлены. Ниже учебная последовательность, а не календарь встреч. В готовом проекте оба интерфейса подключены к настоящему Node.js backend.</p>
-  <nav class="bc-toc" aria-label="Недели программы"><h2>Выберите неделю</h2><ol>{PROGRAM_WEEKS.map((week) => <li><a href={`#week-${week.number}`}><span>{week.number}</span>{week.title}</a></li>)}</ol></nav>
-  {PROGRAM_WEEKS.map((week) => <section class="bc-week" id={`week-${week.number}`} aria-labelledby={`week-${week.number}-title`}>
-    <h2 id={`week-${week.number}-title`}>Неделя {week.number}. {week.title}</h2>
-    <p class="bc-week-subtitle">{week.topic}</p>
-    <p>{week.number === 0 ? 'Проверяете готовность JavaScript и вёрстки, запускаете окружение и оформляете первую работу.' : week.number <= 10 ? 'Применяете тему в приложении сотрудника проката. Код, тесты и исправления после ревью остаются в вашем репозитории.' : week.number <= 16 ? 'Развиваете витрину или кабинет клиента на Next.js. Данные и бизнес-операции приходят из того же Node.js API, что и в приложении сотрудников.' : week.number <= 18 ? 'Проверяете работу полного продукта: два frontend-приложения и backend, поведение при сбоях и ограничения доступа.' : week.number === 19 ? 'Самостоятельно разбираете новое требование и меняете оба интерфейса, используя существующий API. Готового решения и пошаговой инструкции нет.' : 'Показываете работающий продукт, объясняете решения, изменяете код при наставнике и проходите техническое собеседование.'}</p>
-    {week.number > 0 && week.number < 19 && <p>Обязательная часть недели: задача, проверки поведения, описание решений в merge request и доработка после личного ревью. Дополнительная часть предлагает усложнение тем, кто закончил раньше.</p>}
+  <h1>Программа React + Next.js за 12 недель</h1>
+  <p class="bc-lede-doc">Полная программа из 20 учебных этапов укладывается в 12 недель. Подготовка входит в первую неделю. Сначала создаёте React-приложение сотрудников, затем Next.js-витрину и кабинет клиента на том же Node.js backend.</p>
+  <p>Закладывайте {WEEKLY_HOURS} часов в неделю, включая две встречи, чтение, разработку, тесты и доработки. На 6-й, 10-й и 12-й неделях предусмотрено время для общего прогона, исправлений и защиты. Даты старта и встреч сообщим до оплаты.</p>
+  <p>Номер этапа 00-20 обозначает порядок заданий. Ветки week-NN, номера автоматических проверок и уроков сохраняются; они не обозначают календарную неделю.</p>
+  <nav class="bc-toc" aria-label="Недели программы"><h2>Выберите неделю</h2><ol>{PROGRAM_CALENDAR.map(week => <li><a href={`#calendar-week-${week.number}`}><span>{week.number}</span>{week.title}</a></li>)}</ol></nav>
+  {PROGRAM_CALENDAR.map(week => <section class="bc-week" id={`calendar-week-${week.number}`} aria-labelledby={`calendar-week-${week.number}-title`}>
+    <h2 id={`calendar-week-${week.number}-title`}>Неделя {week.number}. {week.title}</h2>
+    <ol class="bc-list">{week.stages.map(stage => <li id={`week-${stage.number}`}>
+      <h3>Этап {String(stage.number).padStart(2, '0')}. {stage.title}</h3>
+      <p>{stage.topic}</p>
+      <p>Чтение: {stage.readingMinutes} минут; практика: около {stage.practiceMinutes / 60} часов. Сдаёте код и тесты, получаете ревью и исправляете замечания.</p>
+    </li>)}</ol>
+    {week.number === 6 && <p>Проверяете React-приложение целиком: роли, гонки, фото, доступность и браузерные тесты. Закрываете замечания до перехода к Next.js.</p>}
+    {week.number === 10 && <p>Прогоняете оба интерфейса с полным backend, отчётами и сбоями. Исправляете расхождения между клиентом и сотрудником.</p>}
+    {week.number === 12 && <p>Завершаете замечания, показываете полный сценарий проката, объясняете код, выполняете новое изменение и проходите техническое собеседование.</p>}
     <a class="bc-week-top" href="#main">К списку недель</a>
   </section>)}
   <h2 id="skills">Что проверяем на защите</h2>
-  <ul class="bc-list"><li>Самостоятельная разработка компонентов, форм и маршрутов.</li><li>Интеграция с настоящим API: сессии, роли, ошибки и изменение данных.</li><li>Выбор серверных и клиентских компонентов, корректное кэширование.</li><li>Полный сценарий от брони клиента до выдачи и возврата сотрудником.</li><li>Тесты, доступность, адаптивность и запуск продукта.</li><li>Способность объяснить код и выполнить новое изменение.</li></ul>
-  <p>Паспорт фиксирует только продемонстрированные навыки со ссылками на работы и проверки. Он не присваивает грейд и не является документом об образовании.</p>
-  <p class="bc-doc-links"><a class="bc-link" href={SAMPLE_PATH}>Пример методички первой недели</a><a class="bc-link" href={FORMAT_PATH}>Как проходит обучение</a><a class="bc-link" href={BOOTCAMP_PATH}>О буткемпе и стоимости</a></p>
+  <ul class="bc-list"><li>Компоненты, формы, маршруты и интеграция с настоящим API.</li><li>Сессии, права, серверные и клиентские компоненты, кэширование и ошибки.</li><li>Полный сценарий от брони и оплаты до выдачи и возврата.</li><li>Тесты, доступность, адаптивность и запуск продукта.</li><li>Объяснение решений и самостоятельное изменение кода.</li></ul>
+  <p>Паспорт фиксирует только продемонстрированные навыки со ссылками на работы. Грейд и трудоустройство не гарантируются.</p>
+  <p class="bc-doc-links"><a class="bc-link" href={SAMPLE_PATH}>Пример методички</a><a class="bc-link" href={FORMAT_PATH}>Как проходит обучение</a><a class="bc-link" href={BOOTCAMP_PATH}>О буткемпе и стоимости</a></p>
 </ReactNextLayout>

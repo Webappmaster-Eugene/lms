@@ -14,16 +14,17 @@ export const QUALITY_PATH = `${BOOTCAMP_PATH}quality/`
 export const SAMPLE_PATH = `${BOOTCAMP_PATH}sample/`
 export const PRIVACY_PATH = '/privacy/'
 export const CONSENT_PATH = '/consent/'
-export const OFFER_VERSION = '2026-11-18'
-export const OFFER_DATE = '18 ноября 2026 года'
+export const OFFER_VERSION = '2026-11-19'
+export const OFFER_DATE = '19 ноября 2026 года'
 export const PAGE_UPDATED = { iso: OFFER_VERSION, text: OFFER_DATE }
 const priceRubles = program.priceKopecks / 100
 export const PRICE = { value: priceRubles, text: `${priceRubles.toLocaleString('ru-RU').replaceAll('\u00a0', ' ')} ₽` }
 export const GROUP_LIMIT = program.groupLimit
-export const WEEKS = program.weeks.length - 1
-export const WEEKLY_HOURS = '15-20'
+export const WEEKS = program.durationWeeks
+export const WEEKLY_HOURS = `${program.weeklyHours.min}-${program.weeklyHours.max}`
 export const REVIEW_DAYS = 5
 export const PROGRAM_WEEKS = program.weeks
+export const PROGRAM_CALENDAR = program.calendar.map(week => ({ ...week, stages: program.weeks.filter(stage => week.stages.includes(stage.number)) }))
 export const NAVIGATION: BootcampNavigation = {
   title: 'Буткемп React + Next.js', path: BOOTCAMP_PATH,
   programPath: PROGRAM_PATH, formatPath: FORMAT_PATH,
@@ -32,10 +33,10 @@ export const NAVIGATION: BootcampNavigation = {
 }
 export { CONSENT_VERSION }
 
-export const SUMMARY = `Буткемп React + Next.js от MentorCareer - ${WEEKS} учебных недель и неделя подготовки для тех, кто знает JavaScript и основы вёрстки. Вы создаёте два интерфейса одного сервиса проката: рабочий кабинет на React и витрину с кабинетом клиента на Next.js. Оба работают с настоящим backend Node.js-буткемпа. Каждую неделю вы сдаёте работу через merge request, получаете ревью наставника и исправляете замечания. Группа до ${GROUP_LIMIT} человек, нагрузка ${WEEKLY_HOURS} часов в неделю, стоимость ${PRICE.text} за весь поток. Дата старта пока не объявлена.`
+export const SUMMARY = `Буткемп React + Next.js от MentorCareer - ${WEEKS} недель, включая подготовку в первой неделе для тех, кто знает JavaScript и основы вёрстки. Вы создаёте два интерфейса одного сервиса проката: рабочий кабинет на React и витрину с кабинетом клиента на Next.js. Оба работают с настоящим backend Node.js-буткемпа. Каждую неделю вы сдаёте работу через merge request, получаете ревью наставника и исправляете замечания. Группа до ${GROUP_LIMIT} человек, нагрузка ${WEEKLY_HOURS} часов в неделю, стоимость ${PRICE.text} за весь поток. Дата старта пока не объявлена.`
 
 export const FACTS = [
-  { term: 'Длительность', value: `${WEEKS} учебных недель и неделя подготовки` },
+  { term: 'Длительность', value: `${WEEKS} недель, подготовка включена` },
   { term: 'Нагрузка', value: `${WEEKLY_HOURS} часов в неделю` },
   { term: 'Занятия', value: 'две групповые встречи в неделю: 2 часа и 1,5 часа' },
   { term: 'Группа', value: `до ${GROUP_LIMIT} человек, личное ревью каждой работы` },
@@ -55,7 +56,7 @@ export const FAQ = [
   { question: 'Нужно ли сначала пройти Node.js-буткемп?', answer: 'Нет. Для frontend-программы предоставляется готовый учебный backend. Если вы проходите и Node.js, сможете подключить собственный backend с совместимым API и собрать один полный проект. Доступ к материалам другого буткемпа отдельно не выдаётся.' },
   { question: 'Зачем два интерфейса?', answer: 'На React вы пишете рабочее приложение сотрудников: каталог, брони, выдачу и возврат. На Next.js - публичную витрину и кабинет клиента. У них разные задачи, но общие товары, пользователи и брони в одном Node.js backend.' },
   { question: 'Будет ли настоящий API?', answer: 'Да. Бронирование, оплата, права и хранение данных выполняются в Node.js backend сервиса проката. Моки помогают в отдельных упражнениях и тестах, а итоговый проект проверяется на настоящем API. Учебные платежи проходят через симулятор, без реальных списаний.' },
-  { question: 'Когда старт и в какие дни встречи?', answer: 'Дата старта пока не объявлена. Даты подготовки, расписание двух встреч в неделю и сроки потока сообщим до оплаты. На этой странице нет оплаты.' },
+  { question: 'Когда старт и в какие дни встречи?', answer: 'Дата старта пока не объявлена. Подготовка входит в первую из 12 недель. Расписание двух встреч в неделю и сроки потока сообщим до оплаты. На этой странице нет оплаты.' },
   { question: 'Можно пользоваться ИИ?', answer: 'Да. В merge request вы указываете, где помогал ИИ и как проверили результат. На ревью и защите нужно объяснить код и изменить решение самостоятельно. Отдельные упражнения посвящены проверке ошибочных предложений ИИ.' },
   { question: 'Проект командный или личный?', answer: 'У каждого свой проект и история работ. При этом вы упражняетесь во взаимном ревью, парной диагностике и обсуждении архитектуры. Отсутствие напарника не мешает сдать собственную работу.' },
   { question: 'Что входит в стоимость?', answer: 'Две встречи в неделю и их записи, методички, задания, автоматические проверки, личное ревью, учебный backend, итоговая защита, техническое собеседование и паспорт проверенных навыков. Отдельное карьерное сопровождение обсуждается отдельно.' },

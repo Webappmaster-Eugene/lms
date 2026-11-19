@@ -27,7 +27,7 @@ test('администратор видит недели потока по со�
     ;[{ id: enrollmentId }] = await query<{ id: number }>(`insert into bootcamp_enrollments (lead_id, email, first_name, last_name, gitlab_username, stream_group, status, gitlab_project_id) values ($1, $2, 'Ева', 'Сдающая', $3, $4, 'done', $5) returning id`, [leadId, `${username}@mail.test`, username, group, 700_000 + Math.floor(Math.random() * 100_000)])
 
     const project = { path_with_namespace: `${group}/${username}`, web_url: `https://git.test/${group}/${username}` }
-    const mr = { iid: 1, title: 'Неделя 1', url: `${project.web_url}/-/merge_requests/1`, source_branch: 'week-01' }
+    const mr = { iid: 1, title: 'Этап 1', url: `${project.web_url}/-/merge_requests/1`, source_branch: 'week-01' }
     const token = createHmac('sha256', E2E_SECRET).update('lms-gitlab-webhook-v1').digest('hex')
     const hook = (event: string, data: unknown) => admin.request.post(`${APP_URL}/api/bootcamp/gitlab-events`, { headers: { 'X-Gitlab-Event': event, 'X-Gitlab-Token': token }, data })
     expect((await hook('Merge Request Hook', { project, user: { username }, object_attributes: { ...mr, action: 'open', target_branch: 'main', created_at: gitlabDate(now - 6 * DAY) } })).status()).toBe(200)
@@ -38,8 +38,8 @@ test('администратор видит недели потока по со�
     await page.goto(`/admin/bootcamp-progress?stream=${streamId}`)
     await expect(page.getByRole('heading', { name: 'Учёба буткемпа', level: 1 })).toBeVisible()
     await expect(page.getByLabel('Итоги потока')).toContainText('Ревью дольше 3 дней1')
-    const row = page.getByRole('region', { name: 'Недели учеников' }).getByRole('row', { name: /Ева Сдающая/ })
-    const week = row.getByRole('link', { name: /^Неделя 1: ждёт ревью, ждёт 5 дней, проверок 26 из 26, .*срок прошёл, ревью дольше 3 дней$/ })
+    const row = page.getByRole('region', { name: 'Этапы учеников' }).getByRole('row', { name: /Ева Сдающая/ })
+    const week = row.getByRole('link', { name: /^Этап 1: ждёт ревью, ждёт 5 дней, проверок 26 из 26, .*срок прошёл, ревью дольше 3 дней$/ })
     await expect(week).toHaveText('5 дн')
     await expect(week).toHaveAttribute('href', mr.url)
     for (const width of [1440, 390, 320]) {

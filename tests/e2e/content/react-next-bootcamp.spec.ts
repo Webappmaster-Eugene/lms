@@ -18,8 +18,8 @@ test('React + Next.js: страницы одной программы, чест�
 
   await page.locator('.bc-header-nav').getByRole('link', { name: 'Программа', exact: true }).click()
   await expect(page).toHaveURL(/\/bootcamp\/react-next\/program\/$/)
-  await expect(page.locator('.bc-week')).toHaveCount(21)
-  await expect(page.getByRole('heading', { name: 'Неделя 20. Защита и паспорт навыков' })).toBeVisible()
+  await expect(page.locator('.bc-week')).toHaveCount(12)
+  await expect(page.getByRole('heading', { name: 'Неделя 12. Защита и доработка проекта' })).toBeVisible()
   await expect(page.locator('.bc-brand')).toHaveAttribute('href', '/bootcamp/react-next/')
 
   for (const path of ['format', 'payment', 'offer', 'quality', 'sample']) {

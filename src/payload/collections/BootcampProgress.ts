@@ -1,6 +1,7 @@
 import { Forbidden, ValidationError, type CollectionConfig } from 'payload'
 
 import { BOOTCAMP_PROGRAM_WEEKS, submissionVerdicts } from '@/lib/bootcamp-progress'
+import { reactNextStreamDeadlines } from '@/lib/react-next-calendar'
 import { isAdmin } from '@/payload/access/isAdmin'
 
 const nobody = () => false
@@ -17,14 +18,17 @@ export const BootcampStreams: CollectionConfig = {
     group: 'Буткемпы',
     useAsTitle: 'title',
     defaultColumns: ['title', 'program', 'gitlabGroup', 'startsAt'],
-    description: 'Календарь потока для экрана «Учёба буткемпа»: неделя считается просроченной, если к её сроку наставник не слил MR недели.',
+    description: 'Календарь потока для экрана «Учёба буткемпа»: этап считается просроченным, если к его сроку наставник не слил MR этапа.',
   },
   access: { create: isAdmin, read: isAdmin, update: isAdmin, delete: isAdmin },
   hooks: {
-    beforeValidate: [({ data }) => {
+    beforeValidate: [({ data, operation }) => {
+      if (operation === 'create' && data?.program === 'react-next' && typeof data.startsAt === 'string' && Number.isFinite(Date.parse(data.startsAt)) && !data.weeks?.length) {
+        data.weeks = reactNextStreamDeadlines(data.startsAt)
+      }
       const weeks = (data?.weeks ?? []) as { week?: number | null }[]
       const numbers = weeks.map((item) => item.week).filter((week): week is number => typeof week === 'number')
-      if (new Set(numbers).size !== numbers.length) throw new ValidationError({ errors: [{ path: 'weeks', message: 'У каждой учебной недели один срок: номер недели повторяется' }] })
+      if (new Set(numbers).size !== numbers.length) throw new ValidationError({ errors: [{ path: 'weeks', message: 'У каждого учебного этапа один срок: номер этапа повторяется' }] })
       return data
     }],
   },
@@ -36,11 +40,11 @@ export const BootcampStreams: CollectionConfig = {
     {
       name: 'weeks',
       type: 'array',
-      label: 'Сроки учебных недель',
-      labels: { singular: 'Неделя', plural: 'Недели' },
+      label: 'Сроки учебных этапов',
+      labels: { singular: 'Этап', plural: 'Этапы' },
       admin: { description: 'Срок - к началу следующей пары встреч. Неделя без срока в план не входит.' },
       fields: [
-        { name: 'week', type: 'number', required: true, min: 1, max: BOOTCAMP_PROGRAM_WEEKS, label: 'Учебная неделя' },
+        { name: 'week', type: 'number', required: true, min: 1, max: BOOTCAMP_PROGRAM_WEEKS, label: 'Учебный этап' },
         { name: 'dueAt', type: 'date', required: true, label: 'Сдать до', admin: dateTime },
       ],
     },
@@ -48,13 +52,13 @@ export const BootcampStreams: CollectionConfig = {
 }
 
 /**
- * Сдача недели - один MR ученика из ветки week-NN. Строку ведёт обработчик вебхука GitLab:
+ * Сдача этапа - один MR ученика из ветки week-NN. Строку ведёт обработчик вебхука GitLab:
  * MR открыт, новые коммиты, CI, вердикт бота проверки, слияние наставником или закрытие.
  */
 export const BootcampWeekSubmissions: CollectionConfig = {
   slug: 'bootcamp-week-submissions',
   lockDocuments: false,
-  labels: { singular: 'Сдача недели', plural: 'Сдачи недель' },
+  labels: { singular: 'Сдача недели', plural: 'Сдачи этапов' },
   admin: {
     group: 'Буткемпы',
     useAsTitle: 'title',
@@ -69,7 +73,7 @@ export const BootcampWeekSubmissions: CollectionConfig = {
   indexes: [{ fields: ['enrollment', 'mrIid'], unique: true }, { fields: ['enrollment', 'week'] }],
   fields: [
     { name: 'enrollment', type: 'relationship', relationTo: 'bootcamp-enrollments', required: true, index: true, label: 'Зачисление' },
-    { name: 'week', type: 'number', required: true, min: 1, max: BOOTCAMP_PROGRAM_WEEKS, label: 'Учебная неделя' },
+    { name: 'week', type: 'number', required: true, min: 1, max: BOOTCAMP_PROGRAM_WEEKS, label: 'Учебный этап' },
     { name: 'mrIid', type: 'number', required: true, label: 'Номер MR' },
     { name: 'title', type: 'text', maxLength: 300, label: 'Название MR' },
     { name: 'mrUrl', type: 'text', maxLength: 500, label: 'Ссылка на MR' },

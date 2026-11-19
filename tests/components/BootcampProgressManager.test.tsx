@@ -36,18 +36,29 @@ const fetchMock = vi.fn(async (_url: string | URL | Request) => Response.json(re
 beforeEach(() => { vi.stubGlobal('fetch', fetchMock); fetchMock.mockClear() })
 
 describe('учёба буткемпа', () => {
+  it('показывает срок ревью React пять дней в пояснении и карточке сдачи', async () => {
+    const frontend = structuredClone(report)
+    if (!frontend.stream) throw new Error('Нет потока фикстуры')
+    frontend.stream.program = 'react-next'
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json(frontend)))
+    render(<BootcampProgressManager />)
+    await screen.findByText(/ответ на сдачу - в течение 5 дней/)
+    expect(screen.getByLabelText('Итоги потока')).toHaveTextContent('Ревью дольше 5 дней')
+    expect(screen.getByRole('link', { name: /Этап 2:.*ревью дольше 5 дней/ })).toBeInTheDocument()
+  })
+
   it('сводка потока и матрица недель: принята, ждёт ревью дольше срока, просрочена без сдачи', async () => {
     render(<BootcampProgressManager />)
     expect(await screen.findByLabelText('Итоги потока')).toHaveTextContent('Ревью дольше 3 дней1')
     expect(screen.getByLabelText('Итоги потока')).toHaveTextContent('Медиана ревью30 ч')
-    const matrix = screen.getByRole('region', { name: 'Недели учеников' })
+    const matrix = screen.getByRole('region', { name: 'Этапы учеников' })
     const ivan = within(matrix).getByRole('row', { name: /Иван Петров/ })
-    expect(within(ivan).getByRole('link', { name: /^Неделя 1: принята, слита .*, проверок 26 из 26/ })).toHaveAttribute('href', 'https://git.test/mr/1')
-    const review = within(ivan).getByRole('link', { name: /^Неделя 2: ждёт ревью, ждёт 4 дня, .*срок прошёл, ревью дольше 3 дней$/ })
+    expect(within(ivan).getByRole('link', { name: /^Этап 1: принята, слита .*, проверок 26 из 26/ })).toHaveAttribute('href', 'https://git.test/mr/1')
+    const review = within(ivan).getByRole('link', { name: /^Этап 2: ждёт ревью, ждёт 4 дня, .*срок прошёл, ревью дольше 3 дней$/ })
     expect(review).toHaveTextContent('4 дн')
     expect(review.closest('td')).toHaveAttribute('data-overdue', 'true')
-    expect(within(ivan).getByRole('img', { name: /^Неделя 3: не начата, срок .*, срок прошёл$/ })).toHaveTextContent('!')
-    expect(within(ivan).getByRole('link', { name: /^Неделя 4: CI упал/ })).toHaveTextContent('CI')
+    expect(within(ivan).getByRole('img', { name: /^Этап 3: не начата, срок .*, срок прошёл$/ })).toHaveTextContent('!')
+    expect(within(ivan).getByRole('link', { name: /^Этап 4: CI упал/ })).toHaveTextContent('CI')
     expect(within(ivan).getByRole('link', { name: 'Карточка ученика' })).toHaveAttribute('href', '/admin/student-analytics?user=171')
     expect(within(ivan).getByText('12 из 40')).toBeInTheDocument()
     const anna = within(matrix).getByRole('row', { name: /Анна Смирнова/ })
@@ -58,7 +69,7 @@ describe('учёба буткемпа', () => {
   it('поток и тестовые уходят в запрос', async () => {
     const user = userEvent.setup()
     render(<BootcampProgressManager />)
-    await screen.findByRole('region', { name: 'Недели учеников' })
+    await screen.findByRole('region', { name: 'Этапы учеников' })
     await user.selectOptions(screen.getByLabelText('Поток'), '2')
     await waitFor(() => expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain('stream=2'))
     await user.click(screen.getByLabelText('Показать тестовых'))

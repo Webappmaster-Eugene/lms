@@ -2190,7 +2190,7 @@ export interface BootcampEnrollment {
   createdAt: string;
 }
 /**
- * Календарь потока для экрана «Учёба буткемпа»: неделя считается просроченной, если к её сроку наставник не слил MR недели.
+ * Календарь потока для экрана «Учёба буткемпа»: этап считается просроченным, если к его сроку наставник не слил MR этапа.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "bootcamp-streams".

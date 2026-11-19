@@ -8,7 +8,7 @@ export const REACT_NEXT_BOOTCAMP = {
   priceKopecks: 2_000_000,
   paymentDueDays: 7,
   offerUrl: 'https://info.mentorcareer.ru/bootcamp/react-next/offer/',
-  offerVersion: '2026-11-18',
+  offerVersion: '2026-11-19',
   receiptItemName: 'Буткемп React + Next.js: frontend сервиса проката',
   gitlabCourseProject: 'react-next/course',
   gitlabStreamGroup: 'react-next-bootcamp',

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-import { BOOTCAMP_PATH, CONSENT_VERSION, FACTS, FAQ, GROUP_LIMIT, NAVIGATION, OFFER_VERSION, PRICE, PROGRAM_KEY, PROGRAM_WEEKS, SAMPLE_PATH, SUMMARY, WEEKS } from '../../landing/src/data/react-next-bootcamp'
+import { BOOTCAMP_PATH, CONSENT_VERSION, FACTS, FAQ, GROUP_LIMIT, NAVIGATION, OFFER_VERSION, PRICE, PROGRAM_KEY, PROGRAM_WEEKS, PROGRAM_CALENDAR, SAMPLE_PATH, SUMMARY, WEEKS } from '../../landing/src/data/react-next-bootcamp'
 import { CONSENT_VERSION as CURRENT_CONSENT } from '../../landing/src/data/bootcamp'
 import { REACT_NEXT_BOOTCAMP } from '@/lib/react-next-bootcamp-setup'
 
@@ -13,7 +13,9 @@ describe('React + Next.js: опубликованные условия и вхо
     expect(PROGRAM_KEY).toBe('react-next')
     expect(PRICE.value).toBe(20_000)
     expect(GROUP_LIMIT).toBe(10)
-    expect(WEEKS).toBe(20)
+    expect(WEEKS).toBe(12)
+    expect(PROGRAM_CALENDAR).toHaveLength(12)
+    expect(PROGRAM_CALENDAR.flatMap(week => week.stages.map(stage => stage.number))).toEqual(Array.from({ length: 21 }, (_, index) => index))
     expect(PROGRAM_WEEKS.map((week) => week.number)).toEqual(Array.from({ length: 21 }, (_, index) => index))
     expect(new Set(PROGRAM_WEEKS.map((week) => week.slug)).size).toBe(21)
     expect(PROGRAM_WEEKS[10]?.title).toContain('React')
@@ -73,7 +75,7 @@ describe('React + Next.js: опубликованные условия и вхо
 
   it('оферта не исключает включённое итоговое техническое собеседование', () => {
     const offer = read('src/pages/bootcamp/react-next/offer.astro')
-    expect(OFFER_VERSION).toBe('2026-11-18')
+    expect(OFFER_VERSION).toBe('2026-11-19')
     expect(offer).toContain('Техническое собеседование по пройденной программе входит в цену')
     expect(offer).toContain('сообщаются заказчику письмом до оплаты')
     expect(JSON.stringify({ FACTS, FAQ, SUMMARY })).not.toMatch(/[—–]/)
