@@ -1,3 +1,4 @@
+import { blankPDF } from '../helpers/fixtures'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { commitTransaction, createLocalReq, handleEndpoints, initTransaction, killTransaction, type CollectionBeforeChangeHook, type Payload } from 'payload'
 import config from '@payload-config'
@@ -34,14 +35,6 @@ const createdLessons: number[] = []
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64')
 const VIDEO = Buffer.from('000000186674797069736f6d0000020069736f6d6d703432000000086d646174', 'hex')
-function blankPDF(): Buffer {
-  const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] >>']
-  let text = '%PDF-1.4\n'
-  const offsets = objects.map((object, index) => { const offset = Buffer.byteLength(text); text += `${index + 1} 0 obj\n${object}\nendobj\n`; return offset })
-  const start = Buffer.byteLength(text)
-  text += `xref\n0 4\n0000000000 65535 f \n${offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n${start}\n%%EOF\n`
-  return Buffer.from(text)
-}
 
 async function upload(mime: string, extension: string, bytes: Buffer, owner?: TestUser): Promise<Media> {
   const req = await createLocalReq({ user: owner ?? admin }, payload)

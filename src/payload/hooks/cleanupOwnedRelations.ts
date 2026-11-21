@@ -37,6 +37,7 @@ function cleanupDependents(
 
 /** Всё, что принадлежит пользователю: прогресс, баллы, достижения, заметки, уведомления */
 export const cleanupUserRelations = cleanupDependents('пользователь', [
+  { collection: 'tutoring-participants', field: 'student' },
   { collection: 'web-vitals-reports', field: 'user' },
   { collection: 'student-learning-events', field: 'user' },
   { collection: 'student-activity-days', field: 'user' },
@@ -91,4 +92,12 @@ export const cleanupTaskRelations = cleanupDependents('задача тренаж
 export const cleanupGuideRelations = cleanupDependents('гайд', [
   { collection: 'bookmarks', field: 'guide' },
   { collection: 'guide-reads', field: 'guide' },
+])
+
+export const cleanupTutoringStream = cleanupDependents('поток репетиторства', [
+  { collection: 'tutoring-participants', field: 'stream' },
+])
+
+export const cleanupTutoringParticipant = cleanupDependents('участник репетиторства', [
+  { collection: 'tutoring-reviews', field: 'participant' },
 ])

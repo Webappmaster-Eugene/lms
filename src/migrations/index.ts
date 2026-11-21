@@ -58,6 +58,7 @@ import * as migration_20261111_131554_payload_391 from './20261111_131554_payloa
 import * as migration_20261112_161557_account_freezes from './20261112_161557_account_freezes';
 import * as migration_20261113_054229_analytics_activity_days from './20261113_054229_analytics_activity_days';
 import * as migration_20261113_061701_bootcamp_week_progress from './20261113_061701_bootcamp_week_progress';
+import * as migration_20261120_180904_tutoring_streams from './20261120_180904_tutoring_streams';
 
 export const migrations = [
   {
@@ -358,6 +359,11 @@ export const migrations = [
   {
     up: migration_20261113_061701_bootcamp_week_progress.up,
     down: migration_20261113_061701_bootcamp_week_progress.down,
-    name: '20261113_061701_bootcamp_week_progress'
+    name: '20261113_061701_bootcamp_week_progress',
+  },
+  {
+    up: migration_20261120_180904_tutoring_streams.up,
+    down: migration_20261120_180904_tutoring_streams.down,
+    name: '20261120_180904_tutoring_streams'
   },
 ];

@@ -20,6 +20,7 @@ import { VideoViewportRecovery } from '@/components/layout/VideoViewportRecovery
 import { getTrainerAccess } from '@/server/trainer-access'
 import { getGuideAccess } from '@/server/guide-access'
 import { getBootcamps } from '@/server/bootcamps'
+import { tutoringMemberships } from '@/server/tutoring-access'
 import { ErrorReportingUser } from '@/components/errors/ErrorReportingUser'
 import { FreezeBanner } from '@/components/layout/FreezeBanner'
 import { getAccountFreeze } from '@/server/account-freeze'
@@ -39,10 +40,11 @@ export default async function FrontendLayout({ children }: { children: React.Rea
   const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login')
   const isAdmin = user.role === 'admin'
-  const [trainerEnabled, guidesEnabled, bootcampEnabled, freeze] = await Promise.all([
+  const [trainerEnabled, guidesEnabled, bootcampEnabled, tutoringEnabled, freeze] = await Promise.all([
     getTrainerAccess(payload, user, req).then((access) => access.hasAccess),
     getGuideAccess(payload, user, req).then((access) => access.hasAccess),
     getBootcamps(payload, user, req).then((bootcamps) => bootcamps.length > 0),
+    tutoringMemberships(payload, req, user.id).then((memberships) => memberships.length > 0),
     isAdmin ? null : getAccountFreeze(payload, user.id, req),
   ])
   const freezeNotice = freeze && freezeNoticeDue(freeze) ? freeze.planned?.startsAt ?? null : null
@@ -64,7 +66,7 @@ export default async function FrontendLayout({ children }: { children: React.Rea
             <SidebarProvider>
               <div className="flex min-h-dvh overflow-x-hidden">
                 <div className="contents print:hidden">
-                  <Sidebar isAdmin={isAdmin} trainerEnabled={trainerEnabled} guidesEnabled={guidesEnabled} bootcampEnabled={bootcampEnabled} />
+                  <Sidebar isAdmin={isAdmin} trainerEnabled={trainerEnabled} guidesEnabled={guidesEnabled} bootcampEnabled={bootcampEnabled} tutoringEnabled={tutoringEnabled} />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col lg:ml-64 print:ml-0">
                   <div className="contents print:hidden">

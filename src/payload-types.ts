@@ -122,6 +122,10 @@ export interface Config {
     'bootcamp-enrollments': BootcampEnrollment;
     'bootcamp-streams': BootcampStream;
     'bootcamp-week-submissions': BootcampWeekSubmission;
+    'tutoring-meetings': TutoringMeeting;
+    'tutoring-streams': TutoringStream;
+    'tutoring-participants': TutoringParticipant;
+    'tutoring-reviews': TutoringReview;
     'bootcamp-payments': BootcampPayment;
     'bootcamp-refunds': BootcampRefund;
     'bootcamp-lead-events': BootcampLeadEvent;
@@ -187,6 +191,10 @@ export interface Config {
     'bootcamp-enrollments': BootcampEnrollmentsSelect<false> | BootcampEnrollmentsSelect<true>;
     'bootcamp-streams': BootcampStreamsSelect<false> | BootcampStreamsSelect<true>;
     'bootcamp-week-submissions': BootcampWeekSubmissionsSelect<false> | BootcampWeekSubmissionsSelect<true>;
+    'tutoring-meetings': TutoringMeetingsSelect<false> | TutoringMeetingsSelect<true>;
+    'tutoring-streams': TutoringStreamsSelect<false> | TutoringStreamsSelect<true>;
+    'tutoring-participants': TutoringParticipantsSelect<false> | TutoringParticipantsSelect<true>;
+    'tutoring-reviews': TutoringReviewsSelect<false> | TutoringReviewsSelect<true>;
     'bootcamp-payments': BootcampPaymentsSelect<false> | BootcampPaymentsSelect<true>;
     'bootcamp-refunds': BootcampRefundsSelect<false> | BootcampRefundsSelect<true>;
     'bootcamp-lead-events': BootcampLeadEventsSelect<false> | BootcampLeadEventsSelect<true>;
@@ -2256,6 +2264,79 @@ export interface BootcampWeekSubmission {
   createdAt: string;
 }
 /**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-meetings".
+ */
+export interface TutoringMeeting {
+  id: number;
+  program: 'nodejs' | 'react-next';
+  number: number;
+  title: string;
+  homework: {
+    stage: number;
+    description: string;
+    assignment?: string | null;
+    practice?: string | null;
+    id?: string | null;
+  }[];
+  instructorNotes?: string | null;
+  sourceDigest?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-streams".
+ */
+export interface TutoringStream {
+  id: number;
+  title: string;
+  program: 'nodejs' | 'react-next';
+  startsAt: string;
+  status: 'draft' | 'active' | 'archived';
+  currentMeeting: number;
+  meetingUrl?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-participants".
+ */
+export interface TutoringParticipant {
+  id: number;
+  stream: number | TutoringStream;
+  student: number | User;
+  paidAt: string;
+  active: boolean;
+  currentMeeting: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-reviews".
+ */
+export interface TutoringReview {
+  id: number;
+  participant: number | TutoringParticipant;
+  meeting: number;
+  status: 'assigned' | 'submitted' | 'changes' | 'accepted';
+  submissionUrl?: string | null;
+  feedback?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * Номер записи - номер счёта в Робокассе. Каждый переход к оплате создаёт новую запись, оплачена из них обычно одна.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2536,6 +2617,22 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'bootcamp-streams';
         value: number | BootcampStream;
+      } | null)
+    | ({
+        relationTo: 'tutoring-meetings';
+        value: number | TutoringMeeting;
+      } | null)
+    | ({
+        relationTo: 'tutoring-streams';
+        value: number | TutoringStream;
+      } | null)
+    | ({
+        relationTo: 'tutoring-participants';
+        value: number | TutoringParticipant;
+      } | null)
+    | ({
+        relationTo: 'tutoring-reviews';
+        value: number | TutoringReview;
       } | null)
     | ({
         relationTo: 'bootcamp-payments';
@@ -3788,6 +3885,77 @@ export interface BootcampWeekSubmissionsSelect<T extends boolean = true> {
   mergedAt?: T;
   closedAt?: T;
   reviewAlertAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-meetings_select".
+ */
+export interface TutoringMeetingsSelect<T extends boolean = true> {
+  program?: T;
+  number?: T;
+  title?: T;
+  homework?:
+    | T
+    | {
+        stage?: T;
+        description?: T;
+        assignment?: T;
+        practice?: T;
+        id?: T;
+      };
+  instructorNotes?: T;
+  sourceDigest?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  focalX?: T;
+  focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-streams_select".
+ */
+export interface TutoringStreamsSelect<T extends boolean = true> {
+  title?: T;
+  program?: T;
+  startsAt?: T;
+  status?: T;
+  currentMeeting?: T;
+  meetingUrl?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-participants_select".
+ */
+export interface TutoringParticipantsSelect<T extends boolean = true> {
+  stream?: T;
+  student?: T;
+  paidAt?: T;
+  active?: T;
+  currentMeeting?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-reviews_select".
+ */
+export interface TutoringReviewsSelect<T extends boolean = true> {
+  participant?: T;
+  meeting?: T;
+  status?: T;
+  submissionUrl?: T;
+  feedback?: T;
   updatedAt?: T;
   createdAt?: T;
 }

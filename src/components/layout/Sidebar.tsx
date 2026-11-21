@@ -25,6 +25,7 @@ import {
   Film,
   Tent,
   Lock,
+  CalendarDays,
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { MobileSheet } from './MobileSheet'
@@ -58,7 +59,7 @@ const NAV_ICONS: Record<PlatformSectionHref, typeof LayoutDashboard> = {
 }
 const NAV_ITEMS = PLATFORM_SECTIONS.map((section) => ({ ...section, icon: NAV_ICONS[section.href] }))
 
-export function Sidebar({ isAdmin = false, trainerEnabled = true, guidesEnabled = false, bootcampEnabled = false }: { isAdmin?: boolean; trainerEnabled?: boolean; guidesEnabled?: boolean; bootcampEnabled?: boolean }) {
+export function Sidebar({ isAdmin = false, trainerEnabled = true, guidesEnabled = false, bootcampEnabled = false, tutoringEnabled = false }: { isAdmin?: boolean; trainerEnabled?: boolean; guidesEnabled?: boolean; bootcampEnabled?: boolean; tutoringEnabled?: boolean }) {
   const pathname = usePathname()
   const { mobileOpen, setMobileOpen } = useSidebar()
 
@@ -73,6 +74,9 @@ export function Sidebar({ isAdmin = false, trainerEnabled = true, guidesEnabled 
     window.location.href = '/login'
   }
 
+  const tutoringItem = { href: '/tutoring', label: 'Репетиторство', hint: 'Встречи и домашние задания', icon: CalendarDays, locked: false }
+  const items = withSectionAccess(NAV_ITEMS, { trainerEnabled, guidesEnabled, bootcampEnabled })
+
   const navContent = (mobile: boolean) => (
     <>
       {/* Logo */}
@@ -83,7 +87,7 @@ export function Sidebar({ isAdmin = false, trainerEnabled = true, guidesEnabled 
 
       {/* Navigation */}
       <nav aria-label="Меню платформы" className={cn('flex-1 overflow-y-auto px-3 py-4', mobile ? 'grid grid-cols-1 gap-2 min-[360px]:grid-cols-2' : 'space-y-1')}>
-        {withSectionAccess(NAV_ITEMS, { trainerEnabled, guidesEnabled, bootcampEnabled }).map(({ href, label, hint, icon: Icon, locked }) => {
+        {(tutoringEnabled ? [tutoringItem, ...items] : items).map(({ href, label, hint, icon: Icon, locked }) => {
           const isActive = href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)
           return (
             <Link
