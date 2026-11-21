@@ -1,6 +1,7 @@
 import type { AdminViewServerProps } from 'payload'
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import { redirect } from 'next/navigation'
+import { adminLoginHref } from '@/lib/admin-login-redirect'
 import { RoadmapEditorClient } from './RoadmapEditorClient'
 
 /**
@@ -12,7 +13,8 @@ import { RoadmapEditorClient } from './RoadmapEditorClient'
  */
 export default function RoadmapEditorView({ params, searchParams, initPageResult }: AdminViewServerProps) {
   const { req, locale, permissions, visibleEntities } = initPageResult
-  if (req.user?.role !== 'admin') redirect('/')
+  if (!req.user) redirect(adminLoginHref(req.headers, '/admin/login'))
+  if (req.user.role !== 'admin') redirect('/')
 
   const segments = params?.segments
 

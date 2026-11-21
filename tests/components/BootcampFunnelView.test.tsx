@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 
 import { BootcampFunnelReport } from '@/components/bootcamp/BootcampFunnelReport'
 import { BootcampFunnelView } from '@/components/bootcamp/BootcampFunnelView'
+import { ADMIN_RETURN_PATH_HEADER } from '@/lib/admin-login-redirect'
 import { FUNNEL_STEPS, parseFunnelFilter } from '@/lib/bootcamp-funnel'
 import type { FunnelProgram, FunnelReport } from '@/server/bootcamp-funnel'
 
@@ -72,11 +73,12 @@ describe('страница воронки в админке', () => {
     expect(bootcampFunnel).toHaveBeenLastCalledWith(props.initPageResult.req.payload, expect.objectContaining({ program: null }))
   })
 
-  it('не открывается без пользователя и не-админу', async () => {
-    const anonymous = { ...props, initPageResult: { ...props.initPageResult, req: { ...props.initPageResult.req, user: null } } } as Parameters<typeof BootcampFunnelView>[0]
-    await expect(BootcampFunnelView(anonymous)).rejects.toThrow('redirect:/')
+  it('гостя отправляет на вход с фильтром, ученика — на платформу', async () => {
+    const headers = new Headers({ [ADMIN_RETURN_PATH_HEADER]: '/admin/bootcamp-funnel?period=30' })
+    const anonymous = { ...props, initPageResult: { ...props.initPageResult, req: { ...props.initPageResult.req, headers, user: null } } }
+    await expect(BootcampFunnelView(anonymous)).rejects.toThrow(new Error('redirect:/admin/login?redirect=%2Fadmin%2Fbootcamp-funnel%3Fperiod%3D30'))
     getLearningAccess.mockResolvedValue({ admin: false })
-    await expect(BootcampFunnelView(props)).rejects.toThrow('redirect:/')
+    await expect(BootcampFunnelView(props)).rejects.toThrow(new Error('redirect:/'))
     expect(bootcampFunnel).not.toHaveBeenCalled()
   })
 

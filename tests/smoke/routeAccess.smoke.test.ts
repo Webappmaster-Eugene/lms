@@ -142,7 +142,7 @@ describe('доступ ко всем страницам приложения', (
     const file = findPageFile(path.join(APP_DIR, '(frontend)'), route)
     const source = readFileSync(file, 'utf8')
 
-    expect(source, `${route} не запрашивает пользователя`).toMatch(/payload\.auth\(/)
+    expect(source, `${route} не запрашивает пользователя`).toMatch(/await (?:payload\.auth|getLearningRequest)\(/)
     expect(source, `${route} не проверяет роль — префикс /admin открыт для всех`).toMatch(
       /role !== 'admin'|role === 'admin'/,
     )

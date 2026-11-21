@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { ADMIN_RETURN_PATH_HEADER } from '@/lib/admin-login-redirect'
 
 vi.mock('next/link', async () => (await import('../helpers/component-mocks')).linkMock())
 vi.mock('next/navigation', () => ({ redirect: (href: string) => { throw new Error(`redirect:${href}`) } }))
@@ -44,9 +45,13 @@ describe('страница назначения обучения в админк
     expect(screen.getByText('Ученик: не выбран')).toBeInTheDocument()
   })
 
-  it('ученика и анонима уводит на главную', () => {
-    expect(() => LearningAccessView(viewProps({ id: 2, role: 'student' }, { user: '34' }))).toThrow('redirect:/')
-    expect(() => LearningAccessView(viewProps(null))).toThrow('redirect:/')
+  it('ученика отправляет на платформу, гостя — на вход с выбранным учеником', () => {
+    expect(() => LearningAccessView(viewProps({ id: 2, role: 'student' }, { user: '34' }))).toThrow(new Error('redirect:/'))
+
+    const props = viewProps(null, { user: '34' })
+    const headers = new Headers({ [ADMIN_RETURN_PATH_HEADER]: '/admin/learning-access?user=34' })
+    const anonymous = { ...props, initPageResult: { ...props.initPageResult, req: { ...props.initPageResult.req, headers } } }
+    expect(() => LearningAccessView(anonymous)).toThrow(new Error('redirect:/admin/login?redirect=%2Fadmin%2Flearning-access%3Fuser%3D34'))
   })
 })
 

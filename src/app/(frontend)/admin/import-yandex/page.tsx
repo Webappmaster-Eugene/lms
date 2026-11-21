@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
-import { getPayload } from '@/lib/payload'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { adminLoginHref } from '@/lib/admin-login-redirect'
 import { collectAllPages } from '@/lib/paginate'
+import { getLearningRequest } from '@/server/learning-request'
 import { ImportForm } from './ImportForm'
 
 export const metadata: Metadata = {
@@ -10,13 +11,10 @@ export const metadata: Metadata = {
 }
 
 export default async function ImportYandexPage() {
-  const payload = await getPayload()
-  const headersList = await headers()
-  const { user } = await payload.auth({ headers: headersList })
+  const { payload, user } = await getLearningRequest()
 
-  if (!user || user.role !== 'admin') {
-    redirect('/')
-  }
+  if (!user) redirect(adminLoginHref(await headers(), '/login'))
+  if (user.role !== 'admin') redirect('/')
 
   const courseDocs = await collectAllPages(
     ({ page, limit }) =>

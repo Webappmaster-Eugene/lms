@@ -1,6 +1,7 @@
 import type { AdminViewServerProps } from 'payload'
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import { redirect } from 'next/navigation'
+import { adminLoginHref } from '@/lib/admin-login-redirect'
 
 import { getLearningAccess } from '@/server/learning-access'
 import { parseStudentFilter } from '@/lib/learning-analytics'
@@ -8,7 +9,8 @@ import { StudentAnalyticsManager } from './StudentAnalyticsManager'
 
 export async function StudentAnalyticsView({ params, searchParams, initPageResult }: AdminViewServerProps) {
   const { req, locale, permissions, visibleEntities } = initPageResult
-  if (!req.user || !(await getLearningAccess(req.payload, req.user, req)).admin) redirect('/')
+  if (!req.user) redirect(adminLoginHref(req.headers, '/admin/login'))
+  if (!(await getLearningAccess(req.payload, req.user, req)).admin) redirect('/')
   const raw = searchParams?.user
   const initialUserId = typeof raw === 'string' && /^\d+$/.test(raw) && Number.isSafeInteger(Number(raw)) && Number(raw) > 0 ? Number(raw) : null
   const initialFilter = parseStudentFilter(searchParams?.filter)

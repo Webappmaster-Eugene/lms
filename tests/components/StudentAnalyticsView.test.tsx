@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { StudentAnalyticsView } from '@/components/student-analytics/StudentAnalyticsView'
 import { UserStudentAnalyticsLink } from '@/components/student-analytics/UserStudentAnalyticsLink'
+import { ADMIN_RETURN_PATH_HEADER } from '@/lib/admin-login-redirect'
 
 const { getLearningAccess } = vi.hoisted(() => ({ getLearningAccess: vi.fn(async () => ({ admin: true })) }))
 vi.mock('@/server/learning-access', () => ({ getLearningAccess }))
@@ -23,11 +24,12 @@ describe('аналитика встроена в защищённую админ
   })
   it('старое поле role=admin не обходит актуальную серверную роль', async () => {
     getLearningAccess.mockResolvedValue({ admin: false })
-    await expect(StudentAnalyticsView(props)).rejects.toThrow('redirect:/')
+    await expect(StudentAnalyticsView(props)).rejects.toThrow(new Error('redirect:/'))
   })
-  it('не открывается без действительного пользователя', async () => {
-    const anonymous = { ...props, initPageResult: { ...props.initPageResult, req: { ...props.initPageResult.req, user: null } } } as Parameters<typeof StudentAnalyticsView>[0]
-    await expect(StudentAnalyticsView(anonymous)).rejects.toThrow('redirect:/')
+  it('гостя отправляет на вход с возвратом к выбранному ученику', async () => {
+    const headers = new Headers({ [ADMIN_RETURN_PATH_HEADER]: '/admin/student-analytics?user=34' })
+    const anonymous = { ...props, initPageResult: { ...props.initPageResult, req: { ...props.initPageResult.req, headers, user: null } } }
+    await expect(StudentAnalyticsView(anonymous)).rejects.toThrow(new Error('redirect:/admin/login?redirect=%2Fadmin%2Fstudent-analytics%3Fuser%3D34'))
     expect(getLearningAccess).not.toHaveBeenCalled()
   })
 })

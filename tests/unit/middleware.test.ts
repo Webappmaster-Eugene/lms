@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { NextRequest } from 'next/server'
 
 import { config, middleware } from '@/middleware'
+import { ADMIN_RETURN_PATH_HEADER, adminLoginHref } from '@/lib/admin-login-redirect'
 import { PUBLIC_FONT_PATHS } from '@/lib/public-fonts'
 
 const ORIGIN = 'https://learn.mentorcareer.ru'
@@ -56,9 +57,45 @@ describe('публичные пути', () => {
     expect(isRedirect(middleware(request(path)))).toBe(false)
   })
 
-  it('проверка идёт по префиксу — вложенные пути админки тоже публичны', () => {
+  it('вложенные пути передаются авторизации Payload', () => {
     expect(isRedirect(middleware(request('/admin/collections/courses')))).toBe(false)
   })
+})
+
+describe('адрес возврата в админку', () => {
+  it('передаёт исходный путь с фильтрами и заменяет одноимённый заголовок клиента', () => {
+    const path = '/admin/student-analytics?user=123&filter=learning'
+    const incoming = request(path)
+    incoming.headers.set(ADMIN_RETURN_PATH_HEADER, '/admin/bootcamp-progress')
+
+    const response = middleware(incoming)
+    expect(response.headers.get(`x-middleware-request-${ADMIN_RETURN_PATH_HEADER}`)).toBe(path)
+  })
+
+  it('удаляет заголовок клиента за пределами админки', () => {
+    const incoming = request('/profile', 'payload-token=abc.def.ghi')
+    incoming.headers.set(ADMIN_RETURN_PATH_HEADER, '/admin/bootcamp-progress')
+
+    const response = middleware(incoming)
+    expect(response.headers.get('x-middleware-override-headers')?.split(',')).not.toContain(ADMIN_RETURN_PATH_HEADER)
+    expect(response.headers.has(`x-middleware-request-${ADMIN_RETURN_PATH_HEADER}`)).toBe(false)
+  })
+
+  it('кодирует адрес возврата как один параметр формы входа', () => {
+    const path = '/admin/learning-access?user=123&q=A%2BB&tag=x&tag=y'
+    const href = adminLoginHref(new Headers({ [ADMIN_RETURN_PATH_HEADER]: path }), '/admin/login')
+    const login = new URL(href, ORIGIN)
+
+    expect(login.pathname).toBe('/admin/login')
+    expect([...login.searchParams]).toEqual([['redirect', path]])
+  })
+
+  it.each(['', '//other.example/admin', '/administrator', '/admin/%2e%2e/profile'])(
+    'использует обычный вход без адреса возврата для %j',
+    (path) => {
+      expect(adminLoginHref(new Headers({ [ADMIN_RETURN_PATH_HEADER]: path }), '/login')).toBe('/login')
+    },
+  )
 })
 
 describe('статика', () => {

@@ -1,12 +1,14 @@
 import type { AdminViewServerProps } from 'payload'
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import { redirect } from 'next/navigation'
+import { adminLoginHref } from '@/lib/admin-login-redirect'
 
 import { LearningAccessManager } from './LearningAccessManager'
 
 export function LearningAccessView({ params, searchParams, initPageResult }: AdminViewServerProps) {
   const { req, locale, permissions, visibleEntities } = initPageResult
-  if (req.user?.role !== 'admin') redirect('/')
+  if (!req.user) redirect(adminLoginHref(req.headers, '/admin/login'))
+  if (req.user.role !== 'admin') redirect('/')
   const raw = searchParams?.user
   const initialUserId = typeof raw === 'string' && /^\d+$/.test(raw) && Number.isSafeInteger(Number(raw)) ? Number(raw) : null
   return (

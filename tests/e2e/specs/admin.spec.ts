@@ -8,6 +8,7 @@ import { APP_URL, storageStateOf } from '../fixtures/env'
  * публикации — и как это видит студент на фронте. Созданное удаляется в конце.
  */
 test.use({ storageState: storageStateOf('admin') })
+const guestStorageState = { cookies: [], origins: [] }
 
 async function asStudent<T>(browser: Browser, fn: (page: Page) => Promise<T>): Promise<T> {
   const context = await browser.newContext({ baseURL: APP_URL, storageState: storageStateOf('student') })
@@ -29,19 +30,112 @@ async function save(page: Page) {
   await expect(page.getByText(/successfully|успешно/i).first()).toBeVisible()
 }
 
+async function submitAdminLogin(page: Page, password: string = USERS.admin.password) {
+  await page.locator('#field-email').fill(USERS.admin.email)
+  await page.locator('#field-password').fill(password)
+  await page.getByRole('button', { name: 'Login' }).click()
+}
+
 test('вход в админку через форму и дашборд с группами коллекций', async ({ browser }) => {
-  const context = await browser.newContext({ baseURL: APP_URL, storageState: { cookies: [], origins: [] } })
+  const context = await browser.newContext({ baseURL: APP_URL, storageState: guestStorageState })
   const page = await context.newPage()
   await page.goto('/admin')
   await expect(page).toHaveURL(/\/admin\/login/)
-  await page.locator('#field-email').fill(USERS.admin.email)
-  await page.locator('#field-password').fill(USERS.admin.password)
-  await page.getByRole('button', { name: 'Login' }).click()
+  await submitAdminLogin(page)
   await expect(page).toHaveURL(/\/admin$/)
   for (const group of ['Контент', 'Тренажёр', 'Пользователи']) {
     await expect(page.getByRole('button', { name: group }).first()).toBeVisible()
   }
   await context.close()
+})
+
+test.describe('возврат после входа в CMS', () => {
+  test('карточка записи открывается с исходными параметрами', async ({ browser, request }) => {
+    const lesson = CONTENT.lessons[0]
+    const response = await request.get(`/api/lessons?where[slug][equals]=${lesson.slug}&depth=0`)
+    expect(response.ok()).toBe(true)
+    const { docs } = await response.json() as { docs: { id: number }[] }
+    expect(docs).toHaveLength(1)
+    const target = `/admin/collections/lessons/${docs[0].id}?from=bookmark`
+
+    const context = await browser.newContext({ baseURL: APP_URL, storageState: guestStorageState })
+    try {
+      const page = await context.newPage()
+      await page.goto(target)
+      await expect(page).toHaveURL((url) => url.pathname === '/admin/login' && url.searchParams.get('redirect') === target)
+      await submitAdminLogin(page)
+      await expect(page).toHaveURL(new URL(target, APP_URL).href)
+      await expect(page.locator('#field-title')).toHaveValue(lesson.title)
+    } finally {
+      await context.close()
+    }
+  })
+
+  test('аналитика выбранного пользователя открывается после отзыва сессии и повторного ввода пароля', async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: APP_URL, storageState: guestStorageState })
+    try {
+      const { email, password, firstName, lastName } = USERS.admin
+      const login = await context.request.post('/api/users/login', { data: { email, password } })
+      expect(login.ok()).toBe(true)
+      const { user } = await login.json() as { user: { id: number } }
+      const cookies = await context.cookies()
+      expect(cookies.some(({ name }) => name === 'payload-token')).toBe(true)
+      expect((await context.request.post('/api/users/logout')).ok()).toBe(true)
+      await context.addCookies(cookies)
+
+      const target = `/admin/student-analytics?user=${user.id}&filter=learning`
+      const page = await context.newPage()
+      await page.goto(target)
+      const isLogin = (url: URL) => url.pathname === '/admin/login' && url.searchParams.get('redirect') === target
+      await expect(page).toHaveURL(isLogin)
+
+      const rejected = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/users/login' && response.request().method() === 'POST')
+      await submitAdminLogin(page, 'wrong-password')
+      expect((await rejected).ok()).toBe(false)
+      await expect(page).toHaveURL(isLogin)
+
+      await submitAdminLogin(page, password)
+      await expect(page).toHaveURL(new URL(target, APP_URL).href)
+      await expect(page.getByRole('heading', { name: `${firstName} ${lastName}`, exact: true })).toBeVisible()
+    } finally {
+      await context.close()
+    }
+  })
+
+  for (const [path, name] of [
+    ['/admin/questions', 'Вопросы учеников'],
+    ['/admin/import-yandex', 'Импорт из Яндекс.Диска'],
+  ]) {
+    test(`${name} открывается после входа через форму платформы`, async ({ browser }) => {
+      const target = `${path}?from=bookmark&tag=A%2BB`
+      const context = await browser.newContext({ baseURL: APP_URL, storageState: guestStorageState })
+      try {
+        const page = await context.newPage()
+        await page.goto(target)
+        await expect(page).toHaveURL((url) => url.pathname === '/login' && url.searchParams.get('redirect') === target)
+        await page.getByLabel('Email').fill(USERS.admin.email)
+        await page.getByLabel('Пароль').fill(USERS.admin.password)
+        await page.getByRole('button', { name: 'Войти' }).click()
+        await expect(page).toHaveURL(new URL(target, APP_URL).href)
+        await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+      } finally {
+        await context.close()
+      }
+    })
+  }
+
+  test('внешний адрес возврата ведёт на дашборд CMS', async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: APP_URL, storageState: guestStorageState })
+    try {
+      const page = await context.newPage()
+      await page.route('https://example.invalid/**', (route) => route.abort())
+      await page.goto('/admin/login?redirect=https%3A%2F%2Fexample.invalid')
+      await submitAdminLogin(page)
+      await expect(page).toHaveURL(new URL('/admin', APP_URL).href)
+    } finally {
+      await context.close()
+    }
+  })
 })
 
 test('студент в админку не попадает', async ({ browser }) => {
@@ -54,15 +148,17 @@ test('студент в админку не попадает', async ({ browser 
 
 test('страницы ментора на платформе: чужих уводят настоящим редиректом, а не страницей с кодом 200', async ({ browser }) => {
   for (const { storageState, redirectPath } of [
-    { storageState: { cookies: [], origins: [] }, redirectPath: '/login' },
+    { storageState: guestStorageState, redirectPath: '/login' },
     { storageState: storageStateOf('student'), redirectPath: '/' },
   ]) {
-    const context = await browser.newContext({ baseURL: APP_URL, storageState })
+    const context = await browser.newContext({ baseURL: APP_URL, extraHTTPHeaders: { Origin: APP_URL }, storageState })
     try {
       for (const path of ['/admin/questions', '/admin/import-yandex']) {
         const response = await context.request.get(path, { maxRedirects: 0 })
         expect(response.status(), path).toBe(307)
-        expect(new URL(response.headers().location ?? '', APP_URL).pathname, path).toBe(redirectPath)
+        const location = new URL(response.headers().location ?? '', APP_URL)
+        expect(location.pathname, path).toBe(redirectPath)
+        expect(location.searchParams.get('redirect'), path).toBe(redirectPath === '/login' ? path : null)
       }
     } finally {
       await context.close()

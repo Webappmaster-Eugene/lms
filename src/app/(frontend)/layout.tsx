@@ -13,7 +13,9 @@ import { NavigationProgress } from '@/components/layout/NavigationProgress'
 import { KeyboardShortcuts } from '@/components/layout/KeyboardShortcuts'
 import { Suspense } from 'react'
 import { getLearningRequest } from '@/server/learning-request'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { adminLoginHref } from '@/lib/admin-login-redirect'
 import { PwaProvider } from '@/components/pwa/PwaProvider'
 import { StudentActivityBridge } from '@/components/analytics/StudentActivityBridge'
 import { VideoViewportRecovery } from '@/components/layout/VideoViewportRecovery'
@@ -38,7 +40,7 @@ export const viewport: Viewport = {
 
 export default async function FrontendLayout({ children }: { children: React.ReactNode }) {
   const { payload, user, req } = await getLearningRequest()
-  if (!user) redirect('/login')
+  if (!user) redirect(adminLoginHref(await headers(), '/login'))
   const isAdmin = user.role === 'admin'
   const [trainerEnabled, guidesEnabled, bootcampEnabled, tutoringEnabled, freeze] = await Promise.all([
     getTrainerAccess(payload, user, req).then((access) => access.hasAccess),

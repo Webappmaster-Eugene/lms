@@ -2,12 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { createElement, type FunctionComponent, type ReactNode } from 'react'
 import userEvent from '@testing-library/user-event'
+import { ADMIN_RETURN_PATH_HEADER } from '@/lib/admin-login-redirect'
 
 vi.mock('@xyflow/react', async () => (await import('../helpers/component-mocks')).xyflowMock())
 vi.mock('@payloadcms/next/templates', () => ({
   DefaultTemplate: ({ children }: { children: ReactNode }) => <div data-testid="admin-template">{children}</div>,
 }))
-vi.mock('next/navigation', () => ({ redirect: () => { throw new Error('redirect') } }))
+vi.mock('next/navigation', () => ({ redirect: (href: string) => { throw new Error(`redirect:${href}`) } }))
 
 const { EditorToolbar } = await import('@/components/roadmap-editor/EditorToolbar')
 const { RoadmapSelector } = await import('@/components/roadmap-editor/RoadmapSelector')
@@ -231,12 +232,13 @@ describe('точка входа редактора', () => {
 
   it('ученик не может открыть серверную страницу редактора', () => {
     const props = { initPageResult: { ...initPageResult, req: { ...initPageResult.req, user: { role: 'student' } } } }
-    expect(() => (RoadmapEditorView as FunctionComponent<Record<string, unknown>>)(props)).toThrow('redirect')
+    expect(() => (RoadmapEditorView as FunctionComponent<Record<string, unknown>>)(props)).toThrow(new Error('redirect:/'))
   })
 
-  it('без сессии серверная страница редактора недоступна', () => {
-    const props = { initPageResult: { ...initPageResult, req: { ...initPageResult.req, user: null } } }
-    expect(() => (RoadmapEditorView as FunctionComponent<Record<string, unknown>>)(props)).toThrow('redirect')
+  it('гостя отправляет на вход с возвратом к выбранной карте', () => {
+    const headers = new Headers({ [ADMIN_RETURN_PATH_HEADER]: '/admin/roadmap-editor/7' })
+    const props = { initPageResult: { ...initPageResult, req: { ...initPageResult.req, headers, user: null } } }
+    expect(() => (RoadmapEditorView as FunctionComponent<Record<string, unknown>>)(props)).toThrow(new Error('redirect:/admin/login?redirect=%2Fadmin%2Froadmap-editor%2F7'))
   })
 })
 

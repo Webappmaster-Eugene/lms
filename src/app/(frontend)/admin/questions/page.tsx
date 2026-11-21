@@ -3,22 +3,20 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { MentorQuestions } from '@/components/questions/MentorQuestions'
+import { adminLoginHref } from '@/lib/admin-login-redirect'
 import { collectAllPages } from '@/lib/paginate'
-import { getPayload } from '@/lib/payload'
 import { loadQuestionThreads } from '@/lib/questions'
+import { getLearningRequest } from '@/server/learning-request'
 
 export const metadata: Metadata = {
   title: 'Вопросы учеников',
 }
 
 export default async function MentorQuestionsPage() {
-  const payload = await getPayload()
-  const { user } = await payload.auth({ headers: await headers() })
+  const { payload, user } = await getLearningRequest()
 
-  // Префикс /admin middleware пропускает без проверки — роль проверяется здесь.
-  if (!user || user.role !== 'admin') {
-    redirect('/')
-  }
+  if (!user) redirect(adminLoginHref(await headers(), '/login'))
+  if (user.role !== 'admin') redirect('/')
 
   const [threads, templates] = await Promise.all([
     loadQuestionThreads(payload, user),

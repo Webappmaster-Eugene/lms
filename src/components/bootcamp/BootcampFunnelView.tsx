@@ -1,6 +1,7 @@
 import type { AdminViewServerProps } from 'payload'
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import { redirect } from 'next/navigation'
+import { adminLoginHref } from '@/lib/admin-login-redirect'
 
 import { parseFunnelFilter } from '@/lib/bootcamp-funnel'
 import { logger } from '@/lib/telemetry'
@@ -10,7 +11,8 @@ import { BootcampFunnelReport } from './BootcampFunnelReport'
 
 export async function BootcampFunnelView({ params, searchParams, initPageResult }: AdminViewServerProps) {
   const { req, locale, permissions, visibleEntities } = initPageResult
-  if (!req.user || !(await getLearningAccess(req.payload, req.user, req)).admin) redirect('/')
+  if (!req.user) redirect(adminLoginHref(req.headers, '/admin/login'))
+  if (!(await getLearningAccess(req.payload, req.user, req)).admin) redirect('/')
   let filter = parseFunnelFilter(searchParams, new Date())
   let programs: FunnelProgram[] = []
   let report: FunnelReport | null = null
