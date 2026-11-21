@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { getLearningRequest } from '@/server/learning-request'
 import { notFound, redirect } from 'next/navigation'
 import { getLearningAccess } from '@/server/learning-access'
@@ -37,7 +38,7 @@ export async function courseDetailTitle(slug: string, area: CourseArea): Promise
 }
 
 /** Страница курса и страница буткемпа: одна программа, разные разделы меню. */
-export async function CourseDetail({ slug, area }: { slug: string; area: CourseArea }) {
+export async function CourseDetail({ slug, area, navigation }: { slug: string; area: CourseArea; navigation?: ReactNode }) {
   const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login')
   const access = await getLearningAccess(payload, user, req)
@@ -189,6 +190,7 @@ export async function CourseDetail({ slug, area }: { slug: string; area: CourseA
       {/* Заголовок */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">{course.title}</h1>
+        {navigation && <div className="mt-3">{navigation}</div>}
         <div className="mt-3"><ShareButton title={course.title} /></div>
         <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
           <span>{pluralize(totalLessons, 'урок', 'урока', 'уроков')}</span>

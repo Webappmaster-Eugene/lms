@@ -122,6 +122,7 @@ export interface Config {
     'bootcamp-enrollments': BootcampEnrollment;
     'bootcamp-streams': BootcampStream;
     'bootcamp-week-submissions': BootcampWeekSubmission;
+    'tutoring-deck-files': TutoringDeckFile;
     'tutoring-meetings': TutoringMeeting;
     'tutoring-streams': TutoringStream;
     'tutoring-participants': TutoringParticipant;
@@ -191,6 +192,7 @@ export interface Config {
     'bootcamp-enrollments': BootcampEnrollmentsSelect<false> | BootcampEnrollmentsSelect<true>;
     'bootcamp-streams': BootcampStreamsSelect<false> | BootcampStreamsSelect<true>;
     'bootcamp-week-submissions': BootcampWeekSubmissionsSelect<false> | BootcampWeekSubmissionsSelect<true>;
+    'tutoring-deck-files': TutoringDeckFilesSelect<false> | TutoringDeckFilesSelect<true>;
     'tutoring-meetings': TutoringMeetingsSelect<false> | TutoringMeetingsSelect<true>;
     'tutoring-streams': TutoringStreamsSelect<false> | TutoringStreamsSelect<true>;
     'tutoring-participants': TutoringParticipantsSelect<false> | TutoringParticipantsSelect<true>;
@@ -2265,6 +2267,24 @@ export interface BootcampWeekSubmission {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-deck-files".
+ */
+export interface TutoringDeckFile {
+  id: number;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "tutoring-meetings".
  */
 export interface TutoringMeeting {
@@ -2280,6 +2300,9 @@ export interface TutoringMeeting {
     id?: string | null;
   }[];
   instructorNotes?: string | null;
+  deckPdf?: (number | null) | TutoringDeckFile;
+  deckPptx?: (number | null) | TutoringDeckFile;
+  deckOrigin?: ('import' | 'manual') | null;
   sourceDigest?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -2617,6 +2640,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'bootcamp-streams';
         value: number | BootcampStream;
+      } | null)
+    | ({
+        relationTo: 'tutoring-deck-files';
+        value: number | TutoringDeckFile;
       } | null)
     | ({
         relationTo: 'tutoring-meetings';
@@ -3890,6 +3917,23 @@ export interface BootcampWeekSubmissionsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-deck-files_select".
+ */
+export interface TutoringDeckFilesSelect<T extends boolean = true> {
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  focalX?: T;
+  focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "tutoring-meetings_select".
  */
 export interface TutoringMeetingsSelect<T extends boolean = true> {
@@ -3906,6 +3950,9 @@ export interface TutoringMeetingsSelect<T extends boolean = true> {
         id?: T;
       };
   instructorNotes?: T;
+  deckPdf?: T;
+  deckPptx?: T;
+  deckOrigin?: T;
   sourceDigest?: T;
   updatedAt?: T;
   createdAt?: T;

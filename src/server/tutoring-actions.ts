@@ -1,17 +1,30 @@
 'use server'
 
+import type { Payload, PayloadRequest } from 'payload'
 import { notFound, redirect } from 'next/navigation'
 
 import { relationId } from '@/lib/content-management/pages'
 import { logger } from '@/lib/telemetry'
-import { isMoscowTuesday, isTutoringMeeting, isTutoringProgram, isTutoringStatus, tutoringHttpsUrl, tutoringPrograms } from '@/lib/tutoring'
+import { isMoscowTuesday, isTutoringMeeting, isTutoringStatus, tutoringHttpsUrl, tutoringPrograms, type TutoringProgram } from '@/lib/tutoring'
 import { getLearningRequest } from '@/server/learning-request'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
+import { tutoringBootcamps, tutoringPath } from '@/server/tutoring-bootcamps'
 import { tutoringMemberships } from '@/server/tutoring-access'
 import { tutoringMeetings, TutoringProblem, writeTutoringReview } from '@/server/tutoring'
 
-const manage = '/manage/tutoring'
 const value = (form: FormData, key: string) => String(form.get(key) ?? '').trim()
+
+async function streamHref(payload: Payload, req: PayloadRequest, program: TutoringProgram, id: number) {
+  const course = (await tutoringBootcamps(payload, req)).find(item => item.program === program)
+  if (!course) notFound()
+  return `${tutoringPath(course.slug)}/streams/${id}`
+}
+
+async function managedStream(payload: Payload, req: PayloadRequest, streamId: number) {
+  const stream = await payload.findByID({ collection: 'tutoring-streams', id: streamId, req, overrideAccess: false, depth: 0, disableErrors: true })
+  if (!stream) notFound()
+  return { stream, href: await streamHref(payload, req, stream.program, streamId) }
+}
 
 async function actor(admin: boolean) {
   const info = await getLearningRequest()
@@ -59,30 +72,31 @@ function streamDetails(form: FormData) {
   return { title, meetingUrl, startsAt: moscowDate(form) }
 }
 
-export async function createTutoringStream(form: FormData) {
+export async function createTutoringStream(program: TutoringProgram, form: FormData) {
   const { payload, user, req } = await actor(true)
-  await run(manage, 'Поток создан', async () => {
-    const program = value(form, 'program')
-    if (!isTutoringProgram(program)) throw new TutoringProblem('Выберите программу')
+  const course = (await tutoringBootcamps(payload, req)).find(item => item.program === program)
+  if (!course) notFound()
+  const base = `${tutoringPath(course.slug)}/streams`
+  await run(base, 'Поток создан', async () => {
     const document = await payload.create({
       collection: 'tutoring-streams', req, user, overrideAccess: false,
       data: { ...streamDetails(form), program, status: 'draft', currentMeeting: 1 },
     })
-    return `${manage}/${document.id}`
+    return `${base}/${document.id}`
   })
 }
 
 export async function updateTutoringStream(streamId: number, form: FormData) {
   const { payload, user, req } = await actor(true)
-  await run(`${manage}/${streamId}`, 'Настройки потока сохранены', async () => {
-    const stream = await payload.findByID({ collection: 'tutoring-streams', id: streamId, req, user, overrideAccess: false, depth: 0 })
+  const { stream, href } = await managedStream(payload, req, streamId)
+  await run(href, 'Настройки потока сохранены', async () => {
     const status = value(form, 'status')
     const currentMeeting = Number(value(form, 'current'))
     if (status !== 'active' && status !== 'draft' && status !== 'archived') throw new TutoringProblem('Выберите доступ к потоку')
     if (!isTutoringMeeting(currentMeeting, stream.program)) throw new TutoringProblem('Выберите встречу потока')
     if (status === 'active') {
       const meetings = await tutoringMeetings(payload, req, stream.program)
-      if (meetings.length !== tutoringPrograms[stream.program].meetings || meetings.some(meeting => !meeting.filename)) {
+      if (meetings.length !== tutoringPrograms[stream.program].meetings || meetings.some(meeting => !meeting.filename && !meeting.deckPdf)) {
         throw new TutoringProblem('Сначала загрузите полный комплект презентаций и домашних заданий программы')
       }
     }
@@ -93,7 +107,8 @@ export async function updateTutoringStream(streamId: number, form: FormData) {
 
 export async function addTutoringParticipant(streamId: number, form: FormData) {
   const { payload, user, req } = await actor(true)
-  await run(`${manage}/${streamId}`, 'Ученик добавлен', async () => {
+  const { href } = await managedStream(payload, req, streamId)
+  await run(href, 'Ученик добавлен', async () => {
     const email = value(form, 'email').toLowerCase()
     if (!email || email.length > 254 || !email.includes('@')) throw new TutoringProblem('Введите почту ученика')
     if (value(form, 'paid') !== 'yes') throw new TutoringProblem('Подтвердите получение оплаты за репетиторство')
@@ -110,13 +125,14 @@ export async function addTutoringParticipant(streamId: number, form: FormData) {
     if (existing) throw new TutoringProblem('Ученик уже в списке потока. Его доступ можно открыть в журнале')
     const member = await payload.create({ collection: 'tutoring-participants', req, user, overrideAccess: false,
       data: { stream: streamId, student: student.id, paidAt: new Date().toISOString(), active: true, currentMeeting: 1 } })
-    return `${manage}/${streamId}?participant=${member.id}`
+    return `${href}?participant=${member.id}`
   })
 }
 
 export async function updateTutoringParticipant(streamId: number, memberId: number, form: FormData) {
   const { payload, user, req } = await actor(true)
-  await run(`${manage}/${streamId}?participant=${memberId}`, 'Отметка сохранена', async () => {
+  const { href } = await managedStream(payload, req, streamId)
+  await run(`${href}?participant=${memberId}`, 'Отметка сохранена', async () => {
     const member = await payload.findByID({ collection: 'tutoring-participants', id: memberId, req, user, overrideAccess: false, depth: 1 })
     const stream = member.stream
     if (!stream || typeof stream === 'number' || stream.id !== streamId) throw new TutoringProblem('Ученик не найден в потоке')
@@ -128,8 +144,9 @@ export async function updateTutoringParticipant(streamId: number, memberId: numb
 }
 
 export async function gradeTutoringHomework(streamId: number, memberId: number, meeting: number, form: FormData) {
-  const { payload, user } = await actor(true)
-  await run(`${manage}/${streamId}?participant=${memberId}&review=${meeting}#homework`, 'Результат проверки сохранён', async () => {
+  const { payload, user, req } = await actor(true)
+  const { href } = await managedStream(payload, req, streamId)
+  await run(`${href}?participant=${memberId}&review=${meeting}#homework`, 'Результат проверки сохранён', async () => {
     const status = value(form, 'status')
     const feedback = value(form, 'feedback')
     if (!isTutoringStatus(status) || feedback.length > 3000) throw new TutoringProblem('Проверьте статус и длину комментария')
@@ -141,11 +158,12 @@ export async function gradeTutoringHomework(streamId: number, memberId: number, 
 
 export async function submitTutoringHomework(streamId: number, meeting: number, form: FormData) {
   const { payload, user, req } = await actor(false)
-  await run(`/tutoring/${streamId}?meeting=${meeting}#homework`, 'Работа отправлена на проверку', async () => {
+  const membership = (await tutoringMemberships(payload, req, user.id)).find(({ stream }) => stream.id === streamId)
+  if (!membership || relationId(membership.member.student) !== user.id) notFound()
+  const href = await streamHref(payload, req, membership.stream.program, streamId)
+  await run(`${href}?meeting=${meeting}#homework`, 'Работа отправлена на проверку', async () => {
     const submission = value(form, 'submission')
     if (!tutoringHttpsUrl(submission)) throw new TutoringProblem('Введите HTTPS-ссылку на работу')
-    const membership = (await tutoringMemberships(payload, req, user.id)).find(({ stream }) => stream.id === streamId)
-    if (!membership || relationId(membership.member.student) !== user.id) throw new TutoringProblem('Поток недоступен')
     await writeTutoringReview(payload, streamId, membership.member.id, meeting, { kind: 'submit', actor: user, url: submission })
   })
 }

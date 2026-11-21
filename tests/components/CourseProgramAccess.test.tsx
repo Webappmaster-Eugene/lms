@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
-const mocks = vi.hoisted(() => ({ find: vi.fn(), findByID: vi.fn(), auth: vi.fn(), policy: vi.fn(), req: { user: { id: 7, role: 'student' } } }))
+const mocks = vi.hoisted(() => ({ find: vi.fn(), findByID: vi.fn(), auth: vi.fn(), policy: vi.fn(), tutoringArea: vi.fn(), req: { user: { id: 7, role: 'student' } } }))
 vi.mock('@/lib/payload', () => ({ getPayload: async () => mocks }))
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }))
 vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('not-found') }, redirect: (to: string) => { throw new Error(`redirect ${to}`) } }))
 vi.mock('payload', () => ({ createLocalReq: async () => mocks.req }))
 vi.mock('next/link', async () => (await import('../helpers/component-mocks')).linkMock())
+vi.mock('@/server/tutoring-bootcamps', () => ({ tutoringArea: mocks.tutoringArea, tutoringPath: (slug: string) => `/bootcamp/${slug}/tutoring` }))
 vi.mock('@/server/learning-access', () => ({ getLearningAccess: (...args: unknown[]) => mocks.policy(...args) }))
 vi.mock('@payloadcms/richtext-lexical/react', () => ({ RichText: () => <p>Описание назначенного курса</p> }))
 
@@ -21,6 +22,7 @@ const page = (docs: unknown[]) => ({ docs, hasNextPage: false, page: 1, totalPag
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.tutoringArea.mockResolvedValue({ manuals: [], tutoring: [] })
   mocks.auth.mockResolvedValue({ user: mocks.req.user })
   mocks.find.mockImplementation(async ({ collection }: { collection: string }) => {
     if (collection === 'courses') return page([{ id: 10, title: 'Node.js', slug: 'node', roadmap: null }])
@@ -31,6 +33,12 @@ beforeEach(() => {
 })
 
 describe('серверная программа курса', () => {
+  it('ведёт ученика с доступом только к репетиторству в его потоки', async () => {
+    mocks.tutoringArea.mockResolvedValue({ manuals: [], tutoring: [{ id: 10, slug: 'node' }] })
+    await expect(BootcampDetailPage({ params: Promise.resolve({ slug: 'node' }) })).rejects.toThrow('redirect /bootcamp/node/tutoring')
+    expect(mocks.find).not.toHaveBeenCalled()
+  })
+
   it('показывает только метаданные неназначенных уроков и не читает описание курса', async () => {
     mocks.policy.mockResolvedValue({ canBrowseCourse: () => true, canBrowseLessonMetadata: () => true, canAccessCourse: () => false, canAccessLessonMetadata: () => false })
     render(await CourseDetailPage({ params: Promise.resolve({ slug: 'node' }) }))

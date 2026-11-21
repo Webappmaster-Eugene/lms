@@ -5,8 +5,7 @@ import { ExternalLink, Tent } from 'lucide-react'
 import { HELP_LINK, LockedSection } from '@/components/access/LockedSection'
 import { BOOTCAMP_LANDING_URL } from '@/lib/site-links'
 import { openProgramLinks } from '@/server/bootcamp-programs'
-import { getLearningRequest } from '@/server/learning-request'
-import { getBootcamps } from '@/server/bootcamps'
+import { tutoringArea, tutoringPath } from '@/server/tutoring-bootcamps'
 
 export const metadata: Metadata = {
   title: 'Буткемпы',
@@ -15,17 +14,15 @@ export const metadata: Metadata = {
 type Props = { searchParams: Promise<{ locked?: string | string[] }> }
 
 export default async function BootcampPage({ searchParams }: Props) {
-  const { payload, user, req } = await getLearningRequest()
-  if (!user) redirect('/login')
-  const bootcamps = await getBootcamps(payload, user, req)
-  // Ссылка на закрытый буткемп с карты роадмапа ведёт сюда с ?locked: участник другого буткемпа
-  // должен увидеть объяснение, а не уйти редиректом в свой.
+  const { payload, isAdmin, manuals, tutoring } = await tutoringArea()
+  const bootcamps = [
+    ...manuals.map(course => ({ ...course, href: `/bootcamp/${course.slug}` })),
+    ...tutoring.filter(course => !manuals.some(manual => manual.id === course.id))
+      .map(course => ({ ...course, href: tutoringPath(course.slug) })),
+  ]
   const lockedRequested = (await searchParams).locked !== undefined
-  // Обычно ученик проходит один буткемп: сразу его программа, без лишнего шага. Страница вне (lists):
-  // их loading.tsx начинает потоковый ответ, и редирект стал бы клиентским — 200 и мелькание заглушки.
   const [only] = bootcamps
-  if (only && bootcamps.length === 1 && !lockedRequested) redirect(`/bootcamp/${only.slug}`)
-  const isAdmin = user.role === 'admin'
+  if (only && bootcamps.length === 1 && !lockedRequested) redirect(only.href)
   const showLocked = !isAdmin && (bootcamps.length === 0 || lockedRequested)
   // Куда записаться - открытые программы из CMS; если их нет, страница буткемпа Node.js, как раньше.
   const programs = showLocked ? await openProgramLinks(payload) : []
@@ -66,7 +63,7 @@ export default async function BootcampPage({ searchParams }: Props) {
           <ul className="grid gap-3 sm:grid-cols-2">
             {bootcamps.map((bootcamp) => (
               <li key={bootcamp.id}>
-                <Link href={`/bootcamp/${bootcamp.slug}`} className="flex min-h-14 items-center gap-3 rounded-xl border border-border bg-card p-4 font-semibold text-foreground transition-colors hover:border-primary/50 focus-visible:outline-2 focus-visible:outline-ring">
+                <Link href={bootcamp.href} className="flex min-h-14 items-center gap-3 rounded-xl border border-border bg-card p-4 font-semibold text-foreground transition-colors hover:border-primary/50 focus-visible:outline-2 focus-visible:outline-ring">
                   <Tent className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
                   {bootcamp.title}
                 </Link>

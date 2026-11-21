@@ -48,8 +48,9 @@ export const ADMIN_NAV_GROUPS = [
   {
     label: 'Репетиторство',
     items: [
-      { href: '/manage/tutoring', label: 'Потоки и журнал' },
+      { href: '/bootcamp', label: 'Лекции, потоки и журнал' },
       { href: '/admin/collections/tutoring-meetings', label: 'Материалы встреч' },
+      { href: '/admin/collections/tutoring-deck-files', label: 'Файлы презентаций' },
       { href: '/admin/collections/tutoring-streams', label: 'Потоки репетиторства' },
       { href: '/admin/collections/tutoring-participants', label: 'Участники' },
       { href: '/admin/collections/tutoring-reviews', label: 'Сдачи и отзывы' },

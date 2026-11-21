@@ -35,6 +35,7 @@ const SEGMENT_SAMPLES: Record<string, readonly string[]> = {
   taskSlug: ['create-counter', 'array.map'],
   token: ['12345678-1234-4123-8123-123456789abc'],
   id: ['42'],
+  number: ['1'],
 }
 
 function collectPageRoutes(dir: string, urlPrefix = ''): string[] {

@@ -16,7 +16,7 @@ const programs = {
   nodejs: { total: 32, practice: values['node-practice'] },
   'react-next': { total: 24, practice: values['react-practice'] },
 }
-if (manifest.schema !== 'mentorcareer-live-meetings/1' || !Array.isArray(manifest.meetings) || manifest.meetings.length !== 56) {
+if (manifest.schema !== 'mentorcareer-live-meetings/2' || !Array.isArray(manifest.meetings) || manifest.meetings.length !== 56) {
   throw new Error('Нужен комплект из 56 встреч')
 }
 
@@ -31,14 +31,15 @@ for (const meeting of manifest.meetings) {
   const week = String(Math.ceil(number / 2)).padStart(2, '0')
   const key = `${program}-${week}-${number % 2 ? 'tue' : 'thu'}`
   if (seen.has(key) || meeting.key !== key || meeting.presentation !== `${program}/${key}.pdf` ||
-    meeting.instructorNotes !== `instructor/${program}/${key}.md`) throw new Error(`Некорректные пути встречи ${key}`)
+    meeting.editable !== `${program}/${key}.pptx` || meeting.instructorNotes !== `instructor/${program}/${key}.md`) throw new Error(`Некорректные пути встречи ${key}`)
   seen.add(key)
-  const [pdf, instructorNotes] = await Promise.all([
+  const [pdf, pptx, instructorNotes] = await Promise.all([
     readFile(path.join(root, meeting.presentation)),
+    readFile(path.join(root, meeting.editable)),
     readFile(path.join(root, meeting.instructorNotes), 'utf8'),
   ])
-  if (!pdf.subarray(0, 5).equals(Buffer.from('%PDF-')) || pdf.length > 5_000_000 || !instructorNotes.trim() || instructorNotes.length > 80_000) {
-    throw new Error(`Некорректный PDF или заметки ${key}`)
+  if (!pdf.subarray(0, 5).equals(Buffer.from('%PDF-')) || pdf.length > 10 * 1024 * 1024 || pptx.length < 4 || pptx.length > 10 * 1024 * 1024 || pptx.readUInt32LE(0) !== 0x04034b50 || !instructorNotes.trim() || instructorNotes.length > 80_000) {
+    throw new Error(`Некорректная презентация или заметки ${key}`)
   }
   const stages = new Set()
   const tasks = await Promise.all(homework.map(async item => {
@@ -59,14 +60,14 @@ for (const meeting of manifest.meetings) {
     return { stage, description: item.description, assignment: text, practice }
   }))
   const data = { program, number, title, homework: tasks, instructorNotes }
-  const sourceDigest = createHash('sha256').update(pdf).update(JSON.stringify(data)).digest('hex')
-  preparations.push({ pdf, data: { ...data, sourceDigest }, filename: `tutoring-${key}-${sourceDigest.slice(0, 10)}.pdf` })
+  const sourceDigest = createHash('sha256').update(JSON.stringify(data)).update(pdf).update(pptx).digest('hex')
+  preparations.push({ pdf, pptx, data: { ...data, sourceDigest }, key })
 }
 
 const { LMS_URL, LMS_ADMIN_EMAIL, LMS_ADMIN_PASSWORD } = process.env
 if (!LMS_URL || !LMS_ADMIN_EMAIL || !LMS_ADMIN_PASSWORD) {
   if (values.apply) throw new Error('Для импорта нужны LMS_URL, LMS_ADMIN_EMAIL и LMS_ADMIN_PASSWORD')
-  process.stdout.write(`Проверено ${preparations.length} встреч, PDF, заметки и задания обоих буткемпов.\n`)
+  process.stdout.write(`Проверено ${preparations.length} встреч, PDF, PPTX, заметки и задания обоих буткемпов.\n`)
   process.exit(0)
 }
 const target = new URL(LMS_URL)
@@ -94,25 +95,41 @@ if (typeof login.token !== 'string') throw new Error('Вход не выдал �
 token = login.token
 const session = await request('GET', 'users/me')
 if (session.user?.role !== 'admin') throw new Error('Нужна авторизованная учётная запись администратора')
-const counts = { created: 0, changed: 0, unchanged: 0 }
-for (const { data, pdf, filename } of preparations) {
+const counts = { created: 0, changed: 0, unchanged: 0, manual: 0 }
+for (const { data, pdf, pptx, key } of preparations) {
   const query = new URLSearchParams({ 'where[program][equals]': data.program, 'where[number][equals]': data.number, depth: '0', limit: '2' })
   const { docs } = await request('GET', `tutoring-meetings?${query}`)
   if (docs.length > 1) throw new Error('Несколько материалов для одной встречи')
   const existing = docs[0]
-  if (existing?.sourceDigest === data.sourceDigest && existing.filename) {
+  if (existing?.deckOrigin === 'manual') {
+    counts.manual++
+    continue
+  }
+  if (existing?.sourceDigest === data.sourceDigest && existing.deckPdf && existing.deckPptx) {
     counts.unchanged++
     continue
   }
-  counts[existing ? 'changed' : 'created']++
-  if (!values.apply) continue
+  if (!values.apply) {
+    counts[existing ? 'changed' : 'created']++
+    continue
+  }
   const form = new FormData()
-  form.append('_payload', JSON.stringify(data))
-  form.append('file', new Blob([pdf], { type: 'application/pdf' }), filename)
-  const result = await request(existing ? 'PATCH' : 'POST', existing ? `tutoring-meetings/${existing.id}` : 'tutoring-meetings', form)
-  const saved = await request('GET', `tutoring-meetings/${result.doc.id}?depth=0`)
-  if (saved.sourceDigest !== data.sourceDigest || saved.mimeType !== 'application/pdf' || !saved.filename) {
+  form.set('id', String(existing?.id ?? 0))
+  form.set('updatedAt', existing?.updatedAt ?? '')
+  form.set('material', JSON.stringify(data))
+  form.set('pdf', new Blob([pdf], { type: 'application/pdf' }), `${key}.pdf`)
+  form.set('pptx', new Blob([pptx], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }), `${key}.pptx`)
+  const result = await request('POST', 'manage/tutoring/presentation', form)
+  if (result.status === 'manual') {
+    counts.manual++
+    continue
+  }
+  const saved = await request('GET', `tutoring-meetings/${result.id}?depth=1`)
+  if (saved.sourceDigest !== data.sourceDigest || saved.deckPdf?.mimeType !== 'application/pdf' ||
+    saved.deckPptx?.mimeType !== 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+    !saved.deckPdf.filename || !saved.deckPptx.filename) {
     throw new Error(`Листинг ${data.program} ${data.number}: LMS сохранила неполные материалы`)
   }
+  counts[result.status === 'unchanged' ? 'unchanged' : existing ? 'changed' : 'created']++
 }
 process.stdout.write(`${values.apply ? 'Импорт' : 'Проверка'}: ${JSON.stringify(counts)}\n`)

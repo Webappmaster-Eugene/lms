@@ -6,7 +6,7 @@ import type { Payload, PayloadRequest } from 'payload'
 import { relationId } from '@/lib/content-management/pages'
 import { collectAllPages } from '@/lib/paginate'
 import { isTutoringMeeting, type TutoringProgram, type TutoringStatus } from '@/lib/tutoring'
-import type { TutoringParticipant, TutoringReview, User } from '@/payload-types'
+import type { TutoringMeeting, TutoringParticipant, TutoringReview, User } from '@/payload-types'
 import { inTransaction, txDb } from '@/server/bootcamp-lead-events'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import { tutoringOpenThrough } from '@/server/tutoring-access'
@@ -16,15 +16,18 @@ export class TutoringProblem extends Error {}
 export async function tutoringMeetings(payload: Payload, req: PayloadRequest, program: TutoringProgram) {
   return collectAllPages(({ page, limit }) => payload.find({
     collection: 'tutoring-meetings', req, overrideAccess: true, depth: 0, page, limit, sort: 'number',
-    where: { program: { equals: program } }, select: { number: true, title: true, filename: true },
+    where: { program: { equals: program } }, select: { number: true, title: true, filename: true, deckPdf: true },
   }), { label: 'Программа репетиторства' })
 }
 
-export async function tutoringMeeting(payload: Payload, req: PayloadRequest, program: TutoringProgram, number: number, mentor: boolean) {
+type MeetingMaterial = Pick<TutoringMeeting, 'id' | 'title' | 'number' | 'homework' | 'filename' | 'deckPdf' | 'deckPptx' | 'deckOrigin' | 'updatedAt' | 'instructorNotes'>
+
+export async function tutoringMeeting(payload: Payload, req: PayloadRequest, program: TutoringProgram, number: number, mentor: boolean): Promise<MeetingMaterial | null> {
   const { docs } = await payload.find({
-    collection: 'tutoring-meetings', req, overrideAccess: true, depth: 0, limit: 1,
+    collection: 'tutoring-meetings', req, overrideAccess: true, depth: 1, limit: 1,
     where: { and: [{ program: { equals: program } }, { number: { equals: number } }] },
-    select: { title: true, number: true, homework: true, filename: true, ...(mentor ? { instructorNotes: true as const } : {}) },
+    select: { title: true, number: true, homework: true, filename: true, deckPdf: true, updatedAt: true, ...(mentor ? { deckPptx: true, deckOrigin: true, instructorNotes: true } as const : {}) },
+    populate: { 'tutoring-deck-files': { filename: true } },
   })
   return docs[0] ?? null
 }

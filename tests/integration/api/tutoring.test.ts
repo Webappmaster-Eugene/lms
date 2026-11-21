@@ -1,6 +1,9 @@
+import { readFile } from 'node:fs/promises'
 import type { Payload } from 'payload'
 import { beforeAll, describe, expect, it } from 'vitest'
 
+import { POST as replacePresentation } from '@/app/api/manage/tutoring/presentation/route'
+import { saveTutoringDeck } from '@/server/tutoring-decks'
 import { writeTutoringReview } from '@/server/tutoring'
 import type { TutoringMeeting, TutoringParticipant, TutoringStream } from '@/payload-types'
 import { blankPDF } from '../helpers/fixtures'
@@ -90,6 +93,63 @@ describe('репетиторство в LMS', () => {
     expect(accepted).toMatchObject({ id: first.id, status: 'accepted', feedback: 'Готово' })
     await expect(submit(student)).rejects.toThrow('Эта работа уже принята')
     expect((await rest('GET', `/tutoring-reviews/${accepted.id}`, { token: outsiderToken })).status).not.toBe(200)
+  })
+
+  it('публикует пару целиком и сохраняет ручную версию при повторном импорте', async () => {
+    const form = new FormData()
+    const pdfFile = new File([new Uint8Array(blankPDF())], 'mentorcareer.pdf')
+    form.set('pdf', pdfFile)
+    form.set('pptx', new File([new Uint8Array(await readFile('tests/fixtures/tutoring-editable.pptx'))], 'mentorcareer.pptx'))
+    const data = {
+      program: material.program, number: material.number, title: 'Исходная лекция', homework: material.homework.map(({ stage, description }) => ({ stage, description })),
+      instructorNotes: 'Только ведущему', sourceDigest: 'a'.repeat(64),
+    }
+    const created = await saveTutoringDeck(payload, admin, form, { id: null, updatedAt: '', material: { ...data, number: 3 } })
+    const createdMeeting = await payload.findByID({ collection: 'tutoring-meetings', id: created.id, depth: 0 })
+    expect(createdMeeting).toMatchObject({ number: 3, deckOrigin: 'import' })
+    expect(createdMeeting.deckPdf).toEqual(expect.any(Number))
+    expect(createdMeeting.deckPptx).toEqual(expect.any(Number))
+    const first = await saveTutoringDeck(payload, admin, form, { id: material.id, updatedAt: material.updatedAt, material: data })
+    expect(first).toEqual({ id: material.id, status: 'saved' })
+    const read = () => payload.findByID({ collection: 'tutoring-meetings', id: material.id, depth: 1 })
+    const imported = await read()
+    if (!imported.deckPdf || typeof imported.deckPdf === 'number' || !imported.deckPptx || typeof imported.deckPptx === 'number') {
+      throw new Error('Файлы презентации не связаны с лекцией')
+    }
+    const deckPath = (filename?: string | null) => `/tutoring-deck-files/file/${filename}`
+    const pdf = deckPath(imported.deckPdf.filename)
+    const editable = deckPath(imported.deckPptx.filename)
+    const studentPdf = await rest('GET', pdf, { token: studentToken })
+    expect(studentPdf.status).toBe(200)
+    expect(studentPdf.headers.get('cache-control')).toContain('no-store')
+    expect((await rest('GET', editable, { token: studentToken })).status).not.toBe(200)
+    expect((await rest('GET', editable, { token: await login(payload, admin) })).status).toBe(200)
+    expect((await rest('GET', pdf, { token: outsiderToken })).status).not.toBe(200)
+
+    const withBadPptx = new FormData()
+    withBadPptx.set('pdf', pdfFile)
+    withBadPptx.set('pptx', new File(['строка'], 'fake.pptx'))
+    await expect(saveTutoringDeck(payload, admin, withBadPptx, { id: material.id, updatedAt: imported.updatedAt })).rejects.toThrow('повреждён')
+    expect((await read()).deckPdf).toEqual(imported.deckPdf)
+    expect((await read()).deckPptx).toEqual(imported.deckPptx)
+    const attempt = () => saveTutoringDeck(payload, admin, form, { id: material.id, updatedAt: imported.updatedAt })
+    const concurrent = await Promise.allSettled([attempt(), attempt()])
+    expect(concurrent.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+    expect(concurrent.find(result => result.status === 'rejected')).toMatchObject({ reason: { message: expect.stringContaining('уже изменилась') } })
+    const manual = await read()
+    expect(manual.deckOrigin).toBe('manual')
+    expect(manual.deckPdf).not.toEqual(imported.deckPdf)
+    expect(manual.deckPptx).not.toEqual(imported.deckPptx)
+    expect((await rest('GET', pdf, { token: studentToken })).status).not.toBe(200)
+    expect(await saveTutoringDeck(payload, admin, form, { id: material.id, updatedAt: manual.updatedAt, material: data })).toEqual({
+      id: material.id, status: 'manual',
+    })
+    expect((await read()).deckPdf).toEqual(manual.deckPdf)
+
+    const unauthorised = await replacePresentation(new Request('http://lms.test/api/manage/tutoring/presentation', {
+      method: 'POST', headers: { Authorization: `JWT ${studentToken}` }, body: form,
+    }))
+    expect(unauthorised.status).toBe(403)
   })
 
   it('открывает материалы при личной отметке, закрывает их при архивировании и чистит связи при удалении аккаунта', async () => {

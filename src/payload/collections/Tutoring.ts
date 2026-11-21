@@ -1,11 +1,31 @@
 import { ValidationError, type CollectionConfig } from 'payload'
 
+import { PPTX_MIME, TUTORING_DECK_DIRECTORY } from '@/lib/tutoring-file-types'
+
 import { isMoscowTuesday, isTutoringMeeting, isTutoringProgram, tutoringHttpsUrl, tutoringPrograms, tutoringStatuses } from '@/lib/tutoring'
 import { isAdmin, isAdminField } from '@/payload/access/isAdmin'
 import { cleanupTutoringParticipant, cleanupTutoringStream } from '@/payload/hooks/cleanupOwnedRelations'
-import { tutoringPresentationAccess } from '@/server/tutoring-access'
+import { tutoringDeckAccess, tutoringPresentationAccess } from '@/server/tutoring-access'
 
 const group = 'Репетиторство'
+
+export const TutoringDeckFiles: CollectionConfig = {
+  slug: 'tutoring-deck-files',
+  labels: { singular: 'Файл презентации', plural: 'Файлы презентаций' },
+  admin: { group, useAsTitle: 'filename' },
+  access: { read: tutoringDeckAccess, create: () => false, update: () => false, delete: () => false },
+  upload: {
+    staticDir: TUTORING_DECK_DIRECTORY,
+    mimeTypes: ['application/pdf', PPTX_MIME],
+    modifyResponseHeaders: ({ headers }) => {
+      headers.set('Cache-Control', 'private, no-store')
+      headers.set('Content-Disposition', headers.get('Content-Type') === 'application/pdf' ? 'inline' : 'attachment')
+      headers.set('X-Content-Type-Options', 'nosniff')
+      return headers
+    },
+  },
+  fields: [],
+}
 const programs = Object.entries(tutoringPrograms).map(([value, { label }]) => ({ value, label }))
 const statuses = Object.entries(tutoringStatuses).map(([value, label]) => ({ value, label }))
 const urlField = (value: unknown) => !value || (typeof value === 'string' && tutoringHttpsUrl(value)) || 'Нужна ссылка HTTPS без логина и пароля'
@@ -20,6 +40,7 @@ export const TutoringMeetings: CollectionConfig = {
   indexes: [{ fields: ['program', 'number'], unique: true }],
   upload: {
     staticDir: 'media/tutoring',
+    filesRequiredOnCreate: false,
     mimeTypes: ['application/pdf'],
     modifyResponseHeaders: ({ headers }) => {
       headers.set('Cache-Control', 'private, no-store')
@@ -28,10 +49,11 @@ export const TutoringMeetings: CollectionConfig = {
       return headers
     },
   },
-  hooks: { beforeValidate: [({ data, originalDoc, operation }) => {
+  hooks: { beforeValidate: [({ data, originalDoc, operation, req }) => {
     const program: unknown = data?.program ?? originalDoc?.program
     const number: unknown = data?.number ?? originalDoc?.number
     if (!isTutoringProgram(program) || !isTutoringMeeting(number, program)) bad('number', 'Укажите номер встречи из программы')
+    if (operation === 'create' && !req.file && (!data?.deckPdf || !data.deckPptx)) bad('deckPdf', 'Загрузите презентацию лекции')
     if (operation === 'update' && originalDoc && (program !== originalDoc.program || number !== originalDoc.number)) bad('number', 'Номер и программа встречи задаются при создании')
     return data
   }] },
@@ -46,6 +68,10 @@ export const TutoringMeetings: CollectionConfig = {
       { name: 'practice', type: 'text', maxLength: 200, label: 'Путь к практикуму' },
     ] },
     { name: 'instructorNotes', type: 'textarea', maxLength: 80000, label: 'Заметки ведущего', access: { read: isAdminField } },
+    { name: 'deckPdf', type: 'upload', relationTo: 'tutoring-deck-files', label: 'PDF слайдов', admin: { readOnly: true }, access: { create: () => false, update: () => false } },
+    { name: 'deckPptx', type: 'upload', relationTo: 'tutoring-deck-files', label: 'Редактируемый PPTX', admin: { readOnly: true }, access: { read: isAdminField, create: () => false, update: () => false } },
+    { name: 'deckOrigin', type: 'select', options: ['import', 'manual'], label: 'Источник презентации', admin: { readOnly: true },
+      access: { read: isAdminField, create: () => false, update: () => false } },
     { name: 'sourceDigest', type: 'text', maxLength: 64, admin: { readOnly: true }, access: { read: isAdminField } },
   ],
 }
