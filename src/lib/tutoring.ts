@@ -1,3 +1,5 @@
+export const TUTORING_MEETING_MINUTES = 120
+
 export const tutoringPrograms = {
   nodejs: { label: 'Node.js', meetings: 32 },
   'react-next': { label: 'React + Next.js', meetings: 24 },

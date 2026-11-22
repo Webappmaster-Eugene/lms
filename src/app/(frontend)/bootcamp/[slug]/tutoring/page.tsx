@@ -1,5 +1,7 @@
 import Link from 'next/link'
 
+import { TUTORING_MEETING_MINUTES } from '@/lib/tutoring'
+
 import { requireTutoringBootcamp } from '@/server/tutoring-bootcamps'
 import { tutoringMeetings } from '@/server/tutoring'
 
@@ -31,7 +33,7 @@ export default async function BootcampTutoring({ params }: { params: Promise<{ s
         <ul className="divide-y divide-border">
           {lectures.map(meeting => <li key={meeting.number}>
             <Link href={`${base}/lectures/${meeting.number}`} className={link}>
-              <span className="block text-xs text-muted-foreground">{meeting.number % 2 ? 'Вторник · 120 минут' : 'Четверг · 90 минут'}</span>
+              <span className="block text-xs text-muted-foreground">{meeting.number % 2 ? 'Вторник' : 'Четверг'} · {TUTORING_MEETING_MINUTES} минут</span>
               <span className="font-semibold">{meeting.title}</span>
             </Link>
           </li>)}
