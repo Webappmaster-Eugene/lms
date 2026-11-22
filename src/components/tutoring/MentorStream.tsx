@@ -3,13 +3,16 @@ import { notFound } from 'next/navigation'
 
 import { ManagementHeading, managementLink, managementPrimary } from '@/components/content-management/ManagementHeading'
 import { TutoringMeetingCard } from '@/components/tutoring/TutoringMeetingCard'
+import { TutoringSeriesForm } from '@/components/tutoring/TutoringSeriesForm'
 import { managedDocument, relationId } from '@/lib/content-management/pages'
 import { isTutoringMeeting, moscowMeetingInput, scheduledTutoringMeeting, tutoringDateLabel, tutoringPrograms, tutoringStatuses } from '@/lib/tutoring'
+import { tutoringScheduleSlots, tutoringScheduleTimeline } from '@/lib/tutoring-schedule'
 import type { requireTutoringBootcamp } from '@/server/tutoring-bootcamps'
-import { addTutoringParticipant, gradeTutoringHomework, rescheduleTutoringMeeting, toggleTutoringStreamCalendar, updateTutoringParticipant, updateTutoringStream } from '@/server/tutoring-actions'
+import { addTutoringParticipant, gradeTutoringHomework, rescheduleTutoringMeeting, rescheduleTutoringSeries, toggleTutoringStreamCalendar, updateTutoringParticipant, updateTutoringStream } from '@/server/tutoring-actions'
 import { getTutoringCalendarSettings } from '@/server/tutoring-calendar-account'
 import { googleCalendarAdminPath, tutoringGoogleConfig } from '@/server/tutoring-google'
 import { tutoringMeeting, tutoringMeetings, tutoringParticipants, tutoringReviewMap, tutoringReviews, tutoringStudentName } from '@/server/tutoring'
+import { tutoringScheduleRevision } from '@/server/tutoring-schedule'
 
 type Query = { participant?: string; preview?: string; review?: string; schedule?: string; error?: string; saved?: string }
 const field = 'min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm'
@@ -44,8 +47,10 @@ export async function MentorStream({ context, id, query }: { context: Awaited<Re
   const selectedWork = materials.find(x => x.number === reviewNumber)
   const meeting = isTutoringMeeting(preview, stream.program) ? await tutoringMeeting(payload, req, stream.program, preview, true) : null
   const program = tutoringPrograms[stream.program]
-  const localStart = moscowMeetingInput(new Date(stream.startsAt))
   const now = new Date().getTime()
+  const schedule = tutoringScheduleSlots(stream)
+  const revision = tutoringScheduleRevision(schedule)
+  const { upcoming, past } = tutoringScheduleTimeline(schedule, now)
   const href = `${base}/streams/${stream.id}`
   const numbers = Array.from({ length: program.meetings }, (_, i) => i + 1)
   const nameByNumber = new Map(materials.map(material => [material.number, material.title]))
@@ -54,7 +59,7 @@ export async function MentorStream({ context, id, query }: { context: Awaited<Re
 
   return <>
     <Link href={`${base}/streams`} className={focus}>Все потоки репетиторства</Link>
-    <ManagementHeading title={stream.title} description={`${program.label}, ${program.meetings} встреч по вторникам и четвергам`} />
+    <ManagementHeading title={stream.title} description={`${program.label}, ${program.meetings} встреч`} />
     {query.error && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{query.error}</p>}
     {query.saved && <p role="status" className="text-sm text-muted-foreground">{query.saved}</p>}
 
@@ -72,8 +77,6 @@ export async function MentorStream({ context, id, query }: { context: Awaited<Re
         <label className="grid gap-1 text-sm">Доступ<select className={field} name="status" defaultValue={stream.status}>
           <option value="draft">Черновик</option><option value="active">Открыт ученикам</option><option value="archived">Архив</option>
         </select></label>
-        <label className="grid gap-1 text-sm">Первый вторник<input className={field} name="date" type="date" required defaultValue={localStart.slice(0, 10)} /></label>
-        <label className="grid gap-1 text-sm">Время МСК<input className={field} name="time" type="time" required defaultValue={localStart.slice(11, 16)} /></label>
         <label className="grid gap-1 text-sm">Ссылка на созвон<input className={field} name="meetingUrl" type="url" defaultValue={stream.meetingUrl ?? ''} /></label>
         <label className="grid gap-1 text-sm">Текущая встреча потока<select className={field} name="current" defaultValue={stream.currentMeeting}>{meetingOptions}</select></label>
         <div className="sm:col-span-2"><button className={managementPrimary}>Сохранить настройки</button></div>
@@ -93,8 +96,10 @@ export async function MentorStream({ context, id, query }: { context: Awaited<Re
           </form>}
         </> : <span className="text-muted-foreground">Подключите аккаунт Google в админке</span>}
       </div>}
+      {stream.status !== 'archived' && <TutoringSeriesForm key={revision} slots={schedule} now={now}
+        action={rescheduleTutoringSeries.bind(null, stream.id, revision)} />}
       <ol className="mt-5 grid gap-x-6 divide-y divide-border border-t border-border sm:grid-cols-2" aria-label="Календарь встреч">
-        {numbers.map(number => {
+        {[...upcoming, ...past].map(({ meeting: number }) => {
           const title = nameByNumber.get(number)
           const { original, start, moved } = scheduledTutoringMeeting(stream, number)
           const local = moscowMeetingInput(start)

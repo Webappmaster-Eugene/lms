@@ -2,7 +2,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { TutoringMeetingCard } from '@/components/tutoring/TutoringMeetingCard'
-import { isTutoringMeeting, scheduledTutoringMeeting, tutoringDateLabel, tutoringPrograms, tutoringStatuses } from '@/lib/tutoring'
+import { isTutoringMeeting, tutoringDateLabel, tutoringPrograms, tutoringStatuses } from '@/lib/tutoring'
+import { tutoringScheduleSlots, tutoringScheduleTimeline, type TutoringScheduleSlot } from '@/lib/tutoring-schedule'
 import { cn } from '@/lib/utils'
 import type { requireTutoringBootcamp } from '@/server/tutoring-bootcamps'
 import { tutoringOpenThrough } from '@/server/tutoring-access'
@@ -29,8 +30,23 @@ export async function StudentStream({ context, id, query }: { context: Awaited<R
   const canSubmit = status === 'assigned' || status === 'changes'
   const accepted = reviews.filter(row => row.status === 'accepted').length
   const program = tutoringPrograms[stream.program]
-  const numbers = Array.from({ length: program.meetings }, (_, index) => index + 1)
+  const { upcoming, past } = tutoringScheduleTimeline(tutoringScheduleSlots(stream), new Date().getTime())
   const names = new Map(materials.map(material => [material.number, material.title]))
+
+  function meetingRow({ meeting: number, startsAt, scheduledAt }: TutoringScheduleSlot) {
+    const title = names.get(number)
+    const meetingReview = byMeeting.get(number)
+    const description = <><span className="block font-medium">{title ? `${number}. ${title}` : `Встреча ${number}`}</span>
+      <span className="mt-1 block text-xs text-muted-foreground">
+        <time dateTime={startsAt}>{tutoringDateLabel(new Date(startsAt))}, МСК</time>{startsAt !== scheduledAt && ' · Перенесено'}
+        {meetingReview && ` · ${tutoringStatuses[meetingReview.status]}`}
+      </span></>
+    return <li key={number}>
+      {number <= open ? <Link href={`${base}/streams/${stream.id}?meeting=${number}`} aria-current={selected === number ? 'page' : undefined}
+        className={cn('block break-words rounded-md px-2 py-2.5 text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring', selected === number && 'bg-primary/10')}>{description}</Link>
+      : <div className="break-words px-2 py-2.5 text-sm text-muted-foreground">{description}<span className="mt-1 block text-xs">Откроется позже</span></div>}
+    </li>
+  }
 
   return <div className="mx-auto max-w-5xl space-y-6">
     <Link href={base} className="rounded text-sm text-primary hover:underline focus-visible:outline-2 focus-visible:outline-ring">Мои потоки репетиторства</Link>
@@ -60,22 +76,13 @@ export async function StudentStream({ context, id, query }: { context: Awaited<R
         </section>}
       </div>
       <nav aria-label="Календарь репетиторства" className="min-w-0 rounded-xl border border-border p-3">
-        <h2 className="mb-2 px-2 text-sm font-semibold">Встречи</h2>
-        <ol className="divide-y divide-border">
-          {numbers.map(number => {
-            const { start, moved } = scheduledTutoringMeeting(stream, number)
-            const title = names.get(number)
-            const meetingReview = byMeeting.get(number)
-            const description = <><span className="block font-medium">{title ? `${number}. ${title}` : `Встреча ${number}`}</span>
-              <span className="mt-1 block text-xs text-muted-foreground">{tutoringDateLabel(start)}, МСК{moved && ' · Перенесено'}
-                {meetingReview && ` · ${tutoringStatuses[meetingReview.status]}`}</span></>
-            return <li key={number}>
-              {number <= open ? <Link href={`${base}/streams/${stream.id}?meeting=${number}`} aria-current={selected === number ? 'page' : undefined}
-                className={cn('block break-words rounded-md px-2 py-2.5 text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring', selected === number && 'bg-primary/10')}>{description}</Link>
-              : <div className="break-words px-2 py-2.5 text-sm text-muted-foreground">{description}<span className="mt-1 block text-xs">Откроется позже</span></div>}
-            </li>
-          })}
-        </ol>
+        <h2 className="mb-2 px-2 text-sm font-semibold">Предстоящие встречи</h2>
+        {upcoming.length ? <ol className="divide-y divide-border">{upcoming.map(meetingRow)}</ol> :
+          <p className="px-2 text-sm text-muted-foreground">Предстоящих встреч пока нет.</p>}
+        {past.length > 0 && <details open={past.some(slot => slot.meeting === selected) || undefined} className="mt-2 border-t border-border pt-2">
+          <summary className="cursor-pointer rounded px-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-ring">Прошедшие встречи ({past.length})</summary>
+          <ol className="mt-2 divide-y divide-border">{past.map(meetingRow)}</ol>
+        </details>}
       </nav>
     </div>
   </div>

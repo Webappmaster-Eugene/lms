@@ -5,12 +5,13 @@ import { createLocalReq } from 'payload'
 
 import { GET as googleCallback } from '@/app/api/manage/tutoring/google-calendar/callback/route'
 import { POST as googleAccount } from '@/app/api/manage/tutoring/google-calendar/route'
-import { scheduledTutoringMeeting } from '@/lib/tutoring'
+import { moscowMeetingInput, scheduledTutoringMeeting } from '@/lib/tutoring'
+import { tutoringScheduleSlots } from '@/lib/tutoring-schedule'
 import { tutoringMemberships } from '@/server/tutoring-access'
 import { setTutoringStreamCalendar } from '@/server/tutoring-calendar-account'
 import { runTutoringCalendarJobs } from '@/server/tutoring-calendar-sync'
 import { googleCalendarApiPath, googleStateCookie, type GoogleEvent } from '@/server/tutoring-google'
-import { moveTutoringMeeting } from '@/server/tutoring-schedule'
+import { changeTutoringSchedule, moveTutoringMeeting, tutoringScheduleRevision } from '@/server/tutoring-schedule'
 import { createAdmin, createStudent, getTestPayload, login, rest, uid, type TestUser } from '../helpers/payload'
 
 const origin = 'http://lms.test'
@@ -20,6 +21,7 @@ while (nextTuesday.getUTCDay() !== 2) nextTuesday.setUTCDate(nextTuesday.getUTCD
 nextTuesday.setUTCHours(17, 0, 0, 0)
 const startsAt = nextTuesday.toISOString()
 const later = (offset: number) => new Date(nextTuesday.getTime() + offset * day).toISOString()
+const local = (offset: number) => moscowMeetingInput(new Date(later(offset)))
 
 let payload: Payload
 let teacher: TestUser
@@ -183,7 +185,37 @@ describe('расписание и Google Calendar репетиторства', (
     expect(scheduledTutoringMeeting(ordinary, 3).start.toISOString()).toBe(later(7))
   })
 
-  it('подключает только текущего администратора и переносит то же событие после ошибок Google', async () => {
+  it('массово меняет только будущие даты, учитывает отдельные переносы и отвергает устаревшее расписание', async () => {
+    const initial = await createStream()
+    const historical = '2000-01-01T17:00:00.000Z'
+    const base = await payload.update({ collection: 'tutoring-streams', id: initial.id, data: {
+      currentMeeting: 3, scheduleOverrides: [{ meeting: 3, startsAt: historical }],
+    } })
+    const revision = tutoringScheduleRevision(tutoringScheduleSlots(base))
+    const input = { fromMeeting: 2, firstStart: local(6), secondStart: local(9).replace('20:00', '21:30'), keepOverrides: true }
+    await expect(changeTutoringSchedule(payload, student, base.id, revision, input)).rejects.toThrow('преподаватель')
+    const overlap = { ...input, secondStart: local(6).replace('20:00', '20:30') }
+    await expect(changeTutoringSchedule(payload, teacher, base.id, revision, overlap)).rejects.toThrow('два часа')
+
+    const moved = await moveTutoringMeeting(payload, teacher, base.id, 4, { expectedStart: later(9), newStart: later(12) })
+    await expect(changeTutoringSchedule(payload, teacher, base.id, revision, input)).rejects.toThrow('уже изменилось')
+    const updated = await changeTutoringSchedule(payload, teacher, base.id, tutoringScheduleRevision(tutoringScheduleSlots(moved)), input)
+    expect(updated.currentMeeting).toBe(3)
+    expect(updated.startsAt).toBe(startsAt)
+    expect(scheduledTutoringMeeting(updated, 1).start.toISOString()).toBe(startsAt)
+    expect(scheduledTutoringMeeting(updated, 2).start.toISOString()).toBe(later(6))
+    expect(scheduledTutoringMeeting(updated, 3).start.toISOString()).toBe(historical)
+    expect(scheduledTutoringMeeting(updated, 4)).toMatchObject({ start: new Date(later(12)), original: new Date(later(13)), moved: true })
+    expect(scheduledTutoringMeeting(updated, 5).start.toISOString()).toBe(new Date(Date.parse(later(16)) + 90 * 60_000).toISOString())
+
+    const reset = await moveTutoringMeeting(payload, teacher, base.id, 4, { expectedStart: later(12), newStart: null })
+    expect(scheduledTutoringMeeting(reset, 4)).toMatchObject({ start: new Date(later(13)), moved: false })
+    await rest('PATCH', `/tutoring-streams/${base.id}`, { token: teacherSession, body: { scheduleDates: [] } })
+    const reread = await payload.findByID({ collection: 'tutoring-streams', id: base.id })
+    expect(scheduledTutoringMeeting(reread, 4).start.toISOString()).toBe(later(13))
+  })
+
+  it('синхронизирует отдельный перенос и массовую правку в существующие события Google', async () => {
     const { calendars, events, changes, simulate, fetchGoogle } = googleFixture()
     expect((await googleAccount(accountRequest(studentSession))).status).toBe(403)
     expect((await googleAccount(accountRequest(teacherSession, 'https://foreign.test'))).status).toBe(403)
@@ -228,6 +260,23 @@ describe('расписание и Google Calendar репетиторства', (
     expect(events.get(first.id)?.start?.dateTime).toBe(later(3))
     expect(changes.patch).toBe(1)
     expect(changes.insert).toBe(24)
+
+    const beforeSeries = await payload.findByID({ collection: 'tutoring-streams', id: selected.id })
+    const originalIds = [...events.keys()].sort()
+    await changeTutoringSchedule(payload, teacher, selected.id, tutoringScheduleRevision(tutoringScheduleSlots(beforeSeries)), {
+      fromMeeting: 2, firstStart: local(6), secondStart: local(9), keepOverrides: false,
+    })
+    await syncNow()
+    expect([...events.keys()].sort()).toEqual(originalIds)
+    expect(events.get(first.id)?.start?.dateTime).toBe(later(3))
+    const byMeeting = new Map([...events.values()].map(event => [event.extendedProperties?.private?.meeting, event]))
+    expect(byMeeting.get(`${selected.id}.2`)).toMatchObject({ id: second?.id, start: { dateTime: later(6) } })
+    expect(byMeeting.get(`${selected.id}.3`)?.start?.dateTime).toBe(later(9))
+    expect(byMeeting.get(`${selected.id}.24`)?.start?.dateTime).toBe(later(6 + 11 * 7))
+    expect(changes.patch).toBe(24)
+    expect(changes.insert).toBe(24)
+    await syncNow()
+    expect(changes.patch).toBe(24)
 
     simulate.revoked = true
     await payload.update({ collection: 'tutoring-streams', id: selected.id, data: { status: 'archived' } })

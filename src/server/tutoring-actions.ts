@@ -13,7 +13,7 @@ import { setTutoringStreamCalendar } from '@/server/tutoring-calendar-account'
 import { tutoringGoogleConfig } from '@/server/tutoring-google'
 import { tutoringMemberships } from '@/server/tutoring-access'
 import { tutoringMeetings, TutoringProblem, writeTutoringReview } from '@/server/tutoring'
-import { moveTutoringMeeting } from '@/server/tutoring-schedule'
+import { changeTutoringSchedule, moveTutoringMeeting } from '@/server/tutoring-schedule'
 
 const value = (form: FormData, key: string) => String(form.get(key) ?? '').trim()
 
@@ -66,7 +66,7 @@ function streamDetails(form: FormData) {
   const meetingUrl = value(form, 'meetingUrl')
   if (!title || title.length > 120) throw new TutoringProblem('Введите название до 120 символов')
   if (meetingUrl && !tutoringHttpsUrl(meetingUrl)) throw new TutoringProblem('Введите HTTPS-ссылку на созвон')
-  return { title, meetingUrl, startsAt: moscowDate(form) }
+  return { title, meetingUrl }
 }
 
 export async function createTutoringStream(program: TutoringProgram, form: FormData) {
@@ -77,9 +77,22 @@ export async function createTutoringStream(program: TutoringProgram, form: FormD
   await run(base, 'Поток создан', async () => {
     const document = await payload.create({
       collection: 'tutoring-streams', req, user, overrideAccess: false,
-      data: { ...streamDetails(form), program, status: 'draft', currentMeeting: 1 },
+      data: { ...streamDetails(form), startsAt: moscowDate(form), program, status: 'draft', currentMeeting: 1 },
     })
     return `${base}/${document.id}`
+  })
+}
+
+export async function rescheduleTutoringSeries(streamId: number, expectedRevision: string, form: FormData) {
+  const { payload, user, req } = await actor(true)
+  const { href } = await managedStream(payload, req, streamId)
+  await run(`${href}?schedule=1#schedule`, 'Расписание будущих встреч сохранено', async () => {
+    await changeTutoringSchedule(payload, user, streamId, expectedRevision, {
+      fromMeeting: Number(value(form, 'fromMeeting')),
+      firstStart: value(form, 'firstStart'),
+      secondStart: value(form, 'secondStart'),
+      keepOverrides: value(form, 'keepOverrides') === 'yes',
+    })
   })
 }
 

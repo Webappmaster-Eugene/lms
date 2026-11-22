@@ -31,11 +31,13 @@ export function tutoringMeetingDate(startsAt: string, meeting: number) {
 
 type StreamSchedule = {
   startsAt: string
+  scheduleDates?: { meeting: number; startsAt: string }[] | null
   scheduleOverrides?: { meeting: number; startsAt: string }[] | null
 }
 
 export function scheduledTutoringMeeting(stream: StreamSchedule, meeting: number) {
-  const original = tutoringMeetingDate(stream.startsAt, meeting)
+  const regular = stream.scheduleDates?.find(row => row.meeting === meeting)
+  const original = regular ? new Date(regular.startsAt) : tutoringMeetingDate(stream.startsAt, meeting)
   const override = stream.scheduleOverrides?.find(row => row.meeting === meeting)
   const start = override ? new Date(override.startsAt) : original
   const end = new Date(start.getTime() + TUTORING_MEETING_MINUTES * 60_000)

@@ -88,13 +88,15 @@ export const TutoringStreams: CollectionConfig = {
       bad('currentMeeting', 'Укажите встречу из программы потока')
     }
     if (!isMoscowTuesday(data?.startsAt ?? originalDoc?.startsAt)) bad('startsAt', 'Первая встреча должна быть во вторник по Москве')
-    if (data?.scheduleOverrides != null) {
-      if (!Array.isArray(data.scheduleOverrides)) bad('scheduleOverrides', 'Укажите список переносов встреч')
+    for (const field of ['scheduleDates', 'scheduleOverrides'] as const) {
+      const rows = data?.[field]
+      if (rows == null) continue
+      if (!Array.isArray(rows)) bad(field, 'Укажите список дат встреч')
       const numbers = new Set<number>()
-      for (const row of data.scheduleOverrides) {
+      for (const row of rows) {
         if (!row || !isTutoringProgram(program) || !isTutoringMeeting(row.meeting, program) || numbers.has(row.meeting) ||
           typeof row.startsAt !== 'string' || !Number.isFinite(Date.parse(row.startsAt))) {
-          bad('scheduleOverrides', 'Укажите уникальный номер и дату встречи потока')
+          bad(field, 'Укажите уникальный номер и дату встречи потока')
         }
         numbers.add(row.meeting)
       }
@@ -105,6 +107,14 @@ export const TutoringStreams: CollectionConfig = {
     { name: 'title', type: 'text', required: true, maxLength: 120, label: 'Название потока' },
     { name: 'program', type: 'select', required: true, options: programs, label: 'Программа' },
     { name: 'startsAt', type: 'date', required: true, label: 'Первая встреча', admin: { date: { pickerAppearance: 'dayAndTime' } } },
+    {
+      name: 'scheduleDates', type: 'array', maxRows: 32, admin: { hidden: true },
+      access: { create: () => false, update: () => false },
+      fields: [
+        { name: 'meeting', type: 'number', required: true, min: 1, max: 32 },
+        { name: 'startsAt', type: 'date', required: true },
+      ],
+    },
     {
       name: 'scheduleOverrides', type: 'array', maxRows: 32, admin: { hidden: true },
       access: { create: () => false, update: () => false },

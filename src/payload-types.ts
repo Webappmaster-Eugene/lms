@@ -2327,6 +2327,13 @@ export interface TutoringStream {
   title: string;
   program: 'nodejs' | 'react-next';
   startsAt: string;
+  scheduleDates?:
+    | {
+        meeting: number;
+        startsAt: string;
+        id?: string | null;
+      }[]
+    | null;
   scheduleOverrides?:
     | {
         meeting: number;
@@ -4009,6 +4016,13 @@ export interface TutoringStreamsSelect<T extends boolean = true> {
   title?: T;
   program?: T;
   startsAt?: T;
+  scheduleDates?:
+    | T
+    | {
+        meeting?: T;
+        startsAt?: T;
+        id?: T;
+      };
   scheduleOverrides?:
     | T
     | {

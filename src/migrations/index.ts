@@ -61,6 +61,7 @@ import * as migration_20261113_061701_bootcamp_week_progress from './20261113_06
 import * as migration_20261120_180904_tutoring_streams from './20261120_180904_tutoring_streams';
 import * as migration_20261121_110257_tutoring_deck_revisions from './20261121_110257_tutoring_deck_revisions';
 import * as migration_20261122_101547_tutoring_google_calendar from './20261122_101547_tutoring_google_calendar';
+import * as migration_20261122_145105_tutoring_future_schedule from './20261122_145105_tutoring_future_schedule';
 
 export const migrations = [
   {
@@ -376,6 +377,11 @@ export const migrations = [
   {
     up: migration_20261122_101547_tutoring_google_calendar.up,
     down: migration_20261122_101547_tutoring_google_calendar.down,
-    name: '20261122_101547_tutoring_google_calendar'
+    name: '20261122_101547_tutoring_google_calendar',
+  },
+  {
+    up: migration_20261122_145105_tutoring_future_schedule.up,
+    down: migration_20261122_145105_tutoring_future_schedule.down,
+    name: '20261122_145105_tutoring_future_schedule'
   },
 ];
