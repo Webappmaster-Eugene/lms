@@ -5,12 +5,15 @@ import { notFound, redirect } from 'next/navigation'
 
 import { relationId } from '@/lib/content-management/pages'
 import { logger } from '@/lib/telemetry'
-import { isMoscowTuesday, isTutoringMeeting, isTutoringStatus, tutoringHttpsUrl, tutoringPrograms, type TutoringProgram } from '@/lib/tutoring'
+import { isMoscowTuesday, isTutoringMeeting, isTutoringStatus, parseMoscowMeetingTime, tutoringHttpsUrl, tutoringPrograms, type TutoringProgram } from '@/lib/tutoring'
 import { getLearningRequest } from '@/server/learning-request'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import { tutoringBootcamps, tutoringPath } from '@/server/tutoring-bootcamps'
+import { setTutoringStreamCalendar } from '@/server/tutoring-calendar-account'
+import { tutoringGoogleConfig } from '@/server/tutoring-google'
 import { tutoringMemberships } from '@/server/tutoring-access'
 import { tutoringMeetings, TutoringProblem, writeTutoringReview } from '@/server/tutoring'
+import { moveTutoringMeeting } from '@/server/tutoring-schedule'
 
 const value = (form: FormData, key: string) => String(form.get(key) ?? '').trim()
 
@@ -52,14 +55,8 @@ async function run(path: string, success: string, job: () => Promise<string | vo
 }
 
 function moscowDate(form: FormData) {
-  const date = value(form, 'date')
-  const time = value(form, 'time')
-  const timestamp = Date.parse(`${date}T${time}:00+03:00`)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time) || !Number.isFinite(timestamp) ||
-    new Date(timestamp + 3 * 3_600_000).toISOString().slice(0, 16) !== `${date}T${time}`) {
-    throw new TutoringProblem('Укажите дату и время первой встречи по Москве')
-  }
-  const iso = new Date(timestamp).toISOString()
+  const iso = parseMoscowMeetingTime(value(form, 'date'), value(form, 'time'))
+  if (!iso) throw new TutoringProblem('Укажите дату и время первой встречи по Москве')
   if (!isMoscowTuesday(iso)) throw new TutoringProblem('Выберите вторник для первой встречи')
   return iso
 }
@@ -102,6 +99,28 @@ export async function updateTutoringStream(streamId: number, form: FormData) {
     }
     await payload.update({ collection: 'tutoring-streams', id: stream.id, req, user, overrideAccess: false,
       data: { ...streamDetails(form), status, currentMeeting } })
+  })
+}
+
+export async function rescheduleTutoringMeeting(streamId: number, meeting: number, form: FormData) {
+  const { payload, user, req } = await actor(true)
+  const { href } = await managedStream(payload, req, streamId)
+  await run(`${href}?schedule=1#schedule`, 'Расписание встречи сохранено', async () => {
+    const reset = value(form, 'intent') === 'reset'
+    const newStart = reset ? null : parseMoscowMeetingTime(value(form, 'date'), value(form, 'time'))
+    if (!reset && !newStart) throw new TutoringProblem('Укажите дату и время встречи по Москве')
+    await moveTutoringMeeting(payload, user, streamId, meeting, { expectedStart: value(form, 'expectedStart'), newStart })
+  })
+}
+
+export async function toggleTutoringStreamCalendar(streamId: number, form: FormData) {
+  const { payload, user, req } = await actor(true)
+  const { href } = await managedStream(payload, req, streamId)
+  await run(`${href}?schedule=1#schedule`, 'Настройки календаря сохранены', async () => {
+    if (!tutoringGoogleConfig()) throw new TutoringProblem('Google Calendar ещё не настроен для LMS')
+    const enable = value(form, 'enable')
+    if (enable !== 'yes' && enable !== 'no') throw new TutoringProblem('Выберите действие для календаря')
+    await setTutoringStreamCalendar(payload, user, streamId, enable === 'yes')
   })
 }
 

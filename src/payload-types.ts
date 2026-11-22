@@ -127,6 +127,7 @@ export interface Config {
     'tutoring-streams': TutoringStream;
     'tutoring-participants': TutoringParticipant;
     'tutoring-reviews': TutoringReview;
+    'tutoring-calendars': TutoringCalendar;
     'bootcamp-payments': BootcampPayment;
     'bootcamp-refunds': BootcampRefund;
     'bootcamp-lead-events': BootcampLeadEvent;
@@ -197,6 +198,7 @@ export interface Config {
     'tutoring-streams': TutoringStreamsSelect<false> | TutoringStreamsSelect<true>;
     'tutoring-participants': TutoringParticipantsSelect<false> | TutoringParticipantsSelect<true>;
     'tutoring-reviews': TutoringReviewsSelect<false> | TutoringReviewsSelect<true>;
+    'tutoring-calendars': TutoringCalendarsSelect<false> | TutoringCalendarsSelect<true>;
     'bootcamp-payments': BootcampPaymentsSelect<false> | BootcampPaymentsSelect<true>;
     'bootcamp-refunds': BootcampRefundsSelect<false> | BootcampRefundsSelect<true>;
     'bootcamp-lead-events': BootcampLeadEventsSelect<false> | BootcampLeadEventsSelect<true>;
@@ -2325,6 +2327,13 @@ export interface TutoringStream {
   title: string;
   program: 'nodejs' | 'react-next';
   startsAt: string;
+  scheduleOverrides?:
+    | {
+        meeting: number;
+        startsAt: string;
+        id?: string | null;
+      }[]
+    | null;
   status: 'draft' | 'active' | 'archived';
   currentMeeting: number;
   meetingUrl?: string | null;
@@ -2356,6 +2365,32 @@ export interface TutoringReview {
   status: 'assigned' | 'submitted' | 'changes' | 'accepted';
   submissionUrl?: string | null;
   feedback?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-calendars".
+ */
+export interface TutoringCalendar {
+  id: number;
+  owner?: (number | null) | User;
+  googleSubject: string;
+  googleEmail: string;
+  calendarId?: string | null;
+  encryptedRefreshToken?: string | null;
+  status: 'connected' | 'reconnect' | 'disconnected';
+  streams?:
+    | {
+        streamId: number;
+        id?: string | null;
+      }[]
+    | null;
+  nextSyncAt?: string | null;
+  lastSyncedAt?: string | null;
+  lastError?: ('temporary' | 'calendar' | 'authorization') | null;
+  failures: number;
+  scheduleDigest?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -3974,6 +4009,13 @@ export interface TutoringStreamsSelect<T extends boolean = true> {
   title?: T;
   program?: T;
   startsAt?: T;
+  scheduleOverrides?:
+    | T
+    | {
+        meeting?: T;
+        startsAt?: T;
+        id?: T;
+      };
   status?: T;
   currentMeeting?: T;
   meetingUrl?: T;
@@ -4003,6 +4045,31 @@ export interface TutoringReviewsSelect<T extends boolean = true> {
   status?: T;
   submissionUrl?: T;
   feedback?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-calendars_select".
+ */
+export interface TutoringCalendarsSelect<T extends boolean = true> {
+  owner?: T;
+  googleSubject?: T;
+  googleEmail?: T;
+  calendarId?: T;
+  encryptedRefreshToken?: T;
+  status?: T;
+  streams?:
+    | T
+    | {
+        streamId?: T;
+        id?: T;
+      };
+  nextSyncAt?: T;
+  lastSyncedAt?: T;
+  lastError?: T;
+  failures?: T;
+  scheduleDigest?: T;
   updatedAt?: T;
   createdAt?: T;
 }

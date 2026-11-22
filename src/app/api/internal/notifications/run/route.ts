@@ -7,6 +7,7 @@ import { cleanupWebVitals } from '@/server/web-vitals'
 import { runEmailBroadcastJobs } from '@/server/broadcasts/service'
 import { runBootcampSchedule } from '@/server/bootcamp-schedule'
 import { sendInactiveDigest } from '@/server/analytics-digests'
+import { runTutoringCalendarJobs } from '@/server/tutoring-calendar-sync'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -24,6 +25,12 @@ export async function POST(request: Request) {
   } catch (error) {
     logger.error('Notification scheduler failed', error)
     return Response.json({ error: 'Задача уведомлений не выполнена' }, { status: 500, headers: { 'Cache-Control': 'no-store' } })
+  }
+
+  try {
+    await runTutoringCalendarJobs(payload)
+  } catch (error) {
+    logger.error('Tutoring calendar scheduler failed', error)
   }
 
   let result: Awaited<ReturnType<typeof runNotificationJobs>> | null = null

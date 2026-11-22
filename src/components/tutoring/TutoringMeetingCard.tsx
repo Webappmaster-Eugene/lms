@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 import { SlidesBlock } from '@/components/lesson/SlidesBlock'
-import { TUTORING_MEETING_MINUTES, tutoringDateLabel, tutoringMeetingDate } from '@/lib/tutoring'
+import { scheduledTutoringMeeting, TUTORING_MEETING_MINUTES, tutoringDateLabel } from '@/lib/tutoring'
 import type { TutoringMeeting, TutoringStream } from '@/payload-types'
 
 type Meeting = Pick<TutoringMeeting, 'title' | 'number' | 'filename' | 'deckPdf' | 'deckPptx' | 'homework' | 'instructorNotes'>
@@ -19,10 +19,11 @@ export function TutoringMeetingCard({ meeting, stream, mentor = false }: { meeti
   const pptx = mentor && meeting.deckPptx && typeof meeting.deckPptx !== 'number' ? meeting.deckPptx.filename : null
   const filename = pdf ?? meeting.filename
   const collection = pdf ? 'tutoring-deck-files' : 'tutoring-meetings'
+  const slot = stream ? scheduledTutoringMeeting(stream, meeting.number) : null
   return <section aria-labelledby="meeting-title" className="min-w-0 space-y-5">
     <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
       <div>
-        <p className="text-sm text-muted-foreground">Встреча {meeting.number} · {stream ? `${tutoringDateLabel(tutoringMeetingDate(stream.startsAt, meeting.number))}, МСК` : meeting.number % 2 ? 'вторник' : 'четверг'} · {TUTORING_MEETING_MINUTES} минут</p>
+        <p className="text-sm text-muted-foreground">Встреча {meeting.number} · {slot ? `${tutoringDateLabel(slot.start)}, МСК` : meeting.number % 2 ? 'вторник' : 'четверг'} · {TUTORING_MEETING_MINUTES} минут{slot?.moved && ' · Перенесено'}</p>
         <h2 id="meeting-title" className="mt-1 text-2xl font-semibold leading-tight">{meeting.title}</h2>
       </div>
       {stream?.meetingUrl && <Link href={stream.meetingUrl} target="_blank" rel="noopener noreferrer"

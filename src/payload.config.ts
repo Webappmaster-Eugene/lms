@@ -41,6 +41,7 @@ import { StudentSessionTelemetry, StudentLearningEvents, StudentActivityDays } f
 import { AdminDigests } from '@/payload/collections/AdminDigests'
 import { BootcampStreams, BootcampWeekSubmissions } from '@/payload/collections/BootcampProgress'
 import { TutoringDeckFiles, TutoringMeetings, TutoringParticipants, TutoringReviews, TutoringStreams } from '@/payload/collections/Tutoring'
+import { TutoringCalendars } from '@/payload/collections/TutoringCalendars'
 import { WebVitalsReports } from '@/payload/collections/WebVitalsReports'
 import { Certificates } from '@/payload/collections/Certificates'
 import { Streaks } from '@/payload/collections/Streaks'
@@ -121,6 +122,10 @@ export default buildConfig({
           Component: '/components/bootcamp/BootcampProgressView#BootcampProgressView',
           path: '/bootcamp-progress',
         },
+        tutoringCalendar: {
+          Component: '/components/tutoring/GoogleCalendarView#GoogleCalendarView',
+          path: '/google-calendar',
+        },
         roadmapEditor: {
           Component: '/components/roadmap-editor/RoadmapEditorView',
           path: '/roadmap-editor/:segments*',
@@ -190,6 +195,7 @@ export default buildConfig({
     TutoringStreams,
     TutoringParticipants,
     TutoringReviews,
+    TutoringCalendars,
     BootcampPayments,
     BootcampRefunds,
     BootcampLeadEvents,

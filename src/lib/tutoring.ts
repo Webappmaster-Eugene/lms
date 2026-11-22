@@ -29,6 +29,30 @@ export function tutoringMeetingDate(startsAt: string, meeting: number) {
   return new Date(Date.parse(startsAt) + days * 86_400_000)
 }
 
+type StreamSchedule = {
+  startsAt: string
+  scheduleOverrides?: { meeting: number; startsAt: string }[] | null
+}
+
+export function scheduledTutoringMeeting(stream: StreamSchedule, meeting: number) {
+  const original = tutoringMeetingDate(stream.startsAt, meeting)
+  const override = stream.scheduleOverrides?.find(row => row.meeting === meeting)
+  const start = override ? new Date(override.startsAt) : original
+  const end = new Date(start.getTime() + TUTORING_MEETING_MINUTES * 60_000)
+  return { original, start, end, moved: start.getTime() !== original.getTime() }
+}
+
+export function parseMoscowMeetingTime(date: string, time: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null
+  const timestamp = Date.parse(`${date}T${time}:00+03:00`)
+  if (!Number.isFinite(timestamp) || moscowMeetingInput(new Date(timestamp)) !== `${date}T${time}`) return null
+  return new Date(timestamp).toISOString()
+}
+
+export function moscowMeetingInput(date: Date) {
+  return new Date(date.getTime() + 3 * 3_600_000).toISOString().slice(0, 16)
+}
+
 export const tutoringDateLabel = (date: Date) => new Intl.DateTimeFormat('ru-RU', {
   weekday: 'short', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow',
 }).format(date)

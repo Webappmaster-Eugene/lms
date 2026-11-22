@@ -4,7 +4,7 @@ import { ManagementHeading, managementPrimary } from '@/components/content-manag
 import { notFound } from 'next/navigation'
 import { requireTutoringBootcamp } from '@/server/tutoring-bootcamps'
 import { collectAllPages } from '@/lib/paginate'
-import { tutoringDateLabel, tutoringPrograms } from '@/lib/tutoring'
+import { scheduledTutoringMeeting, tutoringDateLabel, tutoringPrograms } from '@/lib/tutoring'
 import { createTutoringStream } from '@/server/tutoring-actions'
 
 export const metadata = { title: 'Потоки репетиторства' }
@@ -28,7 +28,7 @@ export default async function TutoringManagePage({ params, searchParams }: { par
               <Link href={`${base}/streams/${stream.id}`} className="block rounded-md px-3 py-4 hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">
                 <span className="block font-semibold">{stream.title}</span>
                 <span className="mt-1 block text-sm text-muted-foreground">
-                  {tutoringPrograms[stream.program].label} · {labels[stream.status]} · {tutoringDateLabel(new Date(stream.startsAt))}, МСК
+                  {tutoringPrograms[stream.program].label} · {labels[stream.status]} · {tutoringDateLabel(scheduledTutoringMeeting(stream, 1).start)}, МСК
                 </span>
               </Link>
             </li>)}

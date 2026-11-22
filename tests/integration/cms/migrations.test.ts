@@ -194,6 +194,20 @@ describe('миграции на чистой базе', () => {
     await payload.delete({ collection: 'users', id: user.id })
   })
 
+  it('миграция календаря сохраняет расписание существующего потока без заполнения переносов', async () => {
+    const migration = migrations.find(item => item.name.endsWith('_tutoring_google_calendar'))
+    if (!migration) throw new Error('Миграция календаря не зарегистрирована')
+    const req = await createLocalReq({}, payload)
+    await migration.down({ db: db().drizzle, payload, req } as never)
+    const [row] = await raw(`insert into tutoring_streams (title, program, starts_at, status, current_meeting)
+      values ('Существующий поток', 'react-next', '2026-11-24T17:00:00Z', 'active', 2) returning id`)
+    await migration.up({ db: db().drizzle, payload, req } as never)
+    const stream = await payload.findByID({ collection: 'tutoring-streams', id: Number(row?.id) })
+    expect(stream).toMatchObject({ startsAt: '2026-11-24T17:00:00.000Z', currentMeeting: 2, status: 'active' })
+    expect(stream.scheduleOverrides ?? []).toEqual([])
+    await payload.delete({ collection: 'tutoring-streams', id: stream.id })
+  })
+
   it('новая история просмотра откатывается и возвращается, сохраняя старые данные', async () => {
     const latest = migrations.find((migration) => migration.name.endsWith('_lesson_learning_states'))
     expect(latest).toBeDefined()

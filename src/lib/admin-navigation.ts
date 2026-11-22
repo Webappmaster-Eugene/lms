@@ -49,6 +49,7 @@ export const ADMIN_NAV_GROUPS = [
     label: 'Репетиторство',
     items: [
       { href: '/bootcamp', label: 'Лекции, потоки и журнал' },
+      { href: '/admin/google-calendar', label: 'Google Calendar' },
       { href: '/admin/collections/tutoring-meetings', label: 'Материалы встреч' },
       { href: '/admin/collections/tutoring-deck-files', label: 'Файлы презентаций' },
       { href: '/admin/collections/tutoring-streams', label: 'Потоки репетиторства' },

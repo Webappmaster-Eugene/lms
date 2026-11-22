@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { TutoringMeetingCard } from '@/components/tutoring/TutoringMeetingCard'
-import { isTutoringMeeting, tutoringDateLabel, tutoringMeetingDate, tutoringPrograms, tutoringStatuses } from '@/lib/tutoring'
+import { isTutoringMeeting, scheduledTutoringMeeting, tutoringDateLabel, tutoringPrograms, tutoringStatuses } from '@/lib/tutoring'
 import { cn } from '@/lib/utils'
 import type { requireTutoringBootcamp } from '@/server/tutoring-bootcamps'
 import { tutoringOpenThrough } from '@/server/tutoring-access'
@@ -28,12 +28,15 @@ export async function StudentStream({ context, id, query }: { context: Awaited<R
   const status = review?.status ?? 'assigned'
   const canSubmit = status === 'assigned' || status === 'changes'
   const accepted = reviews.filter(row => row.status === 'accepted').length
+  const program = tutoringPrograms[stream.program]
+  const numbers = Array.from({ length: program.meetings }, (_, index) => index + 1)
+  const names = new Map(materials.map(material => [material.number, material.title]))
 
   return <div className="mx-auto max-w-5xl space-y-6">
     <Link href={base} className="rounded text-sm text-primary hover:underline focus-visible:outline-2 focus-visible:outline-ring">Мои потоки репетиторства</Link>
     <header className="border-b border-border pb-4">
       <h1 className="text-2xl font-semibold">{stream.title}</h1>
-      <p className="mt-2 text-sm text-muted-foreground">{tutoringPrograms[stream.program].label} · ваша встреча {member.currentMeeting} · принято работ {accepted}</p>
+      <p className="mt-2 text-sm text-muted-foreground">{program.label} · ваша встреча {member.currentMeeting} · принято работ {accepted}</p>
     </header>
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_17rem]">
       <div className="min-w-0 space-y-5">
@@ -59,13 +62,16 @@ export async function StudentStream({ context, id, query }: { context: Awaited<R
       <nav aria-label="Календарь репетиторства" className="min-w-0 rounded-xl border border-border p-3">
         <h2 className="mb-2 px-2 text-sm font-semibold">Встречи</h2>
         <ol className="divide-y divide-border">
-          {materials.map(material => {
-            const description = <><span className="block font-medium">{material.number}. {material.title}</span>
-              <span className="mt-1 block text-xs text-muted-foreground">{tutoringDateLabel(tutoringMeetingDate(stream.startsAt, material.number))}
-                {byMeeting.has(material.number) && ` · ${tutoringStatuses[byMeeting.get(material.number)?.status ?? 'assigned']}`}</span></>
-            return <li key={material.number}>
-              {material.number <= open ? <Link href={`${base}/streams/${stream.id}?meeting=${material.number}`} aria-current={selected === material.number ? 'page' : undefined}
-                className={cn('block break-words rounded-md px-2 py-2.5 text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring', selected === material.number && 'bg-primary/10')}>{description}</Link>
+          {numbers.map(number => {
+            const { start, moved } = scheduledTutoringMeeting(stream, number)
+            const title = names.get(number)
+            const meetingReview = byMeeting.get(number)
+            const description = <><span className="block font-medium">{title ? `${number}. ${title}` : `Встреча ${number}`}</span>
+              <span className="mt-1 block text-xs text-muted-foreground">{tutoringDateLabel(start)}, МСК{moved && ' · Перенесено'}
+                {meetingReview && ` · ${tutoringStatuses[meetingReview.status]}`}</span></>
+            return <li key={number}>
+              {number <= open ? <Link href={`${base}/streams/${stream.id}?meeting=${number}`} aria-current={selected === number ? 'page' : undefined}
+                className={cn('block break-words rounded-md px-2 py-2.5 text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring', selected === number && 'bg-primary/10')}>{description}</Link>
               : <div className="break-words px-2 py-2.5 text-sm text-muted-foreground">{description}<span className="mt-1 block text-xs">Откроется позже</span></div>}
             </li>
           })}

@@ -38,6 +38,7 @@ function cleanupDependents(
 /** Всё, что принадлежит пользователю: прогресс, баллы, достижения, заметки, уведомления */
 export const cleanupUserRelations = cleanupDependents('пользователь', [
   { collection: 'tutoring-participants', field: 'student' },
+  { collection: 'tutoring-calendars', field: 'owner' },
   { collection: 'web-vitals-reports', field: 'user' },
   { collection: 'student-learning-events', field: 'user' },
   { collection: 'student-activity-days', field: 'user' },
