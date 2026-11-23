@@ -109,6 +109,26 @@ describe('репетиторство в LMS', () => {
     expect(createdMeeting).toMatchObject({ number: 3, deckOrigin: 'import' })
     expect(createdMeeting.deckPdf).toEqual(expect.any(Number))
     expect(createdMeeting.deckPptx).toEqual(expect.any(Number))
+    const authored = await payload.update({ collection: 'tutoring-meetings', id: created.id, data: {
+      title: 'Название на платформе', homework: [{ stage: 1, description: 'Уточнённое задание', assignment: 'Ручная формулировка' }],
+    } })
+    const decksOnly = new FormData()
+    form.forEach((item, key) => decksOnly.set(key, item))
+    decksOnly.set('id', String(created.id))
+    decksOnly.set('updatedAt', authored.updatedAt)
+    decksOnly.set('decksOnly', 'true')
+    decksOnly.set('material', JSON.stringify({ ...data, number: 3, instructorNotes: 'Новые заметки', sourceDigest: 'b'.repeat(64),
+      homework: [{ stage: 1, description: 'Не подменяет условие', practice: '/lessons/nodejs-bootcamp-01-fixture-practice' }],
+    }))
+    const importedDeck = await replacePresentation(new Request('http://lms.test/api/manage/tutoring/presentation', {
+      method: 'POST', headers: { Authorization: `JWT ${await login(payload, admin)}` }, body: decksOnly,
+    }))
+    expect(importedDeck.status).toBe(200)
+    const restored = await payload.findByID({ collection: 'tutoring-meetings', id: created.id, depth: 0 })
+    expect(restored).toMatchObject({ id: created.id, title: authored.title, homework: authored.homework, instructorNotes: 'Новые заметки' })
+    expect(restored.deckPdf).not.toEqual(createdMeeting.deckPdf)
+    expect(restored.deckPptx).not.toEqual(createdMeeting.deckPptx)
+
     const first = await saveTutoringDeck(payload, admin, form, { id: material.id, updatedAt: material.updatedAt, material: data })
     expect(first).toEqual({ id: material.id, status: 'saved' })
     const read = () => payload.findByID({ collection: 'tutoring-meetings', id: material.id, depth: 1 })

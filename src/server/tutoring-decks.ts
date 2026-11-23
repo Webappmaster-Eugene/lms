@@ -51,7 +51,8 @@ async function validatedFile(input: FormDataEntryValue | null, format: 'pdf' | '
 }
 
 export async function saveTutoringDeck(payload: Payload, user: User, form: FormData, target:
-  { id: number; updatedAt: string; material?: undefined } | { id: number | null; updatedAt: string; material: ImportMaterial },
+  { id: number; updatedAt: string; material?: undefined; decksOnly?: undefined } |
+  { id: number | null; updatedAt: string; material: ImportMaterial; decksOnly?: boolean },
 ) {
   const label = `mentorcareer-lecture-${randomUUID()}`
   const [pdf, pptx] = await Promise.all([
@@ -80,10 +81,13 @@ export async function saveTutoringDeck(payload: Payload, user: User, form: FormD
       const deckOrigin = target.material ? 'import' as const : 'manual' as const
       const revision = { deckPdf: pdfDoc.id, deckPptx: pptxDoc.id, deckOrigin }
       if (current) {
-        const saved = await payload.update({ collection: 'tutoring-meetings', id: current.id, data: { ...target.material, ...revision }, req, overrideAccess: true, depth: 0 })
+        const material = target.material && target.decksOnly
+          ? { instructorNotes: target.material.instructorNotes, sourceDigest: target.material.sourceDigest }
+          : target.material
+        const saved = await payload.update({ collection: 'tutoring-meetings', id: current.id, data: { ...material, ...revision }, req, overrideAccess: true, depth: 0 })
         return { id: saved.id, status: 'saved' as const }
       }
-      if (!target.material) throw new TutoringProblem('Лекция не найдена')
+      if (!target.material || target.decksOnly) throw new TutoringProblem('Лекция не найдена')
       const saved = await payload.create({ collection: 'tutoring-meetings', data: { ...target.material, ...revision }, req, overrideAccess: true, depth: 0 })
       return { id: saved.id, status: 'saved' as const }
     })

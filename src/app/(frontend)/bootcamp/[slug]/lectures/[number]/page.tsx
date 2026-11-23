@@ -18,6 +18,6 @@ export default async function BootcampLecture({ params }: { params: Promise<{ sl
   return <div className="mx-auto max-w-4xl space-y-5">
     <Link href={area.base} className="text-sm font-semibold text-primary hover:underline">Все лекции буткемпа</Link>
     <h1 className="sr-only">{meeting.title}</h1>
-    <TutoringMeetingCard meeting={meeting} practiceLink={(path) => path.startsWith('/lessons/') ? path : null} />
+    <TutoringMeetingCard meeting={meeting} allowAnnotations={area.isAdmin} practiceLink={(path) => path.startsWith('/lessons/') ? path : null} />
   </div>
 }

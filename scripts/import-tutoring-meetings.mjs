@@ -5,7 +5,7 @@ import { parseArgs } from 'node:util'
 
 const { positionals, values } = parseArgs({
   allowPositionals: true,
-  options: { apply: { type: 'boolean' }, 'node-practice': { type: 'string' }, 'react-practice': { type: 'string' } },
+  options: { apply: { type: 'boolean' }, 'decks-only': { type: 'boolean' }, 'node-practice': { type: 'string' }, 'react-practice': { type: 'string' } },
 })
 const root = positionals[0]
 if (!root || !values['node-practice'] || !values['react-practice']) {
@@ -60,7 +60,8 @@ for (const meeting of manifest.meetings) {
     return { stage, description: item.description, assignment: text, practice }
   }))
   const data = { program, number, title, homework: tasks, instructorNotes }
-  const sourceDigest = createHash('sha256').update(JSON.stringify(data)).update(pdf).update(pptx).digest('hex')
+  const digestData = values['decks-only'] ? { decksOnly: true, program, number, instructorNotes } : data
+  const sourceDigest = createHash('sha256').update(JSON.stringify(digestData)).update(pdf).update(pptx).digest('hex')
   preparations.push({ pdf, pptx, data: { ...data, sourceDigest }, key })
 }
 
@@ -101,8 +102,10 @@ for (const { data, pdf, pptx, key } of preparations) {
   const { docs } = await request('GET', `tutoring-meetings?${query}`)
   if (docs.length > 1) throw new Error('Несколько материалов для одной встречи')
   const existing = docs[0]
+  if (values['decks-only'] && !existing) throw new Error(`Нет встречи для обновления презентации: ${key}`)
   if (existing?.deckOrigin === 'manual') {
     counts.manual++
+    process.stdout.write(`Ручная версия сохранена: ${key}\n`)
     continue
   }
   if (existing?.sourceDigest === data.sourceDigest && existing.deckPdf && existing.deckPptx) {
@@ -117,11 +120,13 @@ for (const { data, pdf, pptx, key } of preparations) {
   form.set('id', String(existing?.id ?? 0))
   form.set('updatedAt', existing?.updatedAt ?? '')
   form.set('material', JSON.stringify(data))
+  if (values['decks-only']) form.set('decksOnly', 'true')
   form.set('pdf', new Blob([pdf], { type: 'application/pdf' }), `${key}.pdf`)
   form.set('pptx', new Blob([pptx], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }), `${key}.pptx`)
   const result = await request('POST', 'manage/tutoring/presentation', form)
   if (result.status === 'manual') {
     counts.manual++
+    process.stdout.write(`Ручная версия сохранена: ${key}\n`)
     continue
   }
   const saved = await request('GET', `tutoring-meetings/${result.id}?depth=1`)
@@ -130,6 +135,8 @@ for (const { data, pdf, pptx, key } of preparations) {
     !saved.deckPdf.filename || !saved.deckPptx.filename) {
     throw new Error(`Листинг ${data.program} ${data.number}: LMS сохранила неполные материалы`)
   }
+  if (values['decks-only'] && (saved.id !== existing.id || saved.title !== existing.title ||
+    JSON.stringify(saved.homework) !== JSON.stringify(existing.homework))) throw new Error(`Изменились данные встречи ${key}`)
   counts[result.status === 'unchanged' ? 'unchanged' : existing ? 'changed' : 'created']++
 }
 process.stdout.write(`${values.apply ? 'Импорт' : 'Проверка'}: ${JSON.stringify(counts)}\n`)

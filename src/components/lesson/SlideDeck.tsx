@@ -14,11 +14,12 @@ type Props = {
   pages?: boolean
   caption?: (index: number) => string | null
   actions?: ReactNode
+  tools?: (index: number) => ReactNode
   children: (slide: SlideRenderState) => ReactNode
 }
 
 const SETTLE_MS = 700
-const FOCUSABLE = 'button, a[href], [tabindex]:not([tabindex="-1"])'
+const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
 const controlClass = 'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-foreground transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring aria-disabled:cursor-default aria-disabled:opacity-40 aria-disabled:hover:bg-background'
 
 /** Шаг по клавише: null — клавиша не листает. */
@@ -36,7 +37,11 @@ function keyTarget(key: string, current: number, count: number): number | null {
  * Листалка слайдов: свайп двигает ленту с привязкой к слайду, кнопки и стрелки
  * клавиатуры прокручивают её программно. Содержимое слайда рисует вызывающий компонент.
  */
-export function SlideDeck({ label, count, aspect = 16 / 9, pages = false, caption, actions, children }: Props) {
+function isEditingText(target: EventTarget | null) {
+  return target instanceof Element && Boolean(target.closest('input, textarea, [contenteditable="true"]'))
+}
+
+export function SlideDeck({ label, count, aspect = 16 / 9, pages = false, caption, actions, tools, children }: Props) {
   const root = useRef<HTMLDivElement>(null)
   const track = useRef<HTMLDivElement>(null)
   const toggle = useRef<HTMLButtonElement>(null)
@@ -139,6 +144,7 @@ export function SlideDeck({ label, count, aspect = 16 / 9, pages = false, captio
       if (event.altKey || event.ctrlKey || event.metaKey) return
       const element = root.current
       if (!element) return
+      if (event.key !== 'Tab' && isEditingText(event.target)) return
       if (event.key === 'Escape') {
         event.preventDefault()
         event.stopPropagation()
@@ -172,7 +178,7 @@ export function SlideDeck({ label, count, aspect = 16 / 9, pages = false, captio
   }, [collapse, count, expanded, go])
 
   function onKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
-    if (expanded || event.altKey || event.ctrlKey || event.metaKey) return
+    if (expanded || event.altKey || event.ctrlKey || event.metaKey || isEditingText(event.target)) return
     const target = keyTarget(event.key, position.current, count)
     if (target === null) return
     // Стрелки на странице урока листают уроки; внутри презентации они листают слайды.
@@ -242,6 +248,7 @@ export function SlideDeck({ label, count, aspect = 16 / 9, pages = false, captio
             <ChevronRight aria-hidden="true" className="h-5 w-5" />
           </button>
         </div>
+        {tools?.(current)}
         <div className="ml-auto flex items-center gap-2 sm:order-last">
           {actions}
           <button ref={toggle} type="button" className={controlClass} aria-label={expanded ? 'Свернуть презентацию' : 'Развернуть на весь экран'} onClick={() => void (expanded ? collapse() : expand())}>

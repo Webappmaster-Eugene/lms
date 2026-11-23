@@ -14,7 +14,9 @@ function MaterialText({ children }: { children: string }) {
   </div>
 }
 
-export function TutoringMeetingCard({ meeting, stream, mentor = false, practiceLink }: { meeting: Meeting; stream?: TutoringStream; mentor?: boolean; practiceLink?: (path: string) => string | null }) {
+export function TutoringMeetingCard({ meeting, stream, mentor = false, allowAnnotations = mentor, practiceLink }: {
+  meeting: Meeting; stream?: TutoringStream; mentor?: boolean; allowAnnotations?: boolean; practiceLink?: (path: string) => string | null
+}) {
   const pdf = meeting.deckPdf && typeof meeting.deckPdf !== 'number' ? meeting.deckPdf.filename : null
   const pptx = mentor && meeting.deckPptx && typeof meeting.deckPptx !== 'number' ? meeting.deckPptx.filename : null
   const filename = pdf ?? meeting.filename
@@ -29,7 +31,7 @@ export function TutoringMeetingCard({ meeting, stream, mentor = false, practiceL
       {stream?.meetingUrl && <Link href={stream.meetingUrl} target="_blank" rel="noopener noreferrer"
         className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-ring">Открыть созвон</Link>}
     </header>
-    {filename ? <SlidesBlock title="Презентация" items={[{
+    {filename ? <SlidesBlock title="Презентация" annotations={allowAnnotations} items={[{
       fileName: filename,
       caption: meeting.title,
       url: `/api/${collection}/file/${encodeURIComponent(filename)}`,

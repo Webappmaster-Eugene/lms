@@ -75,10 +75,12 @@ export async function POST(request: Request) {
   const updatedAt = String(form.get('updatedAt') ?? '')
   if (!Number.isSafeInteger(id) || id < 0 || (id > 0 && !Number.isFinite(Date.parse(updatedAt)))) return failure('Проверьте номер и версию лекции', 400)
   const imported = form.get('material')
+  const decksOnly = form.get('decksOnly') === 'true'
   try {
     if (typeof imported === 'string' && authorization !== null) {
+      if (decksOnly && !id) return failure('Для обновления презентации нужна существующая лекция', 400)
       const material = parseMaterial(imported)
-      const result = await saveTutoringDeck(payload, user, form, { id: id || null, updatedAt, material })
+      const result = await saveTutoringDeck(payload, user, form, { id: id || null, updatedAt, material, decksOnly })
       return json(result)
     }
     if (!id || imported !== null) return failure('Лекция не найдена', 404)

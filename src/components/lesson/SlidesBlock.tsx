@@ -1,15 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Download, FileDown, Loader2, RotateCw } from 'lucide-react'
 
 import { SlideDeck } from '@/components/lesson/SlideDeck'
+import { AnnotationTools, PdfAnnotations, type AnnotationTool, type PdfMark } from '@/components/lesson/PdfAnnotations'
 import { useNearViewport } from '@/hooks/use-near-viewport'
 import { requestLoadSlot } from '@/lib/load-queue'
 import { openPdf, type PdfDocument } from '@/lib/pdf-document'
 import { slideKind, slideSourceUrl, type SlideItem } from '@/lib/slides'
 
-type Props = { title: string; description?: string | null; items: SlideItem[] }
+type Props = { title: string; description?: string | null; items: SlideItem[]; annotations?: boolean }
 type Group =
   | { kind: 'images'; key: string; part: number; slides: SlideItem[] }
   | { kind: 'pdf' | 'file'; key: string; item: SlideItem }
@@ -175,10 +176,22 @@ function ImageDeck({ label, slides }: { label: string; slides: SlideItem[] }) {
 }
 
 /** Монтируется только рядом с текущей страницей: холсты десятков страниц в памяти вешают телефон. */
-function PdfPage({ pdf, page, label }: { pdf: PdfDocument; page: number; label: string }) {
+function PdfPage({ pdf, page, label, annotation }: { pdf: PdfDocument; page: number; label: string; annotation?: ReactNode }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const [state, setState] = useState<{ attempt: number; status: 'loading' | 'ready' | 'failed' }>({ attempt: 0, status: 'loading' })
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null)
   const { attempt } = state
+  const overlay = Boolean(annotation) && state.status === 'ready'
+  useEffect(() => {
+    const element = canvas.current
+    if (!overlay || !element || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      setSize({ width, height })
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [overlay])
   useEffect(() => {
     const element = canvas.current
     if (!element) return
@@ -203,6 +216,10 @@ function PdfPage({ pdf, page, label }: { pdf: PdfDocument; page: number; label: 
     <>
       {state.status === 'loading' && <Waiting text="Готовим страницу…" />}
       <canvas ref={canvas} role="img" aria-label={label} className={`max-h-full max-w-full ${state.status === 'ready' ? '' : 'opacity-0'}`} />
+      {overlay && size && size.width > 0 && size.height > 0 && (
+        <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden [container-type:inline-size]"
+          style={size}>{annotation}</div>
+      )}
     </>
   )
 }
@@ -220,7 +237,33 @@ type PdfState =
   | { key: string; status: 'failed' }
   | { key: string; status: 'ready'; pdf: PdfDocument; aspect: number }
 
-function PdfDeck({ title, item }: { title: string; item: SlideItem }) {
+function ReadyPdfDeck({ name, item, pdf, aspect, annotations }: {
+  name: string; item: SlideItem; pdf: PdfDocument; aspect: number; annotations: boolean
+}) {
+  const [tool, setTool] = useState<AnnotationTool | null>(null)
+  const [marks, setMarks] = useState<Record<number, PdfMark[]>>({})
+
+  function updateMarks(index: number, update: (current: PdfMark[]) => PdfMark[]) {
+    setMarks(previous => ({ ...previous, [index]: update(previous[index] ?? []) }))
+  }
+
+  return <SlideDeck label={name} count={pdf.pages} aspect={aspect} pages caption={() => name}
+    actions={<DownloadLink item={item} text="Скачать PDF" />}
+    tools={annotations ? index => <AnnotationTools tool={tool} toggle={next => setTool(value => value === next ? null : next)}
+      hasMarks={Boolean(marks[index]?.length)} undo={() => updateMarks(index, value => value.slice(0, -1))}
+      clear={() => updateMarks(index, () => [])} /> : undefined}>
+    {({ index, current, near }) => {
+      if (!near) return null
+      const active = current ? tool : null
+      const pageMarks = marks[index] ?? []
+      const annotation = annotations && (active || pageMarks.length) ? <PdfAnnotations
+        key={active ?? 'view'} tool={active} marks={pageMarks} add={mark => updateMarks(index, previous => [...previous, mark])} /> : null
+      return <PdfPage pdf={pdf} page={index + 1} label={`${name}, страница ${index + 1}`} annotation={annotation} />
+    }}
+  </SlideDeck>
+}
+
+function PdfDeck({ title, item, annotations }: { title: string; item: SlideItem; annotations: boolean }) {
   const [frame, visible] = useNearViewport<HTMLDivElement>()
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState<PdfState | null>(null)
@@ -254,9 +297,7 @@ function PdfDeck({ title, item }: { title: string; item: SlideItem }) {
     <div ref={frame} data-slide-deck="" tabIndex={-1} className="outline-none">
       {view.status === 'ready'
         ? (
-            <SlideDeck key={key} label={name} count={view.pdf.pages} aspect={view.aspect} pages caption={() => name} actions={<DownloadLink item={item} text="Скачать PDF" />}>
-              {({ index, near }) => near ? <PdfPage pdf={view.pdf} page={index + 1} label={`${name}, страница ${index + 1}`} /> : null}
-            </SlideDeck>
+            <ReadyPdfDeck key={key} name={name} item={item} pdf={view.pdf} aspect={view.aspect} annotations={annotations} />
           )
         : (
             <div className="relative flex min-h-48 flex-col items-center justify-center gap-3 rounded-xl border border-border bg-card p-6">
@@ -290,7 +331,7 @@ function FileCard({ item }: { item: SlideItem }) {
   )
 }
 
-export function SlidesBlock({ title, description, items }: Props) {
+export function SlidesBlock({ title, description, items, annotations = false }: Props) {
   const groups = groupItems(items)
   const decks = groups.filter((group) => group.kind === 'images').length
   return (
@@ -304,7 +345,7 @@ export function SlidesBlock({ title, description, items }: Props) {
         // Несколько листалок в одном блоке различаются по названию: иначе экранный диктор назовёт их одинаково.
         ? <ImageDeck key={group.key} label={decks > 1 ? `${title}, часть ${group.part}` : title} slides={group.slides} />
         : group.kind === 'pdf'
-          ? <PdfDeck key={group.key} title={title} item={group.item} />
+          ? <PdfDeck key={group.key} title={title} item={group.item} annotations={annotations} />
           : <FileCard key={group.key} item={group.item} />)}
     </section>
   )
