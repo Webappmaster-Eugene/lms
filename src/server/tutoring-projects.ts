@@ -39,14 +39,16 @@ export async function queueTutoringProject(payload: Payload, actor: User, stream
     const existing = await tutoringProject(payload, req, student.id, stream.program)
     if (existing && ['queued', 'running', 'ready', 'revoking'].includes(existing.state)) return existing
     const program = await findProgram(payload, stream.program, req)
-    if (!program?.gitlabCourseProject || !program.gradingProject) throw new TutoringProblem('У программы не настроены стартер и грейдер GitLab')
+    if (!program?.gitlabCourseProject || !program.gradingProject || !program.mentoringGitlabGroup || !program.mentoringGraderUserId) {
+      throw new TutoringProblem('Для менторства не настроена приватная группа GitLab и учётка автопроверки')
+    }
     const { docs: [enrolled] } = await payload.find({
       collection: 'bootcamp-enrollments', req, limit: 1, depth: 0, overrideAccess: true,
       where: { lmsUser: { equals: student.id } },
     })
     const username = existing?.projectId ? existing.username : enrolled?.gitlabUsername || input.toLowerCase()
     if (!/^[a-z0-9][a-z0-9_.-]{1,59}$/.test(username)) throw new TutoringProblem('Укажите логин GitLab из латинских букв, цифр, точки, дефиса или подчёркивания')
-    const group = existing?.projectId ? existing.group : `mentoring-${stream.program}`
+    const group = existing?.projectId ? existing.group : program.mentoringGitlabGroup
     const [bootcampGroup, conflict] = await Promise.all([
       payload.find({ collection: 'bootcamp-streams', req, depth: 0, limit: 1, overrideAccess: true, where: { gitlabGroup: { equals: group } } }),
       payload.find({
@@ -96,12 +98,13 @@ export async function claimTutoringProject(payload: Payload) {
       data: { state: next.revoke ? 'revoking' : 'running', lease, leasedAt: new Date().toISOString() },
     })
     await db.execute(sql`update tutoring_projects set attempts = case when ${next.state} in ('queued', 'ready', 'revoked', 'failed') then 1 else attempts + 1 end where id = ${data.id}`)
+    const program = next.revoke ? null : await findProgram(payload, data.program, req)
     const student = data.student
     if (!student || typeof student === 'number') throw new Error('Tutoring project without a student')
     return { job: {
       id: data.id, lease, revoke: next.revoke, username: data.username, email: student.email,
       firstName: student.firstName || student.email, lastName: student.lastName || '',
-      group: data.group, courseProject: data.courseProject, gradingProject: data.gradingProject,
+      group: data.group, courseProject: data.courseProject, gradingProject: data.gradingProject, graderUserId: program?.mentoringGraderUserId ?? null,
       gitlabProjectId: data.projectId, gitlabUserId: data.gitlabUserId,
     }, webhook: { url: adminLink(`/api/tutoring/gitlab-events?project=${data.id}`), token: tutoringWebhookToken(data.id) } }
   })
@@ -166,7 +169,7 @@ export async function recordTutoringVerdict(payload: Payload, id: number, event:
   const author = obj(body.user)
   const iid = idOf(mr.iid)
   if (!iid) return false
-  const trustedNote = event === 'Note Hook' && note.noteable_type === 'MergeRequest' && /^group_\d+_bot_/.test(string(author.username))
+  const trustedNote = event === 'Note Hook' && note.noteable_type === 'MergeRequest'
   const verdict = trustedNote ? parseVerdict(string(note.note)) : null
   const date = new Date(string(note.updated_at || note.created_at))
   if ((!verdict && !pushed) || !Number.isFinite(date.getTime())) return false
@@ -177,6 +180,10 @@ export async function recordTutoringVerdict(payload: Payload, id: number, event:
     const project = await payload.findByID({ collection: 'tutoring-projects', id, req, depth: 0, overrideAccess: true, disableErrors: true })
     if (!project || !isTutoringProgram(project.program) || !project.projectId || project.projectId !== idOf(obj(body.project).id) ||
       !project.projectUrl || tutoringMergeRequest(project.projectUrl, string(mr.url)) !== iid) return false
+    if (verdict) {
+      const program = await findProgram(payload, project.program, req)
+      if (!program?.mentoringGraderUserId || idOf(author.id) !== program.mentoringGraderUserId) return false
+    }
     const old = await tutoringVerdict(payload, req, id, iid)
     if (old && Date.parse(old.reportedAt) >= date.getTime()) return false
     if (!verdict && !old) return false

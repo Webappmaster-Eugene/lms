@@ -12,9 +12,15 @@ let teacher: TestUser
 let student: TestUser
 let stream: TutoringStream
 let member: TutoringParticipant
+const gradingBot = 34
 
 beforeAll(async () => {
   payload = await getTestPayload()
+  const { docs: [program] } = await payload.find({ collection: 'bootcamp-programs', where: { key: { equals: 'nodejs' } }, limit: 1 })
+  await payload.update({
+    collection: 'bootcamp-programs', id: program.id,
+    data: { mentoringGitlabGroup: 'nodejs-bootcamp/mentoring-nodejs', mentoringGraderUserId: gradingBot },
+  })
   ;[teacher, student] = await Promise.all([createAdmin(payload), createStudent(payload)])
   stream = await payload.create({ collection: 'tutoring-streams',
     data: { title: uid('mentoring'), program: 'nodejs', status: 'active', currentMeeting: 1, startsAt: '2026-11-17T17:00:00Z' },
@@ -56,7 +62,7 @@ describe('менторство как отдельный продукт', () => 
   it('выдаёт отдельный проект, принимает вердикт и снимает доступ после архива', async () => {
     const username = uid('learner').toLowerCase()
     const project = await queueTutoringProject(payload, teacher, stream.id, member.id, username)
-    expect(project).toMatchObject({ group: 'mentoring-nodejs', state: 'queued', student: student.id })
+    expect(project).toMatchObject({ group: 'nodejs-bootcamp/mentoring-nodejs', state: 'queued', student: student.id })
     const once = await queueTutoringProject(payload, teacher, stream.id, member.id, username)
     expect(once.id).toBe(project.id)
     const { job, webhook } = await claimTutoringProject(payload)
@@ -64,7 +70,7 @@ describe('менторство как отдельный продукт', () => 
     if (!job) throw new Error('Нет задания GitLab')
     expect(validTutoringWebhookToken(project.id, webhook?.token ?? null)).toBe(true)
     expect(validTutoringWebhookToken(project.id + 1, tutoringWebhookToken(project.id))).toBe(false)
-    const url = `https://git.mentorcareer.ru/mentoring-nodejs/${username}`
+    const url = `https://git.mentorcareer.ru/nodejs-bootcamp/mentoring-nodejs/${username}`
     const report = { lease: job.lease, status: 'done', gitlabProjectId: 1234567, gitlabUserId: 890, gitlabProjectUrl: url }
     await expect(reportTutoringProject(payload, project.id, { ...report, lease: 'old' })).rejects.toThrow('уже передано')
     await expect(reportTutoringProject(payload, project.id, report)).resolves.toEqual({ ok: true })
@@ -72,12 +78,12 @@ describe('менторство как отдельный продукт', () => 
     expect(tutoringMergeRequest(url, url + '-another/-/merge_requests/19')).toBeNull()
 
     const event = {
-      user: { username: 'group_5_bot_grader' }, project: { id: 1234567 },
+      user: { id: gradingBot, username: 'group_5_bot_grader' }, project: { id: 1234567 },
       merge_request: { iid: 19, url: url + '/-/merge_requests/19' },
       object_attributes: { noteable_type: 'MergeRequest', updated_at: '2027-02-17T17:00:00Z',
         note: '<!-- grader:01:5d1444952459 -->\n**Доверенная проверка: неделя 1 - пройдена**\nПрошло проверок: 26 из 26.' },
     }
-    expect(await recordTutoringVerdict(payload, project.id, 'Note Hook', { ...event, user: { username } })).toBe(false)
+    expect(await recordTutoringVerdict(payload, project.id, 'Note Hook', { ...event, user: { id: gradingBot + 1, username: event.user.username } })).toBe(false)
     expect(await recordTutoringVerdict(payload, project.id, 'Note Hook', event)).toBe(true)
     expect(await recordTutoringVerdict(payload, project.id, 'Note Hook', event)).toBe(false)
     const result = await payload.find({ collection: 'tutoring-checks', where: { project: { equals: project.id } }, limit: 1 })

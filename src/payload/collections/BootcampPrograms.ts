@@ -82,6 +82,16 @@ export const BootcampPrograms: CollectionConfig = {
       ],
     },
     {
+      type: 'collapsible',
+      label: 'GitLab менторства',
+      fields: [
+        { name: 'mentoringGitlabGroup', type: 'text', maxLength: 100, label: 'Приватная группа менторства',
+          validate: (value: unknown) => value == null || value === '' ? true : gitlabPath(value) },
+        { name: 'mentoringGraderUserId', type: 'number', min: 1, label: 'ID бота автопроверки',
+          validate: (value: unknown) => value == null || (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) || 'Укажите положительный числовой ID GitLab' },
+      ],
+    },
+    {
       name: 'entryTaskSet',
       // Текст, а не select: select в Postgres - enum, и каждый набор из кода требовал бы миграции.
       type: 'text',

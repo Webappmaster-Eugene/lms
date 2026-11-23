@@ -22,6 +22,8 @@ export type BootcampProgramConfig = {
   gitlabCourseProject: string
   gitlabStreamGroup: string
   gradingProject: string
+  mentoringGitlabGroup?: string | null
+  mentoringGraderUserId?: number | null
   entryTaskSet: string
 }
 
@@ -41,6 +43,8 @@ type ProgramDoc = {
   gitlabCourseProject: string
   gitlabStreamGroup: string
   gradingProject: string
+  mentoringGitlabGroup?: string | null
+  mentoringGraderUserId?: number | null
   entryTaskSet: string
 }
 
@@ -62,6 +66,8 @@ export function toProgramConfig(doc: ProgramDoc): BootcampProgramConfig {
     gitlabCourseProject: doc.gitlabCourseProject,
     gitlabStreamGroup: doc.gitlabStreamGroup,
     gradingProject: doc.gradingProject,
+    mentoringGitlabGroup: doc.mentoringGitlabGroup ?? null,
+    mentoringGraderUserId: doc.mentoringGraderUserId ?? null,
     entryTaskSet: doc.entryTaskSet,
   }
 }

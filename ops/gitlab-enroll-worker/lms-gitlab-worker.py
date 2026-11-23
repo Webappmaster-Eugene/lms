@@ -157,12 +157,29 @@ class Job:
 
     def preflight(self):
         group = self.job['group']
-        if not gl('GET', '/groups/%s' % q(group), allow404=True):
+        namespace = gl('GET', '/groups/%s' % q(group), allow404=True)
+        if not namespace:
             raise StepError('В GitLab нет группы %s: поток заводится по ops/grading/README.md эталона' % group)
         grading = self.job.get('gradingProject') or GRADING_PROJECT
         graded = gl('GET', '/projects/%s/variables/GRADER_GROUPS' % q(grading))['value']
         if group not in [name.strip() for name in graded.split(',')]:
             raise StepError('Группы %s нет в GRADER_GROUPS проекта %s: сдачи не проверялись бы' % (group, grading))
+        if 'lease' in self.job:
+            if namespace.get('visibility') != 'private' or namespace.get('full_path') != group:
+                raise StepError('Группа менторства должна быть приватной и совпадать с путём в LMS')
+            grader_id = self.job.get('graderUserId')
+            grader_role = gl('GET', '/groups/%s/members/all/%s' % (namespace['id'], grader_id), allow404=True) if grader_id else None
+            if not grader_role or grader_role.get('access_level') != DEVELOPER:
+                raise StepError('Доверенный бот должен иметь роль Developer в группе менторства')
+            page = 1
+            while True:
+                members = gl('GET', '/groups/%s/members/all?per_page=100&page=%s' % (namespace['id'], page))
+                if any(m.get('id') != grader_id and m.get('access_level', 0) < MAINTAINER for m in members):
+                    raise StepError('В группе есть участник с доступом ко всем проектам менторства')
+                if len(members) < 100:
+                    break
+                page += 1
+
 
     def gitlab_user(self):
         username, email = self.job['username'], self.job['email'].lower()
@@ -174,8 +191,12 @@ class Job:
         if not user and by_email:
             raise StepError('Почта %s уже у учётки GitLab %s' % (email, by_email[0]['username']))
         if user:
-            if 'lease' in self.job and user.get('state') != 'active':
-                raise StepError('Учётка GitLab не активна, проверьте её состояние')
+            if 'lease' in self.job:
+                if user.get('state') != 'active':
+                    raise StepError('Учётка GitLab не активна, проверьте её состояние')
+                if user.get('is_admin') or user.get('bot') or user.get('id') == self.job.get('graderUserId'):
+                    raise StepError('Служебная учётка GitLab не может быть учеником')
+
             self.user = user
             detail = 'учётка уже была (%s), письмо не отправлялось' % user.get('state')
         else:
@@ -225,6 +246,12 @@ class Job:
                 raise StepError('main проекта %s, а у курса %s' % (main['short_id'], course_main['short_id']))
             self.project = project
             notes = ['создан из %s на %s' % (self.job['courseProject'], course_main['short_id'])]
+        if 'lease' in self.job:
+            expected = self.job.get('gitlabProjectId')
+            if (expected and self.project['id'] != expected) or self.project.get('path_with_namespace') != '%s/%s' % (group, username):
+                raise StepError('Найденный проект не совпадает с заданием LMS')
+            if differing_settings(self.project) or self.project.get('forked_from_project'):
+                raise StepError('У проекта менторства небезопасные настройки. Проверьте приватность, CI и связь со стартером.')
         self.extra['gitlabProjectId'] = self.project['id']
         self.extra['gitlabProjectUrl'] = self.project['web_url']
         return 'done', ', '.join(notes)
@@ -235,12 +262,19 @@ class Job:
         if protection:
             if usual_protection(protection):
                 return 'done', 'защита уже стояла'
+            if 'lease' in self.job:
+                raise StepError('У main нестандартные правила защиты. Выдача доступа остановлена.')
             return 'skipped', 'защита не обычная (push %s, merge %s), не трогаю' % (levels(protection.get('push_access_levels')), levels(protection.get('merge_access_levels')))
         gl('POST', '/projects/%s/protected_branches' % pid, {'name': 'main', 'push_access_level': MAINTAINER, 'merge_access_level': MAINTAINER, 'allow_force_push': False})
         return 'done', 'push и слияние только у наставника'
 
     def gitlab_member(self):
         pid, uid = self.project['id'], self.user['id']
+        if 'lease' in self.job:
+            effective = gl('GET', '/projects/%s/members/all/%s' % (pid, uid), allow404=True)
+            direct = gl('GET', '/projects/%s/members/%s' % (pid, uid), allow404=True)
+            if effective and (not direct or effective.get('access_level') != DEVELOPER):
+                raise StepError('Учётка уже имеет унаследованный или расширенный доступ к проекту')
         member = gl('GET', '/projects/%s/members/%s' % (pid, uid), allow404=True)
         if member:
             if member.get('access_level') == DEVELOPER:

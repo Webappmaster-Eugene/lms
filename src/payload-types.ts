@@ -1971,6 +1971,8 @@ export interface BootcampProgram {
    */
   gitlabStreamGroup: string;
   gradingProject: string;
+  mentoringGitlabGroup?: string | null;
+  mentoringGraderUserId?: number | null;
   /**
    * Ключ набора задач из кода (src/data/bootcamp-entry). Сейчас есть: rental-js (Три функции JavaScript про прокат); rental-frontend-js (JavaScript перед React: каталог, адрес поиска и обновление данных). Смена набора меняет задачи и у тех, кто ещё решает.
    */
@@ -3842,6 +3844,8 @@ export interface BootcampProgramsSelect<T extends boolean = true> {
   gitlabCourseProject?: T;
   gitlabStreamGroup?: T;
   gradingProject?: T;
+  mentoringGitlabGroup?: T;
+  mentoringGraderUserId?: T;
   entryTaskSet?: T;
   updatedAt?: T;
   createdAt?: T;
