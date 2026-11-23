@@ -23,6 +23,7 @@ import {
   Smartphone,
   History,
   Film,
+  UsersRound,
   Tent,
   Lock,
 } from 'lucide-react'
@@ -39,6 +40,7 @@ import { PLATFORM_SECTIONS, withSectionAccess, type PlatformSectionHref } from '
 const NAV_ICONS: Record<PlatformSectionHref, typeof LayoutDashboard> = {
   '/': LayoutDashboard,
   '/bootcamp': Tent,
+  '/tutoring': UsersRound,
   '/roadmaps': Map,
   '/courses': GraduationCap,
   '/trainer': Code2,
@@ -58,7 +60,7 @@ const NAV_ICONS: Record<PlatformSectionHref, typeof LayoutDashboard> = {
 }
 const NAV_ITEMS = PLATFORM_SECTIONS.map((section) => ({ ...section, icon: NAV_ICONS[section.href] }))
 
-export function Sidebar({ isAdmin = false, trainerEnabled = true, guidesEnabled = false, bootcampEnabled = false }: { isAdmin?: boolean; trainerEnabled?: boolean; guidesEnabled?: boolean; bootcampEnabled?: boolean }) {
+export function Sidebar({ isAdmin = false, trainerEnabled = true, guidesEnabled = false, bootcampEnabled = false, tutoringEnabled = false }: { isAdmin?: boolean; trainerEnabled?: boolean; guidesEnabled?: boolean; bootcampEnabled?: boolean; tutoringEnabled?: boolean }) {
   const pathname = usePathname()
   const { mobileOpen, setMobileOpen } = useSidebar()
 
@@ -73,7 +75,7 @@ export function Sidebar({ isAdmin = false, trainerEnabled = true, guidesEnabled 
     window.location.href = '/login'
   }
 
-  const items = withSectionAccess(NAV_ITEMS, { trainerEnabled, guidesEnabled, bootcampEnabled })
+  const items = withSectionAccess(NAV_ITEMS, { trainerEnabled, guidesEnabled, bootcampEnabled, tutoringEnabled })
 
   const navContent = (mobile: boolean) => (
     <>

@@ -141,7 +141,7 @@ describe('панель «Путь заявки»', () => {
     await userEvent.clear(amount)
     await userEvent.type(amount, '27000')
     await userEvent.type(screen.getByLabelText(/Причина/), 'Отказ после 8-й недели')
-    expect(screen.getByText(/заблокирует учётку GitLab и отправит письмо на ivan@mail.test/)).toBeInTheDocument()
+    expect(screen.getByText(/закроет доступ к проекту GitLab и отправит письмо на ivan@mail.test/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Да, вернуть деньги' }))
 
     const list = await screen.findByRole('list', { name: 'Возвраты' })

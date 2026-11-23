@@ -4,63 +4,71 @@ import { cache } from 'react'
 import { notFound, redirect } from 'next/navigation'
 import type { Payload, PayloadRequest } from 'payload'
 
-import { relationId } from '@/lib/content-management/pages'
 import { routeSlug } from '@/lib/route-slug'
-import { isTutoringProgram, tutoringPrograms } from '@/lib/tutoring'
+import type { TutoringProgram } from '@/lib/tutoring'
+import { getLearningAccess } from '@/server/learning-access'
 import { getBootcamps } from '@/server/bootcamps'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import { getLearningRequest } from '@/server/learning-request'
 import { tutoringMemberships } from '@/server/tutoring-access'
 import type { User } from '@/payload-types'
-
-export const tutoringBootcamps = cache(async (payload: Payload, req: PayloadRequest) => {
-  const { docs: programs } = await payload.find({
-    collection: 'bootcamp-programs', req, depth: 0, limit: Object.keys(tutoringPrograms).length, overrideAccess: true,
-    where: { key: { in: Object.keys(tutoringPrograms) } },
-    select: { key: true, manualsCourse: true },
-  })
-  const ids = programs.flatMap(({ manualsCourse }) => relationId(manualsCourse) ?? [])
-  if (!ids.length) return []
-  const { docs } = await payload.find({
-    collection: 'courses', req, depth: 0, limit: ids.length, overrideAccess: true,
-    where: { id: { in: ids }, isBootcamp: { equals: true }, isPublished: { equals: true } },
-    select: { title: true, slug: true },
-  })
-  return programs.flatMap(({ key, manualsCourse }) => {
-    const course = docs.find(doc => doc.id === relationId(manualsCourse))
-    return course && isTutoringProgram(key) ? [{ id: course.id, title: course.title, slug: course.slug, program: key }] : []
-  })
-})
+import { tutoringBootcamps } from '@/server/tutoring-curriculum'
 
 export async function bootcampMenuAvailable(payload: Payload, req: PayloadRequest, user: User) {
-  if ((await getBootcamps(payload, user, req)).length) return true
-  const memberships = await tutoringMemberships(payload, req, user.id)
-  if (!memberships.length) return false
-  return (await tutoringBootcamps(payload, req)).some(course => memberships.some(({ stream }) => stream.program === course.program))
+  return (await getBootcamps(payload, user, req)).length > 0
 }
 
-export const tutoringArea = cache(async () => {
+export async function tutoringMenuAvailable(payload: Payload, req: PayloadRequest, user: User) {
+  return user.role === 'admin' || (await tutoringMemberships(payload, req, user.id)).length > 0
+}
+
+const area = cache(async () => {
   const { payload, user, req } = await getLearningRequest()
   if (!user) redirect('/login')
   const isAdmin = (await getAuthoritativeLearningPolicy(payload, user.id, req)).role === 'admin'
-  const [memberships, manuals, courses] = await Promise.all([
+  return { payload, user, req, isAdmin }
+})
+
+export const bootcampArea = cache(async () => {
+  const info = await area()
+  return { ...info, manuals: await getBootcamps(info.payload, info.user, info.req) }
+})
+
+export const bootcampLectureArea = cache(async (slug: string) => {
+  const info = await bootcampArea()
+  const manual = info.manuals.find(item => item.slug === slug)
+  if (!manual || (!info.isAdmin && !(await getLearningAccess(info.payload, info.user, info.req)).canReadCourseDescription(manual.id))) return null
+  const course = (await tutoringBootcamps(info.payload, info.req)).find(item => item.id === manual.id)
+  return course ? { ...info, course, base: `/bootcamp/${encodeURIComponent(slug)}/lectures` } : null
+})
+
+export const tutoringArea = cache(async () => {
+  const info = await area()
+  const { payload, req, user, isAdmin } = info
+  const [memberships, courses] = await Promise.all([
     isAdmin ? [] : tutoringMemberships(payload, req, user.id),
-    getBootcamps(payload, user, req),
     tutoringBootcamps(payload, req),
   ])
   const tutoring = courses.filter(course => isAdmin || memberships.some(({ stream }) => stream.program === course.program))
-  return { payload, req, user, isAdmin, memberships, manuals, tutoring }
+  return { ...info, memberships, tutoring }
 })
 
-export async function requireTutoringBootcamp(slug: string) {
-  const area = await tutoringArea()
-  const course = area.tutoring.find(item => item.slug === routeSlug(slug))
+export async function requireTutoringProgram(program: string) {
+  const info = await tutoringArea()
+  const course = info.tutoring.find(item => item.program === program)
   if (!course) notFound()
-  return { ...area, course, base: tutoringPath(course.slug), hasManuals: area.manuals.some(item => item.id === course.id) }
+  return { ...info, course, base: tutoringPath(course.program) }
 }
 
-export function tutoringPath(slug: string) {
-  return `/bootcamp/${encodeURIComponent(slug)}/tutoring`
+export function tutoringPath(program: TutoringProgram) {
+  return `/tutoring/${program}`
+}
+
+export async function legacyTutoringPath(slug: string) {
+  const info = await tutoringArea()
+  const course = info.tutoring.find(item => item.slug === routeSlug(slug))
+  if (!course) notFound()
+  return tutoringPath(course.program)
 }
 
 export async function legacyTutoringStream(id: string, query: Record<string, string | string[] | undefined>) {
@@ -78,5 +86,5 @@ export async function legacyTutoringStream(id: string, query: Record<string, str
   for (const [key, value] of Object.entries(query)) {
     if (typeof value === 'string') params.set(key, value)
   }
-  redirect(`${tutoringPath(course.slug)}/streams/${id}${params.size ? `?${params}` : ''}`)
+  return redirect(`${tutoringPath(course.program)}/streams/${id}${params.size ? `?${params}` : ''}`)
 }

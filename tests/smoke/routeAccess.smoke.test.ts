@@ -35,6 +35,8 @@ const SEGMENT_SAMPLES: Record<string, readonly string[]> = {
   taskSlug: ['create-counter', 'array.map'],
   token: ['12345678-1234-4123-8123-123456789abc'],
   id: ['42'],
+  streamId: ['7'],
+  lesson: ['nodejs-bootcamp-01-node-runtime-practice'],
   number: ['1'],
 }
 

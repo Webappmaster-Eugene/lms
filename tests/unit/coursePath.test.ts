@@ -16,10 +16,10 @@ describe('буткемп отдельно от курсов', () => {
   })
 
   it('раздел без доступа не пропадает, а помечается закрытым; остальные разделы не задевает', () => {
-    const all = { trainerEnabled: true, guidesEnabled: true, bootcampEnabled: true }
+    const all = { trainerEnabled: true, guidesEnabled: true, bootcampEnabled: true, tutoringEnabled: true }
     expect(withSectionAccess(PLATFORM_SECTIONS, all).filter(({ locked }) => locked)).toEqual([])
     const without = withSectionAccess(PLATFORM_SECTIONS, { trainerEnabled: false, guidesEnabled: false, bootcampEnabled: false })
     expect(without.map(({ href }) => href)).toEqual(PLATFORM_SECTIONS.map(({ href }) => href))
-    expect(without.filter(({ locked }) => locked).map(({ href }) => href)).toEqual(['/bootcamp', '/trainer', '/guides'])
+    expect(without.filter(({ locked }) => locked).map(({ href }) => href)).toEqual(['/bootcamp', '/tutoring', '/trainer', '/guides'])
   })
 })

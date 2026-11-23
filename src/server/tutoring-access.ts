@@ -1,6 +1,7 @@
 import type { Access, Payload, PayloadRequest, Where } from 'payload'
 
 import { collectAllPages } from '@/lib/paginate'
+import { tutoringPrograms } from '@/lib/tutoring'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import type { TutoringParticipant, TutoringStream } from '@/payload-types'
 
@@ -23,12 +24,24 @@ async function materialsAccess(req: PayloadRequest): Promise<false | true | Wher
   if (!req.user) return false
   const policy = await getAuthoritativeLearningPolicy(req.payload, req.user.id, req)
   if (policy.role === 'admin') return true
-  const memberships = await tutoringMemberships(req.payload, req, req.user.id)
-  if (!memberships.length) return false
+  const [{ getBootcamps }, { tutoringBootcamps }] = await Promise.all([import('@/server/bootcamps'), import('@/server/tutoring-curriculum')])
+  const [memberships, manuals] = await Promise.all([
+    tutoringMemberships(req.payload, req, req.user.id),
+    getBootcamps(req.payload, req.user, req),
+  ])
   const allowed = new Map<TutoringStream['program'], number>()
   for (const { stream, member } of memberships) {
     allowed.set(stream.program, Math.max(allowed.get(stream.program) ?? 0, tutoringOpenThrough(stream, member)))
   }
+  if (manuals.length) {
+    const { getLearningAccess } = await import('@/server/learning-access')
+    const policy = await getLearningAccess(req.payload, req.user, req)
+    const paidCourses = new Set(manuals.filter(course => policy.canReadCourseDescription(course.id)).map(course => course.id))
+    for (const course of await tutoringBootcamps(req.payload, req)) {
+      if (paidCourses.has(course.id)) allowed.set(course.program, tutoringPrograms[course.program].meetings)
+    }
+  }
+  if (!allowed.size) return false
   return { or: [...allowed].map(([program, number]) => ({
     program: { equals: program }, number: { less_than_equal: number },
   })) }

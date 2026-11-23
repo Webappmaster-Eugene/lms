@@ -46,7 +46,7 @@ describe('боковое меню', () => {
     render(<Sidebar isAdmin guidesEnabled />)
     const links = within(desktop()).getAllByRole('link')
     expect(links.map((link) => link.textContent)).toEqual([
-      'Дашборд', 'Буткемпы', 'Роадмапы', 'Курсы', 'Тренажёр', 'Собеседования', 'Гайды', 'История обучения', 'Сертификаты', 'Заметки', 'Вопросы',
+      'Дашборд', 'Буткемпы', 'Менторство', 'Роадмапы', 'Курсы', 'Тренажёр', 'Собеседования', 'Гайды', 'История обучения', 'Сертификаты', 'Заметки', 'Вопросы',
       'Сохранённое', 'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь',
     ])
     expect(within(desktop()).getByRole('link', { name: 'Приложение' })).toHaveAttribute('href', '/settings/app')
@@ -57,7 +57,7 @@ describe('боковое меню', () => {
   it('закрытые разделы остаются на своих местах с пометкой «нет доступа» и ведут в раздел', () => {
     render(<Sidebar trainerEnabled={false} />)
     expect(within(desktop()).getAllByRole('link').map((link) => link.getAttribute('aria-label') ?? link.textContent)).toEqual([
-      'Дашборд', 'Буткемпы, нет доступа', 'Роадмапы', 'Курсы', 'Тренажёр, нет доступа', 'Собеседования', 'Гайды, нет доступа',
+      'Дашборд', 'Буткемпы, нет доступа', 'Менторство, нет доступа', 'Роадмапы', 'Курсы', 'Тренажёр, нет доступа', 'Собеседования', 'Гайды, нет доступа',
       'История обучения', 'Сертификаты', 'Заметки', 'Вопросы', 'Сохранённое', 'Лидерборд', 'Профиль', 'Приложение', 'Уведомления', 'Контакты', 'Помощь',
     ])
     for (const [name, href] of [['Буткемпы, нет доступа', '/bootcamp'], ['Тренажёр, нет доступа', '/trainer'], ['Гайды, нет доступа', '/guides']]) {
@@ -72,7 +72,7 @@ describe('боковое меню', () => {
     pathname.current = '/bootcamp/nodejs-bootcamp-manuals'
     render(<Sidebar bootcampEnabled />)
     const links = within(desktop()).getAllByRole('link').map((link) => link.textContent)
-    expect(links.slice(0, 4)).toEqual(['Дашборд', 'Буткемпы', 'Роадмапы', 'Курсы'])
+    expect(links.slice(0, 5)).toEqual(['Дашборд', 'Буткемпы', 'Менторство', 'Роадмапы', 'Курсы'])
     const bootcamp = within(desktop()).getByRole('link', { name: 'Буткемпы' })
     expect(bootcamp).toHaveAttribute('href', '/bootcamp')
     expect(bootcamp).toHaveAttribute('aria-current', 'page')

@@ -128,6 +128,9 @@ export interface Config {
     'tutoring-participants': TutoringParticipant;
     'tutoring-reviews': TutoringReview;
     'tutoring-calendars': TutoringCalendar;
+    'tutoring-charges': TutoringCharge;
+    'tutoring-projects': TutoringProject;
+    'tutoring-checks': TutoringCheck;
     'bootcamp-payments': BootcampPayment;
     'bootcamp-refunds': BootcampRefund;
     'bootcamp-lead-events': BootcampLeadEvent;
@@ -199,6 +202,9 @@ export interface Config {
     'tutoring-participants': TutoringParticipantsSelect<false> | TutoringParticipantsSelect<true>;
     'tutoring-reviews': TutoringReviewsSelect<false> | TutoringReviewsSelect<true>;
     'tutoring-calendars': TutoringCalendarsSelect<false> | TutoringCalendarsSelect<true>;
+    'tutoring-charges': TutoringChargesSelect<false> | TutoringChargesSelect<true>;
+    'tutoring-projects': TutoringProjectsSelect<false> | TutoringProjectsSelect<true>;
+    'tutoring-checks': TutoringChecksSelect<false> | TutoringChecksSelect<true>;
     'bootcamp-payments': BootcampPaymentsSelect<false> | BootcampPaymentsSelect<true>;
     'bootcamp-refunds': BootcampRefundsSelect<false> | BootcampRefundsSelect<true>;
     'bootcamp-lead-events': BootcampLeadEventsSelect<false> | BootcampLeadEventsSelect<true>;
@@ -2193,7 +2199,7 @@ export interface BootcampEnrollment {
   lmsSignedInAt?: string | null;
   gitlabSignedInAt?: string | null;
   /**
-   * После возврата денег: исполнитель в VM GitLab блокирует учётку.
+   * После возврата денег: исполнитель в VM GitLab снимает доступ к проекту.
    */
   revokeRequestedAt?: string | null;
   revokedAt?: string | null;
@@ -2355,7 +2361,7 @@ export interface TutoringParticipant {
   id: number;
   stream: number | TutoringStream;
   student: number | User;
-  paidAt: string;
+  paidAt?: string | null;
   active: boolean;
   currentMeeting: number;
   updatedAt: string;
@@ -2398,6 +2404,62 @@ export interface TutoringCalendar {
   lastError?: ('temporary' | 'calendar' | 'authorization') | null;
   failures: number;
   scheduleDigest?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-charges".
+ */
+export interface TutoringCharge {
+  id: number;
+  participant: number | TutoringParticipant;
+  meeting: number;
+  minutes: number;
+  hourlyKopecks: number;
+  amountKopecks: number;
+  status: 'due' | 'paid' | 'cancelled';
+  paidAt?: string | null;
+  updatedBy: number | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-projects".
+ */
+export interface TutoringProject {
+  id: number;
+  student: number | User;
+  program: 'nodejs' | 'react-next';
+  username: string;
+  group: string;
+  courseProject: string;
+  gradingProject: string;
+  projectId?: number | null;
+  projectUrl?: string | null;
+  gitlabUserId?: number | null;
+  state: 'queued' | 'running' | 'ready' | 'failed' | 'revoking' | 'revoked' | 'revoke_failed';
+  lease?: string | null;
+  leasedAt?: string | null;
+  attempts: number;
+  error?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-checks".
+ */
+export interface TutoringCheck {
+  id: number;
+  project: number | TutoringProject;
+  mrIid: number;
+  stage: number;
+  verdict: string;
+  passed?: number | null;
+  total?: number | null;
+  reportedAt: string;
   updatedAt: string;
   createdAt: string;
 }
@@ -2702,6 +2764,18 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'tutoring-reviews';
         value: number | TutoringReview;
+      } | null)
+    | ({
+        relationTo: 'tutoring-charges';
+        value: number | TutoringCharge;
+      } | null)
+    | ({
+        relationTo: 'tutoring-projects';
+        value: number | TutoringProject;
+      } | null)
+    | ({
+        relationTo: 'tutoring-checks';
+        value: number | TutoringCheck;
       } | null)
     | ({
         relationTo: 'bootcamp-payments';
@@ -4084,6 +4158,59 @@ export interface TutoringCalendarsSelect<T extends boolean = true> {
   lastError?: T;
   failures?: T;
   scheduleDigest?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-charges_select".
+ */
+export interface TutoringChargesSelect<T extends boolean = true> {
+  participant?: T;
+  meeting?: T;
+  minutes?: T;
+  hourlyKopecks?: T;
+  amountKopecks?: T;
+  status?: T;
+  paidAt?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-projects_select".
+ */
+export interface TutoringProjectsSelect<T extends boolean = true> {
+  student?: T;
+  program?: T;
+  username?: T;
+  group?: T;
+  courseProject?: T;
+  gradingProject?: T;
+  projectId?: T;
+  projectUrl?: T;
+  gitlabUserId?: T;
+  state?: T;
+  lease?: T;
+  leasedAt?: T;
+  attempts?: T;
+  error?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-checks_select".
+ */
+export interface TutoringChecksSelect<T extends boolean = true> {
+  project?: T;
+  mrIid?: T;
+  stage?: T;
+  verdict?: T;
+  passed?: T;
+  total?: T;
+  reportedAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

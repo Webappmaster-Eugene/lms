@@ -5,7 +5,7 @@ import { ExternalLink, Tent } from 'lucide-react'
 import { HELP_LINK, LockedSection } from '@/components/access/LockedSection'
 import { BOOTCAMP_LANDING_URL } from '@/lib/site-links'
 import { openProgramLinks } from '@/server/bootcamp-programs'
-import { tutoringArea, tutoringPath } from '@/server/tutoring-bootcamps'
+import { bootcampArea } from '@/server/tutoring-bootcamps'
 
 export const metadata: Metadata = {
   title: 'Буткемпы',
@@ -14,12 +14,8 @@ export const metadata: Metadata = {
 type Props = { searchParams: Promise<{ locked?: string | string[] }> }
 
 export default async function BootcampPage({ searchParams }: Props) {
-  const { payload, isAdmin, manuals, tutoring } = await tutoringArea()
-  const bootcamps = [
-    ...manuals.map(course => ({ ...course, href: `/bootcamp/${course.slug}` })),
-    ...tutoring.filter(course => !manuals.some(manual => manual.id === course.id))
-      .map(course => ({ ...course, href: tutoringPath(course.slug) })),
-  ]
+  const { payload, isAdmin, manuals } = await bootcampArea()
+  const bootcamps = manuals.map(course => ({ ...course, href: `/bootcamp/${course.slug}` }))
   const lockedRequested = (await searchParams).locked !== undefined
   const [only] = bootcamps
   if (only && bootcamps.length === 1 && !lockedRequested) redirect(only.href)

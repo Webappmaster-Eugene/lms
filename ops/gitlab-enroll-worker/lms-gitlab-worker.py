@@ -139,7 +139,12 @@ class Job:
         body = {'status': status, 'steps': list(self.steps.values()), **self.extra}
         if error:
             body['error'] = error
-        lms('POST', '/api/internal/bootcamp-enrollments/%s/report' % self.job['id'], body)
+        if 'lease' in self.job:
+            body['lease'] = self.job['lease']
+            path = '/api/internal/tutoring-projects/%s/report'
+        else:
+            path = '/api/internal/bootcamp-enrollments/%s/report'
+        lms('POST', path % self.job['id'], body)
 
     def step(self, key, run):
         try:
@@ -169,6 +174,8 @@ class Job:
         if not user and by_email:
             raise StepError('Почта %s уже у учётки GitLab %s' % (email, by_email[0]['username']))
         if user:
+            if 'lease' in self.job and user.get('state') != 'active':
+                raise StepError('Учётка GitLab не активна, проверьте её состояние')
             self.user = user
             detail = 'учётка уже была (%s), письмо не отправлялось' % user.get('state')
         else:
@@ -282,23 +289,49 @@ def check_first_sign_in(watch):
             log('зачисление %s: первый вход в GitLab %s' % (item['id'], user['last_sign_in_at']))
 
 
+def remove_project_member(item):
+    if not item.get('gitlabProjectId'):
+        return
+    user = gl('GET', '/users/%s' % item['gitlabUserId'], allow404=True)
+    if user is None:
+        return
+    if user.get('username') != item['username']:
+        raise StepError('Логин не совпадает с учёткой GitLab из задания')
+    pid, uid = item['gitlabProjectId'], item['gitlabUserId']
+    project = gl('GET', '/projects/%s' % pid, allow404=True)
+    if project is None:
+        return
+    direct = '/projects/%s/members/%s' % (pid, uid)
+    gl('DELETE', direct, allow404=True)
+    if gl('GET', '/projects/%s/members/all/%s' % (pid, uid), allow404=True):
+        raise StepError('К проекту остался доступ через группу GitLab')
+
+
 def revoke_gitlab(items):
-    """Возврат денег: учётка блокируется, проект остаётся (его история нужна для разбора споров)."""
     for item in items:
         path = '/api/internal/bootcamp-enrollments/%s/revoked' % item['id']
         try:
-            user = gl('GET', '/users/%s' % item['gitlabUserId'], allow404=True)
-            if user is None:
-                log('возврат %s: учётки GitLab %s уже нет' % (item['id'], item['username']))
-            elif user.get('username') != item['username']:
-                raise StepError('учётка GitLab %s принадлежит %s, а не %s: блокировать не стал' % (item['gitlabUserId'], user.get('username'), item['username']))
-            elif user.get('state') != 'blocked':
-                gl('POST', '/users/%s/block' % item['gitlabUserId'])
-                log('возврат %s: учётка GitLab %s заблокирована' % (item['id'], item['username']))
+            remove_project_member(item)
             lms('POST', path, {'ok': True})
         except StepError as error:
             log('возврат %s: %s' % (item['id'], error))
             lms('POST', path, {'error': str(error)})
+
+
+def tutoring_job(claim):
+    job = claim.get('job')
+    if not job:
+        return
+    worker = Job(job, claim.get('webhook'))
+    if job.get('revoke'):
+        try:
+            remove_project_member(job)
+        except StepError as error:
+            worker.report('revoke_failed', str(error))
+            return
+        worker.report('revoked')
+    else:
+        worker.run()
 
 
 def main():
@@ -311,6 +344,9 @@ def main():
                 revoke_gitlab(claim['revoke'])
             if claim.get('job'):
                 Job(claim['job'], claim.get('webhook')).run()
+            mentoring = lms('POST', '/api/internal/tutoring-projects/claim')
+            tutoring_job(mentoring)
+            if claim.get('job') or mentoring.get('job'):
                 continue
             if time.time() - last_watch >= WATCH_EVERY_SECONDS:
                 last_watch = time.time()

@@ -41,6 +41,7 @@ import { StudentSessionTelemetry, StudentLearningEvents, StudentActivityDays } f
 import { AdminDigests } from '@/payload/collections/AdminDigests'
 import { BootcampStreams, BootcampWeekSubmissions } from '@/payload/collections/BootcampProgress'
 import { TutoringDeckFiles, TutoringMeetings, TutoringParticipants, TutoringReviews, TutoringStreams } from '@/payload/collections/Tutoring'
+import { TutoringCharges, TutoringProjects, TutoringChecks } from '@/payload/collections/TutoringOperations'
 import { TutoringCalendars } from '@/payload/collections/TutoringCalendars'
 import { WebVitalsReports } from '@/payload/collections/WebVitalsReports'
 import { Certificates } from '@/payload/collections/Certificates'
@@ -196,6 +197,9 @@ export default buildConfig({
     TutoringParticipants,
     TutoringReviews,
     TutoringCalendars,
+    TutoringCharges,
+    TutoringProjects,
+    TutoringChecks,
     BootcampPayments,
     BootcampRefunds,
     BootcampLeadEvents,

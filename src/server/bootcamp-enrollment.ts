@@ -257,7 +257,7 @@ export type ClaimResult = {
   job: WorkerJob | null
   watch: { id: number, gitlabUserId: number }[]
   webhook: { url: string, token: string } | null
-  /** После возврата денег: учётки GitLab, которые исполнитель блокирует. Старый исполнитель поле не читает. */
+  /** После возврата денег: проекты GitLab, к которым исполнитель закрывает доступ. Старый исполнитель поле не читает. */
   revoke: { id: number, gitlabUserId: number, username: string }[]
 }
 
@@ -293,17 +293,17 @@ export async function claimEnrollment(payload: Payload): Promise<ClaimResult> {
     overrideAccess: true,
   })
   const token = gitlabWebhookToken()
-  // Задание, упавшее до создания учётки GitLab, блокировать нечем: закрываем отметку сразу.
+  // Задание, упавшее до создания учётки GitLab, закрывать нечего: закрываем отметку сразу.
   await db(payload).execute(sql`update bootcamp_enrollments set revoked_at = now(), updated_at = now() where revoke_requested_at is not null and revoked_at is null and gitlab_user_id is null and status in ('done', 'failed')`)
-  const revoking = rows<{ id: number, gitlab_user_id: number, gitlab_username: string }>(await db(payload).execute(sql`
-    select id, gitlab_user_id, gitlab_username from bootcamp_enrollments
+  const revoking = rows<{ id: number, gitlab_user_id: number, gitlab_project_id: number | string | null, gitlab_username: string }>(await db(payload).execute(sql`
+    select id, gitlab_user_id, gitlab_project_id, gitlab_username from bootcamp_enrollments
     where revoke_requested_at is not null and revoked_at is null and revoke_error is null and gitlab_user_id is not null and status <> 'running'
     order by revoke_requested_at, id limit 20`))
   return {
     job,
     watch: watching.docs.flatMap((doc) => typeof doc.gitlabUserId === 'number' ? [{ id: doc.id, gitlabUserId: doc.gitlabUserId }] : []),
     webhook: token ? { url: adminLink('/api/bootcamp/gitlab-events'), token } : null,
-    revoke: revoking.map((row) => ({ id: Number(row.id), gitlabUserId: Number(row.gitlab_user_id), username: row.gitlab_username })),
+    revoke: revoking.map((row) => ({ id: Number(row.id), gitlabUserId: Number(row.gitlab_user_id), username: row.gitlab_username, gitlabProjectId: row.gitlab_project_id === null ? null : Number(row.gitlab_project_id) })),
   }
 }
 
@@ -355,7 +355,7 @@ export async function reportEnrollment(payload: Payload, id: number, report: Wor
   })
   if (report.status === 'done') {
     // Точечно: сохранение заявки целиком затёрло бы отметки оплаты, которые пишутся параллельно.
-    // Возврат денег, пришедший посреди задания, этап не теряет: учётку потом заблокирует исполнитель.
+    // Возврат денег, пришедший посреди задания, этап не теряет: исполнитель закроет доступ к проекту.
     await db(payload).execute(sql`update bootcamp_leads set status = 'enrolled', updated_at = now() where id = ${relationId(updated.lead)} and status <> 'refunded'`)
     await journal(payload, { lead: relationId(updated.lead), type: 'enrolled', message: `Зачислен: проект ${updated.gitlabProjectUrl ?? updated.gitlabUsername}` })
     void notifyAdmins({

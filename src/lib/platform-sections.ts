@@ -5,6 +5,7 @@
 export const PLATFORM_SECTIONS = [
   { href: '/', label: 'Дашборд', hint: 'Главная страница: ваш прогресс, серия дней и урок, с которого стоит продолжить' },
   { href: '/bootcamp', label: 'Буткемпы', hint: 'Ваши буткемпы: методички по неделям и прогресс по ним' },
+  { href: '/tutoring', label: 'Менторство', hint: 'Ваши встречи с наставником, задания и оплата занятий' },
   { href: '/roadmaps', label: 'Роадмапы', hint: 'Карты направлений: какие темы изучать и в каком порядке, с курсами по каждой теме' },
   { href: '/courses', label: 'Курсы', hint: 'Все доступные вам курсы с описанием, программой и прогрессом' },
   { href: '/trainer', label: 'Тренажёр', hint: 'Практика: задачи с автоматической проверкой кода и режим собеседования' },
@@ -26,10 +27,10 @@ export const PLATFORM_SECTIONS = [
 export type PlatformSectionHref = typeof PLATFORM_SECTIONS[number]['href']
 
 /** Что открыто пользователю. Раздел без доступа не прячется: ученик видит его с замком и узнаёт, как его получить. */
-export type SectionAccess = { trainerEnabled: boolean; guidesEnabled: boolean; bootcampEnabled: boolean }
+export type SectionAccess = { trainerEnabled: boolean; guidesEnabled: boolean; bootcampEnabled: boolean; tutoringEnabled?: boolean }
 
 export function isSectionLocked(href: string, access: SectionAccess): boolean {
-  return (href === '/trainer' && !access.trainerEnabled) || (href === '/guides' && !access.guidesEnabled) || (href === '/bootcamp' && !access.bootcampEnabled)
+  return (href === '/trainer' && !access.trainerEnabled) || (href === '/guides' && !access.guidesEnabled) || (href === '/bootcamp' && !access.bootcampEnabled) || (href === '/tutoring' && !access.tutoringEnabled)
 }
 
 export function withSectionAccess<T extends { href: string }>(sections: readonly T[], access: SectionAccess): (T & { locked: boolean })[] {

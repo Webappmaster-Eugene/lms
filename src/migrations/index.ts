@@ -62,6 +62,7 @@ import * as migration_20261120_180904_tutoring_streams from './20261120_180904_t
 import * as migration_20261121_110257_tutoring_deck_revisions from './20261121_110257_tutoring_deck_revisions';
 import * as migration_20261122_101547_tutoring_google_calendar from './20261122_101547_tutoring_google_calendar';
 import * as migration_20261122_145105_tutoring_future_schedule from './20261122_145105_tutoring_future_schedule';
+import * as migration_20261122_211103_mentoring_products from './20261122_211103_mentoring_products';
 
 export const migrations = [
   {
@@ -382,6 +383,11 @@ export const migrations = [
   {
     up: migration_20261122_145105_tutoring_future_schedule.up,
     down: migration_20261122_145105_tutoring_future_schedule.down,
-    name: '20261122_145105_tutoring_future_schedule'
+    name: '20261122_145105_tutoring_future_schedule',
+  },
+  {
+    up: migration_20261122_211103_mentoring_products.up,
+    down: migration_20261122_211103_mentoring_products.down,
+    name: '20261122_211103_mentoring_products'
   },
 ];

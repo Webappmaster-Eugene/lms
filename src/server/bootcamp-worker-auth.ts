@@ -27,3 +27,7 @@ export const validGitlabWebhookToken = (value: string | null) => matches(WEBHOOK
 export function gitlabWebhookToken(): string | null {
   return derive(WEBHOOK)?.toString('hex') ?? null
 }
+
+const tutoringWebhook = (project: number) => `lms-tutoring-gitlab-webhook-v1:${project}`
+export const tutoringWebhookToken = (project: number) => derive(tutoringWebhook(project))?.toString('hex') ?? null
+export const validTutoringWebhookToken = (project: number, value: string | null) => matches(tutoringWebhook(project), value)

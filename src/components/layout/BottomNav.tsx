@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { GraduationCap, History, LayoutDashboard, Map, Menu, Tent } from 'lucide-react'
+import { GraduationCap, History, LayoutDashboard, Map, Menu, Tent, UsersRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useHydrated } from '@/hooks/use-hydrated'
 import { useSidebar } from './SidebarContext'
@@ -25,17 +25,21 @@ const TABS: readonly Tab[] = [
 /** Участнику буткемпа он важнее истории: та остаётся в «Ещё», а вкладок по-прежнему пять. */
 const BOOTCAMP_TABS: readonly Tab[] = [...TABS.slice(0, 3), { href: '/bootcamp', label: 'Буткемпы', icon: Tent }]
 
-export function BottomNav({ bootcampEnabled = false }: { bootcampEnabled?: boolean } = {}) {
+const TUTORING_TABS: readonly Tab[] = [...TABS.slice(0, 3), { href: '/tutoring', label: 'Менторство', icon: UsersRound }]
+
+export function BottomNav({ bootcampEnabled = false, tutoringEnabled = false }: { bootcampEnabled?: boolean; tutoringEnabled?: boolean } = {}) {
   const hydrated = useHydrated()
   const pathname = usePathname()
   const { mobileOpen, toggleMobile } = useSidebar()
+  const tabs = tutoringEnabled && (!bootcampEnabled || pathname.startsWith('/tutoring'))
+    ? TUTORING_TABS : bootcampEnabled ? BOOTCAMP_TABS : TABS
 
   return (
     <nav aria-label="Основная навигация" className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur-md lg:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       <div
         className="mx-auto flex h-16 max-w-lg items-stretch justify-around"
       >
-        {(bootcampEnabled ? BOOTCAMP_TABS : TABS).map(({ href, label, icon: Icon, exact }) => {
+        {tabs.map(({ href, label, icon: Icon, exact }) => {
           // Урок участника буткемпа скорее из буткемпа: подсветка «Курсов» на нём была бы ложной.
           const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`) || (href === '/courses' && !bootcampEnabled && pathname.startsWith('/lessons/'))
           return (

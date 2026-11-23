@@ -1,31 +1,39 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import { ProjectCheck, ProjectStatus } from '@/components/tutoring/ProjectStatus'
+import { tutoringMergeRequest, tutoringProject, tutoringVerdict } from '@/server/tutoring-projects'
+import { MeetingPaymentStatus } from '@/components/tutoring/MeetingPayment'
+import { tutoringCharge } from '@/server/tutoring-payments'
 import { TutoringMeetingCard } from '@/components/tutoring/TutoringMeetingCard'
 import { isTutoringMeeting, tutoringDateLabel, tutoringPrograms, tutoringStatuses } from '@/lib/tutoring'
 import { tutoringScheduleSlots, tutoringScheduleTimeline, type TutoringScheduleSlot } from '@/lib/tutoring-schedule'
 import { cn } from '@/lib/utils'
-import type { requireTutoringBootcamp } from '@/server/tutoring-bootcamps'
+import type { requireTutoringProgram } from '@/server/tutoring-bootcamps'
 import { tutoringOpenThrough } from '@/server/tutoring-access'
 import { submitTutoringHomework } from '@/server/tutoring-actions'
 import { tutoringMeeting, tutoringMeetings, tutoringReviewMap, tutoringReviews } from '@/server/tutoring'
 
 type Query = { meeting?: string; saved?: string; error?: string }
-export async function StudentStream({ context, id, query }: { context: Awaited<ReturnType<typeof requireTutoringBootcamp>>; id: string; query: Query }) {
-  const { payload, req, course, base, memberships } = context
+export async function StudentStream({ context, id, query }: { context: Awaited<ReturnType<typeof requireTutoringProgram>>; id: string; query: Query }) {
+  const { payload, req, course, base, user, memberships } = context
   const membership = memberships.find(({ stream }) => String(stream.id) === id && stream.program === course.program)
   if (!membership) notFound()
   const { stream, member } = membership
   const selected = query.meeting === undefined ? member.currentMeeting : Number(query.meeting)
   const open = tutoringOpenThrough(stream, member)
   if (!isTutoringMeeting(selected, stream.program) || selected > open) notFound()
-  const [materials, meeting, reviews] = await Promise.all([
+  const [materials, meeting, reviews, charge, project] = await Promise.all([
     tutoringMeetings(payload, req, stream.program),
     tutoringMeeting(payload, req, stream.program, selected, false),
     tutoringReviews(payload, req, [member.id]),
+    tutoringCharge(payload, req, member.id, selected),
+    tutoringProject(payload, req, user.id, stream.program),
   ])
   const byMeeting = tutoringReviewMap(reviews)
   const review = byMeeting.get(selected)
+  const mrIid = project?.projectUrl && review?.submissionUrl ? tutoringMergeRequest(project.projectUrl, review.submissionUrl) : null
+  const check = project && mrIid ? await tutoringVerdict(payload, req, project.id, mrIid) : null
   const status = review?.status ?? 'assigned'
   const canSubmit = status === 'assigned' || status === 'changes'
   const accepted = reviews.filter(row => row.status === 'accepted').length
@@ -56,10 +64,13 @@ export async function StudentStream({ context, id, query }: { context: Awaited<R
     </header>
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_17rem]">
       <div className="min-w-0 space-y-5">
-        {meeting ? <TutoringMeetingCard meeting={meeting} stream={stream} /> :
+        {meeting ? <TutoringMeetingCard meeting={meeting} stream={stream} practiceLink={(path) => `${base}/streams/${id}/readings/${selected}/${path.slice(9)}`} /> :
           <p className="rounded-lg bg-muted p-4 text-sm">Материалы этой встречи готовятся. Проверьте позже.</p>}
+        {charge && <section className="rounded-xl border border-border bg-card p-4" aria-label="Оплата встречи"><MeetingPaymentStatus charge={charge} /></section>}
         {meeting && <section id="homework" aria-labelledby="submit-title" className="space-y-3 rounded-xl border border-border bg-card p-4">
           <h2 id="submit-title" className="font-semibold">Сдача домашней работы</h2>
+          <ProjectStatus project={project} />
+          {check && <ProjectCheck check={check} />}
           <p className="text-sm">Статус: <strong>{tutoringStatuses[status]}</strong></p>
           {query.error && <p role="alert" className="text-sm text-destructive">{query.error}</p>}
           {query.saved && status === 'submitted' && <p role="status" className="text-sm text-muted-foreground">Работа отправлена на проверку</p>}

@@ -5,13 +5,13 @@ import { ReplacePresentation } from '@/components/tutoring/ReplacePresentation'
 import { TutoringMeetingCard } from '@/components/tutoring/TutoringMeetingCard'
 import { isTutoringMeeting } from '@/lib/tutoring'
 import { tutoringMeeting } from '@/server/tutoring'
-import { requireTutoringBootcamp } from '@/server/tutoring-bootcamps'
+import { requireTutoringProgram } from '@/server/tutoring-bootcamps'
 
 export const metadata = { title: 'Лекция репетиторства' }
 
-export default async function TutoringLecture({ params }: { params: Promise<{ slug: string; number: string }> }) {
-  const { slug, number: rawNumber } = await params
-  const { payload, req, isAdmin, course, base } = await requireTutoringBootcamp(slug)
+export default async function TutoringLecture({ params }: { params: Promise<{ id: string; number: string }> }) {
+  const { id, number: rawNumber } = await params
+  const { payload, req, isAdmin, course, base } = await requireTutoringProgram(id)
   const number = Number(rawNumber)
   if (!isAdmin || String(number) !== rawNumber || !isTutoringMeeting(number, course.program)) notFound()
   const meeting = await tutoringMeeting(payload, req, course.program, number, true)

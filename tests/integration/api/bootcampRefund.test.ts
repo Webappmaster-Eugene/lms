@@ -313,34 +313,34 @@ describe('возврат, отмеченный вручную', () => {
   })
 })
 
-describe('исполнитель в VM GitLab блокирует учётку', () => {
+describe('исполнитель в VM GitLab закрывает доступ к проекту', () => {
   async function refundedWithGitlab(gitlabUserId: number) {
     const lead = await paidManually()
     const enrollment = await enrollmentOf(lead.id)
-    await db().execute(sql`update bootcamp_enrollments set status = 'done', gitlab_user_id = ${gitlabUserId}, finished_at = now() where id = ${enrollment?.id}`)
+    await db().execute(sql`update bootcamp_enrollments set status = 'done', gitlab_user_id = ${gitlabUserId}, gitlab_project_id = ${gitlabUserId + 1000000}, finished_at = now() where id = ${enrollment?.id}`)
     expect((await act(lead.id, { action: 'mark-refunded', amount: '45000', reason: 'Отказ' })).status).toBe(200)
     return { lead, enrollment: await enrollmentOf(lead.id) }
   }
 
-  it('задание на блокировку, отчёт и запись в журнал; повторно не выдаётся', async () => {
+  it('задание на закрытие доступа, отчёт и запись в журнал; повторно не выдаётся', async () => {
     const gitlabUserId = 900_000 + Math.floor(Math.random() * 99_999)
     const { lead, enrollment } = await refundedWithGitlab(gitlabUserId)
     expect(enrollment?.revokeRequestedAt).toBeTruthy()
     expect(enrollment?.revokedAt).toBeFalsy()
     const item = (await claim()).revoke.find((entry) => entry.id === enrollment?.id)
-    expect(item).toEqual({ id: enrollment?.id, gitlabUserId, username: enrollment?.gitlabUsername })
+    expect(item).toEqual({ id: enrollment?.id, gitlabUserId, gitlabProjectId: gitlabUserId + 1000000, username: enrollment?.gitlabUsername })
 
     expect((await worker(revokedRoute, enrollment?.id ?? 0, { ok: true })).status).toBe(200)
     expect((await enrollmentOf(lead.id))?.revokedAt).toBeTruthy()
-    expect((await state(lead.id)).events.some((event) => event.message.includes(`Учётка GitLab ${enrollment?.gitlabUsername} заблокирована`))).toBe(true)
+    expect((await state(lead.id)).events.some((event) => event.message.includes(`Доступ ${enrollment?.gitlabUsername} к проекту GitLab закрыт`))).toBe(true)
     expect((await claim()).revoke.some((entry) => entry.id === enrollment?.id)).toBe(false)
   })
 
-  it('ошибка блокировки: тревога наставнику, задание больше не повторяется', async () => {
+  it('ошибка закрытия доступа: тревога наставнику, задание больше не повторяется', async () => {
     const { lead, enrollment } = await refundedWithGitlab(800_000 + Math.floor(Math.random() * 99_999))
-    expect((await worker(revokedRoute, enrollment?.id ?? 0, { error: 'GitLab POST /users/1/block: 403' })).status).toBe(200)
+    expect((await worker(revokedRoute, enrollment?.id ?? 0, { error: 'GitLab DELETE /projects/1/members/2: 403' })).status).toBe(200)
     expect((await enrollmentOf(lead.id))?.revokeError).toContain('403')
-    expect(telegram.some((text) => text.includes('Не удалось заблокировать учётку GitLab'))).toBe(true)
+    expect(telegram.some((text) => text.includes('Не удалось закрыть доступ к проекту GitLab'))).toBe(true)
     expect((await claim()).revoke.some((entry) => entry.id === enrollment?.id)).toBe(false)
     expect((await worker(revokedRoute, enrollment?.id ?? 0, {})).status).toBe(400)
   })

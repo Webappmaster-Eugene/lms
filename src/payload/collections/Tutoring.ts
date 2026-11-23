@@ -7,7 +7,7 @@ import { isAdmin, isAdminField } from '@/payload/access/isAdmin'
 import { cleanupTutoringParticipant, cleanupTutoringStream } from '@/payload/hooks/cleanupOwnedRelations'
 import { tutoringDeckAccess, tutoringPresentationAccess } from '@/server/tutoring-access'
 
-const group = 'Репетиторство'
+const group = 'Менторство'
 
 export const TutoringDeckFiles: CollectionConfig = {
   slug: 'tutoring-deck-files',
@@ -151,7 +151,7 @@ export const TutoringParticipants: CollectionConfig = {
   fields: [
     { name: 'stream', type: 'relationship', relationTo: 'tutoring-streams', required: true, label: 'Поток', index: true },
     { name: 'student', type: 'relationship', relationTo: 'users', required: true, label: 'Ученик', index: true },
-    { name: 'paidAt', type: 'date', required: true, label: 'Оплата подтверждена' },
+    { name: 'paidAt', type: 'date', label: 'Историческая отметка оплаты' },
     { name: 'active', type: 'checkbox', defaultValue: true, required: true, label: 'Доступ открыт' },
     { name: 'currentMeeting', type: 'number', defaultValue: 1, required: true, min: 1, max: 32, label: 'Текущая встреча ученика' },
   ],

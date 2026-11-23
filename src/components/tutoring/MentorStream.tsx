@@ -3,22 +3,26 @@ import { notFound } from 'next/navigation'
 
 import { ManagementHeading, managementLink, managementPrimary } from '@/components/content-management/ManagementHeading'
 import { TutoringMeetingCard } from '@/components/tutoring/TutoringMeetingCard'
+import { MentorProject, ProjectCheck } from '@/components/tutoring/ProjectStatus'
+import { tutoringMergeRequest, tutoringProject, tutoringVerdict } from '@/server/tutoring-projects'
+import { MentorMeetingPayment } from '@/components/tutoring/MeetingPayment'
 import { TutoringSeriesForm } from '@/components/tutoring/TutoringSeriesForm'
 import { managedDocument, relationId } from '@/lib/content-management/pages'
 import { isTutoringMeeting, moscowMeetingInput, scheduledTutoringMeeting, tutoringDateLabel, tutoringPrograms, tutoringStatuses } from '@/lib/tutoring'
 import { tutoringScheduleSlots, tutoringScheduleTimeline } from '@/lib/tutoring-schedule'
-import type { requireTutoringBootcamp } from '@/server/tutoring-bootcamps'
+import type { requireTutoringProgram } from '@/server/tutoring-bootcamps'
 import { addTutoringParticipant, gradeTutoringHomework, rescheduleTutoringMeeting, rescheduleTutoringSeries, toggleTutoringStreamCalendar, updateTutoringParticipant, updateTutoringStream } from '@/server/tutoring-actions'
 import { getTutoringCalendarSettings } from '@/server/tutoring-calendar-account'
 import { googleCalendarAdminPath, tutoringGoogleConfig } from '@/server/tutoring-google'
 import { tutoringMeeting, tutoringMeetings, tutoringParticipants, tutoringReviewMap, tutoringReviews, tutoringStudentName } from '@/server/tutoring'
+import { tutoringCharge } from '@/server/tutoring-payments'
 import { tutoringScheduleRevision } from '@/server/tutoring-schedule'
 
 type Query = { participant?: string; preview?: string; review?: string; schedule?: string; error?: string; saved?: string }
 const field = 'min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm'
 const focus = 'rounded text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring'
 
-export async function MentorStream({ context, id, query }: { context: Awaited<ReturnType<typeof requireTutoringBootcamp>>; id: string; query: Query }) {
+export async function MentorStream({ context, id, query }: { context: Awaited<ReturnType<typeof requireTutoringProgram>>; id: string; query: Query }) {
   const { payload, req, user, course, base } = context
   const stream = await managedDocument('tutoring-streams', id)
   if (stream.program !== course.program) notFound()
@@ -44,6 +48,12 @@ export async function MentorStream({ context, id, query }: { context: Awaited<Re
   const preview = Number(query.preview)
   const reviewNumber = Number(query.review)
   const selectedReview = selectedReviews.get(reviewNumber)
+  const billingMeeting = isTutoringMeeting(reviewNumber, stream.program) ? reviewNumber : selected?.currentMeeting
+  const charge = selected && billingMeeting ? await tutoringCharge(payload, req, selected.id, billingMeeting) : null
+  const studentId = relationId(selected?.student)
+  const project = studentId ? await tutoringProject(payload, req, studentId, stream.program) : null
+  const mrIid = project?.projectUrl && selectedReview?.submissionUrl ? tutoringMergeRequest(project.projectUrl, selectedReview.submissionUrl) : null
+  const check = project && mrIid ? await tutoringVerdict(payload, req, project.id, mrIid) : null
   const selectedWork = materials.find(x => x.number === reviewNumber)
   const meeting = isTutoringMeeting(preview, stream.program) ? await tutoringMeeting(payload, req, stream.program, preview, true) : null
   const program = tutoringPrograms[stream.program]
@@ -140,13 +150,14 @@ export async function MentorStream({ context, id, query }: { context: Awaited<Re
       <form action={addTutoringParticipant.bind(null, stream.id)} className="grid gap-3 rounded-xl border border-border bg-card p-4">
         <h3 className="font-semibold">Добавить ученика</h3>
         <label className="grid gap-1 text-sm">Почта аккаунта<input className={field} name="email" type="email" required /></label>
-        <label className="flex items-start gap-2 text-sm"><input className="mt-1" name="paid" type="checkbox" value="yes" required />Оплата репетиторства получена</label>
         <button className={managementPrimary}>Добавить в поток</button>
       </form>
     </section>
 
     {selected && <section id="student" className="space-y-5 border-t border-border pt-5" aria-labelledby="student-title">
       <h2 id="student-title" className="text-xl font-semibold">{tutoringStudentName(selected)}</h2>
+      <MentorProject stream={stream.id} participant={selected.id} project={project} enabled={selected.active && stream.status === 'active'} />
+      {billingMeeting && <MentorMeetingPayment stream={stream.id} participant={selected.id} meeting={billingMeeting} charge={charge} />}
       <form action={updateTutoringParticipant.bind(null, stream.id, selected.id)} className="flex flex-wrap items-end gap-3">
         <label className="grid min-w-0 gap-1 text-sm">Текущая встреча ученика<select className={field} name="current" defaultValue={selected.currentMeeting}>{meetingOptions}</select></label>
         <label className="grid gap-1 text-sm">Доступ<select className={field} name="active" defaultValue={selected.active ? 'yes' : 'no'}>
@@ -157,6 +168,7 @@ export async function MentorStream({ context, id, query }: { context: Awaited<Re
       {selectedWork && <form id="homework" action={gradeTutoringHomework.bind(null, stream.id, selected.id, selectedWork.number)} className="grid gap-3 rounded-xl border border-border bg-card p-4">
         <h3 className="font-semibold">Встреча {selectedWork.number}. {selectedWork.title}</h3>
         {selectedReview?.submissionUrl && <Link className={managementLink} href={selectedReview.submissionUrl} target="_blank" rel="noopener noreferrer">Открыть работу ученика</Link>}
+        {check && <ProjectCheck check={check} />}
         <input type="hidden" name="updatedAt" value={selectedReview?.updatedAt ?? ''} />
         <label className="grid gap-1 text-sm">Статус<select className={field} name="status" defaultValue={selectedReview?.status ?? 'assigned'}>
           {Object.entries(tutoringStatuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}

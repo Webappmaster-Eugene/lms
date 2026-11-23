@@ -22,7 +22,7 @@ import type { BootcampLead, User } from '@/payload-types'
  * Поэтому LMS узнаёт о возврате двумя путями: сама создаёт его через API возвратов и следит за
  * состоянием заявки или наставник отмечает возврат из кабинета вручную. Выполненный возврат
  * переводит заявку в «Деньги возвращены» и закрывает доступы: курс методичек в LMS сразу,
- * учётку GitLab блокирует исполнитель в VM GitLab.
+ * доступ к проекту GitLab закрывает исполнитель в VM GitLab.
  */
 
 type Executor = { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }
@@ -308,7 +308,7 @@ async function anyAdmin(payload: Payload): Promise<User | null> {
 /**
  * Закрыть доступы после возврата, в транзакции выполненного возврата. Курс методичек снимается,
  * только если его выдало зачисление (заметка «Буткемп: …»): назначенный раньше и отдельно курс
- * не наш. Учётку GitLab блокирует исполнитель в VM GitLab; незапущенное зачисление
+ * не наш. Доступ к проекту GitLab закрывает исполнитель в VM GitLab; незапущенное зачисление
  * останавливается. Возвращает итог одной строкой.
  */
 async function revokeAccess(payload: Payload, req: PayloadRequest, lead: BootcampLead, actor: User | null): Promise<string> {
@@ -340,7 +340,7 @@ async function revokeAccess(payload: Payload, req: PayloadRequest, lead: Bootcam
   if (stopped.length > 0) notes.push('зачисление в GitLab ещё не начиналось, остановлено')
   else if (enrollment.gitlabUserId || enrollment.status === 'running') {
     await tx.execute(sql`update bootcamp_enrollments set revoke_requested_at = coalesce(revoke_requested_at, now()), revoke_error = null, updated_at = now() where id = ${enrollment.id}`)
-    notes.push(`учётку GitLab ${enrollment.gitlabUsername} заблокирует исполнитель в VM GitLab`)
+    notes.push(`доступ ${enrollment.gitlabUsername} к проекту GitLab закроет исполнитель в VM GitLab`)
   } else {
     await tx.execute(sql`update bootcamp_enrollments set revoke_requested_at = coalesce(revoke_requested_at, now()), revoked_at = now(), updated_at = now() where id = ${enrollment.id}`)
     notes.push('учётки GitLab нет')
@@ -350,7 +350,7 @@ async function revokeAccess(payload: Payload, req: PayloadRequest, lead: Bootcam
   return summary
 }
 
-/** Исполнитель в VM GitLab отчитался о блокировке учётки после возврата. */
+/** Исполнитель в VM GitLab отчитался о закрытии доступа к проекту после возврата. */
 export async function reportGitlabRevoked(payload: Payload, enrollmentId: number, result: { ok: boolean, error: string | null }): Promise<void> {
   if (result.ok) {
     const [done] = rowsOf<{ lead_id: number, gitlab_username: string, email: string }>(await db(payload).execute(sql`update bootcamp_enrollments set revoked_at = now(), revoke_error = null, updated_at = now() where id = ${enrollmentId} and revoke_requested_at is not null and revoked_at is null returning lead_id, gitlab_username, email`))
@@ -358,8 +358,8 @@ export async function reportGitlabRevoked(payload: Payload, enrollmentId: number
     await journal(payload, {
       lead: done.lead_id,
       type: 'access_revoked',
-      message: `Учётка GitLab ${done.gitlab_username} заблокирована`,
-      telegram: { title: `Учётка GitLab заблокирована: ${done.gitlab_username}`, lines: [done.email, 'После возврата денег доступы ученика закрыты'], link: leadAdminLink(done.lead_id) },
+      message: `Доступ ${done.gitlab_username} к проекту GitLab закрыт`,
+      telegram: { title: `Доступ к проекту GitLab закрыт: ${done.gitlab_username}`, lines: [done.email, 'После возврата денег доступы ученика закрыты'], link: leadAdminLink(done.lead_id) },
     })
     return
   }
@@ -369,7 +369,7 @@ export async function reportGitlabRevoked(payload: Payload, enrollmentId: number
   await journal(payload, {
     lead: failed.lead_id,
     type: 'refund_alert',
-    message: `Учётку GitLab ${failed.gitlab_username} заблокировать не удалось: ${error}`,
-    telegram: { title: `Не удалось заблокировать учётку GitLab: ${failed.gitlab_username}`, lines: [error, 'Заблокируйте учётку в GitLab вручную: Admin, Users, Block'], link: leadAdminLink(failed.lead_id) },
+    message: `Доступ ${failed.gitlab_username} к проекту GitLab закрыть не удалось: ${error}`,
+    telegram: { title: `Не удалось закрыть доступ к проекту GitLab: ${failed.gitlab_username}`, lines: [error, 'Проверьте членство ученика в проекте и его родительской группе'], link: leadAdminLink(failed.lead_id) },
   })
 }
