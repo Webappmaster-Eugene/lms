@@ -136,6 +136,10 @@ def automatic_account(job):
     return 'lease' in job and job.get('autoResolveUsername') is True
 
 
+def positive_id(value):
+    return type(value) is int and value > 0
+
+
 def user_with_primary_email(email):
     matches = {}
     page = 1
@@ -236,7 +240,7 @@ class Job:
                 raise StepError('Почта %s уже у учётки GitLab %s' % (email, by_email['username']))
             user = by_email
         expected = self.job.get('gitlabUserId')
-        if auto and expected and (not user or user['id'] != expected):
+        if 'lease' in self.job and expected is not None and (not positive_id(expected) or not user or user['id'] != expected):
             raise StepError('Учётка GitLab не совпадает с ID, сохранённым в LMS')
         return user
 
@@ -260,13 +264,8 @@ class Job:
                 if not user:
                     raise
 
-        if auto:
+        if 'lease' in self.job:
             user = verified_student_account(user, email, self.job.get('graderUserId'))
-        elif 'lease' in self.job and not created:
-            if user.get('state') != 'active':
-                raise StepError('Учётка GitLab не активна, проверьте её состояние')
-            if user.get('is_admin') or user.get('bot') or user.get('id') == self.job.get('graderUserId'):
-                raise StepError('Служебная учётка GitLab не может быть учеником')
         self.user = user
         self.extra['gitlabUserId'] = user['id']
         return 'done', ('создана, GitLab отправил письмо со ссылкой для пароля' if created
@@ -388,19 +387,26 @@ def check_first_sign_in(watch):
 
 
 def remove_project_member(item):
-    if not item.get('gitlabProjectId'):
+    mentoring = 'lease' in item
+    pid, uid = item.get('gitlabProjectId'), item.get('gitlabUserId')
+    if mentoring and (not positive_id(pid) or not positive_id(uid)):
+        raise StepError('Для отзыва доступа нужны сохранённые ID проекта и ученика в GitLab')
+    if not pid:
         return
-    user = gl('GET', '/users/%s' % item['gitlabUserId'], allow404=True)
+    user = gl('GET', '/users/%s' % uid, allow404=True)
     if user is None:
         return
-    if not automatic_account(item) and user.get('username') != item['username']:
+    if mentoring and user.get('id') != uid:
+        raise StepError('ID учётки GitLab не совпадает с заданием на отзыв доступа')
+    if not mentoring and user.get('username') != item['username']:
         raise StepError('Логин не совпадает с учёткой GitLab из задания')
-    pid, uid = item['gitlabProjectId'], item['gitlabUserId']
     project = gl('GET', '/projects/%s' % pid, allow404=True)
     if project is None:
         return
-    if automatic_account(item) and project.get('path_with_namespace') != '%s/%s' % (item['group'], item['username']):
-        raise StepError('Путь проекта GitLab не совпадает с заданием на отзыв доступа')
+    if mentoring:
+        expected_path = '%s/%s' % (item['group'], item['username'])
+        if project.get('id') != pid or project.get('path_with_namespace') != expected_path:
+            raise StepError('Учебный проект GitLab не совпадает с заданием на отзыв доступа')
     direct = '/projects/%s/members/%s' % (pid, uid)
     gl('DELETE', direct, allow404=True)
     if gl('GET', '/projects/%s/members/all/%s' % (pid, uid), allow404=True):

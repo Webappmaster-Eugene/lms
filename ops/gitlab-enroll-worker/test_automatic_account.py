@@ -128,6 +128,25 @@ class AutomaticAccountTest(unittest.TestCase):
             task.gitlab_user()
         self.assertEqual(api.created, [])
 
+    def test_historical_mentoring_login_requires_a_verified_personal_account(self):
+        for fields in ({'confirmed_at': None}, {'locked': True}, {'state': 'blocked'}, {'is_auditor': True},
+                       {'is_admin': True}, {'bot': True}, {'id': 33}):
+            with self.subTest(fields=fields):
+                api = UsersAPI([example_user(username='former-bootcamp-user', **fields)])
+                task = job(autoResolveUsername=False, username='former-bootcamp-user')
+                with patch.object(worker, 'gl', api), self.assertRaises(worker.StepError):
+                    task.gitlab_user()
+                self.assertIsNone(task.user)
+                self.assertEqual(api.created, [])
+
+    def test_missing_or_replaced_historical_account_does_not_trigger_creation(self):
+        for users in ([], [example_user(id=99)]):
+            with self.subTest(users=users):
+                api = UsersAPI(users)
+                with patch.object(worker, 'gl', api), self.assertRaises(worker.StepError):
+                    job(autoResolveUsername=False, username='personal', gitlabUserId=42).gitlab_user()
+                self.assertEqual(api.created, [])
+
     def test_revocation_uses_recorded_ids_and_checks_the_project_path(self):
         task = job(gitlabUserId=42, gitlabProjectId=11, group='mentoring').job
         for path in ('another/project', 'mentoring/mc-student-7'):
@@ -140,6 +159,49 @@ class AutomaticAccountTest(unittest.TestCase):
                     worker.remove_project_member(task)
                 writes = [call.args for call in gl.call_args_list if call.args[0] != 'GET']
                 self.assertEqual(writes, [('DELETE', '/projects/11/members/42')] if path == 'mentoring/mc-student-7' else [])
+
+    def test_historical_login_renamed_or_reassigned_revokes_only_the_recorded_id_in_the_original_project(self):
+        task = job(autoResolveUsername=False, username='old-name', gitlabUserId=42, gitlabProjectId=11, group='mentoring').job
+        with patch.object(worker, 'gl') as gl:
+            gl.side_effect = [example_user(username='renamed'), {'id': 11, 'path_with_namespace': 'mentoring/old-name'}, None, None]
+            worker.remove_project_member(task)
+            self.assertEqual([call.args for call in gl.call_args_list], [
+                ('GET', '/users/42'), ('GET', '/projects/11'), ('DELETE', '/projects/11/members/42'),
+                ('GET', '/projects/11/members/all/42'),
+            ])
+            self.assertTrue(gl.call_args_list[2].kwargs['allow404'])
+
+    def test_historical_login_does_not_revoke_outside_the_assigned_project(self):
+        task = job(autoResolveUsername=False, username='old-name', gitlabUserId=42, gitlabProjectId=11, group='mentoring').job
+        for project in ({'id': 11, 'path_with_namespace': 'bootcamp/old-name'},
+                        {'id': 12, 'path_with_namespace': 'mentoring/old-name'}):
+            with self.subTest(project=project), patch.object(worker, 'gl') as gl:
+                gl.side_effect = [example_user(username='renamed'), project]
+                with self.assertRaises(worker.StepError):
+                    worker.remove_project_member(task)
+                self.assertTrue(all(call.args[0] == 'GET' for call in gl.call_args_list))
+
+    def test_invalid_mentoring_ids_are_rejected_before_revocation(self):
+        for pid, uid in ((None, 42), (11, 0), (True, 42), ('11', 42)):
+            with self.subTest(pid=pid, uid=uid), patch.object(worker, 'gl') as gl:
+                with self.assertRaises(worker.StepError):
+                    worker.remove_project_member(job(autoResolveUsername=False, gitlabProjectId=pid, gitlabUserId=uid).job)
+                gl.assert_not_called()
+
+    def test_historical_login_with_remaining_group_access_reports_a_failed_revocation(self):
+        task = job(autoResolveUsername=False, username='old-name', gitlabUserId=42, gitlabProjectId=11, group='mentoring').job
+        with patch.object(worker, 'gl') as gl:
+            gl.side_effect = [example_user(username='renamed'), {'id': 11, 'path_with_namespace': 'mentoring/old-name'},
+                              None, {'id': 42, 'access_level': worker.DEVELOPER}]
+            with self.assertRaises(worker.StepError):
+                worker.remove_project_member(task)
+            self.assertEqual(gl.call_args.args, ('GET', '/projects/11/members/all/42'))
+
+    def test_bootcamp_revocation_still_checks_the_username(self):
+        with patch.object(worker, 'gl', return_value=example_user(username='renamed')) as gl:
+            with self.assertRaises(worker.StepError):
+                worker.remove_project_member({'username': 'old-name', 'gitlabUserId': 42, 'gitlabProjectId': 11})
+            self.assertEqual([call.args for call in gl.call_args_list], [('GET', '/users/42')])
 
 
 if __name__ == '__main__':
