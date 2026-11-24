@@ -1,4 +1,5 @@
 import { ValidationError, type CollectionConfig } from 'payload'
+import { sql } from '@payloadcms/db-postgres'
 
 import { PPTX_MIME, TUTORING_DECK_DIRECTORY } from '@/lib/tutoring-file-types'
 
@@ -6,6 +7,8 @@ import { isMoscowTuesday, isTutoringMeeting, isTutoringProgram, tutoringHttpsUrl
 import { isAdmin, isAdminField } from '@/payload/access/isAdmin'
 import { cleanupTutoringParticipant, cleanupTutoringStream } from '@/payload/hooks/cleanupOwnedRelations'
 import { tutoringDeckAccess, tutoringPresentationAccess } from '@/server/tutoring-access'
+import { enqueueMissingTutoringProjects } from '@/server/tutoring-project-queue'
+import { rowsOf, txDb } from '@/server/bootcamp-lead-events'
 
 const group = 'Менторство'
 
@@ -81,7 +84,11 @@ export const TutoringStreams: CollectionConfig = {
   labels: { singular: 'Поток репетиторства', plural: 'Потоки репетиторства' },
   admin: { group, useAsTitle: 'title', defaultColumns: ['title', 'program', 'status', 'startsAt'] },
   access: { read: isAdmin, create: isAdmin, update: isAdmin, delete: isAdmin },
-  hooks: { beforeDelete: [cleanupTutoringStream], beforeValidate: [({ data, originalDoc, operation }) => {
+  hooks: { beforeDelete: [cleanupTutoringStream], afterChange: [async ({ req, doc, previousDoc, operation }) => {
+    if (operation === 'update' && doc.status === 'active' && previousDoc.status !== 'active') {
+      await enqueueMissingTutoringProjects(req, { stream: doc.id })
+    }
+  }], beforeValidate: [({ data, originalDoc, operation }) => {
     const program: unknown = data?.program ?? originalDoc?.program
     if (operation === 'update' && originalDoc && originalDoc.program !== program) bad('program', 'Программа потока задаётся при создании')
     if (!isTutoringProgram(program) || !isTutoringMeeting(data?.currentMeeting ?? originalDoc?.currentMeeting ?? 1, program)) {
@@ -137,7 +144,21 @@ export const TutoringParticipants: CollectionConfig = {
   admin: { group, defaultColumns: ['student', 'stream', 'currentMeeting', 'active'] },
   access: { read: isAdmin, create: isAdmin, update: isAdmin, delete: isAdmin },
   indexes: [{ fields: ['stream', 'student'], unique: true }, { fields: ['student', 'active'] }],
-  hooks: { beforeDelete: [cleanupTutoringParticipant], beforeValidate: [async ({ data, originalDoc, operation, req }) => {
+  hooks: { beforeDelete: [cleanupTutoringParticipant], beforeChange: [async ({ req, data, operation, context }) => {
+    if (operation !== 'create') return data
+    const student = relId(data.student)
+    if (typeof student !== 'number') return data
+    const db = await txDb(req)
+    const [account] = rowsOf<{ email: string }>(await db.execute(sql`select email from users where id = ${student} for share`))
+    if (!account || (context.tutoringInviteEmail && context.tutoringInviteEmail !== account.email.toLowerCase())) {
+      bad('student', 'Адрес ученика изменился. Проверьте почту и повторите добавление')
+    }
+    return { ...data, gitlabInviteEmail: account.email.toLowerCase() }
+  }], afterChange: [async ({ req, doc, previousDoc, operation }) => {
+    if (doc.active && (operation === 'create' || !previousDoc.active)) {
+      await enqueueMissingTutoringProjects(req, { participant: doc.id })
+    }
+  }], beforeValidate: [async ({ data, originalDoc, operation, req }) => {
     const stream = relId(data?.stream ?? originalDoc?.stream)
     const student = relId(data?.student ?? originalDoc?.student)
     if (operation === 'update' && originalDoc && (stream !== relId(originalDoc.stream) || student !== relId(originalDoc.student))) {
@@ -151,6 +172,8 @@ export const TutoringParticipants: CollectionConfig = {
   fields: [
     { name: 'stream', type: 'relationship', relationTo: 'tutoring-streams', required: true, label: 'Поток', index: true },
     { name: 'student', type: 'relationship', relationTo: 'users', required: true, label: 'Ученик', index: true },
+    { name: 'gitlabInviteEmail', type: 'email', label: 'Почта приглашения в GitLab', admin: { readOnly: true },
+      access: { create: () => false, update: () => false } },
     { name: 'paidAt', type: 'date', label: 'Историческая отметка оплаты' },
     { name: 'active', type: 'checkbox', defaultValue: true, required: true, label: 'Доступ открыт' },
     { name: 'currentMeeting', type: 'number', defaultValue: 1, required: true, min: 1, max: 32, label: 'Текущая встреча ученика' },

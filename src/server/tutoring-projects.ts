@@ -14,6 +14,7 @@ import { findProgram } from '@/server/bootcamp-programs'
 import { tutoringWebhookToken } from '@/server/bootcamp-worker-auth'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import { TutoringProblem } from '@/server/tutoring'
+import { approvedInviteEmail, automaticTutoringUsername, enqueueMissingTutoringProjects, groupUsedByBootcamp } from '@/server/tutoring-project-queue'
 
 export async function tutoringProject(payload: Payload, req: PayloadRequest, student: number, program: TutoringProgram) {
   const { docs } = await payload.find({
@@ -23,7 +24,7 @@ export async function tutoringProject(payload: Payload, req: PayloadRequest, stu
   return docs[0] ?? null
 }
 
-export async function queueTutoringProject(payload: Payload, actor: User, streamId: number, participant: number, input: string) {
+export async function queueTutoringProject(payload: Payload, actor: User, streamId: number, participant: number, inviteEmail = '') {
   return inTransaction(payload, actor, async req => {
     if ((await getAuthoritativeLearningPolicy(payload, actor.id, req)).role !== 'admin') throw new TutoringProblem('Проект открывает наставник')
     const db = await txDb(req)
@@ -32,38 +33,33 @@ export async function queueTutoringProject(payload: Payload, actor: User, stream
     const stream = member?.stream
     const student = member?.student
     if (!stream || typeof stream === 'number' || stream.id !== streamId || stream.status !== 'active' ||
-      !member?.active || !student || typeof student === 'number' || student.isActive === false) {
+      !member?.active || !student || typeof student === 'number' || student.isActive === false || student.role !== 'student') {
       throw new TutoringProblem('Сначала откройте доступ ученика и потока')
     }
-    await db.execute(sql`select id from users where id = ${student.id} for update`)
+    if (inviteEmail && !member.gitlabInviteEmail) {
+      const [account] = rowsOf<{ email: string }>(await db.execute(sql`select email from users where id = ${student.id} for share`))
+      if (account?.email.toLowerCase() !== inviteEmail.trim().toLowerCase()) {
+        throw new TutoringProblem('Подтверждённая почта должна совпадать с адресом ученика в LMS')
+      }
+      await payload.update({ collection: 'tutoring-participants', id: member.id, req, overrideAccess: true,
+        data: { gitlabInviteEmail: account.email.toLowerCase() } })
+    }
+    await enqueueMissingTutoringProjects(req, { participant })
+    await db.execute(sql`select id from tutoring_projects where student_id = ${student.id} and program = ${stream.program} for update`)
     const existing = await tutoringProject(payload, req, student.id, stream.program)
     if (existing && ['queued', 'running', 'ready', 'revoking'].includes(existing.state)) return existing
     const program = await findProgram(payload, stream.program, req)
     if (!program?.gitlabCourseProject || !program.gradingProject || !program.mentoringGitlabGroup || !program.mentoringGraderUserId) {
       throw new TutoringProblem('Для менторства не настроена приватная группа GitLab и учётка автопроверки')
     }
-    const { docs: [enrolled] } = await payload.find({
-      collection: 'bootcamp-enrollments', req, limit: 1, depth: 0, overrideAccess: true,
-      where: { lmsUser: { equals: student.id } },
-    })
-    const username = existing?.projectId ? existing.username : enrolled?.gitlabUsername || input.toLowerCase()
-    if (!/^[a-z0-9][a-z0-9_.-]{1,59}$/.test(username)) throw new TutoringProblem('Укажите логин GitLab из латинских букв, цифр, точки, дефиса или подчёркивания')
     const group = existing?.projectId ? existing.group : program.mentoringGitlabGroup
-    const [bootcampGroup, conflict] = await Promise.all([
-      payload.find({ collection: 'bootcamp-streams', req, depth: 0, limit: 1, overrideAccess: true, where: { gitlabGroup: { equals: group } } }),
-      payload.find({
-        collection: 'tutoring-projects', req, depth: 0, limit: 1, overrideAccess: true,
-        where: { and: [{ group: { equals: group } }, { username: { equals: username } }, { student: { not_equals: student.id } }] },
-      }),
-    ])
-    if (group === program.gitlabStreamGroup || bootcampGroup.docs.length) throw new TutoringProblem('Группа GitLab менторства занята буткемпом')
-    if (conflict.docs.length) throw new TutoringProblem('Такой логин уже используется в группе GitLab')
-    const data = { student: student.id, program: stream.program, username, group,
-      courseProject: program.gitlabCourseProject, gradingProject: program.gradingProject,
-      state: 'queued' as const, attempts: 0, lease: null, leasedAt: null, error: null }
-    return existing
-      ? payload.update({ collection: 'tutoring-projects', id: existing.id, req, depth: 0, overrideAccess: true, data })
-      : payload.create({ collection: 'tutoring-projects', req, depth: 0, overrideAccess: true, data })
+    const [shared] = rowsOf<{ occupied: boolean }>(await db.execute(sql`select ${groupUsedByBootcamp(group)} as occupied`))
+    if (shared.occupied) throw new TutoringProblem('Группа GitLab менторства занята буткемпом')
+    if (!existing) throw new TutoringProblem('Проверьте почту приглашения и настройки группы GitLab')
+    return payload.update({ collection: 'tutoring-projects', id: existing.id, req, depth: 0, overrideAccess: true, data: {
+      group, courseProject: program.gitlabCourseProject, gradingProject: program.gradingProject,
+      state: 'queued', attempts: 0, lease: null, leasedAt: null, error: null,
+    } })
   })
 }
 
@@ -77,33 +73,45 @@ const activeMembership = sql`exists (
 export async function claimTutoringProject(payload: Payload) {
   return inTransaction(payload, null, async req => {
     const db = await txDb(req)
+    await enqueueMissingTutoringProjects(req)
     await db.execute(sql`update tutoring_projects
       set state = case when state = 'revoking' then 'revoke_failed'::enum_tutoring_projects_state else 'failed'::enum_tutoring_projects_state end,
         lease = null, error = 'Исполнитель не отчитался после пяти попыток', updated_at = now()
       where state in ('running', 'revoking') and leased_at < now() - interval '10 minutes' and attempts >= 5`)
-    const [next] = rowsOf<{ id: number; revoke: boolean; state: string }>(await db.execute(sql`
-      select p.id, p.state, not ${activeMembership} as revoke from tutoring_projects p
+    const [next] = rowsOf<{ id: number; revoke: boolean; state: string; shared: boolean; email: string | null }>(await db.execute(sql`
+      select p.id, p.state, not ${activeMembership} as revoke, ${groupUsedByBootcamp(sql`p."group"`)} as shared,
+        coalesce(p.gitlab_email, (
+          select ${approvedInviteEmail} from tutoring_participants m join tutoring_streams s on s.id = m.stream_id
+            join users u on u.id = m.student_id where m.student_id = p.student_id and s.program::text = p.program::text
+            and s.status = 'active' and m.active and ${approvedInviteEmail} is not null order by m.id limit 1
+        )) as email from tutoring_projects p
       where (
-        ${activeMembership} and (p.state in ('queued', 'revoked') or
+        ${activeMembership} and (p.state in ('queued', 'revoked', 'revoke_failed') or
           (p.state in ('running', 'revoking') and p.leased_at < now() - interval '10 minutes'))
       ) or (
         not ${activeMembership} and p.project_id is not null and p.gitlab_user_id is not null and (
           p.state in ('ready', 'queued', 'failed') or (p.state in ('running', 'revoking') and p.leased_at < now() - interval '10 minutes')
         )
-      ) order by p.updated_at, p.id for update skip locked limit 1`))
+      ) order by revoke desc, p.updated_at, p.id for update skip locked limit 1`))
     if (!next) return { job: null }
+    if (!next.revoke && (next.shared || !next.email)) {
+      await payload.update({ collection: 'tutoring-projects', id: next.id, req, overrideAccess: true,
+        data: { state: 'failed', lease: null, error: next.shared ? 'Группа GitLab менторства занята буткемпом' : 'Подтвердите почту приглашения ученика в GitLab' } })
+      return { job: null }
+    }
     const lease = randomUUID()
     const data = await payload.update({
       collection: 'tutoring-projects', id: Number(next.id), req, depth: 1, overrideAccess: true,
-      data: { state: next.revoke ? 'revoking' : 'running', lease, leasedAt: new Date().toISOString() },
+      data: { state: next.revoke ? 'revoking' : 'running', gitlabEmail: next.email, lease, leasedAt: new Date().toISOString() },
     })
-    await db.execute(sql`update tutoring_projects set attempts = case when ${next.state} in ('queued', 'ready', 'revoked', 'failed') then 1 else attempts + 1 end where id = ${data.id}`)
+    await db.execute(sql`update tutoring_projects set attempts = case when ${next.state} in ('queued', 'ready', 'revoked', 'failed', 'revoke_failed') then 1 else attempts + 1 end where id = ${data.id}`)
     const program = next.revoke ? null : await findProgram(payload, data.program, req)
     const student = data.student
     if (!student || typeof student === 'number') throw new Error('Tutoring project without a student')
     return { job: {
-      id: data.id, lease, revoke: next.revoke, username: data.username, email: student.email,
-      firstName: student.firstName || student.email, lastName: student.lastName || '',
+      id: data.id, lease, revoke: next.revoke, username: data.username, email: data.gitlabEmail ?? student.email,
+      autoResolveUsername: data.username === automaticTutoringUsername(student.id),
+      firstName: student.firstName || data.gitlabEmail || student.email, lastName: student.lastName || '',
       group: data.group, courseProject: data.courseProject, gradingProject: data.gradingProject, graderUserId: program?.mentoringGraderUserId ?? null,
       gitlabProjectId: data.projectId, gitlabUserId: data.gitlabUserId,
     }, webhook: { url: adminLink(`/api/tutoring/gitlab-events?project=${data.id}`), token: tutoringWebhookToken(data.id) } }

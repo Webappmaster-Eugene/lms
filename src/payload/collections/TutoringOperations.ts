@@ -36,6 +36,7 @@ export const TutoringProjects: CollectionConfig = {
     { name: 'student', type: 'relationship', relationTo: 'users', required: true },
     { name: 'program', type: 'select', options: Object.keys(tutoringPrograms), required: true },
     { name: 'username', type: 'text', required: true, maxLength: 60 },
+    { name: 'gitlabEmail', type: 'email', label: 'Почта приглашения в GitLab', admin: { readOnly: true } },
     { name: 'group', type: 'text', required: true, maxLength: 100 },
     { name: 'courseProject', type: 'text', required: true, maxLength: 200 },
     { name: 'gradingProject', type: 'text', required: true, maxLength: 200 },

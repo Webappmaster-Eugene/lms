@@ -165,6 +165,7 @@ export async function addTutoringParticipant(streamId: number, form: FormData) {
     })
     if (existing) throw new TutoringProblem('Ученик уже в списке потока. Его доступ можно открыть в журнале')
     const member = await payload.create({ collection: 'tutoring-participants', req, user, overrideAccess: false,
+      context: { tutoringInviteEmail: email },
       data: { stream: streamId, student: student.id, active: true, currentMeeting: 1 } })
     return `${href}?participant=${member.id}`
   })
@@ -227,6 +228,6 @@ export async function provisionTutoringProject(streamId: number, memberId: numbe
   const { payload, user, req } = await actor(true)
   const { href } = await managedStream(payload, req, streamId)
   await run(`${href}?participant=${memberId}#project`, 'Запрос на проект сохранён', async () => {
-    await queueTutoringProject(payload, user, streamId, memberId, value(form, 'username'))
+    await queueTutoringProject(payload, user, streamId, memberId, value(form, 'inviteEmail'))
   })
 }

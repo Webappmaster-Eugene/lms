@@ -2363,6 +2363,7 @@ export interface TutoringParticipant {
   id: number;
   stream: number | TutoringStream;
   student: number | User;
+  gitlabInviteEmail?: string | null;
   paidAt?: string | null;
   active: boolean;
   currentMeeting: number;
@@ -2435,6 +2436,7 @@ export interface TutoringProject {
   student: number | User;
   program: 'nodejs' | 'react-next';
   username: string;
+  gitlabEmail?: string | null;
   group: string;
   courseProject: string;
   gradingProject: string;
@@ -4121,6 +4123,7 @@ export interface TutoringStreamsSelect<T extends boolean = true> {
 export interface TutoringParticipantsSelect<T extends boolean = true> {
   stream?: T;
   student?: T;
+  gitlabInviteEmail?: T;
   paidAt?: T;
   active?: T;
   currentMeeting?: T;
@@ -4189,6 +4192,7 @@ export interface TutoringProjectsSelect<T extends boolean = true> {
   student?: T;
   program?: T;
   username?: T;
+  gitlabEmail?: T;
   group?: T;
   courseProject?: T;
   gradingProject?: T;

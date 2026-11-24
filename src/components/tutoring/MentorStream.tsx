@@ -156,7 +156,7 @@ export async function MentorStream({ context, id, query }: { context: Awaited<Re
 
     {selected && <section id="student" className="space-y-5 border-t border-border pt-5" aria-labelledby="student-title">
       <h2 id="student-title" className="text-xl font-semibold">{tutoringStudentName(selected)}</h2>
-      <MentorProject stream={stream.id} participant={selected.id} project={project} enabled={selected.active && stream.status === 'active'} />
+      <MentorProject stream={stream.id} participant={selected.id} project={project} inviteEmail={selected.gitlabInviteEmail} enabled={selected.active && stream.status === 'active'} />
       {billingMeeting && <MentorMeetingPayment stream={stream.id} participant={selected.id} meeting={billingMeeting} charge={charge} />}
       <form action={updateTutoringParticipant.bind(null, stream.id, selected.id)} className="flex flex-wrap items-end gap-3">
         <label className="grid min-w-0 gap-1 text-sm">Текущая встреча ученика<select className={field} name="current" defaultValue={selected.currentMeeting}>{meetingOptions}</select></label>
