@@ -1,6 +1,7 @@
 import { managementPrimary } from '@/components/content-management/ManagementHeading'
+import { TUTORING_GITLAB_ATTEMPTS } from '@/lib/tutoring'
 import type { TutoringCheck, TutoringProject } from '@/payload-types'
-import { provisionTutoringProject } from '@/server/tutoring-actions'
+import { provisionTutoringProject, retryTutoringProjectRevocation } from '@/server/tutoring-actions'
 
 export function ProjectStatus({ project, enabled = true }: { project: TutoringProject | null; enabled?: boolean }) {
   if (project?.state === 'ready' && project.projectUrl) {
@@ -29,6 +30,11 @@ export function MentorProject({ stream, participant, project, enabled, inviteEma
       ? <p className="text-sm text-muted-foreground">Участник добавлен до автоматической выдачи. Уточните у ученика, какую почту использовать для входа в GitLab, и подтвердите её здесь.</p>
       : <ProjectStatus project={project} enabled={enabled} />}
     {project?.error && <p className="text-sm text-destructive">{project.error}</p>}
+    {project?.state === 'revoke_failed' && project.attempts >= TUTORING_GITLAB_ATTEMPTS &&
+      <form action={retryTutoringProjectRevocation.bind(null, stream, participant)} className="space-y-2">
+        <p className="text-sm">GitLab пока не подтвердил снятие доступа. Устраните указанную причину и повторите отзыв.</p>
+        <button className={managementPrimary}>Повторить отзыв доступа</button>
+      </form>}
     {enabled && (!project || project.state === 'failed') &&
       <form action={provisionTutoringProject.bind(null, stream, participant)} className="flex flex-wrap items-end gap-3">
         {confirmEmail && <label className="grid min-w-0 gap-1 text-sm">Почта приглашения

@@ -6,7 +6,7 @@ import type { Payload, PayloadRequest } from 'payload'
 
 import { EnrollmentInputError } from '@/lib/bootcamp-enrollment'
 import { parseVerdict } from '@/lib/bootcamp-progress'
-import { isTutoringProgram, tutoringHttpsUrl, type TutoringProgram } from '@/lib/tutoring'
+import { isTutoringProgram, TUTORING_GITLAB_ATTEMPTS, tutoringHttpsUrl, type TutoringProgram } from '@/lib/tutoring'
 import type { User } from '@/payload-types'
 import { adminLink } from '@/server/admin-telegram'
 import { inTransaction, rowsOf, txDb } from '@/server/bootcamp-lead-events'
@@ -70,6 +70,23 @@ const activeMembership = sql`exists (
     and m.active = true and s.status = 'active' and u.is_active is distinct from false and u.role = 'student'
 )`
 
+export async function retryTutoringRevocation(payload: Payload, actor: User, streamId: number, participant: number) {
+  return inTransaction(payload, actor, async req => {
+    if ((await getAuthoritativeLearningPolicy(payload, actor.id, req)).role !== 'admin') throw new TutoringProblem('Отзыв доступа повторяет наставник')
+    const db = await txDb(req)
+    const retried = rowsOf<{ id: number }>(await db.execute(sql`
+      update tutoring_projects p set attempts = 0, leased_at = null, updated_at = now()
+        from tutoring_participants m join tutoring_streams s on s.id = m.stream_id
+       where m.id = ${participant} and s.id = ${streamId} and m.student_id = p.student_id
+         and s.program::text = p.program::text and not ${activeMembership}
+         and p.state = 'revoke_failed' and p.attempts >= ${TUTORING_GITLAB_ATTEMPTS}
+         and p.project_id is not null and p.gitlab_user_id is not null
+       returning p.id
+    `))
+    if (!retried.length) throw new TutoringProblem('Проверьте состояние проекта и доступ ученика к другим потокам программы')
+  })
+}
+
 export async function claimTutoringProject(payload: Payload) {
   return inTransaction(payload, null, async req => {
     const db = await txDb(req)
@@ -77,7 +94,7 @@ export async function claimTutoringProject(payload: Payload) {
     await db.execute(sql`update tutoring_projects
       set state = case when state = 'revoking' then 'revoke_failed'::enum_tutoring_projects_state else 'failed'::enum_tutoring_projects_state end,
         lease = null, error = 'Исполнитель не отчитался после пяти попыток', updated_at = now()
-      where state in ('running', 'revoking') and leased_at < now() - interval '10 minutes' and attempts >= 5`)
+      where state in ('running', 'revoking') and leased_at < now() - interval '10 minutes' and attempts >= ${TUTORING_GITLAB_ATTEMPTS}`)
     const [next] = rowsOf<{ id: number; revoke: boolean; state: string; shared: boolean; email: string | null }>(await db.execute(sql`
       select p.id, p.state, not ${activeMembership} as revoke, ${groupUsedByBootcamp(sql`p."group"`)} as shared,
         coalesce(p.gitlab_email, (
@@ -90,7 +107,9 @@ export async function claimTutoringProject(payload: Payload) {
           (p.state in ('running', 'revoking') and p.leased_at < now() - interval '10 minutes'))
       ) or (
         not ${activeMembership} and p.project_id is not null and p.gitlab_user_id is not null and (
-          p.state in ('ready', 'queued', 'failed') or (p.state in ('running', 'revoking') and p.leased_at < now() - interval '10 minutes')
+          p.state in ('ready', 'queued', 'failed') or (p.state in ('running', 'revoking') and p.leased_at < now() - interval '10 minutes') or
+          (p.state = 'revoke_failed' and p.attempts < ${TUTORING_GITLAB_ATTEMPTS}
+            and (p.leased_at is null or p.leased_at + p.attempts * interval '1 minute' <= now()))
         )
       ) order by revoke desc, p.updated_at, p.id for update skip locked limit 1`))
     if (!next) return { job: null }
@@ -104,7 +123,8 @@ export async function claimTutoringProject(payload: Payload) {
       collection: 'tutoring-projects', id: Number(next.id), req, depth: 1, overrideAccess: true,
       data: { state: next.revoke ? 'revoking' : 'running', gitlabEmail: next.email, lease, leasedAt: new Date().toISOString() },
     })
-    await db.execute(sql`update tutoring_projects set attempts = case when ${next.state} in ('queued', 'ready', 'revoked', 'failed', 'revoke_failed') then 1 else attempts + 1 end where id = ${data.id}`)
+    const retry = next.revoke ? ['revoking', 'revoke_failed'].includes(next.state) : next.state === 'running'
+    await db.execute(sql`update tutoring_projects set attempts = ${retry ? sql`attempts + 1` : 1} where id = ${data.id}`)
     const program = next.revoke ? null : await findProgram(payload, data.program, req)
     const student = data.student
     if (!student || typeof student === 'number') throw new Error('Tutoring project without a student')
@@ -146,7 +166,8 @@ export async function reportTutoringProject(payload: Payload, id: number, input:
     const state = status === 'done' ? 'ready' : status as 'running' | 'failed' | 'revoked' | 'revoke_failed'
     await payload.update({ collection: 'tutoring-projects', id, req, overrideAccess: true,
       data: { state, projectId, gitlabUserId, projectUrl: url, lease: status === 'running' ? current.lease : null,
-        leasedAt: status === 'running' ? new Date().toISOString() : null, error: string(body.error).slice(0, 1500) || null } })
+        leasedAt: status === 'running' || status === 'revoke_failed' ? new Date().toISOString() : null,
+        error: string(body.error).slice(0, 1500) || null } })
     return { ok: true }
   })
 }

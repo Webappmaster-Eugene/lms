@@ -12,7 +12,7 @@ import { tutoringPath } from '@/server/tutoring-bootcamps'
 import { tutoringBootcamps } from '@/server/tutoring-curriculum'
 import { setTutoringStreamCalendar } from '@/server/tutoring-calendar-account'
 import { tutoringGoogleConfig } from '@/server/tutoring-google'
-import { queueTutoringProject, tutoringMergeRequest, tutoringProject } from '@/server/tutoring-projects'
+import { queueTutoringProject, retryTutoringRevocation, tutoringMergeRequest, tutoringProject } from '@/server/tutoring-projects'
 import { saveTutoringCharge } from '@/server/tutoring-payments'
 import { tutoringMemberships } from '@/server/tutoring-access'
 import { tutoringMeetings, TutoringProblem, writeTutoringReview } from '@/server/tutoring'
@@ -229,5 +229,13 @@ export async function provisionTutoringProject(streamId: number, memberId: numbe
   const { href } = await managedStream(payload, req, streamId)
   await run(`${href}?participant=${memberId}#project`, 'Запрос на проект сохранён', async () => {
     await queueTutoringProject(payload, user, streamId, memberId, value(form, 'inviteEmail'))
+  })
+}
+
+export async function retryTutoringProjectRevocation(streamId: number, memberId: number) {
+  const { payload, user, req } = await actor(true)
+  const { href } = await managedStream(payload, req, streamId)
+  await run(`${href}?participant=${memberId}#project`, 'Отзыв доступа поставлен в очередь', async () => {
+    await retryTutoringRevocation(payload, user, streamId, memberId)
   })
 }

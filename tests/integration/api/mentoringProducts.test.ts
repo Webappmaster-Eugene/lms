@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 
 import { validTutoringWebhookToken, tutoringWebhookToken } from '@/server/bootcamp-worker-auth'
 import { saveTutoringCharge } from '@/server/tutoring-payments'
-import { claimTutoringProject, queueTutoringProject, recordTutoringVerdict, reportTutoringProject, tutoringMergeRequest } from '@/server/tutoring-projects'
+import { claimTutoringProject, queueTutoringProject, recordTutoringVerdict, reportTutoringProject, retryTutoringRevocation, tutoringMergeRequest } from '@/server/tutoring-projects'
 import type { TutoringParticipant, TutoringStream } from '@/payload-types'
 import { createAdmin, createStudent, getTestPayload, login, rest, uid, type TestUser } from '../helpers/payload'
 
@@ -208,6 +208,63 @@ describe('менторство как отдельный продукт', () => 
       const project = await queueTutoringProject(payload, teacher, lesson.id, participant.id, newEmail)
       expect(project).toMatchObject({ gitlabEmail: newEmail, state: 'queued' })
       expect((await claimTutoringProject(payload)).job).toMatchObject({ id: project.id, email: newEmail })
+    } finally {
+      await payload.delete({ collection: 'tutoring-streams', id: lesson.id })
+      await payload.delete({ collection: 'users', id: learner.id })
+    }
+  })
+
+  it.each([null, 74901])('берёт прежний логин буткемпа только с привязанным числовым GitLab ID (%s)', async gitlabUserId => {
+    const learner = await createStudent(payload)
+    const login = uid('previous-login')
+    const lead = await payload.create({ collection: 'bootcamp-leads', data: { name: 'Ученик', email: learner.email,
+      program: 'nodejs', consentVersion: '1', consentAt: new Date().toISOString(), submissionCount: 1, status: 'enrolled', entryTaskToken: uid('entry') } })
+    const course = await payload.create({ collection: 'bootcamp-enrollments', data: { lead: lead.id, email: learner.email, firstName: 'Ученик',
+      lastName: 'Тестовый', gitlabUsername: login, gitlabUserId, lmsUser: learner.id, streamGroup: 'bootcamp/mass', status: 'queued' } })
+    const lesson = await payload.create({ collection: 'tutoring-streams', data: {
+      program: 'nodejs', title: uid('existing-login'), status: 'active', startsAt: stream.startsAt, currentMeeting: 1 } })
+    try {
+      await payload.create({ collection: 'tutoring-participants', data: { student: learner.id, stream: lesson.id, active: true, currentMeeting: 1 } })
+      const { docs: [project] } = await payload.find({ collection: 'tutoring-projects', where: { student: { equals: learner.id } }, depth: 0 })
+      expect(project).toMatchObject({ username: gitlabUserId ? login : `mc-student-${learner.id}`, gitlabUserId, gitlabEmail: learner.email })
+    } finally {
+      await payload.delete({ collection: 'tutoring-streams', id: lesson.id })
+      await payload.delete({ collection: 'bootcamp-enrollments', id: course.id })
+      await payload.delete({ collection: 'bootcamp-leads', id: lead.id })
+      await payload.delete({ collection: 'users', id: learner.id })
+    }
+  })
+
+  it('ждёт перед повтором отзыва, останавливается после пяти ошибок и разрешает наставнику повторить после исправления', async () => {
+    const learner = await createStudent(payload)
+    const lesson = await payload.create({ collection: 'tutoring-streams', data: {
+      program: 'nodejs', title: uid('archived'), status: 'archived', startsAt: stream.startsAt, currentMeeting: 1 } })
+    const participant = await payload.create({ collection: 'tutoring-participants', data: {
+      stream: lesson.id, student: learner.id, active: true, currentMeeting: 1 } })
+    const project = await payload.create({ collection: 'tutoring-projects', data: { student: learner.id, program: 'nodejs',
+      state: 'ready', username: uid('historical'), gitlabUserId: 98765, projectId: 56789, attempts: 1,
+      group: 'nodejs-bootcamp/mentoring-nodejs', courseProject: 'bootcamp/course', gradingProject: 'bootcamp-staff/grading' } })
+    try {
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        const { job } = await claimTutoringProject(payload)
+        expect(job).toMatchObject({ id: project.id, revoke: true, gitlabProjectId: project.projectId,
+          gitlabUserId: project.gitlabUserId, autoResolveUsername: false, group: project.group, username: project.username })
+        await reportTutoringProject(payload, project.id, { lease: job?.lease, status: 'revoke_failed', error: 'GitLab недоступен' })
+        expect((await payload.findByID({ collection: 'tutoring-projects', id: project.id })).attempts).toBe(attempt)
+        expect((await claimTutoringProject(payload)).job?.id).not.toBe(project.id)
+        await payload.update({ collection: 'tutoring-projects', id: project.id, data: { leasedAt: '2000-01-01T00:00:00Z' } })
+      }
+      expect((await claimTutoringProject(payload)).job?.id).not.toBe(project.id)
+      await expect(retryTutoringRevocation(payload, learner, lesson.id, participant.id)).rejects.toThrow('Отзыв доступа повторяет наставник')
+      await expect(retryTutoringRevocation(payload, teacher, stream.id, participant.id)).rejects.toThrow('Проверьте состояние проекта')
+      await payload.update({ collection: 'tutoring-streams', id: lesson.id, data: { status: 'active' } })
+      await expect(retryTutoringRevocation(payload, teacher, lesson.id, participant.id)).rejects.toThrow('Проверьте состояние проекта')
+      await payload.update({ collection: 'tutoring-streams', id: lesson.id, data: { status: 'archived' } })
+      await retryTutoringRevocation(payload, teacher, lesson.id, participant.id)
+      const { job } = await claimTutoringProject(payload)
+      expect(job).toMatchObject({ id: project.id, revoke: true })
+      await reportTutoringProject(payload, project.id, { lease: job?.lease, status: 'revoked' })
+      expect(await payload.findByID({ collection: 'tutoring-projects', id: project.id })).toMatchObject({ state: 'revoked', attempts: 1 })
     } finally {
       await payload.delete({ collection: 'tutoring-streams', id: lesson.id })
       await payload.delete({ collection: 'users', id: learner.id })

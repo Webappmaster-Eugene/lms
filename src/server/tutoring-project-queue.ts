@@ -15,7 +15,7 @@ export function groupUsedByBootcamp(group: string | ReturnType<typeof sql>) {
 // У старого участия может не быть снимка адреса. Доверяем текущему адресу
 // только при доказуемой неизменности профиля или подтверждённой связи с GitLab.
 export const approvedInviteEmail = sql`coalesce(m.gitlab_invite_email, case when u.updated_at < m.created_at or exists (
-  select 1 from bootcamp_enrollments e where e.lms_user_id = u.id and e.gitlab_user_id is not null
+  select 1 from bootcamp_enrollments e where e.lms_user_id = u.id and e.gitlab_user_id > 0
     and lower(e.email) = lower(u.email)
 ) then lower(u.email) end)`
 
@@ -37,12 +37,12 @@ export async function enqueueMissingTutoringProjects(req: PayloadRequest, scope?
       left join lateral (
         select accounts.username, accounts.gitlab_user_id from (
           select e.gitlab_username as username, e.gitlab_user_id, 0 as priority, e.id
-            from bootcamp_enrollments e where e.lms_user_id = m.student_id
+            from bootcamp_enrollments e where e.lms_user_id = m.student_id and e.gitlab_user_id > 0
           union all
           select p.username, p.gitlab_user_id, 1 as priority, p.id
-            from tutoring_projects p where p.student_id = m.student_id
+            from tutoring_projects p where p.student_id = m.student_id and p.gitlab_user_id > 0
         ) accounts
-        order by (accounts.gitlab_user_id is null), accounts.priority, accounts.id limit 1
+        order by accounts.priority, accounts.id limit 1
       ) known on true
       cross join lateral (
         select coalesce(known.username, ${automaticUsernamePrefix}::text || m.student_id::text) as username
