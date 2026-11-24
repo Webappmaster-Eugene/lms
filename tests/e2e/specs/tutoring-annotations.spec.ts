@@ -18,9 +18,12 @@ test('в лекции наставник рисует и печатает, уч�
   const program = programs.docs[0]
   await json(await page.request.patch(`/api/bootcamp-programs/${program.id}`, { data: { manualsCourse: course.docs[0].id } }))
   const original = blankPDF(4, 160, 90)
+  const snippet = "const response = await fetch('/catalog/42')\nconst item = await response.json()"
+  const notes = ['## Заметки для наставника', '### Код запроса', '```js\n' + snippet + '\n```',
+    '### Вывод', '```text\n200\nДрель\n```'].join('\n\n')
   const meetings = await json(await page.request.get('/api/tutoring-meetings?where[program][equals]=nodejs&where[number][equals]=1&depth=0'))
   const meeting = meetings.docs[0] ?? (await json(await page.request.post('/api/tutoring-meetings', { multipart: {
-    _payload: JSON.stringify({ program: 'nodejs', number: 1, title: 'Два запроса к серверу', instructorNotes: 'Заметки для наставника',
+    _payload: JSON.stringify({ program: 'nodejs', number: 1, title: 'Два запроса к серверу', instructorNotes: notes,
       homework: [{ stage: 1, description: 'Проверить два запроса' }] }),
     file: { name: 'original-lecture.pdf', mimeType: 'application/pdf', buffer: original },
   } }))).doc
@@ -37,6 +40,12 @@ test('в лекции наставник рисует и печатает, уч�
 
     await page.setViewportSize({ width: 1440, height: 950 })
     await page.goto('/tutoring/nodejs/lectures/1')
+    const summary = page.getByText('Сценарий и заметки ведущего', { exact: true })
+    await summary.click()
+    await expect(page.getByRole('heading', { name: 'Код запроса' })).toBeVisible()
+    expect(await page.locator('pre code.language-js').textContent()).toBe(snippet + '\n')
+    expect(await page.locator('pre code.language-text').textContent()).toBe('200\nДрель\n')
+    await summary.click()
     const tools = page.getByRole('group', { name: 'Пометки на слайде' })
     const pen = tools.getByRole('button', { name: 'Карандаш' })
     const text = tools.getByRole('button', { name: 'Текст', exact: true })

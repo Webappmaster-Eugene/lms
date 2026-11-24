@@ -9,7 +9,7 @@ import type { TutoringMeeting, TutoringStream } from '@/payload-types'
 type Meeting = Pick<TutoringMeeting, 'title' | 'number' | 'filename' | 'deckPdf' | 'deckPptx' | 'homework' | 'instructorNotes'>
 
 function MaterialText({ children }: { children: string }) {
-  return <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+  return <div className="prose prose-sm dark:prose-invert min-w-0 max-w-full wrap-anywhere prose-headings:text-foreground prose-a:text-primary prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted prose-pre:text-foreground">
     <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml>{children}</ReactMarkdown>
   </div>
 }
@@ -60,9 +60,9 @@ export function TutoringMeetingCard({ meeting, stream, mentor = false, allowAnno
         </li>})}
       </ul>
     </section>
-    {mentor && meeting.instructorNotes && <details className="rounded-xl border border-border bg-card p-4">
+    {mentor && meeting.instructorNotes && <details className="min-w-0 rounded-xl border border-border bg-card p-4">
       <summary className="cursor-pointer font-semibold">Сценарий и заметки ведущего</summary>
-      <div className="mt-4"><MaterialText>{meeting.instructorNotes}</MaterialText></div>
+      <div className="mt-4 max-w-prose"><MaterialText>{meeting.instructorNotes}</MaterialText></div>
     </details>}
   </section>
 }
