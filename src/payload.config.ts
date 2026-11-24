@@ -40,6 +40,7 @@ import { bootstrapDefaultAchievements } from '@/lib/default-achievements'
 import { StudentSessionTelemetry, StudentLearningEvents, StudentActivityDays } from '@/payload/collections/StudentAnalytics'
 import { AdminDigests } from '@/payload/collections/AdminDigests'
 import { BootcampStreams, BootcampWeekSubmissions } from '@/payload/collections/BootcampProgress'
+import { TutoringIntroductions } from '@/payload/collections/TutoringIntroductions'
 import { TutoringDeckFiles, TutoringMeetings, TutoringParticipants, TutoringReviews, TutoringStreams } from '@/payload/collections/Tutoring'
 import { TutoringCharges, TutoringProjects, TutoringChecks } from '@/payload/collections/TutoringOperations'
 import { TutoringCalendars } from '@/payload/collections/TutoringCalendars'
@@ -192,6 +193,7 @@ export default buildConfig({
     BootcampStreams,
     BootcampWeekSubmissions,
     TutoringDeckFiles,
+    TutoringIntroductions,
     TutoringMeetings,
     TutoringStreams,
     TutoringParticipants,

@@ -4,7 +4,7 @@ import { ManagementHeading, managementPrimary } from '@/components/content-manag
 import { notFound } from 'next/navigation'
 import { requireTutoringProgram } from '@/server/tutoring-bootcamps'
 import { collectAllPages } from '@/lib/paginate'
-import { isMoscowTuesday, scheduledTutoringMeeting, tutoringDateLabel, tutoringPrograms } from '@/lib/tutoring'
+import { isMoscowTuesday, scheduledTutoringMeeting, TUTORING_INTRODUCTION_MINUTES, tutoringDateLabel, tutoringPrograms } from '@/lib/tutoring'
 import { createTutoringStream } from '@/server/tutoring-actions'
 
 export const metadata = { title: 'Потоки репетиторства' }
@@ -54,6 +54,10 @@ export default async function TutoringManagePage({ params, searchParams }: { par
             {calendars.filter(item => isMoscowTuesday(item.startsAt)).map(item => <option key={item.id} value={item.id}>{item.title} · {tutoringDateLabel(new Date(item.startsAt))}</option>)}
           </select>
         </label>}
+        <label className={label}>Вводная встреча, МСК
+          <input className={field} name="introductionStartsAt" type="datetime-local" aria-describedby="introduction-time-hint" />
+          <span id="introduction-time-hint" className="text-xs text-muted-foreground">{TUTORING_INTRODUCTION_MINUTES} минут, бесплатно. Можно назначить позже.</span>
+        </label>
         <label className={label}>Ссылка на созвон<input className={field} name="meetingUrl" type="url" maxLength={1000} /></label>
         <button className={managementPrimary}>Создать черновик</button>
       </form>

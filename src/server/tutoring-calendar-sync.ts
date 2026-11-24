@@ -6,7 +6,7 @@ import type { Payload, PayloadRequest } from 'payload'
 import { relationId } from '@/lib/content-management/pages'
 import { collectAllPages } from '@/lib/paginate'
 import { logger } from '@/lib/telemetry'
-import { scheduledTutoringMeeting, tutoringPrograms } from '@/lib/tutoring'
+import { scheduledTutoringMeeting, TUTORING_INTRODUCTION_MINUTES, tutoringPrograms } from '@/lib/tutoring'
 import type { TutoringCalendar, TutoringStream } from '@/payload-types'
 import { inTransaction, rowsOf, txDb } from '@/server/bootcamp-lead-events'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
@@ -26,21 +26,29 @@ const hasStatus = (error: unknown, ...statuses: number[]) => error instanceof Go
 const inFuture = (event: GoogleEvent, now: number) => Date.parse(event.start?.dateTime ?? '') > now
 
 function streamEvents(stream: TutoringStream, origin: string, marker: string) {
-  return Array.from({ length: tutoringPrograms[stream.program].meetings }, (_, index) => {
-    const number = index + 1
-    const { start, end } = scheduledTutoringMeeting(stream, number)
-    const key = `${stream.id}.${number}`
+  function calendarEntry(key: string, label: string, path: string, start: Date, end: Date) {
     return {
       key, startsAt: start.getTime(), event: {
-        summary: `${stream.title} · Встреча ${number}`,
-        description: `${origin}/tutoring/${stream.id}?preview=${number}#material`,
+        summary: `${stream.title} · ${label}`,
+        description: `${origin}${path}`,
         visibility: 'private',
         start: { dateTime: start.toISOString(), timeZone: 'Europe/Moscow' },
         end: { dateTime: end.toISOString(), timeZone: 'Europe/Moscow' },
         extendedProperties: { private: { mentorcareer: marker, meeting: key } },
       },
     }
+  }
+  const meetings = Array.from({ length: tutoringPrograms[stream.program].meetings }, (_, index) => {
+    const number = index + 1
+    const { start, end } = scheduledTutoringMeeting(stream, number)
+    return calendarEntry(`${stream.id}.${number}`, `Встреча ${number}`, `/tutoring/${stream.id}?preview=${number}#material`, start, end)
   })
+  if (stream.introductionStartsAt) {
+    const start = new Date(stream.introductionStartsAt)
+    const end = new Date(start.getTime() + TUTORING_INTRODUCTION_MINUTES * minute)
+    meetings.unshift(calendarEntry(`${stream.id}.introduction`, 'Вводная встреча', `/tutoring/${stream.program}/introduction`, start, end))
+  }
+  return meetings
 }
 
 function sameEvent(current: GoogleEvent, target: EventWrite) {

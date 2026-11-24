@@ -4,7 +4,9 @@ import { randomUUID } from 'node:crypto'
 import { unlink } from 'node:fs/promises'
 import path from 'node:path'
 import { sql } from '@payloadcms/db-postgres'
-import type { Payload } from 'payload'
+import type { Payload, PayloadRequest } from 'payload'
+
+import type { TutoringProgram } from '@/lib/tutoring'
 
 import { PPTX_MIME, TUTORING_DECK_DIRECTORY, TUTORING_FILE_LIMIT } from '@/lib/tutoring-file-types'
 import type { TutoringMeeting, User } from '@/payload-types'
@@ -50,9 +52,10 @@ async function validatedFile(input: FormDataEntryValue | null, format: 'pdf' | '
   return { data, name: `${label}.${format}`, mimetype: format === 'pdf' ? 'application/pdf' : PPTX_MIME, size: data.length }
 }
 
-export async function saveTutoringDeck(payload: Payload, user: User, form: FormData, target:
-  { id: number; updatedAt: string; material?: undefined; decksOnly?: undefined } |
-  { id: number | null; updatedAt: string; material: ImportMaterial; decksOnly?: boolean },
+type SavedDeck = { id: number; status: 'saved' | 'manual' | 'unchanged' }
+
+async function withDeckFiles(payload: Payload, user: User, form: FormData,
+  save: (req: PayloadRequest, upload: () => Promise<{ deckPdf: number; deckPptx: number }>) => Promise<SavedDeck>,
 ) {
   const label = `mentorcareer-lecture-${randomUUID()}`
   const [pdf, pptx] = await Promise.all([
@@ -61,35 +64,11 @@ export async function saveTutoringDeck(payload: Payload, user: User, form: FormD
   ])
   try {
     return await inTransaction(payload, user, async req => {
-      const tx = await txDb(req)
-      if (target.id) await tx.execute(sql`select id from tutoring_meetings where id = ${target.id} for update`)
-      const current = target.id ? await payload.findByID({
-        collection: 'tutoring-meetings', id: target.id, req, overrideAccess: true, depth: 0, disableErrors: true,
-      }) : null
-      if (current && target.material && (current.program !== target.material.program || current.number !== target.material.number)) {
-        throw new TutoringProblem('Номер и программа лекции не совпадают')
-      }
-      if (target.material && current?.deckOrigin === 'manual') return { id: current.id, status: 'manual' as const }
-      if (target.material && current?.sourceDigest === target.material.sourceDigest && current?.deckPdf && current.deckPptx) {
-        return { id: current.id, status: 'unchanged' as const }
-      }
-      if ((target.id && !current) || (current && current.updatedAt !== target.updatedAt)) {
-        throw new TutoringProblem('Лекция уже изменилась. Обновите страницу и загрузите файлы снова')
-      }
-      const pdfDoc = await payload.create({ collection: 'tutoring-deck-files', file: pdf, data: {}, req, overrideAccess: true, depth: 0 })
-      const pptxDoc = await payload.create({ collection: 'tutoring-deck-files', file: pptx, data: {}, req, overrideAccess: true, depth: 0 })
-      const deckOrigin = target.material ? 'import' as const : 'manual' as const
-      const revision = { deckPdf: pdfDoc.id, deckPptx: pptxDoc.id, deckOrigin }
-      if (current) {
-        const material = target.material && target.decksOnly
-          ? { instructorNotes: target.material.instructorNotes, sourceDigest: target.material.sourceDigest }
-          : target.material
-        const saved = await payload.update({ collection: 'tutoring-meetings', id: current.id, data: { ...material, ...revision }, req, overrideAccess: true, depth: 0 })
-        return { id: saved.id, status: 'saved' as const }
-      }
-      if (!target.material || target.decksOnly) throw new TutoringProblem('Лекция не найдена')
-      const saved = await payload.create({ collection: 'tutoring-meetings', data: { ...target.material, ...revision }, req, overrideAccess: true, depth: 0 })
-      return { id: saved.id, status: 'saved' as const }
+      return save(req, async () => {
+        const pdfDoc = await payload.create({ collection: 'tutoring-deck-files', file: pdf, data: {}, req, overrideAccess: true, depth: 0 })
+        const pptxDoc = await payload.create({ collection: 'tutoring-deck-files', file: pptx, data: {}, req, overrideAccess: true, depth: 0 })
+        return { deckPdf: pdfDoc.id, deckPptx: pptxDoc.id }
+      })
     })
   } catch (error) {
     // Payload writes uploads to disk. Verify the rolled-back rows before removing either candidate.
@@ -101,4 +80,66 @@ export async function saveTutoringDeck(payload: Payload, user: User, form: FormD
       .map(file => unlink(path.resolve(TUTORING_DECK_DIRECTORY, file.name))))
     throw error
   }
+}
+
+export async function saveTutoringDeck(payload: Payload, user: User, form: FormData, target:
+  { id: number; updatedAt: string; material?: undefined; decksOnly?: undefined } |
+  { id: number | null; updatedAt: string; material: ImportMaterial; decksOnly?: boolean },
+) {
+  return withDeckFiles(payload, user, form, async (req, upload) => {
+    const tx = await txDb(req)
+    if (target.id) await tx.execute(sql`select id from tutoring_meetings where id = ${target.id} for update`)
+    const current = target.id ? await payload.findByID({
+      collection: 'tutoring-meetings', id: target.id, req, overrideAccess: true, depth: 0, disableErrors: true,
+    }) : null
+    if (current && target.material && (current.program !== target.material.program || current.number !== target.material.number)) {
+      throw new TutoringProblem('Номер и программа лекции не совпадают')
+    }
+    if (target.material && current?.deckOrigin === 'manual') return { id: current.id, status: 'manual' as const }
+    if (target.material && current?.sourceDigest === target.material.sourceDigest && current?.deckPdf && current.deckPptx) {
+      return { id: current.id, status: 'unchanged' as const }
+    }
+    if ((target.id && !current) || (current && current.updatedAt !== target.updatedAt)) {
+      throw new TutoringProblem('Лекция уже изменилась. Обновите страницу и загрузите файлы снова')
+    }
+    const revision = { ...await upload(), deckOrigin: target.material ? 'import' as const : 'manual' as const }
+    if (current) {
+      const material = target.material && target.decksOnly
+        ? { instructorNotes: target.material.instructorNotes, sourceDigest: target.material.sourceDigest }
+        : target.material
+      const saved = await payload.update({ collection: 'tutoring-meetings', id: current.id, data: { ...material, ...revision }, req, overrideAccess: true, depth: 0 })
+      return { id: saved.id, status: 'saved' as const }
+    }
+    if (!target.material || target.decksOnly) throw new TutoringProblem('Лекция не найдена')
+    const saved = await payload.create({ collection: 'tutoring-meetings', data: { ...target.material, ...revision }, req, overrideAccess: true, depth: 0 })
+    return { id: saved.id, status: 'saved' as const }
+  })
+}
+
+export async function saveTutoringIntroduction(payload: Payload, user: User, form: FormData,
+  program: TutoringProgram, updatedAt: string, material?: { instructorNotes: string; sourceDigest: string }, expectedId?: number,
+) {
+  return withDeckFiles(payload, user, form, async (req, upload) => {
+    const tx = await txDb(req)
+    // Первые две параллельные загрузки еще не имеют строки для SELECT FOR UPDATE.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('tutoring-introduction'), hashtext(${program}))`)
+    const existing = (await payload.find({ collection: 'tutoring-introductions', where: { program: { equals: program } },
+      limit: 1, depth: 0, overrideAccess: true, req })).docs[0]
+    if (expectedId && existing?.id !== expectedId) throw new TutoringProblem('Вводная встреча не найдена в этой программе')
+    if (existing && material && existing.deckOrigin === 'manual') return { id: existing.id, status: 'manual' }
+    if (existing && material && existing.sourceDigest === material.sourceDigest) return { id: existing.id, status: 'unchanged' }
+    if ((existing?.updatedAt ?? '') !== updatedAt) throw new TutoringProblem('Вводная встреча уже изменилась. Обновите страницу.')
+    if (!existing && !material) throw new TutoringProblem('Сначала загрузите вводную встречу из комплекта')
+    const files = await upload()
+    const deckOrigin = material ? 'import' as const : 'manual' as const
+    if (existing) {
+      const row = await payload.update({ collection: 'tutoring-introductions', id: existing.id,
+        data: { ...files, ...material, deckOrigin }, req, overrideAccess: true, depth: 0 })
+      return { id: row.id, status: 'saved' }
+    }
+    if (!material) throw new TutoringProblem('Нужен сценарий новой вводной встречи')
+    const row = await payload.create({ collection: 'tutoring-introductions',
+      data: { program, ...files, ...material, deckOrigin }, req, overrideAccess: true, depth: 0 })
+    return { id: row.id, status: 'saved' }
+  })
 }

@@ -1,3 +1,4 @@
+import { saveIntroductionSubmission } from '@/server/tutoring-intro-practice'
 import type { Payload, Where } from 'payload'
 import { beforeAll, describe, expect, it } from 'vitest'
 
@@ -80,6 +81,13 @@ describe('менторство как отдельный продукт', () => 
     expect(tutoringMergeRequest(url, url + '/-/merge_requests/19')).toBe(19)
     expect(tutoringMergeRequest(url, url + '-another/-/merge_requests/19')).toBeNull()
 
+    const sample = url + '/-/merge_requests/12'
+    await saveIntroductionSubmission(payload, student, stream.id, sample, '')
+    await saveIntroductionSubmission(payload, student, stream.id, sample, '')
+    await expect(saveIntroductionSubmission(payload, student, stream.id, url + '/-/merge_requests/13', '')).rejects.toThrow('Ссылка уже изменилась')
+    await expect(saveIntroductionSubmission(payload, student, stream.id, 'https://other.example/repo/-/merge_requests/12', sample)).rejects.toThrow('Нужна ссылка')
+    expect((await payload.findByID({ collection: 'tutoring-participants', id: member.id })).introSubmissionUrl).toBe(sample)
+    expect((await payload.count({ collection: 'tutoring-reviews', where: { participant: { equals: member.id } } })).totalDocs).toBe(0)
     const event = {
       user: { id: gradingBot, username: 'group_5_bot_grader' }, project: { id: 1234567 },
       merge_request: { iid: 19, url: url + '/-/merge_requests/19' },
@@ -98,6 +106,7 @@ describe('менторство как отдельный продукт', () => 
     expect(await recordTutoringVerdict(payload, project.id, 'Note Hook', event)).toBe(false)
     expect((await payload.findByID({ collection: 'tutoring-checks', id: result.docs[0].id })).verdict).toBe('pending')
     await payload.update({ collection: 'tutoring-streams', id: stream.id, data: { status: 'archived' } })
+    await expect(saveIntroductionSubmission(payload, student, stream.id, sample, sample)).rejects.toThrow('открытого потока')
     const after = await claimTutoringProject(payload)
     expect(after.job).toMatchObject({ id: project.id, revoke: true, gitlabProjectId: 1234567, autoResolveUsername: true })
     if (!after.job) throw new Error('Нет отзыва проекта')

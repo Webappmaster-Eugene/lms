@@ -65,6 +65,7 @@ import * as migration_20261122_145105_tutoring_future_schedule from './20261122_
 import * as migration_20261122_211103_mentoring_products from './20261122_211103_mentoring_products';
 import * as migration_20261123_140936_mentoring_gitlab_trust from './20261123_140936_mentoring_gitlab_trust';
 import * as migration_20261124_115020_tutoring_gitlab_invitation from './20261124_115020_tutoring_gitlab_invitation';
+import * as migration_20261124_200121_mentoring_student_library from './20261124_200121_mentoring_student_library';
 
 export const migrations = [
   {
@@ -400,6 +401,11 @@ export const migrations = [
   {
     up: migration_20261124_115020_tutoring_gitlab_invitation.up,
     down: migration_20261124_115020_tutoring_gitlab_invitation.down,
-    name: '20261124_115020_tutoring_gitlab_invitation'
+    name: '20261124_115020_tutoring_gitlab_invitation',
+  },
+  {
+    up: migration_20261124_200121_mentoring_student_library.up,
+    down: migration_20261124_200121_mentoring_student_library.down,
+    name: '20261124_200121_mentoring_student_library'
   },
 ];

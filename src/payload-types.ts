@@ -123,6 +123,7 @@ export interface Config {
     'bootcamp-streams': BootcampStream;
     'bootcamp-week-submissions': BootcampWeekSubmission;
     'tutoring-deck-files': TutoringDeckFile;
+    'tutoring-introductions': TutoringIntroduction;
     'tutoring-meetings': TutoringMeeting;
     'tutoring-streams': TutoringStream;
     'tutoring-participants': TutoringParticipant;
@@ -197,6 +198,7 @@ export interface Config {
     'bootcamp-streams': BootcampStreamsSelect<false> | BootcampStreamsSelect<true>;
     'bootcamp-week-submissions': BootcampWeekSubmissionsSelect<false> | BootcampWeekSubmissionsSelect<true>;
     'tutoring-deck-files': TutoringDeckFilesSelect<false> | TutoringDeckFilesSelect<true>;
+    'tutoring-introductions': TutoringIntroductionsSelect<false> | TutoringIntroductionsSelect<true>;
     'tutoring-meetings': TutoringMeetingsSelect<false> | TutoringMeetingsSelect<true>;
     'tutoring-streams': TutoringStreamsSelect<false> | TutoringStreamsSelect<true>;
     'tutoring-participants': TutoringParticipantsSelect<false> | TutoringParticipantsSelect<true>;
@@ -2295,6 +2297,21 @@ export interface TutoringDeckFile {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-introductions".
+ */
+export interface TutoringIntroduction {
+  id: number;
+  program: 'nodejs' | 'react-next';
+  deckPdf: number | TutoringDeckFile;
+  deckPptx: number | TutoringDeckFile;
+  instructorNotes: string;
+  deckOrigin: 'import' | 'manual';
+  sourceDigest: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "tutoring-meetings".
  */
 export interface TutoringMeeting {
@@ -2335,6 +2352,8 @@ export interface TutoringStream {
   title: string;
   program: 'nodejs' | 'react-next';
   startsAt: string;
+  awaitingFirstLecture?: boolean | null;
+  introductionStartsAt?: string | null;
   scheduleDates?:
     | {
         meeting: number;
@@ -2364,6 +2383,8 @@ export interface TutoringParticipant {
   stream: number | TutoringStream;
   student: number | User;
   gitlabInviteEmail?: string | null;
+  introSubmissionUrl?: string | null;
+  graduatedThrough?: number | null;
   paidAt?: string | null;
   active: boolean;
   currentMeeting: number;
@@ -2752,6 +2773,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'tutoring-deck-files';
         value: number | TutoringDeckFile;
+      } | null)
+    | ({
+        relationTo: 'tutoring-introductions';
+        value: number | TutoringIntroduction;
       } | null)
     | ({
         relationTo: 'tutoring-meetings';
@@ -4056,6 +4081,20 @@ export interface TutoringDeckFilesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-introductions_select".
+ */
+export interface TutoringIntroductionsSelect<T extends boolean = true> {
+  program?: T;
+  deckPdf?: T;
+  deckPptx?: T;
+  instructorNotes?: T;
+  deckOrigin?: T;
+  sourceDigest?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "tutoring-meetings_select".
  */
 export interface TutoringMeetingsSelect<T extends boolean = true> {
@@ -4096,6 +4135,8 @@ export interface TutoringStreamsSelect<T extends boolean = true> {
   title?: T;
   program?: T;
   startsAt?: T;
+  awaitingFirstLecture?: T;
+  introductionStartsAt?: T;
   scheduleDates?:
     | T
     | {
@@ -4124,6 +4165,8 @@ export interface TutoringParticipantsSelect<T extends boolean = true> {
   stream?: T;
   student?: T;
   gitlabInviteEmail?: T;
+  introSubmissionUrl?: T;
+  graduatedThrough?: T;
   paidAt?: T;
   active?: T;
   currentMeeting?: T;

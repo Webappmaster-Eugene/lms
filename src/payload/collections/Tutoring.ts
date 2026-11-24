@@ -1,9 +1,10 @@
 import { ValidationError, type CollectionConfig } from 'payload'
 import { sql } from '@payloadcms/db-postgres'
 
+import { introductionScheduleError } from '@/lib/tutoring-schedule'
 import { PPTX_MIME, TUTORING_DECK_DIRECTORY } from '@/lib/tutoring-file-types'
 
-import { isMoscowTuesday, isTutoringMeeting, isTutoringProgram, tutoringHttpsUrl, tutoringPrograms, tutoringStatuses } from '@/lib/tutoring'
+import { isMoscowTuesday, isTutoringMeeting, isTutoringProgram, scheduledTutoringMeeting, tutoringHttpsUrl, tutoringPrograms, tutoringStatuses } from '@/lib/tutoring'
 import { isAdmin, isAdminField } from '@/payload/access/isAdmin'
 import { cleanupTutoringParticipant, cleanupTutoringStream } from '@/payload/hooks/cleanupOwnedRelations'
 import { tutoringDeckAccess, tutoringPresentationAccess } from '@/server/tutoring-access'
@@ -94,6 +95,13 @@ export const TutoringStreams: CollectionConfig = {
     if (!isTutoringProgram(program) || !isTutoringMeeting(data?.currentMeeting ?? originalDoc?.currentMeeting ?? 1, program)) {
       bad('currentMeeting', 'Укажите встречу из программы потока')
     }
+    const waiting = data?.awaitingFirstLecture === undefined ? originalDoc?.awaitingFirstLecture : data.awaitingFirstLecture
+    if (waiting && operation === 'update' && !originalDoc?.awaitingFirstLecture) {
+      bad('awaitingFirstLecture', 'Технические занятия уже открыты')
+    }
+    if (waiting && (data?.currentMeeting ?? originalDoc?.currentMeeting ?? 1) !== 1) {
+      bad('currentMeeting', 'Сначала откройте первую лекцию потоку')
+    }
     if (!isMoscowTuesday(data?.startsAt ?? originalDoc?.startsAt)) bad('startsAt', 'Первая встреча должна быть во вторник по Москве')
     for (const field of ['scheduleDates', 'scheduleOverrides'] as const) {
       const rows = data?.[field]
@@ -108,12 +116,28 @@ export const TutoringStreams: CollectionConfig = {
         numbers.add(row.meeting)
       }
     }
+    const intro = data?.introductionStartsAt === undefined ? originalDoc?.introductionStartsAt : data.introductionStartsAt
+    if (intro != null && isTutoringProgram(program)) {
+      const stream = {
+        startsAt: data?.startsAt ?? originalDoc?.startsAt,
+        scheduleDates: data?.scheduleDates === undefined ? originalDoc?.scheduleDates : data.scheduleDates,
+        scheduleOverrides: data?.scheduleOverrides === undefined ? originalDoc?.scheduleOverrides : data.scheduleOverrides,
+      }
+      const starts = Array.from({ length: tutoringPrograms[program].meetings }, (_, n) =>
+        scheduledTutoringMeeting(stream, n + 1).start.getTime())
+      const error = introductionScheduleError(intro, starts, !waiting && starts.some(date => date <= Date.now()))
+      if (error) bad('introductionStartsAt', error)
+    }
     return data
   }] },
   fields: [
     { name: 'title', type: 'text', required: true, maxLength: 120, label: 'Название потока' },
     { name: 'program', type: 'select', required: true, options: programs, label: 'Программа' },
     { name: 'startsAt', type: 'date', required: true, label: 'Первая встреча', admin: { date: { pickerAppearance: 'dayAndTime' } } },
+    { name: 'awaitingFirstLecture', type: 'checkbox', label: 'Открыта только вводная встреча',
+      access: { update: () => false }, admin: { readOnly: true } },
+    { name: 'introductionStartsAt', type: 'date', label: 'Вводная встреча',
+      access: { update: () => false }, admin: { date: { pickerAppearance: 'dayAndTime' } } },
     {
       name: 'scheduleDates', type: 'array', maxRows: 32, admin: { hidden: true },
       access: { create: () => false, update: () => false },
@@ -144,7 +168,11 @@ export const TutoringParticipants: CollectionConfig = {
   admin: { group, defaultColumns: ['student', 'stream', 'currentMeeting', 'active'] },
   access: { read: isAdmin, create: isAdmin, update: isAdmin, delete: isAdmin },
   indexes: [{ fields: ['stream', 'student'], unique: true }, { fields: ['student', 'active'] }],
-  hooks: { beforeDelete: [cleanupTutoringParticipant], beforeChange: [async ({ req, data, operation, context }) => {
+  hooks: { beforeDelete: [cleanupTutoringParticipant], beforeChange: [async ({ req, data, operation, context, originalDoc }) => {
+    if (operation === 'update' && originalDoc?.graduatedThrough != null && data.active === true) {
+      // Возвращение в поток заменяет доступ выпускника текущим доступом участника.
+      data.graduatedThrough = null
+    }
     if (operation !== 'create') return data
     const student = relId(data.student)
     if (typeof student !== 'number') return data
@@ -166,7 +194,10 @@ export const TutoringParticipants: CollectionConfig = {
     }
     if (typeof stream !== 'number') return data
     const doc = await req.payload.findByID({ collection: 'tutoring-streams', id: stream, depth: 0, req, overrideAccess: true })
-    if (!isTutoringMeeting(data?.currentMeeting ?? originalDoc?.currentMeeting ?? 1, doc.program)) bad('currentMeeting', 'Укажите встречу из программы потока')
+    const current = data?.currentMeeting ?? originalDoc?.currentMeeting ?? 1
+    if (!isTutoringMeeting(current, doc.program) || (doc.awaitingFirstLecture && current !== 1)) {
+      bad('currentMeeting', 'Откройте технические встречи и выберите номер из программы потока')
+    }
     return data
   }] },
   fields: [
@@ -174,6 +205,10 @@ export const TutoringParticipants: CollectionConfig = {
     { name: 'student', type: 'relationship', relationTo: 'users', required: true, label: 'Ученик', index: true },
     { name: 'gitlabInviteEmail', type: 'email', label: 'Почта приглашения в GitLab', admin: { readOnly: true },
       access: { create: () => false, update: () => false } },
+    { name: 'introSubmissionUrl', type: 'text', maxLength: 1000, label: 'Пробная работа вводной встречи',
+      admin: { readOnly: true }, access: { create: () => false, update: () => false } },
+    { name: 'graduatedThrough', type: 'number', min: 0, max: 32, label: 'Материалы выпускника до встречи',
+      admin: { readOnly: true }, access: { create: () => false, update: () => false } },
     { name: 'paidAt', type: 'date', label: 'Историческая отметка оплаты' },
     { name: 'active', type: 'checkbox', defaultValue: true, required: true, label: 'Доступ открыт' },
     { name: 'currentMeeting', type: 'number', defaultValue: 1, required: true, min: 1, max: 32, label: 'Текущая встреча ученика' },

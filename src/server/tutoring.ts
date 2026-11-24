@@ -3,6 +3,7 @@ import 'server-only'
 import { sql } from '@payloadcms/db-postgres'
 import type { Payload, PayloadRequest } from 'payload'
 
+import { tutoringDisplayText } from '@/lib/tutoring-display'
 import { relationId } from '@/lib/content-management/pages'
 import { collectAllPages } from '@/lib/paginate'
 import { isTutoringMeeting, type TutoringProgram, type TutoringStatus } from '@/lib/tutoring'
@@ -13,11 +14,13 @@ import { tutoringOpenThrough } from '@/server/tutoring-access'
 
 export class TutoringProblem extends Error {}
 
-export async function tutoringMeetings(payload: Payload, req: PayloadRequest, program: TutoringProgram) {
-  return collectAllPages(({ page, limit }) => payload.find({
+export async function tutoringMeetings(payload: Payload, req: PayloadRequest, program: TutoringProgram, openThrough?: number) {
+  const meetings = await collectAllPages(({ page, limit }) => payload.find({
     collection: 'tutoring-meetings', req, overrideAccess: true, depth: 0, page, limit, sort: 'number',
-    where: { program: { equals: program } }, select: { number: true, title: true, filename: true, deckPdf: true },
+    where: { program: { equals: program }, ...(openThrough !== undefined ? { number: { less_than_equal: openThrough } } : {}) },
+    select: { number: true, title: true, filename: true, deckPdf: true },
   }), { label: 'Программа репетиторства' })
+  return meetings.map(row => ({ ...row, title: tutoringDisplayText(row.title) }))
 }
 
 type MeetingMaterial = Pick<TutoringMeeting, 'id' | 'title' | 'number' | 'homework' | 'filename' | 'deckPdf' | 'deckPptx' | 'deckOrigin' | 'updatedAt' | 'instructorNotes'>
@@ -29,7 +32,8 @@ export async function tutoringMeeting(payload: Payload, req: PayloadRequest, pro
     select: { title: true, number: true, homework: true, filename: true, deckPdf: true, updatedAt: true, ...(mentor ? { deckPptx: true, deckOrigin: true, instructorNotes: true } as const : {}) },
     populate: { 'tutoring-deck-files': { filename: true } },
   })
-  return docs[0] ?? null
+  const meeting = docs[0]
+  return meeting ? { ...meeting, title: tutoringDisplayText(meeting.title) } : null
 }
 
 export async function tutoringReviews(payload: Payload, req: PayloadRequest, participants: number[]) {
@@ -64,6 +68,7 @@ export async function writeTutoringReview(payload: Payload, streamId: number, me
     if (!stream || typeof stream === 'number' || stream.id !== streamId || !isTutoringMeeting(meeting, stream.program)) {
       throw new TutoringProblem('Участник или встреча не найдены')
     }
+    if (stream.awaitingFirstLecture) throw new TutoringProblem('Задание пока недоступно')
     if (action.kind === 'submit' && (relationId(member.student) !== action.actor.id ||
       !member.active || stream.status !== 'active' || meeting > tutoringOpenThrough(stream, member))) {
       throw new TutoringProblem('Задание пока недоступно')

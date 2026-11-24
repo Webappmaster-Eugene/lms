@@ -11,16 +11,17 @@ export const metadata = { title: 'Лекция репетиторства' }
 
 export default async function TutoringLecture({ params }: { params: Promise<{ id: string; number: string }> }) {
   const { id, number: rawNumber } = await params
-  const { payload, req, isAdmin, course, base } = await requireTutoringProgram(id)
+  const { payload, req, isAdmin, course, base, openThrough } = await requireTutoringProgram(id)
   const number = Number(rawNumber)
-  if (!isAdmin || String(number) !== rawNumber || !isTutoringMeeting(number, course.program)) notFound()
-  const meeting = await tutoringMeeting(payload, req, course.program, number, true)
+  if (String(number) !== rawNumber || !isTutoringMeeting(number, course.program) || number > openThrough) notFound()
+  const meeting = await tutoringMeeting(payload, req, course.program, number, isAdmin)
   if (!meeting) notFound()
 
   return <div className="max-w-4xl space-y-5">
-    <Link href={base} className="text-sm font-semibold text-primary hover:underline">Все лекции</Link>
+    <Link href={isAdmin ? base : `${base}/materials`} className="text-sm font-semibold text-primary hover:underline">{isAdmin ? 'Все лекции' : 'Мои материалы'}</Link>
     <h1 className="sr-only">{meeting.title}</h1>
-    <TutoringMeetingCard meeting={meeting} mentor />
-    <ReplacePresentation id={meeting.id} updatedAt={meeting.updatedAt} manual={meeting.deckOrigin === 'manual'} />
+    <TutoringMeetingCard meeting={meeting} mentor={isAdmin}
+      practiceLink={isAdmin ? undefined : path => `${base}/lectures/${number}/readings/${path.slice('/lessons/'.length)}`} />
+    {isAdmin && <ReplacePresentation id={meeting.id} updatedAt={meeting.updatedAt} manual={meeting.deckOrigin === 'manual'} />}
   </div>
 }

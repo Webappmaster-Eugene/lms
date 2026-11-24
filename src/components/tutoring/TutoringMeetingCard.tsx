@@ -3,6 +3,8 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 import { SlidesBlock } from '@/components/lesson/SlidesBlock'
+import { tutoringReadingMarkdown } from '@/lib/tutoring-reading'
+import { stageTitle, tutoringDisplayText } from '@/lib/tutoring-display'
 import { scheduledTutoringMeeting, TUTORING_MEETING_MINUTES, tutoringDateLabel } from '@/lib/tutoring'
 import type { TutoringMeeting, TutoringStream } from '@/payload-types'
 
@@ -46,8 +48,8 @@ export function TutoringMeetingCard({ meeting, stream, mentor = false, allowAnno
         {meeting.homework.map(({ stage, description, assignment, practice }) => {
           const href = practice?.startsWith('/lessons/') ? (practiceLink ? practiceLink(practice) : mentor ? practice : null) : null
           return <li key={stage} className="space-y-2 py-4">
-          <h4 className="text-sm font-semibold">Этап {String(stage).padStart(2, '0')}</h4>
-          <p className="text-sm">{description}</p>
+          <h4 className="text-sm font-semibold">{stageTitle(stage)}</h4>
+          <p className="text-sm">{tutoringDisplayText(description)}</p>
           {href && <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-primary">
             <Link href={href.replace(/-practice$/, '-theory')} className="hover:underline">Теория</Link>
             <Link href={href} className="hover:underline">Практикум</Link>
@@ -55,7 +57,7 @@ export function TutoringMeetingCard({ meeting, stream, mentor = false, allowAnno
           </div>}
           {assignment && <details className="rounded-lg bg-muted/40 px-3 py-2">
             <summary className="cursor-pointer text-sm font-medium">Полное задание и проверка</summary>
-            <div className="mt-3"><MaterialText>{assignment}</MaterialText></div>
+            <div className="mt-3"><MaterialText>{tutoringReadingMarkdown(assignment)}</MaterialText></div>
           </details>}
         </li>})}
       </ul>

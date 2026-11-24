@@ -1,4 +1,5 @@
 export const TUTORING_MEETING_MINUTES = 120
+export const TUTORING_INTRODUCTION_MINUTES = 60
 export const TUTORING_GITLAB_ATTEMPTS = 5
 
 export const tutoringPrograms = {

@@ -5,12 +5,12 @@ import { notFound, redirect } from 'next/navigation'
 import type { Payload, PayloadRequest } from 'payload'
 
 import { routeSlug } from '@/lib/route-slug'
-import type { TutoringProgram } from '@/lib/tutoring'
+import { tutoringPrograms, type TutoringProgram } from '@/lib/tutoring'
 import { getLearningAccess } from '@/server/learning-access'
 import { getBootcamps } from '@/server/bootcamps'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import { getLearningRequest } from '@/server/learning-request'
-import { tutoringMemberships } from '@/server/tutoring-access'
+import { tutoringLibraryMemberships } from '@/server/tutoring-access'
 import type { User } from '@/payload-types'
 import { tutoringBootcamps } from '@/server/tutoring-curriculum'
 
@@ -19,12 +19,12 @@ export async function bootcampMenuAvailable(payload: Payload, req: PayloadReques
 }
 
 export async function tutoringMenuAvailable(payload: Payload, req: PayloadRequest, user: User) {
-  return user.role === 'admin' || (await tutoringMemberships(payload, req, user.id)).length > 0
+  return user.isActive !== false && (user.role === 'admin' || (await tutoringLibraryMemberships(payload, req, user.id)).length > 0)
 }
 
 const area = cache(async () => {
   const { payload, user, req } = await getLearningRequest()
-  if (!user) redirect('/login')
+  if (!user || user.isActive === false) redirect('/login')
   const isAdmin = (await getAuthoritativeLearningPolicy(payload, user.id, req)).role === 'admin'
   return { payload, user, req, isAdmin }
 })
@@ -45,19 +45,22 @@ export const bootcampLectureArea = cache(async (slug: string) => {
 export const tutoringArea = cache(async () => {
   const info = await area()
   const { payload, req, user, isAdmin } = info
-  const [memberships, courses] = await Promise.all([
-    isAdmin ? [] : tutoringMemberships(payload, req, user.id),
+  const [libraryMemberships, courses] = await Promise.all([
+    isAdmin ? [] : tutoringLibraryMemberships(payload, req, user.id),
     tutoringBootcamps(payload, req),
   ])
-  const tutoring = courses.filter(course => isAdmin || memberships.some(({ stream }) => stream.program === course.program))
-  return { ...info, memberships, tutoring }
+  const tutoring = courses.filter(course => isAdmin || libraryMemberships.some(({ stream }) => stream.program === course.program))
+  const memberships = libraryMemberships.filter(({ member, stream }) => member.active && stream.status === 'active')
+  return { ...info, memberships, libraryMemberships, tutoring }
 })
 
 export async function requireTutoringProgram(program: string) {
   const info = await tutoringArea()
   const course = info.tutoring.find(item => item.program === program)
   if (!course) notFound()
-  return { ...info, course, base: tutoringPath(course.program) }
+  const openThrough = info.isAdmin ? tutoringPrograms[course.program].meetings : info.libraryMemberships.reduce(
+    (open, entry) => entry.stream.program === course.program ? Math.max(open, entry.openThrough) : open, 0)
+  return { ...info, course, base: tutoringPath(course.program), openThrough }
 }
 
 export function tutoringPath(program: TutoringProgram) {
@@ -79,7 +82,7 @@ export async function legacyTutoringStream(id: string, query: Record<string, str
       collection: 'tutoring-streams', where: { id: { equals: Number(id) } }, limit: 1, depth: 0,
       overrideAccess: false, req: area.req, select: { program: true },
     })).docs[0]?.program
-    : area.memberships.find(({ stream }) => String(stream.id) === id)?.stream.program
+    : area.libraryMemberships.find(({ stream }) => String(stream.id) === id)?.stream.program
   const course = area.tutoring.find(item => item.program === program)
   if (!course) notFound()
   const params = new URLSearchParams()

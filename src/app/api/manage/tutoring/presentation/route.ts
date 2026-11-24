@@ -6,7 +6,7 @@ import { isTutoringMeeting, isTutoringProgram } from '@/lib/tutoring'
 import { sameOriginRequest } from '@/server/error-tunnel'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import { TutoringProblem } from '@/server/tutoring'
-import { saveTutoringDeck, TUTORING_REQUEST_LIMIT } from '@/server/tutoring-decks'
+import { saveTutoringDeck, saveTutoringIntroduction, TUTORING_REQUEST_LIMIT } from '@/server/tutoring-decks'
 
 export const runtime = 'nodejs'
 
@@ -77,6 +77,21 @@ export async function POST(request: Request) {
   const imported = form.get('material')
   const decksOnly = form.get('decksOnly') === 'true'
   try {
+    if (form.has('introduction')) {
+      const program = form.get('introduction')
+      if (!isTutoringProgram(program) || decksOnly) return failure('Проверьте программу вводной встречи', 400)
+      if (imported === null) {
+        if (!id) return failure('Вводная встреча не найдена', 404)
+        return json(await saveTutoringIntroduction(payload, user, form, program, updatedAt, undefined, id))
+      }
+      if (authorization === null || typeof imported !== 'string') return failure('Требуется авторизованный импорт', 403)
+      const fields: unknown = JSON.parse(imported)
+      if (!fields || typeof fields !== 'object' || !('instructorNotes' in fields) || !('sourceDigest' in fields) ||
+        typeof fields.instructorNotes !== 'string' || !fields.instructorNotes.trim() || fields.instructorNotes.length > 80_000 ||
+        typeof fields.sourceDigest !== 'string' || !/^[a-f0-9]{64}$/.test(fields.sourceDigest)) return failure('Проверьте сценарий вводной встречи', 400)
+      return json(await saveTutoringIntroduction(payload, user, form, program, updatedAt,
+        { instructorNotes: fields.instructorNotes, sourceDigest: fields.sourceDigest }, id))
+    }
     if (typeof imported === 'string' && authorization !== null) {
       if (decksOnly && !id) return failure('Для обновления презентации нужна существующая лекция', 400)
       const material = parseMaterial(imported)

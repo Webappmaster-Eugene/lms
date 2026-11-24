@@ -50,6 +50,7 @@ export const ADMIN_NAV_GROUPS = [
     items: [
       { href: '/tutoring', label: 'Лекции, группы и журнал' },
       { href: '/admin/google-calendar', label: 'Google Calendar' },
+      { href: '/admin/collections/tutoring-introductions', label: 'Вводные встречи' },
       { href: '/admin/collections/tutoring-meetings', label: 'Материалы встреч' },
       { href: '/admin/collections/tutoring-deck-files', label: 'Файлы презентаций' },
       { href: '/admin/collections/tutoring-streams', label: 'Потоки репетиторства' },

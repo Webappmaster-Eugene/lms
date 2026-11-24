@@ -172,6 +172,43 @@ describe('репетиторство в LMS', () => {
     expect(unauthorised.status).toBe(403)
   })
 
+  it('хранит отдельную вводную, открывает PDF участнику и сохраняет ручную замену', async () => {
+    const adminToken = await login(payload, admin)
+    const form = new FormData()
+    form.set('introduction', 'nodejs')
+    form.set('pdf', new File([new Uint8Array(blankPDF())], 'intro.pdf'))
+    form.set('pptx', new File([new Uint8Array(await readFile('tests/fixtures/tutoring-editable.pptx'))], 'intro.pptx'))
+    const material = { instructorNotes: 'Закрытые заметки вводной', sourceDigest: 'e'.repeat(64) }
+    form.set('material', JSON.stringify(material))
+    const upload = (token: string) => replacePresentation(new Request('http://lms.test/api/manage/tutoring/presentation', {
+      method: 'POST', headers: { Authorization: `JWT ${token}` }, body: form,
+    }))
+    expect((await upload(studentToken)).status).toBe(403)
+    const first = await upload(adminToken)
+    expect(first.status).toBe(200)
+    const { id } = await first.json()
+    expect(await (await upload(adminToken)).json()).toEqual({ id, status: 'unchanged' })
+    const saved = await payload.findByID({ collection: 'tutoring-introductions', id, depth: 1 })
+    if (typeof saved.deckPdf === 'number' || typeof saved.deckPptx === 'number') throw new Error('Не загружены файлы вводной')
+    const pdf = '/tutoring-deck-files/file/' + saved.deckPdf.filename
+    expect((await rest('GET', pdf, { token: studentToken })).status).toBe(200)
+    expect((await rest('GET', pdf, { token: outsiderToken })).status).not.toBe(200)
+    expect((await rest('GET', pdf)).status).not.toBe(200)
+    expect((await rest('GET', '/tutoring-deck-files/file/' + saved.deckPptx.filename, { token: studentToken })).status).not.toBe(200)
+    const response = await rest('GET', `/tutoring-introductions/${id}?depth=0`, { token: studentToken })
+    expect(response.status).toBe(200)
+    expect(response.json).not.toHaveProperty('instructorNotes')
+    expect(response.json).not.toHaveProperty('deckPptx')
+    form.delete('material')
+    form.set('id', String(id))
+    form.set('updatedAt', saved.updatedAt)
+    expect((await upload(adminToken)).status).toBe(200)
+    expect((await upload(adminToken)).status).toBe(400)
+    form.set('material', JSON.stringify({ ...material, sourceDigest: 'd'.repeat(64) }))
+    expect(await (await upload(adminToken)).json()).toEqual({ id, status: 'manual' })
+    expect((await rest('GET', pdf, { token: studentToken })).status).not.toBe(200)
+  })
+
   it('открывает материалы при личной отметке, закрывает их при архивировании и чистит связи при удалении аккаунта', async () => {
     await payload.update({ collection: 'tutoring-participants', id: participant.id, data: { currentMeeting: 2 } })
     const nextFile = `/tutoring-meetings/file/${future.filename}`

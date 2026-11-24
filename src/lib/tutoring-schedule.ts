@@ -1,4 +1,4 @@
-import { moscowMeetingInput, parseMoscowMeetingTime, scheduledTutoringMeeting, TUTORING_MEETING_MINUTES, tutoringPrograms } from '@/lib/tutoring'
+import { moscowMeetingInput, parseMoscowMeetingTime, scheduledTutoringMeeting, TUTORING_INTRODUCTION_MINUTES, TUTORING_MEETING_MINUTES, tutoringPrograms } from '@/lib/tutoring'
 import type { TutoringStream } from '@/payload-types'
 
 const day = 86_400_000
@@ -12,6 +12,20 @@ export type TutoringScheduleChange = {
   firstStart: string
   secondStart: string
   keepOverrides: boolean
+}
+
+export function introductionScheduleError(start: string, technicalStarts: number[], courseStarted = false) {
+  const end = Date.parse(start) + TUTORING_INTRODUCTION_MINUTES * 60_000
+  if (!Number.isFinite(end)) return 'Укажите дату и время вводной встречи'
+  if (courseStarted) {
+    return technicalStarts.some(technical => technical < end && technical + duration > Date.parse(start))
+      ? 'Вводная пересекается с техническим занятием. Выберите другое время'
+      : null
+  }
+  if (technicalStarts.some(technical => technical < end)) {
+    return 'Вводная длится час и должна закончиться до начала технических занятий'
+  }
+  return null
 }
 
 export function tutoringScheduleSlots(stream: TutoringStream): TutoringScheduleSlot[] {
@@ -44,7 +58,7 @@ export function tutoringScheduleDefaults(slots: TutoringScheduleSlot[], first: T
   return { firstStart: moscowMeetingInput(new Date(start)), secondStart: moscowMeetingInput(new Date(second)) }
 }
 
-export function planTutoringScheduleChange(slots: TutoringScheduleSlot[], input: TutoringScheduleChange, now: number):
+export function planTutoringScheduleChange(slots: TutoringScheduleSlot[], input: TutoringScheduleChange, now: number, introductionStartsAt?: string | null, awaitingFirstLecture?: boolean | null):
   { rows: TutoringScheduleSlot[]; changed: number } | { error: string } {
   const upcoming = slots.filter(slot => slot.meeting >= input.fromMeeting && Date.parse(slot.startsAt) > now)
   if (!upcoming.some(slot => slot.meeting === input.fromMeeting)) return { error: 'Выберите предстоящую встречу' }
@@ -70,6 +84,11 @@ export function planTutoringScheduleChange(slots: TutoringScheduleSlot[], input:
   const entries = new Map(rows.map(slot => [slot.meeting, slot.startsAt]))
   const ordered = slots.map(slot => ({ meeting: slot.meeting, start: Date.parse(entries.get(slot.meeting) ?? slot.startsAt) }))
     .sort((a, b) => a.start - b.start)
+  if (introductionStartsAt) {
+    const courseStarted = !awaitingFirstLecture && slots.some(slot => Date.parse(slot.startsAt) <= now)
+    const error = introductionScheduleError(introductionStartsAt, ordered.map(slot => slot.start), courseStarted)
+    if (error) return { error }
+  }
   for (let index = 1; index < ordered.length; index += 1) {
     const previous = ordered[index - 1]
     const current = ordered[index]

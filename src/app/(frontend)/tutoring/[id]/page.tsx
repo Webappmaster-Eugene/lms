@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 
 import { TUTORING_MEETING_MINUTES } from '@/lib/tutoring'
 
@@ -12,13 +13,14 @@ export default async function BootcampTutoring({ params, searchParams }: { param
   if (/^[1-9]\d*$/.test(id)) return legacyTutoringStream(id, await searchParams)
   const { payload, req, isAdmin, course, base, memberships } = await requireTutoringProgram(id)
   const link = 'block rounded-md px-3 py-3 hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring'
+  if (!isAdmin && !memberships.some(({ stream }) => stream.program === course.program)) redirect(`${base}/materials`)
   if (!isAdmin) return <section className="space-y-4">
     <h1 className="text-2xl font-semibold">Мои потоки</h1>
     <ul className="divide-y divide-border border-y border-border">
       {memberships.filter(({ stream }) => stream.program === course.program).map(({ stream, member }) => <li key={member.id}>
         <Link href={`${base}/streams/${stream.id}`} className={link}>
           <span className="block font-semibold">{stream.title}</span>
-          <span className="text-sm text-muted-foreground">Ваша встреча {member.currentMeeting}</span>
+          <span className="text-sm text-muted-foreground">{stream.awaitingFirstLecture ? 'Вводная встреча' : `Ваша встреча ${member.currentMeeting}`}</span>
         </Link>
       </li>)}
     </ul>
@@ -28,6 +30,7 @@ export default async function BootcampTutoring({ params, searchParams }: { param
   const weeks = Map.groupBy(meetings, ({ number }) => Math.ceil(number / 2))
   return <section className="space-y-5">
     <h1 className="text-2xl font-semibold">Лекции</h1>
+    <Link href={`${base}/introduction`} className={link}><span className="block text-sm text-muted-foreground">60 минут · бесплатно</span><span className="font-semibold">Вводная встреча</span></Link>
     {!meetings.length && <p className="text-muted-foreground">Лекции ещё не загружены.</p>}
     <div className="grid gap-4 md:grid-cols-2">
       {[...weeks].map(([week, lectures]) => <section key={week} className="rounded-xl border border-border bg-card p-4">

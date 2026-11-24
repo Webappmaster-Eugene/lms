@@ -6,6 +6,7 @@ import { notFound, redirect } from 'next/navigation'
 import { relationId } from '@/lib/content-management/pages'
 import { logger } from '@/lib/telemetry'
 import { isMoscowTuesday, isTutoringMeeting, isTutoringStatus, parseMoscowMeetingTime, tutoringHttpsUrl, tutoringPrograms, type TutoringProgram } from '@/lib/tutoring'
+import { introductionScheduleError, parseMoscowScheduleInput } from '@/lib/tutoring-schedule'
 import { getLearningRequest } from '@/server/learning-request'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import { tutoringPath } from '@/server/tutoring-bootcamps'
@@ -15,8 +16,10 @@ import { tutoringGoogleConfig } from '@/server/tutoring-google'
 import { queueTutoringProject, retryTutoringRevocation, tutoringMergeRequest, tutoringProject } from '@/server/tutoring-projects'
 import { saveTutoringCharge } from '@/server/tutoring-payments'
 import { tutoringMemberships } from '@/server/tutoring-access'
+import { saveIntroductionSubmission } from '@/server/tutoring-intro-practice'
+import { changeTutoringEnrollment } from '@/server/tutoring-graduation'
 import { tutoringMeetings, TutoringProblem, writeTutoringReview } from '@/server/tutoring'
-import { changeTutoringSchedule, moveTutoringMeeting } from '@/server/tutoring-schedule'
+import { changeTutoringSchedule, moveTutoringMeeting, openFirstTutoringLecture, scheduleTutoringIntroduction, writeTutoringStream } from '@/server/tutoring-schedule'
 
 const value = (form: FormData, key: string) => String(form.get(key) ?? '').trim()
 
@@ -64,6 +67,14 @@ function moscowDate(form: FormData) {
   return iso
 }
 
+function introductionDate(form: FormData) {
+  const raw = value(form, 'introductionStartsAt')
+  if (!raw) return null
+  const iso = parseMoscowScheduleInput(raw)
+  if (!iso || Date.parse(iso) <= Date.now()) throw new TutoringProblem('Укажите будущую дату и время вводной встречи по Москве')
+  return iso
+}
+
 function streamDetails(form: FormData) {
   const title = value(form, 'title')
   const meetingUrl = value(form, 'meetingUrl')
@@ -85,11 +96,35 @@ export async function createTutoringStream(program: TutoringProgram, form: FormD
     if (templateId && (!template || template.program !== program || !isMoscowTuesday(template.startsAt))) {
       throw new TutoringProblem('Выберите календарь этого буткемпа с первым занятием во вторник')
     }
+    const startsAt = template?.startsAt ?? moscowDate(form)
+    const introductionStartsAt = introductionDate(form)
+    if (introductionStartsAt) {
+      const error = introductionScheduleError(introductionStartsAt, [Date.parse(startsAt)])
+      if (error) throw new TutoringProblem(error)
+    }
     const document = await payload.create({
       collection: 'tutoring-streams', req, user, overrideAccess: false,
-      data: { ...streamDetails(form), startsAt: template?.startsAt ?? moscowDate(form), program, status: 'draft', currentMeeting: 1 },
+      data: { ...streamDetails(form), startsAt, introductionStartsAt, awaitingFirstLecture: true, program, status: 'draft', currentMeeting: 1 },
     })
     return `${base}/${document.id}`
+  })
+}
+
+export async function rescheduleTutoringIntroduction(streamId: number, form: FormData) {
+  const { payload, user, req } = await actor(true)
+  const { href } = await managedStream(payload, req, streamId)
+  await run(`${href}?schedule=1#schedule`, 'Время вводной встречи сохранено', async () => {
+    const date = introductionDate(form)
+    if (!date) throw new TutoringProblem('Укажите дату и время вводной встречи по Москве')
+    await scheduleTutoringIntroduction(payload, user, streamId, value(form, 'expectedStart'), date)
+  })
+}
+
+export async function releaseFirstLecture(streamId: number, revision: string) {
+  const { payload, user, req } = await actor(true)
+  const { href } = await managedStream(payload, req, streamId)
+  await run(href, 'Первая лекция открыта ученикам', async () => {
+    await openFirstTutoringLecture(payload, user, streamId, revision)
   })
 }
 
@@ -108,20 +143,24 @@ export async function rescheduleTutoringSeries(streamId: number, expectedRevisio
 
 export async function updateTutoringStream(streamId: number, form: FormData) {
   const { payload, user, req } = await actor(true)
-  const { stream, href } = await managedStream(payload, req, streamId)
+  const { href } = await managedStream(payload, req, streamId)
   await run(href, 'Настройки потока сохранены', async () => {
-    const status = value(form, 'status')
-    const currentMeeting = Number(value(form, 'current'))
-    if (status !== 'active' && status !== 'draft' && status !== 'archived') throw new TutoringProblem('Выберите доступ к потоку')
-    if (!isTutoringMeeting(currentMeeting, stream.program)) throw new TutoringProblem('Выберите встречу потока')
-    if (status === 'active') {
-      const meetings = await tutoringMeetings(payload, req, stream.program)
-      if (meetings.length !== tutoringPrograms[stream.program].meetings || meetings.some(meeting => !meeting.filename && !meeting.deckPdf)) {
-        throw new TutoringProblem('Сначала загрузите полный комплект презентаций и домашних заданий программы')
+    await writeTutoringStream(payload, user, streamId, async (req, stream) => {
+      if (stream.updatedAt !== value(form, 'updatedAt')) throw new TutoringProblem('Настройки уже изменились. Обновите страницу')
+      const status = value(form, 'status')
+      const currentMeeting = Number(value(form, 'current'))
+      if (status !== 'active' && status !== 'draft' && status !== 'archived') throw new TutoringProblem('Выберите доступ к потоку')
+      if (!isTutoringMeeting(currentMeeting, stream.program)) throw new TutoringProblem('Выберите встречу потока')
+      if (stream.awaitingFirstLecture && currentMeeting !== 1) throw new TutoringProblem('Сначала откройте первую лекцию потоку')
+      if (status === 'active') {
+        const meetings = await tutoringMeetings(payload, req, stream.program)
+        if (meetings.length !== tutoringPrograms[stream.program].meetings || meetings.some(meeting => !meeting.filename && !meeting.deckPdf)) {
+          throw new TutoringProblem('Сначала загрузите полный комплект презентаций и домашних заданий программы')
+        }
       }
-    }
-    await payload.update({ collection: 'tutoring-streams', id: stream.id, req, user, overrideAccess: false,
-      data: { ...streamDetails(form), status, currentMeeting } })
+      await payload.update({ collection: 'tutoring-streams', id: stream.id, req, user, overrideAccess: false,
+        data: { ...streamDetails(form), status, currentMeeting } })
+    }, true)
   })
 }
 
@@ -175,13 +214,18 @@ export async function updateTutoringParticipant(streamId: number, memberId: numb
   const { payload, user, req } = await actor(true)
   const { href } = await managedStream(payload, req, streamId)
   await run(`${href}?participant=${memberId}`, 'Отметка сохранена', async () => {
-    const member = await payload.findByID({ collection: 'tutoring-participants', id: memberId, req, user, overrideAccess: false, depth: 1 })
-    const stream = member.stream
-    if (!stream || typeof stream === 'number' || stream.id !== streamId) throw new TutoringProblem('Ученик не найден в потоке')
-    const currentMeeting = Number(value(form, 'current'))
-    if (!isTutoringMeeting(currentMeeting, stream.program)) throw new TutoringProblem('Выберите встречу ученика')
-    await payload.update({ collection: 'tutoring-participants', id: member.id, req, user, overrideAccess: false,
-      data: { currentMeeting, active: value(form, 'active') === 'yes' } })
+    await changeTutoringEnrollment(payload, user, streamId, memberId, value(form, 'revision'), {
+      kind: 'update', currentMeeting: Number(value(form, 'current')), active: value(form, 'active') === 'yes',
+    })
+  })
+}
+
+export async function closeTutoringEnrollment(streamId: number, memberId: number, revision: string, action: 'graduate' | 'revoke') {
+  const { payload, user, req } = await actor(true)
+  const { href } = await managedStream(payload, req, streamId)
+  if (action !== 'graduate' && action !== 'revoke') notFound()
+  await run(`${href}?participant=${memberId}#student`, action === 'graduate' ? 'Обучение завершено' : 'Доступ к материалам закрыт', async () => {
+    await changeTutoringEnrollment(payload, user, streamId, memberId, revision, { kind: action })
   })
 }
 
@@ -195,6 +239,15 @@ export async function gradeTutoringHomework(streamId: number, memberId: number, 
     await writeTutoringReview(payload, streamId, memberId, meeting, {
       kind: 'grade', actor: user, status, feedback, expectedUpdatedAt: value(form, 'updatedAt'),
     })
+  })
+}
+
+export async function submitIntroductionWork(streamId: number, form: FormData) {
+  const { payload, req, user } = await actor(false)
+  const membership = (await tutoringMemberships(payload, req, user.id)).find(({ stream }) => stream.id === streamId)
+  if (!membership) notFound()
+  await run(`${tutoringPath(membership.stream.program)}/introduction#intro-practice-${streamId}`, 'Пробная работа отправлена', async () => {
+    await saveIntroductionSubmission(payload, user, streamId, value(form, 'submission'), value(form, 'previous'))
   })
 }
 

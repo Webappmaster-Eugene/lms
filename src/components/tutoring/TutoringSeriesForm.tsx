@@ -26,9 +26,11 @@ function PreviewRows({ rows }: { rows: TutoringScheduleSlot[] }) {
   </ol>
 }
 
-export function TutoringSeriesForm({ slots, now, action }: {
+export function TutoringSeriesForm({ slots, now, introductionStartsAt, awaitingFirstLecture, action }: {
   slots: TutoringScheduleSlot[]
   now: number
+  introductionStartsAt?: string | null
+  awaitingFirstLecture?: boolean | null
   action: (form: FormData) => Promise<void>
 }) {
   const upcoming = slots.filter(slot => Date.parse(slot.startsAt) > now)
@@ -40,7 +42,7 @@ export function TutoringSeriesForm({ slots, now, action }: {
 
   const hasSecond = upcoming.some(slot => slot.meeting > draft.fromMeeting)
   const hasOverrides = upcoming.some(slot => slot.meeting >= draft.fromMeeting && slot.startsAt !== slot.scheduledAt)
-  const plan = planTutoringScheduleChange(slots, draft, now)
+  const plan = planTutoringScheduleChange(slots, draft, now, introductionStartsAt, awaitingFirstLecture)
   const disabled = 'error' in plan || plan.changed === 0
 
   function selectMeeting(value: string) {

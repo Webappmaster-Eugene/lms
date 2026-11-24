@@ -8,10 +8,12 @@ import { POST as googleAccount } from '@/app/api/manage/tutoring/google-calendar
 import { moscowMeetingInput, scheduledTutoringMeeting } from '@/lib/tutoring'
 import { tutoringScheduleSlots } from '@/lib/tutoring-schedule'
 import { tutoringMemberships } from '@/server/tutoring-access'
+import { saveTutoringCharge } from '@/server/tutoring-payments'
+import { writeTutoringReview } from '@/server/tutoring'
 import { setTutoringStreamCalendar } from '@/server/tutoring-calendar-account'
 import { runTutoringCalendarJobs } from '@/server/tutoring-calendar-sync'
 import { googleCalendarApiPath, googleStateCookie, type GoogleEvent } from '@/server/tutoring-google'
-import { changeTutoringSchedule, moveTutoringMeeting, tutoringScheduleRevision } from '@/server/tutoring-schedule'
+import { changeTutoringSchedule, moveTutoringMeeting, openFirstTutoringLecture, scheduleTutoringIntroduction, tutoringScheduleRevision } from '@/server/tutoring-schedule'
 import { createAdmin, createStudent, getTestPayload, login, rest, uid, type TestUser } from '../helpers/payload'
 
 const origin = 'http://lms.test'
@@ -215,6 +217,78 @@ describe('расписание и Google Calendar репетиторства', (
     expect(scheduledTutoringMeeting(reread, 4).start.toISOString()).toBe(later(13))
   })
 
+  it('первый урок открывает наставник, повтор открытия сохраняет более позднюю встречу', async () => {
+    const stream = await payload.create({ collection: 'tutoring-streams',
+      data: { title: uid('first-lecture'), program: 'react-next', startsAt, status: 'draft', awaitingFirstLecture: true, currentMeeting: 1 } })
+    await expect(openFirstTutoringLecture(payload, teacher, stream.id, stream.updatedAt)).rejects.toThrow('Сначала откройте поток')
+    const opened = await payload.update({ collection: 'tutoring-streams', id: stream.id, data: { status: 'active' } })
+    await expect(openFirstTutoringLecture(payload, teacher, stream.id, 'старая версия')).rejects.toThrow('Настройки уже изменились')
+    const member = await payload.create({ collection: 'tutoring-participants', data: { stream: stream.id, student: student.id, currentMeeting: 1, active: true } })
+    await expect(saveTutoringCharge(payload, teacher, stream.id, member.id, 1, {
+      minutes: '60', rate: '1000', action: 'cancel', revision: '',
+    })).rejects.toThrow('Вводная встреча бесплатна')
+    await expect(openFirstTutoringLecture(payload, student, stream.id, opened.updatedAt)).rejects.toThrow('преподаватель')
+    await expect(payload.update({ collection: 'tutoring-streams', id: stream.id, data: { currentMeeting: 2 } }))
+      .rejects.toThrow('currentMeeting')
+    const results = await Promise.all([openFirstTutoringLecture(payload, teacher, stream.id, opened.updatedAt), openFirstTutoringLecture(payload, teacher, stream.id, opened.updatedAt)])
+    for (const result of results) expect(result).toMatchObject({ awaitingFirstLecture: false, currentMeeting: 1 })
+    await payload.update({ collection: 'tutoring-streams', id: stream.id, data: { currentMeeting: 3 } })
+    expect(await openFirstTutoringLecture(payload, teacher, stream.id, opened.updatedAt)).toMatchObject({ awaitingFirstLecture: false, currentMeeting: 3 })
+    await expect(payload.update({ collection: 'tutoring-streams', id: stream.id, data: { awaitingFirstLecture: true, currentMeeting: 1 } }))
+      .rejects.toThrow('awaitingFirstLecture')
+  })
+
+  it('позволяет назначить вводную старому потоку между занятиями, сохраняя выданный доступ', async () => {
+    const historicalStart = later(-14)
+    const stream = await payload.create({ collection: 'tutoring-streams',
+      data: { title: uid('previous-course'), program: 'react-next', startsAt: historicalStart, status: 'active', currentMeeting: 3 } })
+    const intro = new Date(Date.parse(startsAt) + 3_600_000).toISOString()
+    await expect(scheduleTutoringIntroduction(payload, teacher, stream.id, '', intro)).rejects.toThrow('пересекается')
+    const valid = later(1)
+    const updated = await scheduleTutoringIntroduction(payload, teacher, stream.id, '', valid)
+    expect(updated.currentMeeting).toBe(3)
+    expect(updated.awaitingFirstLecture).toBeFalsy()
+    expect(updated.introductionStartsAt).toBe(valid)
+    expect(tutoringScheduleSlots(updated)).toEqual(tutoringScheduleSlots(stream))
+  })
+
+  it('назначает вводную отдельно и отклоняет пересечения при любом переносе', async () => {
+    const stream = await createStream('draft')
+    const slot = tutoringScheduleSlots(stream)[0]
+    if (!slot) throw new Error('В программе должна быть первая техническая встреча')
+    const hour = 3_600_000
+    const first = Date.parse(slot.startsAt)
+    const intro = new Date(first - hour).toISOString()
+    const earlier = new Date(first - 2 * hour).toISOString()
+    const overlap = new Date(first - hour / 2).toISOString()
+    expect(stream.introductionStartsAt).toBeNull()
+    await expect(scheduleTutoringIntroduction(payload, student, stream.id, '', intro)).rejects.toThrow('преподаватель')
+    await expect(scheduleTutoringIntroduction(payload, teacher, stream.id, '', overlap)).rejects.toThrow('должна закончиться')
+    const updated = await scheduleTutoringIntroduction(payload, teacher, stream.id, '', intro)
+    expect(updated.introductionStartsAt).toBe(intro)
+    expect(tutoringScheduleSlots(updated)).toEqual(tutoringScheduleSlots(stream))
+    const member = await payload.create({ collection: 'tutoring-participants', data: { stream: stream.id, student: student.id, active: true, currentMeeting: 1 } })
+    await expect(saveTutoringCharge(payload, teacher, stream.id, member.id, 0, {
+      minutes: '60', rate: '1000', action: 'charge', revision: '',
+    })).rejects.toThrow('встреча не найдены')
+    await expect(writeTutoringReview(payload, stream.id, member.id, 0, {
+      kind: 'submit', actor: student, url: 'https://git.example.test/group/student/-/merge_requests/1',
+    })).rejects.toThrow('встреча не найдены')
+    for (const collection of ['tutoring-charges', 'tutoring-reviews'] as const) {
+      expect((await payload.count({ collection, where: { participant: { equals: member.id } } })).totalDocs).toBe(0)
+    }
+    await expect(scheduleTutoringIntroduction(payload, teacher, stream.id, '', earlier)).rejects.toThrow('уже изменилось')
+    await expect(moveTutoringMeeting(payload, teacher, stream.id, 1, {
+      expectedStart: slot.startsAt, newStart: overlap,
+    })).rejects.toThrow('должна закончиться')
+    await expect(changeTutoringSchedule(payload, teacher, stream.id, tutoringScheduleRevision(tutoringScheduleSlots(updated)), {
+      fromMeeting: 1, firstStart: moscowMeetingInput(new Date(overlap)), secondStart: local(2), keepOverrides: false,
+    })).rejects.toThrow('должна закончиться')
+    expect((await scheduleTutoringIntroduction(payload, teacher, stream.id, intro, earlier)).introductionStartsAt).toBe(earlier)
+    await payload.update({ collection: 'tutoring-streams', id: stream.id, data: { status: 'archived' } })
+    await expect(scheduleTutoringIntroduction(payload, teacher, stream.id, earlier, intro)).rejects.toThrow('недоступен')
+  })
+
   it('синхронизирует отдельный перенос и массовую правку в существующие события Google', async () => {
     const { calendars, events, changes, simulate, fetchGoogle } = googleFixture()
     expect((await googleAccount(accountRequest(studentSession))).status).toBe(403)
@@ -278,6 +352,22 @@ describe('расписание и Google Calendar репетиторства', (
     await syncNow()
     expect(changes.patch).toBe(24)
 
+    const firstIntro = new Date(Date.parse(startsAt) - 3_600_000).toISOString()
+    const movedIntro = new Date(Date.parse(firstIntro) - 3_600_000).toISOString()
+    await scheduleTutoringIntroduction(payload, teacher, selected.id, '', firstIntro)
+    await syncNow()
+    const introduction = [...events.values()].find(event => event.extendedProperties?.private?.meeting === `${selected.id}.introduction`)
+    if (!introduction) throw new Error('Вводная встреча отсутствует в Google')
+    expect(introduction).toMatchObject({
+      start: { dateTime: firstIntro }, end: { dateTime: startsAt }, visibility: 'private',
+      description: `${origin}/tutoring/react-next/introduction`, summary: `${selected.title} · Вводная встреча`,
+    })
+    await scheduleTutoringIntroduction(payload, teacher, selected.id, firstIntro, movedIntro)
+    await syncNow()
+    expect(events.get(introduction.id)).toMatchObject({ start: { dateTime: movedIntro }, end: { dateTime: firstIntro } })
+    expect(events.get(first.id)?.start?.dateTime).toBe(later(3))
+    expect(changes.insert).toBe(25)
+
     simulate.revoked = true
     await payload.update({ collection: 'tutoring-streams', id: selected.id, data: { status: 'archived' } })
     await syncNow()
@@ -291,7 +381,9 @@ describe('расписание и Google Calendar репетиторства', (
     events.set(past.id, past)
     events.set(personal.id, personal)
     await syncNow()
+    await syncNow()
     expect(events.get(first.id)?.status).toBe('cancelled')
+    expect(events.get(introduction.id)?.status).toBe('cancelled')
     expect(events.get(past.id)).toEqual(past)
     expect(events.get(personal.id)).toEqual(personal)
     events.delete(past.id)
@@ -299,11 +391,12 @@ describe('расписание и Google Calendar репетиторства', (
 
     await payload.update({ collection: 'tutoring-streams', id: selected.id, data: { status: 'active' } })
     await syncNow()
-    expect([...events.values()].filter(event => event.status !== 'cancelled')).toHaveLength(24)
+    await syncNow()
+    expect([...events.values()].filter(event => event.status !== 'cancelled')).toHaveLength(25)
     expect(changes.calendar).toBe(1)
     expect((await googleAccount(accountRequest(teacherSession, origin, '?operation=disconnect'))).headers.get('location')).toContain('result=disconnected')
     await syncNow()
     expect(await loadConnection()).toMatchObject({ status: 'disconnected', encryptedRefreshToken: null })
-    expect([...events.values()].filter(event => event.status !== 'cancelled')).toHaveLength(24)
+    expect([...events.values()].filter(event => event.status !== 'cancelled')).toHaveLength(25)
   })
 })

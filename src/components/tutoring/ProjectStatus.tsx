@@ -48,7 +48,7 @@ export function MentorProject({ stream, participant, project, enabled, inviteEma
 export function ProjectCheck({ check }: { check: TutoringCheck }) {
   if (check.verdict === 'pending') return <p className="text-sm">Новая версия работы ожидает автопроверки</p>
   const status = check.verdict === 'passed' ? 'пройдена' : check.verdict === 'failed' ? 'есть ошибки' : 'требует внимания'
-  return <p className="text-sm">Автопроверка этапа {check.stage}: <strong>{status}</strong>
+  return <p className="text-sm">{check.stage === 0 ? 'Автопроверка подготовки' : `Автопроверка этапа ${check.stage}`}: <strong>{status}</strong>
     {check.total != null && check.passed != null && <> · {check.passed} из {check.total}</>}
   </p>
 }

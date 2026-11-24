@@ -3,9 +3,10 @@
 import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 
+import type { TutoringProgram } from '@/lib/tutoring'
 import { PPTX_MIME, TUTORING_FILE_LIMIT } from '@/lib/tutoring-file-types'
 
-export function ReplacePresentation({ id, updatedAt, manual }: { id: number; updatedAt: string; manual: boolean }) {
+export function ReplacePresentation({ id, updatedAt, manual, introduction }: { id: number; updatedAt: string; manual: boolean; introduction?: TutoringProgram }) {
   const router = useRouter()
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState<{ error: boolean; text: string } | null>(null)
@@ -24,6 +25,7 @@ export function ReplacePresentation({ id, updatedAt, manual }: { id: number; upd
     }
     body.set('id', String(id))
     body.set('updatedAt', updatedAt)
+    if (introduction) body.set('introduction', introduction)
     setPending(true)
     setMessage(null)
     try {

@@ -38,6 +38,7 @@ export async function saveTutoringCharge(payload: Payload, actor: User, streamId
     if (!stream || typeof stream === 'number' || stream.id !== streamId || !isTutoringMeeting(meeting, stream.program)) {
       throw new TutoringProblem('Ученик или встреча не найдены')
     }
+    if (stream.awaitingFirstLecture) throw new TutoringProblem('Вводная встреча бесплатна. Технические занятия еще не открыты')
     const current = await tutoringCharge(payload, req, participant, meeting)
     if ((current?.updatedAt ?? '') !== input.revision) throw new TutoringProblem('Запись оплаты уже изменена. Обновите страницу')
     if (input.action === 'paid' || input.action === 'reopen') {

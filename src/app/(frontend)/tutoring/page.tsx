@@ -17,13 +17,32 @@ export default async function TutoringPage() {
           <Link className={managementLink} href={tutoringPath(program) + '/streams'}>Потоки</Link>
         </div>
       </li>)}
-    </ul> : memberships.length ? <ul className="divide-y divide-border border-y border-border">
-      {memberships.map(({ stream, member }) => <li key={member.id}>
-        <Link href={`${tutoringPath(stream.program)}/streams/${stream.id}`} className="block rounded px-3 py-4 hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">
-          <span className="block font-semibold">{stream.title}</span>
-          <span className="text-sm text-muted-foreground">{tutoringPrograms[stream.program].label} · встреча {member.currentMeeting}</span>
-        </Link>
-      </li>)}
-    </ul> : <p className="text-sm text-muted-foreground">Наставник пока не открыл вам группу.</p>}
+    </ul> : tutoring.length ? <>
+      <section aria-labelledby="materials" className="space-y-2">
+        <h2 id="materials" className="text-lg font-semibold">Мои материалы</h2>
+        <ul className="divide-y divide-border border-y border-border">
+          {tutoring.map(({ program }) => <li key={program}>
+            <Link href={`${tutoringPath(program)}/materials`} aria-label={`Мои материалы по курсу ${tutoringPrograms[program].label}`}
+              className="block rounded px-3 py-4 font-semibold hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">
+              {tutoringPrograms[program].label}
+            </Link>
+          </li>)}
+        </ul>
+      </section>
+      {memberships.length > 0 && <section aria-labelledby="streams" className="space-y-2">
+        <h2 id="streams" className="text-lg font-semibold">Мои потоки</h2>
+        <ul className="divide-y divide-border border-y border-border">
+          {memberships.map(({ stream, member }) => <li key={member.id}>
+            <Link href={`${tutoringPath(stream.program)}/streams/${stream.id}`}
+              className="block rounded px-3 py-4 hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">
+              <span className="block font-semibold">{stream.title}</span>
+              <span className="text-sm text-muted-foreground">
+                {tutoringPrograms[stream.program].label} · {stream.awaitingFirstLecture ? 'Вводная встреча' : `встреча ${member.currentMeeting}`}
+              </span>
+            </Link>
+          </li>)}
+        </ul>
+      </section>}
+    </> : <p className="text-sm text-muted-foreground">Наставник пока не открыл вам группу.</p>}
   </section>
 }
