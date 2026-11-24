@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKe
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from 'lucide-react'
 
 export type SlideRenderState = { index: number; current: boolean; near: boolean }
+export type HistoryDirection = 'undo' | 'redo'
 
 type Props = {
   label: string
@@ -15,6 +16,7 @@ type Props = {
   caption?: (index: number) => string | null
   actions?: ReactNode
   tools?: (index: number) => ReactNode
+  onHistoryAction?: (index: number, direction: HistoryDirection) => void
   children: (slide: SlideRenderState) => ReactNode
 }
 
@@ -38,10 +40,20 @@ function keyTarget(key: string, current: number, count: number): number | null {
  * клавиатуры прокручивают её программно. Содержимое слайда рисует вызывающий компонент.
  */
 function isEditingText(target: EventTarget | null) {
-  return target instanceof Element && Boolean(target.closest('input, textarea, [contenteditable="true"]'))
+  return target instanceof Element && Boolean(target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])'))
 }
 
-export function SlideDeck({ label, count, aspect = 16 / 9, pages = false, caption, actions, tools, children }: Props) {
+function historyDirection(event: KeyboardEvent): HistoryDirection | null {
+  if ((!event.ctrlKey && !event.metaKey) || event.altKey || event.isComposing) return null
+  const key = event.key.toLowerCase()
+  // Физическая клавиша нужна для кириллицы. В латинской раскладке используем введённую букву.
+  const physical = /^[a-z]$/.test(key) ? '' : event.code
+  if (key === 'z' || physical === 'KeyZ') return event.shiftKey ? 'redo' : 'undo'
+  if (event.ctrlKey && !event.metaKey && !event.shiftKey && (key === 'y' || physical === 'KeyY')) return 'redo'
+  return null
+}
+
+export function SlideDeck({ label, count, aspect = 16 / 9, pages = false, caption, actions, tools, onHistoryAction, children }: Props) {
   const root = useRef<HTMLDivElement>(null)
   const track = useRef<HTMLDivElement>(null)
   const toggle = useRef<HTMLButtonElement>(null)
@@ -56,6 +68,16 @@ export function SlideDeck({ label, count, aspect = 16 / 9, pages = false, captio
   const unit = pages ? { one: 'Страница', previous: 'Предыдущая страница', next: 'Следующая страница' } : { one: 'Слайд', previous: 'Предыдущий слайд', next: 'Следующий слайд' }
 
   useEffect(() => { position.current = current }, [current])
+
+  const handleHistory = useCallback((event: KeyboardEvent | ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!onHistoryAction || event.defaultPrevented || isEditingText(event.target)) return false
+    const direction = historyDirection('nativeEvent' in event ? event.nativeEvent : event)
+    if (!direction) return false
+    event.preventDefault()
+    event.stopPropagation()
+    onHistoryAction(position.current, direction)
+    return true
+  }, [onHistoryAction])
 
   const release = useCallback(() => {
     if (!settling.current) return
@@ -141,6 +163,7 @@ export function SlideDeck({ label, count, aspect = 16 / 9, pages = false, captio
     const previous = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const onKey = (event: KeyboardEvent) => {
+      if (handleHistory(event)) return
       if (event.altKey || event.ctrlKey || event.metaKey) return
       const element = root.current
       if (!element) return
@@ -175,10 +198,10 @@ export function SlideDeck({ label, count, aspect = 16 / 9, pages = false, captio
       document.body.style.overflow = previous
       window.removeEventListener('keydown', onKey, true)
     }
-  }, [collapse, count, expanded, go])
+  }, [collapse, count, expanded, go, handleHistory])
 
   function onKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
-    if (expanded || event.altKey || event.ctrlKey || event.metaKey || isEditingText(event.target)) return
+    if (expanded || handleHistory(event) || event.altKey || event.ctrlKey || event.metaKey || isEditingText(event.target)) return
     const target = keyTarget(event.key, position.current, count)
     if (target === null) return
     // Стрелки на странице урока листают уроки; внутри презентации они листают слайды.
@@ -200,9 +223,9 @@ export function SlideDeck({ label, count, aspect = 16 / 9, pages = false, captio
       aria-roledescription={expanded ? undefined : 'презентация'}
       aria-label={label}
       onKeyDown={onKeyDown}
-      className={expanded
+      className={(expanded
         ? 'fixed inset-0 z-[100] m-0 flex flex-col bg-background pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)] outline-none'
-        : 'flex flex-col overflow-hidden rounded-xl border border-border bg-card outline-none'}
+        : 'flex flex-col overflow-hidden rounded-xl border border-border bg-card outline-none') + (tools ? ' @container' : '')}
     >
       <div
         className={`relative min-h-0 w-full overflow-hidden bg-muted/40 ${expanded ? 'flex-1' : 'max-h-[max(12rem,calc(100dvh-12rem))]'}`}
@@ -235,21 +258,27 @@ export function SlideDeck({ label, count, aspect = 16 / 9, pages = false, captio
       <div className="h-1 w-full bg-muted" aria-hidden="true">
         <div className="h-full bg-primary transition-[width] duration-200 motion-reduce:transition-none" style={{ width: `${((current + 1) / count) * 100}%` }} />
       </div>
-      <div className="flex flex-wrap items-center gap-3 p-3">
-        <div className="flex items-center gap-2">
+      <div className={tools
+        ? 'grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1.5 p-2 @min-[46rem]:grid-cols-[auto_1fr_auto] @min-[46rem]:px-3'
+        : 'flex flex-wrap items-center gap-3 p-3'}>
+        <div className={tools ? 'flex items-center gap-1.5' : 'flex items-center gap-2'}>
           {/* aria-disabled, а не disabled: отключённая кнопка теряет фокус, и следующая стрелка листала бы уроки. */}
           <button type="button" className={controlClass} aria-disabled={atStart} aria-label={unit.previous} onClick={() => go(current - 1)}>
             <ChevronLeft aria-hidden="true" className="h-5 w-5" />
           </button>
-          <p className="min-w-16 text-center text-sm font-medium tabular-nums text-foreground" aria-live="polite" aria-atomic="true">
+          <p className={`${tools ? 'min-w-12' : 'min-w-16'} text-center text-sm font-medium tabular-nums text-foreground`} aria-live="polite" aria-atomic="true">
             <span className="sr-only">{unit.one} </span>{current + 1}<span aria-hidden="true"> / </span><span className="sr-only"> из </span>{count}
           </p>
           <button type="button" className={controlClass} aria-disabled={atEnd} aria-label={unit.next} onClick={() => go(current + 1)}>
             <ChevronRight aria-hidden="true" className="h-5 w-5" />
           </button>
         </div>
-        {tools?.(current)}
-        <div className="ml-auto flex items-center gap-2 sm:order-last">
+        {tools && <div className="col-span-2 row-start-2 border-t border-border pt-1.5 @min-[46rem]:col-span-1 @min-[46rem]:col-start-2 @min-[46rem]:row-start-1 @min-[46rem]:border-t-0 @min-[46rem]:pt-0">
+          {tools(current)}
+        </div>}
+        <div className={tools
+          ? 'col-start-2 row-start-1 flex items-center justify-self-end gap-1.5 @min-[46rem]:col-start-3'
+          : 'ml-auto flex items-center gap-2 sm:order-last'}>
           {actions}
           <button ref={toggle} type="button" className={controlClass} aria-label={expanded ? 'Свернуть презентацию' : 'Развернуть на весь экран'} onClick={() => void (expanded ? collapse() : expand())}>
             {expanded ? <Minimize2 aria-hidden="true" className="h-5 w-5" /> : <Maximize2 aria-hidden="true" className="h-5 w-5" />}

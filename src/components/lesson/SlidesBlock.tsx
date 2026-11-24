@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Download, FileDown, Loader2, RotateCw } from 'lucide-react'
 
-import { SlideDeck } from '@/components/lesson/SlideDeck'
+import { SlideDeck, type HistoryDirection } from '@/components/lesson/SlideDeck'
 import { AnnotationTools, PdfAnnotations, type AnnotationTool, type PdfMark } from '@/components/lesson/PdfAnnotations'
 import { useNearViewport } from '@/hooks/use-near-viewport'
 import { requestLoadSlot } from '@/lib/load-queue'
@@ -224,10 +224,12 @@ function PdfPage({ pdf, page, label, annotation }: { pdf: PdfDocument; page: num
   )
 }
 
-function DownloadLink({ item, text }: { item: SlideItem; text: string }) {
+function DownloadLink({ item, text, compact = false }: { item: SlideItem; text: string; compact?: boolean }) {
   return (
-    <a href={slideSourceUrl(item.url)} download={item.fileName ?? true} className={actionClass}>
-      <Download aria-hidden="true" className="h-4 w-4" />{text}
+    <a href={slideSourceUrl(item.url)} download={item.fileName ?? true} aria-label={compact ? text : undefined}
+      title={compact ? text : undefined} className={compact ? `${actionClass} min-w-11 justify-center` : actionClass}>
+      <Download aria-hidden="true" className="h-4 w-4" />
+      {compact ? <span className="hidden @min-[26rem]:inline">{text}</span> : text}
     </a>
   )
 }
@@ -237,27 +239,62 @@ type PdfState =
   | { key: string; status: 'failed' }
   | { key: string; status: 'ready'; pdf: PdfDocument; aspect: number }
 
+type AnnotationStep = PdfMark | 'clear'
+type AnnotationHistory = { steps: AnnotationStep[]; cursor: number }
+const emptyHistory: AnnotationHistory = { steps: [], cursor: 0 }
+
+function canClearHistory({ steps, cursor }: AnnotationHistory) {
+  return cursor > 0 && steps[cursor - 1] !== 'clear'
+}
+
+function visibleMarks({ steps, cursor }: AnnotationHistory): PdfMark[] {
+  if (!canClearHistory({ steps, cursor })) return []
+  const start = steps.lastIndexOf('clear', cursor - 1) + 1
+  return steps.slice(start, cursor).filter(step => step !== 'clear')
+}
+
 function ReadyPdfDeck({ name, item, pdf, aspect, annotations }: {
   name: string; item: SlideItem; pdf: PdfDocument; aspect: number; annotations: boolean
 }) {
   const [tool, setTool] = useState<AnnotationTool | null>(null)
-  const [marks, setMarks] = useState<Record<number, PdfMark[]>>({})
+  const [histories, setHistories] = useState<Record<number, AnnotationHistory>>({})
 
-  function updateMarks(index: number, update: (current: PdfMark[]) => PdfMark[]) {
-    setMarks(previous => ({ ...previous, [index]: update(previous[index] ?? []) }))
+  const updateHistory = useCallback((index: number, update: (current: AnnotationHistory) => AnnotationHistory) => {
+    setHistories(previous => {
+      const current = previous[index] ?? emptyHistory
+      const next = update(current)
+      return current === next ? previous : { ...previous, [index]: next }
+    })
+  }, [])
+
+  const moveHistory = useCallback((index: number, direction: HistoryDirection) => {
+    updateHistory(index, current => {
+      const cursor = current.cursor + (direction === 'undo' ? -1 : 1)
+      return cursor < 0 || cursor > current.steps.length ? current : { ...current, cursor }
+    })
+  }, [updateHistory])
+
+  function recordStep(index: number, step: AnnotationStep) {
+    updateHistory(index, current => step === 'clear' && !canClearHistory(current) ? current : {
+      steps: [...current.steps.slice(0, current.cursor), step], cursor: current.cursor + 1,
+    })
   }
 
-  return <SlideDeck label={name} count={pdf.pages} aspect={aspect} pages caption={() => name}
-    actions={<DownloadLink item={item} text="Скачать PDF" />}
-    tools={annotations ? index => <AnnotationTools tool={tool} toggle={next => setTool(value => value === next ? null : next)}
-      hasMarks={Boolean(marks[index]?.length)} undo={() => updateMarks(index, value => value.slice(0, -1))}
-      clear={() => updateMarks(index, () => [])} /> : undefined}>
+  return <SlideDeck label={name} count={pdf.pages} aspect={aspect} pages caption={annotations ? undefined : () => name}
+    actions={<DownloadLink item={item} text="Скачать PDF" compact={annotations} />}
+    onHistoryAction={annotations ? moveHistory : undefined}
+    tools={annotations ? index => {
+      const history = histories[index] ?? emptyHistory
+      return <AnnotationTools tool={tool} toggle={next => setTool(value => value === next ? null : next)}
+        canUndo={history.cursor > 0} canRedo={history.cursor < history.steps.length} canClear={canClearHistory(history)}
+        undo={() => moveHistory(index, 'undo')} redo={() => moveHistory(index, 'redo')} clear={() => recordStep(index, 'clear')} />
+    } : undefined}>
     {({ index, current, near }) => {
       if (!near) return null
       const active = current ? tool : null
-      const pageMarks = marks[index] ?? []
+      const pageMarks = visibleMarks(histories[index] ?? emptyHistory)
       const annotation = annotations && (active || pageMarks.length) ? <PdfAnnotations
-        key={active ?? 'view'} tool={active} marks={pageMarks} add={mark => updateMarks(index, previous => [...previous, mark])} /> : null
+        key={active ?? 'view'} tool={active} marks={pageMarks} add={mark => recordStep(index, mark)} /> : null
       return <PdfPage pdf={pdf} page={index + 1} label={`${name}, страница ${index + 1}`} annotation={annotation} />
     }}
   </SlideDeck>

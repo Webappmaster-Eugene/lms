@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, type PointerEvent } from 'react'
-import { Pencil, Type, Undo2, Trash2 } from 'lucide-react'
+import { Pencil, Type, Undo2, Redo2, Trash2 } from 'lucide-react'
 
 export type AnnotationTool = 'pen' | 'text'
 type Point = { x: number; y: number }
@@ -9,28 +9,42 @@ export type PdfMark = { kind: 'stroke'; points: Point[] } | { kind: 'text'; orig
 
 const coordinateSize = 1000
 const textLimit = 80
-const toolClass = 'inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring aria-pressed:border-primary aria-pressed:bg-primary/15 disabled:opacity-40'
+const toolClass = 'inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-background px-2.5 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring aria-pressed:border-primary aria-pressed:bg-primary/15 aria-disabled:cursor-default aria-disabled:opacity-40 aria-disabled:hover:bg-background'
 const iconClass = 'h-4 w-4 shrink-0'
+const toolLabel = 'hidden @min-[23rem]:inline'
 
-export function AnnotationTools({ tool, toggle, hasMarks, undo, clear }: {
+export function AnnotationTools({ tool, toggle, canUndo, canRedo, canClear, undo, redo, clear }: {
   tool: AnnotationTool | null
   toggle: (next: AnnotationTool) => void
-  hasMarks: boolean
+  canUndo: boolean
+  canRedo: boolean
+  canClear: boolean
   undo: () => void
+  redo: () => void
   clear: () => void
 }) {
-  return <div role="group" aria-label="Пометки на слайде" className="flex flex-wrap gap-2">
-    <button type="button" className={toolClass} aria-pressed={tool === 'pen'} onClick={() => toggle('pen')}>
-      <Pencil className={iconClass} aria-hidden="true" />Карандаш
-    </button>
-    <button type="button" className={toolClass} aria-pressed={tool === 'text'} onClick={() => toggle('text')}>
-      <Type className={iconClass} aria-hidden="true" />Текст
-    </button>
-    <button type="button" className={toolClass} disabled={!hasMarks} onClick={undo}>
-      <Undo2 className={iconClass} aria-hidden="true" />Отменить
-    </button>
-    <button type="button" className={toolClass} disabled={!hasMarks} onClick={clear}>
-      <Trash2 className={iconClass} aria-hidden="true" />Очистить слайд
+  return <div role="group" aria-label="Пометки на слайде" className="flex flex-wrap items-center justify-center gap-2">
+    <div className="flex gap-1">
+      <button type="button" className={toolClass} aria-label="Карандаш" title="Карандаш" aria-pressed={tool === 'pen'} onClick={() => toggle('pen')}>
+        <Pencil className={iconClass} aria-hidden="true" /><span className={toolLabel}>Карандаш</span>
+      </button>
+      <button type="button" className={toolClass} aria-label="Текст" title="Текст" aria-pressed={tool === 'text'} onClick={() => toggle('text')}>
+        <Type className={iconClass} aria-hidden="true" /><span className={toolLabel}>Текст</span>
+      </button>
+    </div>
+    <div className="flex gap-1">
+      <button type="button" className={toolClass} aria-label="Отменить" title="Отменить (Ctrl+Z / Cmd+Z)"
+        aria-keyshortcuts="Control+Z Meta+Z" aria-disabled={!canUndo} onClick={() => { if (canUndo) undo() }}>
+        <Undo2 className={iconClass} aria-hidden="true" />
+      </button>
+      <button type="button" className={toolClass} aria-label="Вернуть" title="Вернуть (Ctrl+Y / Ctrl+Shift+Z / Cmd+Shift+Z)"
+        aria-keyshortcuts="Control+Y Control+Shift+Z Meta+Shift+Z" aria-disabled={!canRedo} onClick={() => { if (canRedo) redo() }}>
+        <Redo2 className={iconClass} aria-hidden="true" />
+      </button>
+    </div>
+    <button type="button" className={toolClass} aria-label="Очистить слайд" title="Очистить слайд"
+      aria-disabled={!canClear} onClick={() => { if (canClear) clear() }}>
+      <Trash2 className={iconClass} aria-hidden="true" />
     </button>
   </div>
 }
@@ -77,6 +91,7 @@ export function PdfAnnotations({ tool, marks, add }: {
       setOrigin(point)
       return
     }
+    event.currentTarget.closest<HTMLElement>('[data-slide-deck]')?.focus({ preventScroll: true })
     event.currentTarget.setPointerCapture(event.pointerId)
     drawing.current = { id: event.pointerId, points: [point] }
     setPreview([point])
