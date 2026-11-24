@@ -66,6 +66,12 @@ class StepError(Exception):
     """Ошибка, которую должен увидеть наставник: уходит в LMS и в Telegram."""
 
 
+class GitLabError(StepError):
+    def __init__(self, status, message):
+        super().__init__(message)
+        self.status = status
+
+
 def http(method, url, headers, body=None, timeout=30):
     data = None if body is None else json.dumps(body).encode('utf-8')
     request = urllib.request.Request(url, data=data, method=method, headers=dict(headers, **({'Content-Type': 'application/json'} if data else {})))
@@ -97,7 +103,7 @@ def gl(method, path, body=None, allow404=False):
     if status == 404 and allow404:
         return None
     if status >= 400:
-        raise StepError('GitLab %s %s: %s %s' % (method, path, status, str(data)[:300]))
+        raise GitLabError(status, 'GitLab %s %s: %s %s' % (method, path, status, str(data)[:300]))
     return data
 
 
@@ -124,6 +130,41 @@ def usual_protection(protection):
 
 def differing_settings(project):
     return [key for key, value in PROJECT_SETTINGS.items() if project.get(key) != value]
+
+
+def automatic_account(job):
+    return 'lease' in job and job.get('autoResolveUsername') is True
+
+
+def user_with_primary_email(email):
+    matches = {}
+    page = 1
+    while True:
+        users = gl('GET', '/users?search=%s&per_page=100&page=%s' % (q(email), page))
+        for user in users:
+            if (user.get('email') or '').lower() == email:
+                matches[user['id']] = user
+        if len(users) < 100:
+            break
+        page += 1
+    if len(matches) > 1:
+        raise StepError('Основная почта совпала с несколькими учётками GitLab')
+    return next(iter(matches.values()), None)
+
+
+def verified_student_account(user, email, grader_id):
+    # Список по имени без humans также возвращает служебные учётные записи.
+    regular = gl('GET', '/users?username=%s&humans=true' % q(user['username']))
+    if len(regular) != 1 or regular[0]['id'] != user['id']:
+        raise StepError('Для учебного проекта нужна личная учётка GitLab')
+    account = regular[0]
+    if (account.get('email') or '').lower() != email or not account.get('confirmed_at'):
+        raise StepError('Основная почта GitLab должна быть подтверждена и совпадать с почтой в LMS')
+    if account.get('state') != 'active' or account.get('locked'):
+        raise StepError('Учётка GitLab не активна или заблокирована')
+    if account.get('is_admin') is not False or account.get('is_auditor') or account.get('bot') or account['id'] == grader_id:
+        raise StepError('Служебная учётка GitLab не может быть учеником')
+    return account
 
 
 class Job:
@@ -181,32 +222,55 @@ class Job:
                 page += 1
 
 
-    def gitlab_user(self):
-        username, email = self.job['username'], self.job['email'].lower()
+    def existing_gitlab_user(self, username, email):
         found = gl('GET', '/users?username=%s' % q(username))
         user = found[0] if found else None
-        by_email = [item for item in gl('GET', '/users?search=%s' % q(email)) if (item.get('email') or '').lower() == email]
         if user and (user.get('email') or '').lower() != email:
             raise StepError('Логин %s в GitLab занят учёткой с другой почтой' % username)
+        by_email = user_with_primary_email(email)
+        auto = automatic_account(self.job)
+        if user and by_email and user['id'] != by_email['id']:
+            raise StepError('Логин и основная почта указывают на разные учётки GitLab')
         if not user and by_email:
-            raise StepError('Почта %s уже у учётки GitLab %s' % (email, by_email[0]['username']))
-        if user:
-            if 'lease' in self.job:
-                if user.get('state') != 'active':
-                    raise StepError('Учётка GitLab не активна, проверьте её состояние')
-                if user.get('is_admin') or user.get('bot') or user.get('id') == self.job.get('graderUserId'):
-                    raise StepError('Служебная учётка GitLab не может быть учеником')
+            if not auto:
+                raise StepError('Почта %s уже у учётки GitLab %s' % (email, by_email['username']))
+            user = by_email
+        expected = self.job.get('gitlabUserId')
+        if auto and expected and (not user or user['id'] != expected):
+            raise StepError('Учётка GitLab не совпадает с ID, сохранённым в LMS')
+        return user
 
-            self.user = user
-            detail = 'учётка уже была (%s), письмо не отправлялось' % user.get('state')
-        else:
-            self.user = gl('POST', '/users', {
-                'username': username, 'email': email, 'name': '%s %s' % (self.job['firstName'], self.job['lastName']),
-                'skip_confirmation': True, 'reset_password': True, 'projects_limit': 0, 'can_create_group': False,
-            })
-            detail = 'создана, GitLab отправил письмо со ссылкой для пароля'
-        self.extra['gitlabUserId'] = self.user['id']
-        return 'done', detail
+    def gitlab_user(self):
+        username, email = self.job['username'], self.job['email'].lower()
+        auto = automatic_account(self.job)
+        user = self.existing_gitlab_user(username, email)
+        created = False
+        if not user:
+            try:
+                user = gl('POST', '/users', {
+                    'username': username, 'email': email, 'name': '%s %s' % (self.job['firstName'], self.job['lastName']),
+                    'skip_confirmation': True, 'reset_password': True, 'projects_limit': 0, 'can_create_group': False,
+                })
+                created = True
+            except GitLabError as error:
+                # Два курса могут одновременно готовить доступ одному ученику.
+                if not auto or error.status not in (400, 409, 422):
+                    raise
+                user = self.existing_gitlab_user(username, email)
+                if not user:
+                    raise
+
+        if auto:
+            user = verified_student_account(user, email, self.job.get('graderUserId'))
+        elif 'lease' in self.job and not created:
+            if user.get('state') != 'active':
+                raise StepError('Учётка GitLab не активна, проверьте её состояние')
+            if user.get('is_admin') or user.get('bot') or user.get('id') == self.job.get('graderUserId'):
+                raise StepError('Служебная учётка GitLab не может быть учеником')
+        self.user = user
+        self.extra['gitlabUserId'] = user['id']
+        return 'done', ('создана, GitLab отправил письмо со ссылкой для пароля' if created
+                        else 'учётка уже была (%s), письмо не отправлялось' % user.get('state'))
 
     def gitlab_project(self):
         group, username = self.job['group'], self.job['username']
@@ -329,12 +393,14 @@ def remove_project_member(item):
     user = gl('GET', '/users/%s' % item['gitlabUserId'], allow404=True)
     if user is None:
         return
-    if user.get('username') != item['username']:
+    if not automatic_account(item) and user.get('username') != item['username']:
         raise StepError('Логин не совпадает с учёткой GitLab из задания')
     pid, uid = item['gitlabProjectId'], item['gitlabUserId']
     project = gl('GET', '/projects/%s' % pid, allow404=True)
     if project is None:
         return
+    if automatic_account(item) and project.get('path_with_namespace') != '%s/%s' % (item['group'], item['username']):
+        raise StepError('Путь проекта GitLab не совпадает с заданием на отзыв доступа')
     direct = '/projects/%s/members/%s' % (pid, uid)
     gl('DELETE', direct, allow404=True)
     if gl('GET', '/projects/%s/members/all/%s' % (pid, uid), allow404=True):
