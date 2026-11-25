@@ -5,7 +5,7 @@ import { COMMENT_MAX_LENGTH } from '@/lib/comment-threads'
 import type { Course, Lesson, Roadmap, User } from '@/payload-types'
 
 import { getTestPayload, uid } from '../helpers/payload'
-import { buildFixtureContext, INTERNAL_COLLECTIONS, makeValid, VALID, type Data, type FixtureContext } from '../helpers/fixtures'
+import { buildFixtureContext, cleanupTutoringFixture, tutoringFileForCreate, tutoringPdf, INTERNAL_COLLECTIONS, makeValid, VALID, type Data, type FixtureContext } from '../helpers/fixtures'
 
 /**
  * Схема каждой коллекции проверяется по её собственному конфигу: обязательные
@@ -35,7 +35,8 @@ async function makeValidDoc(slug: string): Promise<Data> {
 }
 
 async function createAs<T extends object = Data & { id: number }>(slug: string, data: Data): Promise<T> {
-  const doc = await payload.create({ collection: slug as CollectionSlug, data: data as never, ...(slug === 'learning-access-grants' ? { user: admin } : {}), context: { skipHooks: true, ...(slug === 'learning-access-policies' ? { syncLearningAccessPolicy: true } : {}), ...(slug === 'auth-session-revocations' ? { syncAuthSessionRevocations: true } : {}), ...(slug === 'account-freezes' ? { syncAccountFreezes: true } : {}), ...(['student-session-telemetry', 'student-learning-events', 'student-activity-days'].includes(slug) ? { syncStudentAnalytics: true } : {}), ...(slug === 'admin-digests' ? { syncAdminDigests: true } : {}), ...(slug === 'bootcamp-week-submissions' ? { syncBootcampSubmissions: true } : {}), ...(slug === 'web-vitals-reports' ? { syncWebVitals: true } : {}) } })
+  const doc = await payload.create({ collection: slug as CollectionSlug, data: data as never, file: tutoringFileForCreate(slug), ...(slug === 'learning-access-grants' ? { user: admin } : {}), context: { skipHooks: true, ...(slug === 'learning-access-policies' ? { syncLearningAccessPolicy: true } : {}), ...(slug === 'auth-session-revocations' ? { syncAuthSessionRevocations: true } : {}), ...(slug === 'account-freezes' ? { syncAccountFreezes: true } : {}), ...(['student-session-telemetry', 'student-learning-events', 'student-activity-days'].includes(slug) ? { syncStudentAnalytics: true } : {}), ...(slug === 'admin-digests' ? { syncAdminDigests: true } : {}), ...(slug === 'bootcamp-week-submissions' ? { syncBootcampSubmissions: true } : {}), ...(slug === 'web-vitals-reports' ? { syncWebVitals: true } : {}) } })
+  cleanupTutoringFixture(payload, slug, Number(doc.id))
   return doc as unknown as T
 }
 
@@ -59,6 +60,11 @@ async function expectInvalidField(slug: string, field: string, promise: Promise<
   }
   if (slug === 'comments' && field === 'content') {
     await expect(promise).rejects.toMatchObject({ status: 400, message: `Комментарий должен содержать от 1 до ${COMMENT_MAX_LENGTH} символов` })
+    return
+  }
+  // Проверки номера по выбранной программе выполняются до валидации select.
+  if (field === 'program' && (slug === 'tutoring-meetings' || slug === 'tutoring-streams')) {
+    expect(await validationPaths(promise)).toContain(slug === 'tutoring-meetings' ? 'number' : 'currentMeeting')
     return
   }
   expect(await validationPaths(promise), `${slug}.${field}`).toContain(field)
@@ -113,7 +119,9 @@ describe.each(Object.keys(VALID))('коллекция %s', (slug) => {
   })
 
   it('уникальные поля не допускают дубликатов', async () => {
-    const unique = topLevelFields(slug).filter((f) => f.unique && !(slug === 'learning-access-grants' && f.name === 'ruleKey'))
+    // Для файлов Payload сохраняет оба документа под разными именами. Проверяем это отдельным тестом.
+    const uploaded = slug === 'tutoring-deck-files' || slug === 'tutoring-meetings'
+    const unique = topLevelFields(slug).filter((f) => f.unique && !(uploaded && f.name === 'filename') && !(slug === 'learning-access-grants' && f.name === 'ruleKey'))
     for (const field of unique) {
       const first = await makeValidDoc(slug)
       const doc = (await createAs(slug, first)) as unknown as Data
@@ -131,7 +139,7 @@ describe.each(Object.keys(VALID))('коллекция %s', (slug) => {
     for (const field of selects) {
       const data = await makeValidDoc(slug)
       data[field.name] = (field as { hasMany?: boolean }).hasMany ? ['__нет_такого__'] : '__нет_такого__'
-      expect(await validationPaths(createAs(slug, data)), `${slug}.${field.name}`).toContain(field.name)
+      await expectInvalidField(slug, field.name, createAs(slug, data))
     }
   })
 
@@ -170,6 +178,25 @@ describe.each(Object.keys(VALID))('коллекция %s', (slug) => {
 })
 
 describe('частные правила полей', () => {
+  it.each(['tutoring-deck-files', 'tutoring-meetings'] as const)('%s: два PDF с одним именем сохраняются отдельно', async (slug) => {
+    const name = uid('same-name') + '.pdf'
+    async function add(pages: number, number: number) {
+      const data = await makeValidDoc(slug)
+      if (slug === 'tutoring-meetings') data.number = number
+      const doc = await payload.create({ collection: slug, data: data as never, file: tutoringPdf(name, pages), depth: 0 })
+      cleanupTutoringFixture(payload, slug, doc.id)
+      return doc
+    }
+    const original = await add(1, 32)
+    const copy = await add(2, 31)
+    expect(original.filename).toBe(name)
+    expect(copy.filename).toMatch(/\.pdf$/)
+    expect(copy.filename).not.toBe(original.filename)
+    expect(copy.filesize).toBeGreaterThan(original.filesize ?? 0)
+    const unchanged = await payload.findByID({ collection: slug, id: original.id, depth: 0 })
+    expect(unchanged).toMatchObject({ filename: original.filename, filesize: original.filesize })
+  })
+
   it('ключ назначения вычисляет сервер, дубликат ученика и цели запрещён', async () => {
     const first = await makeValidDoc('learning-access-grants')
     const doc = await createAs<{ id: number; ruleKey: string; target: { relationTo: string; value: number | { id: number } } }>('learning-access-grants', { ...first, ruleKey: 'поддельный' })

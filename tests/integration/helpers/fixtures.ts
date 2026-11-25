@@ -1,5 +1,10 @@
-import type { Payload } from 'payload'
+import type { CollectionSlug, Payload } from 'payload'
 import { createHash } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
+import { onTestFinished } from 'vitest'
+
+import { PPTX_MIME } from '@/lib/tutoring-file-types'
+import { blankPDF } from '../../fixtures/blank-pdf'
 
 import { createAdmin, createCourseTree, createStudent, createSumTask, createTopic, uid } from './payload'
 
@@ -17,6 +22,10 @@ export type FixtureContext = {
   topicId: number
   taskId: number
   achievementId: number
+  tutoringPdfId: number
+  tutoringPptxId: number
+  tutoringParticipantId: number
+  tutoringProjectId: number
   interviewDirectionId: number
 }
 
@@ -85,6 +94,23 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   'faq-items': () => ({ question: 'Вопрос?', answer: lexical('Ответ') }),
   'reply-templates': () => ({ title: `Заготовка ${uid()}`, content: '{имя}, пришлите код целиком' }),
   'yandex-disk-imports': (ctx) => ({ publicUrl: 'https://disk.yandex.ru/d/test', course: ctx.courseId, importedBy: ctx.userId }),
+  'tutoring-deck-files': () => ({}),
+  'tutoring-introductions': (ctx) => ({
+    program: 'nodejs', deckPdf: ctx.tutoringPdfId, deckPptx: ctx.tutoringPptxId, deckOrigin: 'import',
+    instructorNotes: 'Сценарий вводной встречи', sourceDigest: createHash('sha256').update('intro-fixture').digest('hex'),
+  }),
+  'tutoring-meetings': () => ({
+    program: 'nodejs', number: 32, title: 'Защита проекта',
+    homework: [{ stage: 20, description: 'Показать итоговое изменение' }],
+  }),
+  'tutoring-streams': () => ({ program: 'nodejs', title: uid('mentoring'), startsAt: '2027-02-16T17:00:00Z' }),
+  'tutoring-participants': (ctx) => ({ student: ctx.studentId }),
+  'tutoring-reviews': (ctx) => ({ participant: ctx.tutoringParticipantId, meeting: 1 }),
+  'tutoring-calendars': (ctx) => ({ owner: ctx.userId, googleSubject: uid('subject'), googleEmail: 'calendar@lms.test', status: 'disconnected' }),
+  'tutoring-charges': (ctx) => ({ participant: ctx.tutoringParticipantId, meeting: 1, minutes: 60, hourlyKopecks: 150000, amountKopecks: 150000, updatedBy: ctx.userId, status: 'due' }),
+  'tutoring-projects': () => ({ program: 'nodejs', username: uid('gitlab'), group: 'school/mentoring',
+    courseProject: 'school/starter', gradingProject: 'school/grading' }),
+  'tutoring-checks': (ctx) => ({ project: ctx.tutoringProjectId, mrIid: 1, stage: 1, verdict: 'passed', reportedAt: new Date().toISOString() }),
   // Ключ уникален и в формате ключа программы: латиница, цифры и дефис.
   'bootcamp-programs': () => ({
     key: uid('program').toLowerCase().replace(/[^a-z0-9-]/g, '-'), title: 'Программа фикстуры', shortTitle: 'Фикстура', isActive: false,
@@ -111,6 +137,27 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
 /** Коллекции, где пользователь может владеть документом (поле user). */
 export const UNIQUE_PER_USER = new Set(['streaks', 'user-trainer-progress', 'learning-access-policies', 'notification-preferences'])
 
+export function tutoringPdf(name = uid('slides') + '.pdf', pages = 1) {
+  const data = blankPDF(pages)
+  return { data, name, mimetype: 'application/pdf', size: data.length }
+}
+
+export function tutoringFileForCreate(slug: string) {
+  if (slug === 'tutoring-deck-files' || slug === 'tutoring-meetings') return tutoringPdf()
+}
+
+function draftTutoringStream(payload: Payload) {
+  return payload.create({ collection: 'tutoring-streams', data: { program: 'nodejs', title: uid('mentoring'),
+    startsAt: '2027-02-16T17:00:00Z', status: 'draft', currentMeeting: 1 } })
+}
+
+// Освобождаем номера встреч и вводные, а пробные проекты не оставляем в очереди исполнителя.
+export function cleanupTutoringFixture(payload: Payload, slug: string, id: number) {
+  if (slug.startsWith('tutoring-')) {
+    onTestFinished(async () => { await payload.delete({ collection: slug as CollectionSlug, where: { id: { equals: id } } }) })
+  }
+}
+
 export async function buildFixtureContext(payload: Payload): Promise<FixtureContext> {
   const admin = await createAdmin(payload)
   const student = await createStudent(payload)
@@ -126,7 +173,19 @@ export async function buildFixtureContext(payload: Payload): Promise<FixtureCont
     data: { title: 'Ачивка фикстур', description: 'Не выдаётся', criteriaType: 'lesson_count', criteriaValue: 100000, isActive: false },
   })
   const direction = await payload.create({ collection: 'interview-directions', data: { title: 'Направление фикстур', slug: uid('direction') } })
+  const pptx = await readFile('tests/fixtures/tutoring-editable.pptx')
+  const pdfDoc = await payload.create({ collection: 'tutoring-deck-files', data: {}, file: tutoringPdf() })
+  const pptxDoc = await payload.create({ collection: 'tutoring-deck-files', data: {},
+    file: { name: uid('slides') + '.pptx', data: pptx, mimetype: PPTX_MIME, size: pptx.length } })
+  const stream = await draftTutoringStream(payload)
+  const participant = await payload.create({ collection: 'tutoring-participants',
+    data: { stream: stream.id, student: student.id, active: false, currentMeeting: 1 } })
+  const project = await payload.create({ collection: 'tutoring-projects', data: { student: student.id,
+    program: 'nodejs', username: uid('gitlab'), group: 'school/mentoring', courseProject: 'school/starter',
+    gradingProject: 'school/grading', state: 'revoked', attempts: 0 } })
   return {
+    tutoringPdfId: pdfDoc.id, tutoringPptxId: pptxDoc.id,
+    tutoringParticipantId: participant.id, tutoringProjectId: project.id,
     userId: admin.id, studentId: student.id, lessonId: tree.lessons[0].id, courseId: tree.course.id,
     roadmapId: tree.roadmap.id, nodeId: node.id, topicId: topic.id, taskId: task.id, achievementId: achievement.id, interviewDirectionId: direction.id,
   }
@@ -138,6 +197,12 @@ export async function buildFixtureContext(payload: Payload): Promise<FixtureCont
  */
 export async function makeValid(payload: Payload, slug: string, ctx: FixtureContext, owner?: number): Promise<Data> {
   const data = VALID[slug](ctx)
+  if (slug === 'tutoring-participants') data.stream = (await draftTutoringStream(payload)).id
+  if (slug === 'tutoring-projects') {
+    data.student = (await createStudent(payload)).id
+    data.projectId = data.student
+  }
+  if (slug === 'tutoring-calendars') data.owner = (await createAdmin(payload)).id
   // Закладка уникальна по паре «пользователь + урок» — каждой копии свой урок.
   if (slug === 'bookmarks' || slug === 'lesson-learning-states') {
     data.lesson = (await payload.create({ collection: 'lessons', data: { title: `Урок ${uid()}`, course: ctx.courseId, isPublished: true } as never })).id
@@ -193,4 +258,4 @@ export async function makeValid(payload: Payload, slug: string, ctx: FixtureCont
   return data
 }
 
-export { blankPDF } from '../../fixtures/blank-pdf'
+export { blankPDF }

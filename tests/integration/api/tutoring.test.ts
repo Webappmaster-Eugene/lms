@@ -6,7 +6,7 @@ import { POST as replacePresentation } from '@/app/api/manage/tutoring/presentat
 import { saveTutoringDeck } from '@/server/tutoring-decks'
 import { writeTutoringReview } from '@/server/tutoring'
 import type { TutoringMeeting, TutoringParticipant, TutoringStream } from '@/payload-types'
-import { blankPDF } from '../helpers/fixtures'
+import { blankPDF, cleanupTutoringFixture } from '../helpers/fixtures'
 import { createAdmin, createStudent, getTestPayload, login, rest, uid, type TestUser } from '../helpers/payload'
 
 let payload: Payload
@@ -187,6 +187,7 @@ describe('репетиторство в LMS', () => {
     const first = await upload(adminToken)
     expect(first.status).toBe(200)
     const { id } = await first.json()
+    cleanupTutoringFixture(payload, 'tutoring-introductions', id)
     expect(await (await upload(adminToken)).json()).toEqual({ id, status: 'unchanged' })
     const saved = await payload.findByID({ collection: 'tutoring-introductions', id, depth: 1 })
     if (typeof saved.deckPdf === 'number' || typeof saved.deckPptx === 'number') throw new Error('Не загружены файлы вводной')
