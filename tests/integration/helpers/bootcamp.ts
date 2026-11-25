@@ -32,3 +32,13 @@ export async function createProgram(payload: Payload, extra: Record<string, unkn
     overrideAccess: true,
   })
 }
+
+export async function configureTestBootcampGrader(payload: Payload, key: string, id: number) {
+  const { docs: [old] } = await payload.find({ collection: 'bootcamp-programs', where: { key: { equals: key } }, limit: 1 })
+  if (!old) {
+    const created = await createProgram(payload, { key, bootcampGraderUserId: id })
+    return () => payload.delete({ collection: 'bootcamp-programs', id: created.id })
+  }
+  await payload.update({ collection: 'bootcamp-programs', id: old.id, data: { bootcampGraderUserId: id } })
+  return () => payload.update({ collection: 'bootcamp-programs', id: old.id, data: { bootcampGraderUserId: old.bootcampGraderUserId ?? null } })
+}

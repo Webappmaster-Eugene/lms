@@ -7,8 +7,9 @@ import { GET as pathState, POST as pathAction } from '@/app/api/bootcamp/leads/[
 import { POST as startRoute } from '@/app/api/bootcamp/pay/[token]/start/route'
 import { POST as resultRoute } from '@/app/api/bootcamp/robokassa/result/route'
 import { adminTelegramTransport } from '@/server/admin-telegram'
-import { noteFailReturn, paymentPageState } from '@/server/bootcamp-payment'
+import { applyPaid, handleResultNotice, noteFailReturn, paymentPageState, successReturnState } from '@/server/bootcamp-payment'
 import { runBootcampSchedule } from '@/server/bootcamp-schedule'
+import * as robokassa from '@/server/robokassa'
 import { noticeSignatureBase, signatureHash } from '@/server/robokassa'
 import type { BootcampLead } from '@/payload-types'
 import { captureEmails, createAdmin, createCourseTree, getTestPayload, login, uid, type TestUser } from '../helpers/payload'
@@ -35,6 +36,7 @@ beforeAll(async () => {
     if (value === undefined) delete process.env[key]
     else process.env[key] = value
   }
+  vi.spyOn(robokassa, 'fetchOperationState').mockResolvedValue({ state: 'not_found', stateCode: null })
   vi.spyOn(adminTelegramTransport, 'send').mockImplementation(async (_cfg, _chat, text) => { telegram.push(text) })
 })
 
@@ -160,6 +162,15 @@ describe('путь заявки: этап только кнопками', () => 
     const earlier = await newLead({ status: 'enrolled', paidAt: new Date().toISOString() })
     await payload.create({ collection: 'bootcamp-enrollments', data: { lead: earlier.id, email: earlier.email, firstName: 'Иван', lastName: 'Петров', gitlabUsername: newUsername(), streamGroup: 'nodejs-2027-1', program: 'nodejs', status: 'done' }, overrideAccess: true })
     expect((await act((await newLead()).id, { ...admitBody(), group: 'nodejs-2027-1' })).status).toBe(200)
+    const lead = await newLead()
+    const unverified = newUsername()
+    await payload.create({ collection: 'bootcamp-streams', overrideAccess: true, data: { program: 'nodejs', title: 'Группа выходного дня', gitlabGroup: 'nodejs-2027-1', startsAt: '2027-02-02' } })
+    await payload.create({ collection: 'bootcamp-streams', overrideAccess: true, data: { program: 'nodejs', title: 'Новый календарь', gitlabGroup: unverified, startsAt: '2027-02-09' } })
+    const view = await pathState(new Request('http://lms.test/api/x', { headers: asAdmin() }), { params: Promise.resolve({ id: String(lead.id) }) })
+    const { defaults } = await view.json() as { defaults: { streams: { group: string; title: string }[] } }
+    expect(defaults.streams).toContainEqual({ group: 'nodejs-2027-1', title: 'Группа выходного дня' })
+    expect(defaults.streams.some(item => item.group === unverified)).toBe(false)
+    expect((await act(lead.id, { ...admitBody(), group: unverified })).status).toBe(409)
   })
 
   it('«Отправить входное задание»: заявка без письма получает ссылку и срок, в журнале отдельная запись', async () => {
@@ -358,6 +369,47 @@ describe('оплата через Робокассу', () => {
     expect(fresh.enrollment).toBeNull()
     expect((await payload.findByID({ collection: 'bootcamp-payments', id: stale, overrideAccess: true })).status).toBe('paid')
     await vi.waitFor(() => expect(telegram.find((text) => text.startsWith(`Оплата по недействующему счёту: ${lead.email}`))).toBeTruthy())
+  })
+
+  it.each([true, false])('после смены режима магазина счет сохраняет исходный режим isTest=%s', async (issuedInTest) => {
+    const originalMode = process.env.ROBOKASSA_IS_TEST
+    try {
+      process.env.ROBOKASSA_IS_TEST = issuedInTest ? '1' : '0'
+      const { lead, token } = await admitted()
+      const id = await checkout(token)
+      process.env.ROBOKASSA_IS_TEST = issuedInTest ? '0' : '1'
+      // Подпись уже проверена платежным адаптером. Здесь проверяем,
+      // к какому счету разрешено применить его результат.
+      const verified = { ok: true as const, notice: { invId: id, amountKopecks: 4_500_000, outSum: '45000.00', shp: {} } }
+      await vi.spyOn(robokassa, 'verifyResultNotice').withImplementation(() => verified, async () => {
+        expect((await handleResultNotice(payload, {})).status).toBe(400)
+      })
+      await vi.spyOn(robokassa, 'verifySuccessReturn').withImplementation(() => verified, async () => {
+        expect((await successReturnState(payload, {})).kind).toBe('invalid')
+      })
+      if (issuedInTest) {
+        expect(await applyPaid(payload, id, { source: 'reconcile', isTest: false, amountKopecks: 4_500_000 })).toMatchObject({ outcome: 'unknown' })
+      }
+      const untouched = await payload.findByID({ collection: 'bootcamp-payments', id, depth: 0 })
+      expect(untouched).toMatchObject({ status: 'pending', processedAt: null, paidAt: null, isTest: issuedInTest })
+      expect(await state(lead.id)).toMatchObject({ lead: { status: 'admitted', paidAt: null }, enrollment: null })
+    } finally {
+      process.env.ROBOKASSA_IS_TEST = originalMode
+    }
+  })
+
+  it('ручной платеж не учитывается как подтверждение или повтор операции Робокассы', async () => {
+    const { lead } = await admitted()
+    const accepted = await act(lead.id, { action: 'mark-paid', amount: '45000', comment: 'Получен перевод' })
+    expect(accepted.status).toBe(200)
+    const { docs: [manual] } = await payload.find({ collection: 'bootcamp-payments', depth: 0, where: { lead: { equals: lead.id } } })
+    expect(manual).toMatchObject({ method: 'manual', status: 'paid' })
+    for (const source of ['reconcile', 'robokassa'] as const) {
+      expect(await applyPaid(payload, manual.id, { source, isTest: false, amountKopecks: 4_500_000 })).toEqual({ outcome: 'unknown', leadId: null })
+    }
+    const after = await payload.findByID({ collection: 'bootcamp-payments', id: manual.id, depth: 0 })
+    expect(after).toEqual(manual)
+    expect(await payload.count({ collection: 'bootcamp-enrollments', where: { lead: { equals: lead.id } } })).toMatchObject({ totalDocs: 1 })
   })
 
   it('тестовая оплата не выдаёт доступы сама, её можно снять отменой допуска', async () => {

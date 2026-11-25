@@ -3,116 +3,137 @@ import 'server-only'
 import { sql } from '@payloadcms/db-postgres'
 import type { Payload } from 'payload'
 
-import { parseVerdict, weekFromBranch, type ParsedVerdict } from '@/lib/bootcamp-progress'
-import { logger } from '@/lib/telemetry'
-import type { BootcampEnrollment } from '@/payload-types'
-
-/**
- * Сдачи недель из событий GitLab: одна строка на MR ученика. Каждое событие меняет только свои
- * поля и только если оно не старее записанного - GitLab не обещает порядок доставки вебхуков.
- */
+import { parseVerdict, weekFromBranch } from '@/lib/bootcamp-progress'
+import { BOOTCAMP_GITLAB_ORIGIN } from '@/lib/site-links'
+import { tutoringHttpsUrl } from '@/lib/tutoring'
+import type { BootcampEnrollment, BootcampWeekSubmission } from '@/payload-types'
+import { inTransaction, rowsOf, txDb } from '@/server/bootcamp-lead-events'
 
 type Json = Record<string, unknown>
-type Db = { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }
-const db = (payload: Payload) => (payload.db as unknown as { drizzle: Db }).drizzle
+type EventKind = 'mr' | 'pipeline' | 'verdict' | 'comment'
+type Patch = Partial<BootcampWeekSubmission>
 const obj = (value: unknown): Json => value && typeof value === 'object' && !Array.isArray(value) ? value as Json : {}
-const str = (value: unknown): string => typeof value === 'string' ? value : typeof value === 'number' ? String(value) : ''
-const rowsOf = <T>(result: unknown) => (result as { rows?: T[] }).rows ?? []
+const str = (value: unknown) => typeof value === 'string' ? value : ''
+const positiveId = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null
+const shaOf = (value: unknown) => typeof value === 'string' && /^[0-9a-f]{40}$/i.test(value) ? value.toLowerCase() : null
 
-/** GitLab пишет время как «2026-11-13 10:00:00 UTC»; без времени в событии берём момент получения. */
-export function gitlabTime(value: unknown): string {
-  const text = str(value).trim().replace(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) UTC$/, '$1T$2Z')
-  const at = Date.parse(text)
-  return Number.isFinite(at) ? new Date(at).toISOString() : new Date().toISOString()
+export function enrollmentProjectUrl(enrollment: Pick<BootcampEnrollment, 'streamGroup' | 'gitlabUsername' | 'gitlabProjectUrl'>): string | null {
+  const path = '/' + enrollment.streamGroup + '/' + enrollment.gitlabUsername
+  const url = enrollment.gitlabProjectUrl || BOOTCAMP_GITLAB_ORIGIN + path
+  if (!tutoringHttpsUrl(url)) return null
+  const parsed = new URL(url)
+  return parsed.pathname === path && !parsed.search && !parsed.hash ? url : null
 }
 
-type MergeRequest = { iid: number; title: string | null; url: string | null; branch: string }
-
-function mergeRequestOf(value: Json, branch?: unknown): MergeRequest | null {
-  const iid = Number(value.iid)
-  if (!Number.isSafeInteger(iid) || iid <= 0) return null
-  return { iid, title: str(value.title).slice(0, 300) || null, url: str(value.url).slice(0, 500) || null, branch: str(branch ?? value.source_branch).slice(0, 100) }
+export function gitlabTime(value: unknown) {
+  const date = Date.parse(str(value).trim().replace(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) UTC$/, '$1T$2Z'))
+  return Number.isFinite(date) ? new Date(date).toISOString() : null
 }
 
-async function ensureRow(payload: Payload, enrollment: number, week: number, mr: MergeRequest, openedAt: string | null): Promise<number> {
-  const [row] = rowsOf<{ id: number }>(await db(payload).execute(sql`
-    insert into bootcamp_week_submissions (enrollment_id, week, mr_iid, title, mr_url, branch, opened_at)
-    values (${enrollment}, ${week}, ${mr.iid}, ${mr.title}, ${mr.url}, ${mr.branch || null}, ${openedAt})
-    on conflict (enrollment_id, mr_iid) do update set
-      week = excluded.week,
-      title = coalesce(excluded.title, bootcamp_week_submissions.title),
-      mr_url = coalesce(excluded.mr_url, bootcamp_week_submissions.mr_url),
-      branch = coalesce(excluded.branch, bootcamp_week_submissions.branch),
-      opened_at = coalesce(bootcamp_week_submissions.opened_at, excluded.opened_at),
-      updated_at = now()
-    returning id`))
-  return Number(row.id)
-}
+const clearResults = { verdict: null, verdictAt: null, verdictSha: null, checksPassed: null, checksTotal: null,
+  attempt: null, reviewAlertAt: null, pipelineAt: null, pipelineStatus: null }
 
-async function onMergeRequest(payload: Payload, enrollment: number, body: Json) {
-  const attributes = obj(body.object_attributes)
-  const mr = mergeRequestOf(attributes)
-  const week = weekFromBranch(str(attributes.source_branch))
-  if (!mr || week === null) return
-  const action = str(attributes.action)
-  const at = gitlabTime(attributes.updated_at)
-  const id = await ensureRow(payload, enrollment, week, mr, action === 'open' || action === 'reopen' ? gitlabTime(attributes.created_at) : null)
-  // opened_at - последнее открытие: закрытие старее него (повтор или доставка не по порядку) MR не закрывает.
-  if (action === 'reopen') await db(payload).execute(sql`
-    update bootcamp_week_submissions set opened_at = greatest(coalesce(opened_at, ${at}), ${at}),
-      closed_at = case when closed_at <= ${at} then null else closed_at end, updated_at = now()
-    where id = ${id}`)
-  // update без oldrev - правка описания или меток, сдачу она не меняет.
-  if (action === 'update' && attributes.oldrev) await db(payload).execute(sql`update bootcamp_week_submissions set last_commit_at = greatest(coalesce(last_commit_at, ${at}), ${at}), updated_at = now() where id = ${id}`)
-  if (action === 'merge') await db(payload).execute(sql`update bootcamp_week_submissions set merged_at = coalesce(merged_at, ${at}), updated_at = now() where id = ${id}`)
-  if (action === 'close') await db(payload).execute(sql`
-    update bootcamp_week_submissions set closed_at = ${at}, updated_at = now()
-    where id = ${id} and merged_at is null and (opened_at is null or opened_at <= ${at}) and (closed_at is null or closed_at < ${at})`)
-}
-
-async function onPipeline(payload: Payload, enrollment: number, body: Json) {
-  const pipeline = obj(body.object_attributes)
-  const status = str(pipeline.status)
-  if (status !== 'success' && status !== 'failed') return
-  const source = obj(body.merge_request)
-  const mr = mergeRequestOf(source, source.source_branch ?? pipeline.ref)
-  const week = weekFromBranch(mr?.branch)
-  if (!mr || week === null) return
-  const at = gitlabTime(pipeline.finished_at ?? pipeline.updated_at)
-  const id = await ensureRow(payload, enrollment, week, mr, null)
-  await db(payload).execute(sql`
-    update bootcamp_week_submissions set pipeline_status = ${status}::enum_bootcamp_week_submissions_pipeline_status, pipeline_at = ${at}, updated_at = now()
-    where id = ${id} and (pipeline_at is null or pipeline_at <= ${at})`)
-}
-
-async function onVerdict(payload: Payload, enrollment: number, body: Json, verdict: ParsedVerdict) {
-  const note = obj(body.object_attributes)
-  const source = obj(body.merge_request)
-  const mr = mergeRequestOf(source)
-  if (!mr) return
-  // Метка бота точнее ветки: она пишется проверкой той недели, которую она проверяла.
-  const week = verdict.week
-  const at = gitlabTime(note.updated_at ?? note.created_at)
-  const id = await ensureRow(payload, enrollment, week, mr, null)
-  // Повторная доставка того же вердикта срок ответа не перезапускает: иначе ушло бы второе напоминание.
-  await db(payload).execute(sql`
-    update bootcamp_week_submissions set verdict = ${verdict.verdict}::enum_bootcamp_week_submissions_verdict, checks_passed = ${verdict.checksPassed},
-      checks_total = ${verdict.checksTotal}, attempt = ${verdict.attempt}, verdict_at = ${at},
-      review_alert_at = case when verdict_at is null or verdict_at < ${at} or verdict is distinct from ${verdict.verdict}::enum_bootcamp_week_submissions_verdict then null else review_alert_at end,
-      updated_at = now()
-    where id = ${id} and (verdict_at is null or verdict_at <= ${at})`)
-}
-
-/** Сбой учёта не мешает уведомлению наставника: событие уже пришло, а строку поправит следующее. */
-export async function recordSubmission(payload: Payload, enrollment: BootcampEnrollment, event: string | null, body: Json, botNote: boolean): Promise<void> {
-  try {
-    if (event === 'Merge Request Hook') await onMergeRequest(payload, enrollment.id, body)
-    else if (event === 'Pipeline Hook') await onPipeline(payload, enrollment.id, body)
-    else if (event === 'Note Hook' && botNote) {
-      const verdict = parseVerdict(str(obj(body.object_attributes).note))
-      if (verdict) await onVerdict(payload, enrollment.id, body, verdict)
-    }
-  } catch (error) {
-    logger.error('Bootcamp week submission was not recorded', error, { 'enrollment.id': enrollment.id, 'gitlab.event': event ?? '' })
+/** Запись держит порядок событий одного MR. При одинаковом времени коммит GitLab указывает своего предшественника в oldrev. */
+function snapshotPatch(mr: Json, old: BootcampWeekSubmission | null, head: string, at: string, merge: boolean): Patch | null {
+  if (old?.mergedHeadSha || (old?.headAt && old.headAt > at)) return null
+  const changed = old?.headSha !== head
+  const closed = mr.state === 'closed' || mr.target_branch !== 'main'
+  if (old?.headAt === at && changed && shaOf(mr.oldrev) !== old.headSha) return null
+  if (old?.headAt === at && !changed && !merge && (old.closedAt || !closed)) return null
+  const opened = mr.state === 'opened'
+  return {
+    ...((changed || closed) ? clearResults : {}),
+    title: str(mr.title).slice(0, 300), headSha: head, headAt: at,
+    openedAt: opened && (mr.action === 'reopen' || old?.closedAt) ? at : old?.openedAt ?? gitlabTime(mr.created_at) ?? at,
+    lastCommitAt: changed && old?.headSha ? at : old?.lastCommitAt ?? null,
+    closedAt: closed ? at : null,
+    mergedHeadSha: merge ? head : null, mergedAt: merge ? at : null,
   }
+}
+
+export async function recordSubmission(payload: Payload, enrollment: BootcampEnrollment, event: string | null, body: Json): Promise<EventKind | null> {
+  if (!['Merge Request Hook', 'Note Hook', 'Pipeline Hook'].includes(event ?? '')) return null
+  const attr = obj(body.object_attributes)
+  const isMr = event === 'Merge Request Hook'
+  const isPipeline = event === 'Pipeline Hook'
+  const mr = isMr ? attr : obj(body.merge_request)
+  const iid = positiveId(mr.iid)
+  const base = enrollmentProjectUrl(enrollment)
+  if (!iid || !base || !enrollment.gitlabProjectId || !enrollment.gitlabUserId) return null
+  const url = base + '/-/merge_requests/' + iid
+  if ((mr.url !== undefined && mr.url !== url) || (mr.web_url !== undefined && mr.web_url !== url)) return null
+  const user = positiveId(obj(body.user).id)
+  const contributor = enrollment.gitlabUserId
+  const ownProject = enrollment.gitlabProjectId
+  if ((mr.author_id !== undefined && mr.author_id !== contributor) ||
+      (mr.source_project_id !== undefined && mr.source_project_id !== ownProject) ||
+      (mr.target_project_id !== undefined && mr.target_project_id !== ownProject)) return null
+  const fullSnapshot = mr.author_id === contributor && mr.source_project_id === ownProject && mr.target_project_id === ownProject
+  const head = shaOf(obj(mr.last_commit).id)
+  const mrAt = gitlabTime(mr.updated_at ?? mr.created_at)
+  const at = gitlabTime(isPipeline ? attr.finished_at ?? attr.updated_at : attr.updated_at ?? attr.created_at)
+  const branch = str(mr.source_branch)
+  if (branch && !/^week-(0[1-9]|1\d|20)$/.test(branch)) return null
+
+  return inTransaction(payload, null, async req => {
+    const db = await txDb(req)
+    const locked = await db.execute(sql`select id from bootcamp_enrollments where id = ${enrollment.id}
+      and status = 'done' and revoked_at is null and revoke_requested_at is null
+      and gitlab_project_id = ${ownProject} and gitlab_user_id = ${contributor}
+      and gitlab_project_url is not distinct from ${enrollment.gitlabProjectUrl ?? null}
+      and stream_group = ${enrollment.streamGroup} and gitlab_username = ${enrollment.gitlabUsername}
+      and program is not distinct from ${enrollment.program ?? null}
+      for update`)
+    if (!rowsOf(locked).length) return null
+    const { docs: [old] } = await payload.find({ collection: 'bootcamp-week-submissions', req, depth: 0, limit: 1, overrideAccess: true,
+      where: { enrollment: { equals: enrollment.id }, mrIid: { equals: iid } } })
+    const week = weekFromBranch(branch || (old?.headSha ? old.branch : ''))
+    if (!week || (old?.headSha && branch && old.branch !== branch)) return null
+    const canonicalBranch = 'week-' + String(week).padStart(2, '0')
+    const persist = async (data: Patch) => {
+      const base = { enrollment: enrollment.id, week, mrIid: iid, branch: canonicalBranch, mrUrl: url }
+      const options = { collection: 'bootcamp-week-submissions' as const, depth: 0, req, overrideAccess: true, context: { syncBootcampSubmissions: true } }
+      if (old) await payload.update({ ...options, id: old.id, data: { ...data, ...base } })
+      else await payload.create({ ...options, data: { ...data, ...base } })
+    }
+    if (isMr) {
+      if (!fullSnapshot || !head || !mrAt || !user || !branch || typeof mr.target_branch !== 'string') return null
+      if (mr.target_branch !== 'main' && !old?.headSha) return null
+      const merge = mr.action === 'merge' && mr.state === 'merged' && mr.target_branch === 'main' && user !== contributor
+      if ((mr.state === 'merged' && !merge && mr.target_branch === 'main') ||
+          (mr.action === 'merge' && mr.state !== 'merged') || (mr.action === 'open' && user !== contributor) ||
+          !['opened', 'closed', 'merged'].includes(str(mr.state))) return null
+      const patch = snapshotPatch(mr, old ?? null, head, mrAt, merge)
+      if (!patch) return null
+      await persist(patch)
+      return mr.target_branch === 'main' ? 'mr' : null
+    }
+    if (mr.target_branch !== undefined && mr.target_branch !== 'main') return null
+    if (event === 'Note Hook' && attr.noteable_type !== 'MergeRequest') return null
+    if (event === 'Note Hook' && user === contributor) return old?.headSha || (fullSnapshot && mr.target_branch === 'main') ? 'comment' : null
+    if (!at) return null
+
+    // Полный снимок MR может прийти с комментарием до вебхука открытия. Сокращенный снимок самостоятельно доступ не подтверждает.
+    const canObserve = fullSnapshot && head && mrAt && branch && mr.target_branch === 'main' && mr.state === 'opened'
+    const fresh = canObserve && (!old?.headSha || (old.headSha !== head && (!old.headAt || mrAt > old.headAt)))
+      ? snapshotPatch(mr, old ?? null, head, mrAt, false) : null
+    const current = fresh?.headSha ?? old?.headSha
+    if (!current || (head && head !== current) || (!fresh && old?.closedAt)) return null
+    if (isPipeline) {
+      if (!['success', 'failed'].includes(str(attr.status)) || shaOf(attr.sha) !== current ||
+          (!fresh && old?.pipelineAt && at <= old.pipelineAt)) return null
+      await persist({ ...fresh, pipelineStatus: attr.status === 'success' ? 'success' : 'failed', pipelineAt: at })
+      return 'pipeline'
+    }
+    const verdict = parseVerdict(str(attr.note))
+    const marker = /<!--\s*grader:\d{2}:([0-9a-f]{40})\s*-->/i.exec(str(attr.note))?.[1].toLowerCase()
+    if (!user || !verdict || verdict.week !== week || marker !== current) return null
+    const { docs: [program] } = await payload.find({ collection: 'bootcamp-programs', req, depth: 0, limit: 1, overrideAccess: true,
+      where: { key: { equals: enrollment.program ?? 'nodejs' } }, select: { bootcampGraderUserId: true } })
+    if (user !== program?.bootcampGraderUserId || (attr.author_id !== undefined && attr.author_id !== user) ||
+        (!fresh && old?.verdictAt && at <= old.verdictAt)) return null
+    await persist({ ...fresh, verdict: verdict.verdict, checksPassed: verdict.checksPassed, checksTotal: verdict.checksTotal,
+      attempt: verdict.attempt, verdictSha: marker, verdictAt: at, reviewAlertAt: null })
+    return 'verdict'
+  })
 }

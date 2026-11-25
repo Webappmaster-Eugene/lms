@@ -64,7 +64,7 @@ type CardProps = { userId: number; disabled: boolean; onBusy?: (busy: boolean) =
 export function StudentCard({ userId, disabled, onBusy, onChanged, onDeleted, onCredentials }: CardProps) {
   const [details, setDetails] = useState<StudentDetails | null>(null)
   const [attempt, setAttempt] = useState(0)
-  const [panel, setPanel] = useState<'edit' | 'password' | 'delete' | 'freeze' | 'unfreeze' | 'plan' | null>(null)
+  const [panel, setPanel] = useState<'edit' | 'password' | 'delete' | 'freeze' | 'unfreeze' | 'plan' | 'identity' | null>(null)
   const [draft, setDraft] = useState({ email: '', firstName: '', lastName: '', telegram: '' })
   const [confirmEmail, setConfirmEmail] = useState('')
   const [busy, setBusy] = useState(false)
@@ -73,7 +73,12 @@ export function StudentCard({ userId, disabled, onBusy, onChanged, onDeleted, on
   useEffect(() => {
     const abort = new AbortController()
     apiFetch(`${base}/${userId}`, { signal: abort.signal, credentials: 'same-origin' }).then(result<StudentDetails>)
-      .then((data) => { if (!abort.signal.aborted) { setDetails(data); setError('') } })
+      .then((data) => {
+        if (abort.signal.aborted) return
+        setDetails(data)
+        setError('')
+        if (window.location.hash === '#enrollment-identity' && data.enrollmentIdentity && !data.enrollmentIdentity.confirmed) setPanel('identity')
+      })
       .catch((cause) => { if (!abort.signal.aborted) setError(message(cause)) })
     return () => abort.abort()
   }, [userId, attempt])
@@ -106,6 +111,19 @@ export function StudentCard({ userId, disabled, onBusy, onChanged, onDeleted, on
   return <section className="student-panel" aria-label="Карточка ученика">
     <p className="student-panel__line"><span>{student.email}</span>{student.telegram && <span>{student.telegram}</span>}{!student.isActive && <strong>Отключён: войти не сможет</strong>}{student.freeze.active ? <strong>{freezeStatus(student)}</strong> : <span>{freezeStatus(student)}</span>}{student.freeze.active && student.freeze.note && <span>{student.freeze.note}</span>}</p>
     {disabled && <p className="learning-access__hint">Сначала сохраните или отмените изменения доступа.</p>}
+    {details?.enrollmentIdentity && <div id="enrollment-identity" className="access-tree__actions">
+      {details.enrollmentIdentity.confirmed
+        ? <span role="status">Адрес для зачисления подтвержден.</span>
+        : student.isActive && <button type="button" disabled={locked} aria-expanded={panel === 'identity'}
+          onClick={() => setPanel(panel === 'identity' ? null : 'identity')}>Сверить адрес для зачисления</button>}
+      {panel === 'identity' && !details.enrollmentIdentity.confirmed && <div>
+        <p>Уточните у ученика, что {student.email} принадлежит ему и он входит с этим адресом в учетную запись №{userId}. После сверки можно повторить приглашение или зачисление.</p>
+        <button type="button" disabled={locked} onClick={() => void run(async () => {
+          await send(`${base}/${userId}/enrollment-identity`, 'POST', { email: student.email, revision: details.enrollmentIdentity?.revision })
+          reload()
+        })}>Подтвердить адрес ученика</button>
+      </div>}
+    </div>}
     <div className="access-tree__actions">
       <button type="button" disabled={locked} aria-expanded={panel === 'edit'} onClick={() => panel === 'edit' ? setPanel(null) : openEdit()}>Изменить данные</button>
       <button type="button" disabled={locked} aria-expanded={panel === 'password'} onClick={() => setPanel(panel === 'password' ? null : 'password')}>Новый пароль</button>

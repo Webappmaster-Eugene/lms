@@ -11,7 +11,7 @@ API GitLab от имени root. Токен root не покидает VM: LMS �
 расхождения с обычными настройками показывает, но не исправляет.
 
 Раз в 5 минут исполнитель проверяет, вошли ли недавно зачисленные в GitLab впервые.
-После возврата денег LMS отдаёт вместе с заданием список учёток, которые надо заблокировать.
+После возврата денег LMS передает ID проектов и учеников для отзыва членства.
 Только стандартная библиотека: в VM GitLab нет Node и pip.
 """
 import datetime
@@ -110,7 +110,10 @@ def gl(method, path, body=None, allow404=False):
 def lms(method, path, body=None):
     with open(KEY_FILE, encoding='utf-8') as file:
         key = file.read().strip()
-    status, data = http(method, LMS_URL + path, {'x-lms-worker-key': key, 'User-Agent': 'lms-gitlab-worker'}, {} if body is None else body)
+    headers = {'x-lms-worker-key': key, 'User-Agent': 'lms-gitlab-worker'}
+    if method == 'POST' and path == '/api/internal/bootcamp-enrollments/claim':
+        headers['x-lms-enrollment-protocol'] = '2'
+    status, data = http(method, LMS_URL + path, headers, {} if body is None else body)
     if status >= 400:
         raise RuntimeError('LMS %s %s: %s %s' % (method, path, status, str(data)[:300]))
     return data
@@ -125,7 +128,12 @@ def levels(items):
 
 
 def usual_protection(protection):
-    return levels(protection.get('push_access_levels')) == str(MAINTAINER) and levels(protection.get('merge_access_levels')) == str(MAINTAINER) and not protection.get('allow_force_push')
+    rules = (protection.get('push_access_levels'), protection.get('merge_access_levels'))
+    return protection.get('allow_force_push') is False and all(
+        levels(items) == str(MAINTAINER)
+        and not any(items[0].get(key) for key in ('user_id', 'group_id', 'deploy_key_id'))
+        for items in rules
+    )
 
 
 def differing_settings(project):
@@ -227,6 +235,16 @@ class Job:
 
 
     def existing_gitlab_user(self, username, email):
+        expected = self.job.get('gitlabUserId')
+        if 'lease' not in self.job and expected is not None:
+            # В массовом курсе это ID, ранее подтвержденный для того же ученика LMS.
+            # Путь нового проекта может отличаться от нынешнего логина аккаунта.
+            if not positive_id(expected):
+                raise StepError('В LMS указан неверный ID ученика GitLab')
+            user = gl('GET', '/users/%s' % expected, allow404=True)
+            if not user or user.get('id') != expected:
+                raise StepError('Не найдена подтвержденная учетная запись ученика GitLab')
+            return user
         found = gl('GET', '/users?username=%s' % q(username))
         user = found[0] if found else None
         if user and (user.get('email') or '').lower() != email:
@@ -239,7 +257,6 @@ class Job:
             if not auto:
                 raise StepError('Почта %s уже у учётки GitLab %s' % (email, by_email['username']))
             user = by_email
-        expected = self.job.get('gitlabUserId')
         if 'lease' in self.job and expected is not None and (not positive_id(expected) or not user or user['id'] != expected):
             raise StepError('Учётка GitLab не совпадает с ID, сохранённым в LMS')
         return user
@@ -264,8 +281,7 @@ class Job:
                 if not user:
                     raise
 
-        if 'lease' in self.job:
-            user = verified_student_account(user, email, self.job.get('graderUserId'))
+        user = verified_student_account(user, email, self.job.get('graderUserId'))
         self.user = user
         self.extra['gitlabUserId'] = user['id']
         return 'done', ('создана, GitLab отправил письмо со ссылкой для пароля' if created
@@ -273,22 +289,43 @@ class Job:
 
     def gitlab_project(self):
         group, username = self.job['group'], self.job['username']
-        project = gl('GET', '/projects/%s' % q('%s/%s' % (group, username)), allow404=True)
-        if project:
+        path = '%s/%s' % (group, username)
+        project = gl('GET', '/projects/%s' % q(path), allow404=True)
+        expected = self.job.get('gitlabProjectId')
+        if expected is not None and (not positive_id(expected) or not project or project.get('id') != expected):
+            raise StepError('Проект GitLab в этом потоке не совпадает с ID зачисления в LMS')
+        if project and project.get('path_with_namespace') != path:
+            raise StepError('Путь проекта GitLab не совпадает с зачислением в LMS')
+        if project and project.get('visibility') != 'private':
+            raise StepError('Для выдачи нужен приватный учебный проект GitLab')
+        mass = 'lease' not in self.job
+        marker = '[LMS bootcamp enrollment %s]' % self.job['id']
+        marked = mass and project and (project.get('description') or '').endswith(marker)
+        recovering = marked and (expected or project.get('forked_from_project'))
+        if mass and project and not expected and not recovering:
+            # Знакомый путь и даже членство ученика встречаются в его личных проектах.
+            raise StepError('Проект с таким путем уже существует, его связь с зачислением не подтверждена')
+        completed = self.steps.get('gitlab_project', {}).get('state') == 'done'
+        incomplete = recovering and not completed and (project.get('forked_from_project') or differing_settings(project))
+        if project and not incomplete:
             notes = ['проект уже был']
-            differs = differing_settings(project)
-            if differs:
-                notes.append('настройки отличаются от обычных: %s, не трогаю' % ', '.join(differs))
-            if project.get('forked_from_project'):
-                notes.append('проект связан форком, проверьте вручную')
             self.project = project
         else:
             course = gl('GET', '/projects/%s' % q(self.job['courseProject']))
             course_main = gl('GET', '/projects/%s/repository/branches/main' % course['id'])['commit']
-            fork = gl('POST', '/projects/%s/fork' % course['id'], {
+            description = 'Проект ученика: %s %s' % (self.job['firstName'], self.job['lastName'])
+            fork = project or gl('POST', '/projects/%s/fork' % course['id'], {
                 'namespace_path': group, 'path': username, 'name': username, 'visibility': 'private',
-                'description': 'Проект ученика: %s %s' % (self.job['firstName'], self.job['lastName']),
+                'description': description + ('\n' + marker if mass else ''),
             })
+            if mass and not expected:
+                if not positive_id(fork.get('id')) or fork.get('path_with_namespace') != path:
+                    raise StepError('GitLab вернул другой проект при создании копии')
+                if project and project['forked_from_project'].get('id') != course['id']:
+                    raise StepError('Проект скопирован из другого источника')
+                # ID нужен для отзыва, даже если процесс прервется во время импорта.
+                self.extra['gitlabProjectId'] = fork['id']
+                self.report()
             for _ in range(120):
                 state = gl('GET', '/projects/%s' % fork['id'])
                 if state.get('import_status') == 'finished':
@@ -299,22 +336,24 @@ class Job:
             else:
                 raise StepError('Копия курса не готова за 2 минуты')
             # Связь форка ученику не нужна: материалы недели приходят из upstream (методичка 00).
-            gl('DELETE', '/projects/%s/fork' % fork['id'])
+            source = state.get('forked_from_project')
+            if source and source.get('id') != course['id']:
+                raise StepError('Проект скопирован из другого источника')
+            main = gl('GET', '/projects/%s/repository/branches/main' % fork['id'])['commit']
+            if main['id'] != course_main['id']:
+                raise StepError('main проекта %s, а у курса %s' % (main['short_id'], course_main['short_id']))
+            if source or not project:
+                gl('DELETE', '/projects/%s/fork' % fork['id'])
             project = gl('PUT', '/projects/%s' % fork['id'], PROJECT_SETTINGS)
             differs = differing_settings(project)
             if differs or project.get('forked_from_project'):
                 raise StepError('Настройки проекта не применились: %s' % (', '.join(differs) or 'связь форка'))
-            main = gl('GET', '/projects/%s/repository/branches/main' % fork['id'])['commit']
-            if main['id'] != course_main['id']:
-                raise StepError('main проекта %s, а у курса %s' % (main['short_id'], course_main['short_id']))
             self.project = project
             notes = ['создан из %s на %s' % (self.job['courseProject'], course_main['short_id'])]
-        if 'lease' in self.job:
-            expected = self.job.get('gitlabProjectId')
-            if (expected and self.project['id'] != expected) or self.project.get('path_with_namespace') != '%s/%s' % (group, username):
-                raise StepError('Найденный проект не совпадает с заданием LMS')
-            if differing_settings(self.project) or self.project.get('forked_from_project'):
-                raise StepError('У проекта менторства небезопасные настройки. Проверьте приватность, CI и связь со стартером.')
+        if self.project.get('path_with_namespace') != path:
+            raise StepError('Найденный проект не совпадает с заданием LMS')
+        if differing_settings(self.project) or self.project.get('forked_from_project'):
+            raise StepError('Проверьте приватность учебного проекта, настройки CI и связь со стартером')
         self.extra['gitlabProjectId'] = self.project['id']
         self.extra['gitlabProjectUrl'] = self.project['web_url']
         return 'done', ', '.join(notes)
@@ -322,27 +361,25 @@ class Job:
     def gitlab_protect(self):
         pid = self.project['id']
         protection = gl('GET', '/projects/%s/protected_branches/main' % pid, allow404=True)
-        if protection:
-            if usual_protection(protection):
-                return 'done', 'защита уже стояла'
-            if 'lease' in self.job:
-                raise StepError('У main нестандартные правила защиты. Выдача доступа остановлена.')
-            return 'skipped', 'защита не обычная (push %s, merge %s), не трогаю' % (levels(protection.get('push_access_levels')), levels(protection.get('merge_access_levels')))
-        gl('POST', '/projects/%s/protected_branches' % pid, {'name': 'main', 'push_access_level': MAINTAINER, 'merge_access_level': MAINTAINER, 'allow_force_push': False})
-        return 'done', 'push и слияние только у наставника'
+        if protection and not usual_protection(protection):
+            raise StepError('У main нестандартные правила защиты. Выдача доступа остановлена.')
+        if not protection:
+            gl('POST', '/projects/%s/protected_branches' % pid, {'name': 'main', 'push_access_level': MAINTAINER, 'merge_access_level': MAINTAINER, 'allow_force_push': False})
+        branch = gl('GET', '/projects/%s/repository/branches/main' % pid)
+        if branch.get('protected') is not True or branch.get('developers_can_push') is not False or branch.get('developers_can_merge') is not False:
+            raise StepError('Проверьте защиту main: ученик не должен менять или сливать код в нее напрямую')
+        return 'done', 'защита уже стояла' if protection else 'push и слияние только у наставника'
 
     def gitlab_member(self):
         pid, uid = self.project['id'], self.user['id']
-        if 'lease' in self.job:
-            effective = gl('GET', '/projects/%s/members/all/%s' % (pid, uid), allow404=True)
-            direct = gl('GET', '/projects/%s/members/%s' % (pid, uid), allow404=True)
-            if effective and (not direct or effective.get('access_level') != DEVELOPER):
-                raise StepError('Учётка уже имеет унаследованный или расширенный доступ к проекту')
+        effective = gl('GET', '/projects/%s/members/all/%s' % (pid, uid), allow404=True)
         member = gl('GET', '/projects/%s/members/%s' % (pid, uid), allow404=True)
+        if effective and (not member or effective.get('access_level') != DEVELOPER):
+            raise StepError('Учётка уже имеет унаследованный или расширенный доступ к проекту')
         if member:
-            if member.get('access_level') == DEVELOPER:
+            if member.get('access_level') == DEVELOPER and member.get('id') == uid:
                 return 'done', 'роль уже была'
-            return 'skipped', 'роль %s вместо обычной 30 (Developer), не трогаю' % member.get('access_level')
+            raise StepError('У ученика уже назначена другая роль в проекте')
         gl('POST', '/projects/%s/members' % pid, {'user_id': uid, 'access_level': DEVELOPER})
         return 'done', 'Developer'
 
@@ -389,23 +426,39 @@ def check_first_sign_in(watch):
 def remove_project_member(item):
     mentoring = 'lease' in item
     pid, uid = item.get('gitlabProjectId'), item.get('gitlabUserId')
-    if mentoring and (not positive_id(pid) or not positive_id(uid)):
-        raise StepError('Для отзыва доступа нужны сохранённые ID проекта и ученика в GitLab')
-    if not pid:
+    path_known = mentoring or 'group' in item
+    expected_path = '%s/%s' % (item.get('group'), item['username']) if path_known else None
+    if not mentoring and path_known and (pid is None or uid is None):
+        if (pid is not None and not positive_id(pid)) or (uid is not None and not positive_id(uid)):
+            raise StepError('Неверный ID в задании на отзыв доступа')
+        project = gl('GET', '/projects/%s' % (pid or q(expected_path)), allow404=True)
+        if project is None:
+            return
+        found = project.get('id')
+        if not positive_id(found) or (pid is not None and pid != found) or project.get('path_with_namespace') != expected_path:
+            raise StepError('Учебный проект GitLab не совпадает с заданием на отзыв доступа')
+        if uid and not gl('GET', '/projects/%s/members/all/%s' % (found, uid), allow404=True):
+            return
+        raise StepError('Нужна сверка доступа: для существующего проекта в LMS не сохранены оба ID')
+    if pid is None and not mentoring:
+        # Выдача буткемпа могла остановиться после создания учетки и до создания проекта.
         return
+    if not positive_id(pid) or not positive_id(uid):
+        raise StepError('Для отзыва доступа нужны сохранённые ID проекта и ученика в GitLab')
     user = gl('GET', '/users/%s' % uid, allow404=True)
     if user is None:
         return
-    if mentoring and user.get('id') != uid:
+    if user.get('id') != uid:
         raise StepError('ID учётки GitLab не совпадает с заданием на отзыв доступа')
-    if not mentoring and user.get('username') != item['username']:
+    if not path_known and user.get('username') != item['username']:
         raise StepError('Логин не совпадает с учёткой GitLab из задания')
     project = gl('GET', '/projects/%s' % pid, allow404=True)
     if project is None:
         return
-    if mentoring:
-        expected_path = '%s/%s' % (item['group'], item['username'])
-        if project.get('id') != pid or project.get('path_with_namespace') != expected_path:
+    if project.get('id') != pid:
+        raise StepError('ID проекта GitLab не совпадает с заданием на отзыв доступа')
+    if path_known:
+        if project.get('path_with_namespace') != expected_path:
             raise StepError('Учебный проект GitLab не совпадает с заданием на отзыв доступа')
     direct = '/projects/%s/members/%s' % (pid, uid)
     gl('DELETE', direct, allow404=True)
@@ -416,12 +469,13 @@ def remove_project_member(item):
 def revoke_gitlab(items):
     for item in items:
         path = '/api/internal/bootcamp-enrollments/%s/revoked' % item['id']
+        response = {'revision': item['revision']} if 'revision' in item else {}
         try:
             remove_project_member(item)
-            lms('POST', path, {'ok': True})
+            lms('POST', path, dict(response, ok=True))
         except StepError as error:
             log('возврат %s: %s' % (item['id'], error))
-            lms('POST', path, {'error': str(error)})
+            lms('POST', path, dict(response, error=str(error)))
 
 
 def tutoring_job(claim):

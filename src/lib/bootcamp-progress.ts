@@ -50,6 +50,7 @@ export function parseVerdict(note: string): ParsedVerdict | null {
 }
 
 export type SubmissionFacts = {
+  verifiedHead?: boolean
   mrIid: number
   mrUrl: string | null
   openedAt: string | null
@@ -61,10 +62,11 @@ export type SubmissionFacts = {
   checksTotal: number | null
   verdictAt: string | null
   mergedAt: string | null
+  historicalMergedAt?: string | null
   closedAt: string | null
 }
 
-export type WeekState = 'none' | 'open' | 'checking' | 'ci-failed' | 'failed-check' | 'review' | 'accepted' | 'closed'
+export type WeekState = 'none' | 'open' | 'checking' | 'ci-failed' | 'failed-check' | 'review' | 'accepted' | 'closed' | 'historical-merge'
 export type WeekCell = { week: number; state: WeekState; since: string | null; mrUrl: string | null; overdue: boolean; dueAt: string | null; late: boolean; checks: string | null }
 
 const time = (value: string | null) => value ? Date.parse(value) : Number.NEGATIVE_INFINITY
@@ -72,14 +74,15 @@ const time = (value: string | null) => value ? Date.parse(value) : Number.NEGATI
 /** Состояние одного MR: что сейчас ждёт ученик или наставник. */
 function submissionState(item: SubmissionFacts): { state: WeekState; since: string | null } {
   if (item.mergedAt) return { state: 'accepted', since: item.mergedAt }
+  if (item.historicalMergedAt) return { state: 'historical-merge', since: item.historicalMergedAt }
   if (item.closedAt && time(item.closedAt) >= time(item.openedAt)) return { state: 'closed', since: item.closedAt }
   const changed = time(item.lastCommitAt)
-  if (item.verdict && time(item.verdictAt) >= changed) {
+  if (item.verdict && (item.verifiedHead || time(item.verdictAt) >= changed)) {
     if (item.verdict === 'passed') return { state: 'review', since: item.verdictAt }
     if (item.verdict === 'infra') return { state: 'checking', since: item.verdictAt }
     return { state: 'failed-check', since: item.verdictAt }
   }
-  if (item.pipelineStatus === 'failed' && time(item.pipelineAt) >= changed) return { state: 'ci-failed', since: item.pipelineAt }
+  if (item.pipelineStatus === 'failed' && (item.verifiedHead || time(item.pipelineAt) >= changed)) return { state: 'ci-failed', since: item.pipelineAt }
   return { state: item.lastCommitAt ? 'checking' : 'open', since: item.lastCommitAt ?? item.openedAt }
 }
 
@@ -91,14 +94,15 @@ export function weekCell(week: number, items: readonly SubmissionFacts[], dueAt:
   const due = dueAt ? Date.parse(dueAt) : null
   const merged = items.filter((item) => item.mergedAt).sort((left, right) => time(left.mergedAt) - time(right.mergedAt))[0]
   const open = items.filter((item) => !item.mergedAt && !(item.closedAt && time(item.closedAt) >= time(item.openedAt))).sort((left, right) => time(right.openedAt) - time(left.openedAt) || right.mrIid - left.mrIid)[0]
-  const chosen = merged ?? open ?? [...items].sort((left, right) => time(right.closedAt) - time(left.closedAt))[0]
+  const historical = items.find(item => item.historicalMergedAt)
+  const chosen = merged ?? historical ?? open ?? [...items].sort((left, right) => time(right.closedAt) - time(left.closedAt))[0]
   if (!chosen) return { week, state: 'none', since: null, mrUrl: null, overdue: false, dueAt, late: due !== null && due <= now, checks: null }
   const { state, since } = submissionState(chosen)
   const accepted = state === 'accepted'
   return {
     week, state, since, mrUrl: chosen.mrUrl, dueAt,
     overdue: state === 'review' && since !== null && now - Date.parse(since) > reviewDays * DAY_MS,
-    late: due !== null && (accepted ? Date.parse(since ?? '') > due : due <= now),
+    late: state !== 'historical-merge' && due !== null && (accepted ? Date.parse(since ?? '') > due : due <= now),
     checks: chosen.checksTotal !== null && chosen.checksPassed !== null ? `${chosen.checksPassed} из ${chosen.checksTotal}` : null,
   }
 }
@@ -109,7 +113,7 @@ export function scheduleLag(cells: readonly WeekCell[], now: number = Date.now()
   return {
     planned: due.length,
     accepted: cells.filter((cell) => cell.state === 'accepted').length,
-    lag: due.filter((cell) => cell.state !== 'accepted').length,
+    lag: due.filter((cell) => cell.state !== 'accepted' && cell.state !== 'historical-merge').length,
   }
 }
 
@@ -132,6 +136,7 @@ export const FIRST_STREAM = {
 }
 
 export const WEEK_STATE_LABELS: Record<WeekState, string> = {
+  'historical-merge': 'ранее отмечено слияние, версия работы не подтверждена',
   none: 'не начата',
   open: 'MR открыт',
   checking: 'на проверке',
@@ -160,6 +165,7 @@ export type ProgressStudent = {
 }
 
 export type BootcampProgressReport = {
+  failedEnrollments: { leadId: number; title: string }[]
   streams: { id: number; title: string }[]
   stream: { id: number; title: string; program: string; startsAt: string; gitlabGroup: string } | null
   summary: { students: number; onPlan: number; lagOne: number; lagMore: number; waitingReview: number; overdueReview: number; medianReviewHours: number | null }

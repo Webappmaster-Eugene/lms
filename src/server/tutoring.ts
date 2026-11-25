@@ -6,11 +6,12 @@ import type { Payload, PayloadRequest } from 'payload'
 import { tutoringDisplayText } from '@/lib/tutoring-display'
 import { relationId } from '@/lib/content-management/pages'
 import { collectAllPages } from '@/lib/paginate'
-import { isTutoringMeeting, type TutoringProgram, type TutoringStatus } from '@/lib/tutoring'
+import { isTutoringMeeting, tutoringHttpsUrl, type TutoringProgram, type TutoringStatus } from '@/lib/tutoring'
 import type { TutoringMeeting, TutoringParticipant, TutoringReview, User } from '@/payload-types'
 import { inTransaction, txDb } from '@/server/bootcamp-lead-events'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import { tutoringOpenThrough } from '@/server/tutoring-access'
+import { tutoringHomeworkProject, tutoringMergeRequest } from '@/server/tutoring-student-project'
 
 export class TutoringProblem extends Error {}
 
@@ -82,6 +83,17 @@ export async function writeTutoringReview(payload: Payload, streamId: number, me
     if (action.kind === 'submit' && (existing?.status === 'accepted' || existing?.status === 'submitted')) {
       throw new TutoringProblem(existing.status === 'accepted' ? 'Эта работа уже принята' : 'Работа уже на проверке')
     }
+    if (action.kind === 'submit' && existing?.submissionUrl && action.url !== existing.submissionUrl) {
+      throw new TutoringProblem('Исправления нужно сдать в той же работе GitLab')
+    }
+    if (action.kind === 'submit' && !existing?.submissionUrl) {
+      if (!tutoringHttpsUrl(action.url)) throw new TutoringProblem('Введите HTTPS-ссылку на работу')
+      const { project, waiting } = await tutoringHomeworkProject(payload, req, action.actor.id, stream.program)
+      if (waiting) throw new TutoringProblem('Отправить работу можно после выдачи проекта GitLab')
+      if (project?.projectUrl && !tutoringMergeRequest(project.projectUrl, action.url)) {
+        throw new TutoringProblem('Вставьте ссылку на запрос на слияние своего учебного проекта')
+      }
+    }
     if (action.kind === 'grade' && (existing?.updatedAt ?? '') !== action.expectedUpdatedAt) {
       throw new TutoringProblem('Работа уже изменилась. Проверьте новую версию перед сохранением')
     }
@@ -96,8 +108,9 @@ export async function writeTutoringReview(payload: Payload, streamId: number, me
 
 export function tutoringStudentName(member: TutoringParticipant) {
   const student = member.student
-  return typeof student === 'number' ? `Ученик №${student}`
-    : [student.firstName, student.lastName].filter(Boolean).join(' ') || student.email
+  if (typeof student === 'number') return `Ученик №${student}`
+  if (student.firstName === 'Ученик' && student.lastName === 'менторства') return student.email
+  return [student.firstName, student.lastName].filter(Boolean).join(' ') || student.email
 }
 
 export function tutoringReviewMap(reviews: TutoringReview[]) {

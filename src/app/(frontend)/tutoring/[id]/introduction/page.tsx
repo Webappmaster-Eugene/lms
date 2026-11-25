@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 import { IntroPractice } from '@/components/tutoring/IntroPractice'
+import { tutoringWorkChoices } from '@/server/tutoring-merge-requests'
 import { tutoringProject } from '@/server/tutoring-projects'
 import { SlidesBlock } from '@/components/lesson/SlidesBlock'
 import { ReplacePresentation } from '@/components/tutoring/ReplacePresentation'
@@ -21,6 +22,8 @@ export default async function Introduction({ params, searchParams }: { params: P
   })
   const streams = memberships.filter(entry => entry.stream.program === course.program)
   const project = streams.length ? await tutoringProject(payload, req, user.id, course.program) : null
+  const works = project && streams.some(({ member }) => !member.introSubmissionUrl)
+    ? await tutoringWorkChoices(payload, req, project, 0) : []
   const file = intro && typeof intro.deckPdf === 'object' && intro.deckPdf.filename
   const editable = isAdmin && intro?.deckPptx && typeof intro.deckPptx === 'object' && intro.deckPptx.filename
   return <article className="min-w-0 max-w-5xl space-y-5">
@@ -36,7 +39,7 @@ export default async function Introduction({ params, searchParams }: { params: P
     {query.saved && <p role="status">{query.saved}</p>}
     {streams.map(({ member, stream }) => <div key={stream.id} className="space-y-2">
       {streams.length > 1 && <p className="font-medium">{stream.title}</p>}
-      <IntroPractice stream={stream.id} participant={member} project={project} />
+      <IntroPractice stream={stream.id} participant={member} project={project} works={works} />
     </div>)}
     {editable && <a className="inline-flex min-h-11 items-center text-primary hover:underline"
       href={`/api/tutoring-deck-files/file/${encodeURIComponent(editable)}`} download>Скачать редактируемый PPTX</a>}

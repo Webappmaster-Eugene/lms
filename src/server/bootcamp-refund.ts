@@ -10,6 +10,8 @@ import { REFUNDABLE_STAGES, receiptAdvice, refundRejectionText, type RefundFormI
 import { relationId } from '@/lib/relation-id'
 import { logger } from '@/lib/telemetry'
 import { bootcampRefundEmail } from '@/payload/emails/templates'
+import { lockLearningAccess } from '@/payload/hooks/learningAccessLock'
+import { noReportedGitlabWork } from '@/server/bootcamp-gitlab-account'
 import { actorName, inTransaction, journal, leadAdminLink, recordLeadEvent, rowsOf, txDb } from '@/server/bootcamp-lead-events'
 import { programNames, requireProgram } from '@/server/bootcamp-programs'
 import { contactReplyTo } from '@/server/contact-reply-to'
@@ -319,31 +321,46 @@ async function revokeAccess(payload: Payload, req: PayloadRequest, lead: Bootcam
     return 'Зачисления не было: закрывать нечего'
   }
   const notes: string[] = []
-  const program = await requireProgram(payload, enrollment.program || lead.program, req)
+  const courseId = enrollment.manualsCourse ? relationId(enrollment.manualsCourse) : null
   const userId = enrollment.lmsUser ? relationId(enrollment.lmsUser) : null
-  if (userId && program.manualsCourseId) {
-    const grant = (await payload.find({ collection: 'learning-access-grants', where: { ruleKey: { equals: `${userId}:courses:${program.manualsCourseId}` } }, limit: 1, depth: 0, overrideAccess: true, req })).docs[0]
+  if (userId && courseId) {
+    await lockLearningAccess(req, userId)
+    const grant = (await payload.find({ collection: 'learning-access-grants', where: { ruleKey: { equals: `${userId}:courses:${courseId}` } }, limit: 1, depth: 0, overrideAccess: true, req })).docs[0]
+    const [other] = rowsOf<{ access_until: Date | string | null }>(await tx.execute(sql`
+      select e.access_until from bootcamp_enrollments e join bootcamp_leads l on l.id = e.lead_id
+      where e.id <> ${enrollment.id} and e.lms_user_id = ${userId}
+        and e.manuals_course_id = ${courseId}
+        and l.paid_at is not null and l.status <> 'refunded' and e.revoked_at is null and e.revoke_requested_at is null
+        and (e.access_until is null or e.access_until > now()) order by e.access_until desc nulls first limit 1`))
     // Назначения меняются только от имени администратора: так их пишет журнал доступа.
     const admin = req.user?.role === 'admin' ? req.user : null
     if (!grant || grant.effect !== 'allow') notes.push('курса методичек в LMS у ученика нет')
     else if (!(grant.note ?? '').startsWith('Буткемп:')) notes.push('курс методичек назначен не зачислением, его не трогаю')
     else if (!admin) notes.push('курс методичек не снят: нет действующего администратора, снимите вручную')
-    else {
+    else if (other) {
+      const expiresAt = other.access_until ? new Date(other.access_until).toISOString() : null
+      if ((grant.expiresAt ?? null) !== expiresAt) {
+        await payload.update({ collection: 'learning-access-grants', id: grant.id, data: { expiresAt }, req, overrideAccess: false })
+      }
+      notes.push('действует другое оплаченное зачисление на этот курс')
+    } else {
       await payload.delete({ collection: 'learning-access-grants', id: grant.id, overrideAccess: false, user: admin, req })
       notes.push('курс методичек в LMS снят')
     }
   } else {
-    notes.push('учётки LMS или курса методичек у зачисления нет')
+    notes.push(userId ? 'У старого зачисления не подтвержден курс. Сверьте назначение в карточке ученика и закройте доступ к оплаченному курсу вручную.' : 'учетки LMS у зачисления нет')
   }
 
-  const stopped = rowsOf(await tx.execute(sql`update bootcamp_enrollments set status = 'failed', error = 'Деньги возвращены: зачисление остановлено', revoke_requested_at = now(), revoked_at = now(), finished_at = now(), updated_at = now() where id = ${enrollment.id} and status = 'queued' returning id`))
+  const stopped = rowsOf(await tx.execute(sql`update bootcamp_enrollments set status = 'failed', error = 'Деньги возвращены: зачисление остановлено', revoke_requested_at = now(), revoked_at = now(), finished_at = now(), updated_at = now()
+    where id = ${enrollment.id} and status = 'queued' and coalesce(attempts, 0) = 0 and started_at is null
+      and gitlab_user_id is null and gitlab_project_id is null
+      and (${noReportedGitlabWork(sql`steps`)}) returning id`))
   if (stopped.length > 0) notes.push('зачисление в GitLab ещё не начиналось, остановлено')
-  else if (enrollment.gitlabUserId || enrollment.status === 'running') {
-    await tx.execute(sql`update bootcamp_enrollments set revoke_requested_at = coalesce(revoke_requested_at, now()), revoke_error = null, updated_at = now() where id = ${enrollment.id}`)
+  else {
+    await tx.execute(sql`update bootcamp_enrollments set revoke_requested_at = coalesce(revoke_requested_at, now()),
+      status = case when status = 'queued' then 'failed'::enum_bootcamp_enrollments_status else status end,
+      revoke_error = null, updated_at = now() where id = ${enrollment.id}`)
     notes.push(`доступ ${enrollment.gitlabUsername} к проекту GitLab закроет исполнитель в VM GitLab`)
-  } else {
-    await tx.execute(sql`update bootcamp_enrollments set revoke_requested_at = coalesce(revoke_requested_at, now()), revoked_at = now(), updated_at = now() where id = ${enrollment.id}`)
-    notes.push('учётки GitLab нет')
   }
   const summary = `Доступы: ${notes.join('; ')}`
   await recordLeadEvent(payload, req, { lead: lead.id, type: 'access_revoked', actor, message: summary })
@@ -351,9 +368,10 @@ async function revokeAccess(payload: Payload, req: PayloadRequest, lead: Bootcam
 }
 
 /** Исполнитель в VM GitLab отчитался о закрытии доступа к проекту после возврата. */
-export async function reportGitlabRevoked(payload: Payload, enrollmentId: number, result: { ok: boolean, error: string | null }): Promise<void> {
+export async function reportGitlabRevoked(payload: Payload, enrollmentId: number, result: { ok: boolean, error: string | null, revision?: string }): Promise<void> {
+  const current = result.revision ? sql`revoke_requested_at = ${result.revision}::timestamptz` : sql`needs_verified_gitlab_account is not true`
   if (result.ok) {
-    const [done] = rowsOf<{ lead_id: number, gitlab_username: string, email: string }>(await db(payload).execute(sql`update bootcamp_enrollments set revoked_at = now(), revoke_error = null, updated_at = now() where id = ${enrollmentId} and revoke_requested_at is not null and revoked_at is null returning lead_id, gitlab_username, email`))
+    const [done] = rowsOf<{ lead_id: number, gitlab_username: string, email: string }>(await db(payload).execute(sql`update bootcamp_enrollments set revoked_at = now(), revoke_error = null, updated_at = now() where id = ${enrollmentId} and revoke_requested_at is not null and revoked_at is null and ${current} returning lead_id, gitlab_username, email`))
     if (!done) return
     await journal(payload, {
       lead: done.lead_id,
@@ -364,7 +382,7 @@ export async function reportGitlabRevoked(payload: Payload, enrollmentId: number
     return
   }
   const error = (result.error ?? 'исполнитель не указал причину').slice(0, 2000)
-  const [failed] = rowsOf<{ lead_id: number, gitlab_username: string }>(await db(payload).execute(sql`update bootcamp_enrollments set revoke_error = ${error}, updated_at = now() where id = ${enrollmentId} and revoke_requested_at is not null and revoked_at is null and revoke_error is null returning lead_id, gitlab_username`))
+  const [failed] = rowsOf<{ lead_id: number, gitlab_username: string }>(await db(payload).execute(sql`update bootcamp_enrollments set revoke_error = ${error}, updated_at = now() where id = ${enrollmentId} and revoke_requested_at is not null and revoked_at is null and revoke_error is null and ${current} returning lead_id, gitlab_username`))
   if (!failed) return
   await journal(payload, {
     lead: failed.lead_id,

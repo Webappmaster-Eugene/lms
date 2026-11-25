@@ -43,6 +43,7 @@ import { BootcampStreams, BootcampWeekSubmissions } from '@/payload/collections/
 import { TutoringIntroductions } from '@/payload/collections/TutoringIntroductions'
 import { TutoringDeckFiles, TutoringMeetings, TutoringParticipants, TutoringReviews, TutoringStreams } from '@/payload/collections/Tutoring'
 import { TutoringCharges, TutoringProjects, TutoringChecks } from '@/payload/collections/TutoringOperations'
+import { TutoringMergeRequests } from '@/payload/collections/TutoringMergeRequests'
 import { TutoringCalendars } from '@/payload/collections/TutoringCalendars'
 import { WebVitalsReports } from '@/payload/collections/WebVitalsReports'
 import { Certificates } from '@/payload/collections/Certificates'
@@ -202,6 +203,7 @@ export default buildConfig({
     TutoringCharges,
     TutoringProjects,
     TutoringChecks,
+    TutoringMergeRequests,
     BootcampPayments,
     BootcampRefunds,
     BootcampLeadEvents,

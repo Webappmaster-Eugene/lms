@@ -66,6 +66,8 @@ import * as migration_20261122_211103_mentoring_products from './20261122_211103
 import * as migration_20261123_140936_mentoring_gitlab_trust from './20261123_140936_mentoring_gitlab_trust';
 import * as migration_20261124_115020_tutoring_gitlab_invitation from './20261124_115020_tutoring_gitlab_invitation';
 import * as migration_20261124_200121_mentoring_student_library from './20261124_200121_mentoring_student_library';
+import * as migration_20261125_141549_learning_workflows from './20261125_141549_learning_workflows';
+import * as migration_20261125_141551_purchased_course_history from './20261125_141551_purchased_course_history';
 
 export const migrations = [
   {
@@ -406,6 +408,16 @@ export const migrations = [
   {
     up: migration_20261124_200121_mentoring_student_library.up,
     down: migration_20261124_200121_mentoring_student_library.down,
-    name: '20261124_200121_mentoring_student_library'
+    name: '20261124_200121_mentoring_student_library',
+  },
+  {
+    up: migration_20261125_141549_learning_workflows.up,
+    down: migration_20261125_141549_learning_workflows.down,
+    name: '20261125_141549_learning_workflows',
+  },
+  {
+    up: migration_20261125_141551_purchased_course_history.up,
+    down: migration_20261125_141551_purchased_course_history.down,
+    name: '20261125_141551_purchased_course_history'
   },
 ];

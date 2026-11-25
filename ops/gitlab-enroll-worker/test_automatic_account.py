@@ -1,7 +1,7 @@
 import importlib.util
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import mock_open, patch
 from urllib.parse import parse_qs, urlsplit
 
 
@@ -20,8 +20,11 @@ class UsersAPI:
         self.users = list(users)
         self.created = []
 
-    def __call__(self, method, path, body=None):
+    def __call__(self, method, path, body=None, allow404=False):
         route = urlsplit(path)
+        if method == 'GET' and route.path.startswith('/users/'):
+            assert allow404
+            return next((user for user in self.users if route.path == '/users/%s' % user['id']), None)
         assert route.path == '/users'
         if method == 'POST':
             self.created.append(body)
@@ -202,6 +205,164 @@ class AutomaticAccountTest(unittest.TestCase):
             with self.assertRaises(worker.StepError):
                 worker.remove_project_member({'username': 'old-name', 'gitlabUserId': 42, 'gitlabProjectId': 11})
             self.assertEqual([call.args for call in gl.call_args_list], [('GET', '/users/42')])
+
+
+class PaidBootcampAccountTest(unittest.TestCase):
+    def course(self, **overrides):
+        return worker.Job(dict({'id': 17, 'email': 'learner@example.test', 'username': 'course-project',
+                                'firstName': 'Тест', 'lastName': 'Ученик', 'group': 'cohort-two',
+                                'courseProject': 'bootcamp/course'}, **overrides), None)
+
+    def test_protocol_is_advertised_only_at_enrollment_claim(self):
+        with patch('builtins.open', mock_open(read_data='test-key')), patch.object(worker, 'http', return_value=(200, {})) as api:
+            worker.lms('POST', '/api/internal/bootcamp-enrollments/claim')
+            self.assertEqual(api.call_args.args[2]['x-lms-enrollment-protocol'], '2')
+            worker.lms('POST', '/api/internal/tutoring-projects/claim')
+            self.assertNotIn('x-lms-enrollment-protocol', api.call_args.args[2])
+
+    def test_second_course_reuses_known_personal_account_after_rename(self):
+        api = UsersAPI([example_user(username='new-name')])
+        task = self.course(gitlabUserId=42)
+        with patch.object(worker, 'gl', api):
+            task.gitlab_user()
+        self.assertEqual(task.user['username'], 'new-name')
+        self.assertEqual(task.extra['gitlabUserId'], 42)
+        self.assertEqual(api.created, [])
+
+    def test_matching_email_alone_cannot_attach_an_unlinked_mass_account(self):
+        api = UsersAPI([example_user()])
+        with patch.object(worker, 'gl', api), self.assertRaises(worker.StepError):
+            self.course().gitlab_user()
+        self.assertEqual(api.created, [])
+
+    def test_bound_account_is_exact_confirmed_active_human(self):
+        for fields in ({'id': 41}, {'email': 'other@example.test'}, {'confirmed_at': None}, {'is_admin': True},
+                       {'locked': True}, {'state': 'blocked'}, {'bot': True}, {'is_auditor': True}):
+            with self.subTest(fields=fields):
+                api = UsersAPI([example_user(**fields)])
+                task = self.course(gitlabUserId=42)
+                with patch.object(worker, 'gl', api), self.assertRaises(worker.StepError):
+                    task.gitlab_user()
+                self.assertEqual(task.extra, {})
+                self.assertEqual(api.created, [])
+
+    def test_project_from_another_course_cannot_be_adopted(self):
+        project = {'id': 60, 'path_with_namespace': 'cohort-two/course-project', 'visibility': 'private'}
+        for bound, responses in [(61, [project]), (None, [project]), (60, [None])]:
+            with self.subTest(bound=bound, responses=responses), patch.object(worker, 'gl') as api:
+                api.side_effect = responses
+                task = self.course(gitlabUserId=42, gitlabProjectId=bound)
+                task.user = example_user()
+                with self.assertRaises(worker.StepError):
+                    task.gitlab_project()
+                self.assertTrue(all(call.args[0] == 'GET' for call in api.call_args_list))
+
+    def test_running_again_after_fork_resumes_the_same_project(self):
+        project = {'id': 60, 'path_with_namespace': 'cohort-two/course-project', 'visibility': 'private',
+                   'web_url': 'https://git.example.test/cohort-two/course-project',
+                   'description': 'Тест\n[LMS bootcamp enrollment 17]', 'forked_from_project': {'id': 7}}
+        main = {'commit': {'id': 'ab', 'short_id': 'ab'}}
+        ready = dict(project, **worker.PROJECT_SETTINGS)
+        ready.pop('forked_from_project')
+        with patch.object(worker, 'gl') as api, patch.object(worker, 'lms') as report:
+            api.side_effect = [project, {'id': 7}, main, dict(project, import_status='finished'), main, None, ready]
+            task = self.course(gitlabUserId=42)
+            task.gitlab_project()
+            self.assertEqual(task.extra['gitlabProjectId'], 60)
+            self.assertEqual(report.call_args.args[2]['gitlabProjectId'], 60)
+            self.assertEqual([c.args[:2] for c in api.call_args_list if c.args[0] != 'GET'],
+                             [('DELETE', '/projects/60/fork'), ('PUT', '/projects/60')])
+
+    def test_interrupted_enrollment_checks_project_even_without_saved_ids(self):
+        project = {'id': 70, 'path_with_namespace': 'cohort-two/course-project'}
+        cases = [
+            (None, None, [None], True),
+            (70, None, [None], True),
+            (None, 42, [project, None], True),
+            (None, 42, [project, {'id': 42}], False),
+            (None, None, [project], False),
+            (70, None, [project], False),
+            (70, None, [dict(project, id=71)], False),
+        ]
+        for pid, uid, responses, revoke_done in cases:
+            with self.subTest(pid=pid, uid=uid, responses=responses), patch.object(worker, 'gl') as api:
+                api.side_effect = responses
+                task = dict(gitlabProjectId=pid, gitlabUserId=uid, username='course-project', group='cohort-two')
+                if revoke_done:
+                    worker.remove_project_member(task)
+                else:
+                    with self.assertRaises(worker.StepError):
+                        worker.remove_project_member(task)
+                expected_path = '/projects/70' if pid else '/projects/cohort-two%2Fcourse-project'
+                self.assertEqual(api.call_args_list[0].args, ('GET', expected_path))
+                self.assertTrue(all(call.args[0] == 'GET' for call in api.call_args_list))
+
+    def test_public_and_internal_projects_are_rejected_before_any_change(self):
+        for visibility in ('public', 'internal'):
+            for uid in (None, 42):
+                project = dict(worker.PROJECT_SETTINGS, id=60, path_with_namespace='cohort-two/course-project',
+                               description='[LMS bootcamp enrollment 17]', visibility=visibility)
+                with self.subTest(visibility=visibility, uid=uid), patch.object(worker, 'gl', return_value=project) as api:
+                    task = self.course(gitlabUserId=uid)
+                    with self.assertRaises(worker.StepError):
+                        task.gitlab_project()
+                    self.assertEqual([call.args[0] for call in api.call_args_list], ['GET'])
+
+    def test_unsafe_main_is_rejected_for_new_and_reused_accounts(self):
+        safe = {'allow_force_push': False, 'push_access_levels': [{'access_level': worker.MAINTAINER}],
+                'merge_access_levels': [{'access_level': worker.MAINTAINER}]}
+        branch = {'protected': True, 'developers_can_push': False, 'developers_can_merge': False}
+        for uid in (None, 42):
+            for field in ('push_access_levels', 'merge_access_levels'):
+                for rule in ({'access_level': worker.DEVELOPER}, {'access_level': worker.MAINTAINER, 'user_id': 55}):
+                    with self.subTest(uid=uid, field=field, rule=rule), patch.object(worker, 'gl', return_value=dict(safe, **{field: [rule]})) as api:
+                        task = self.course(gitlabUserId=uid)
+                        task.project = {'id': 70}
+                        with self.assertRaises(worker.StepError):
+                            task.gitlab_protect()
+                        self.assertEqual([call.args[0] for call in api.call_args_list], ['GET'])
+            for field in ('developers_can_push', 'developers_can_merge'):
+                with self.subTest(uid=uid, permission=field), patch.object(worker, 'gl', side_effect=[safe, dict(branch, **{field: True})]) as api:
+                    task = self.course(gitlabUserId=uid)
+                    task.project = {'id': 70}
+                    with self.assertRaises(worker.StepError):
+                        task.gitlab_protect()
+                    self.assertEqual([call.args[0] for call in api.call_args_list], ['GET', 'GET'])
+
+    def test_revocation_report_matches_the_claim_revision_on_success_and_failure(self):
+        for result in (None, worker.StepError('нужна сверка')):
+            with self.subTest(result=result), patch.object(worker, 'remove_project_member', side_effect=result), patch.object(worker, 'lms') as lms, patch.object(worker, 'log'):
+                worker.revoke_gitlab([{'id': 9, 'revision': '2026-11-25T00:00:00.000Z'}])
+                body = lms.call_args.args[2]
+                self.assertEqual(body['revision'], '2026-11-25T00:00:00.000Z')
+                self.assertEqual(body.get('ok'), None if result else True)
+                self.assertEqual(body.get('error'), str(result) if result else None)
+
+    def test_refund_of_one_course_keeps_the_other_membership(self):
+        projects = {60: 'cohort-one/course-project', 70: 'cohort-two/course-project'}
+        memberships = {60: {42}, 70: {42}}
+
+        def api(method, path, allow404=False):
+            parts = path.strip('/').split('/')
+            if method == 'GET' and parts == ['users', '42']:
+                return example_user(username='renamed')
+            self.assertEqual(parts[0], 'projects')
+            pid = int(parts[1])
+            if method == 'GET' and len(parts) == 2:
+                return {'id': pid, 'path_with_namespace': projects[pid]}
+            if method == 'DELETE' and parts[2:] == ['members', '42']:
+                memberships[pid].discard(42)
+                return None
+            self.assertEqual((method, parts[2:]), ('GET', ['members', 'all', '42']))
+            return {'id': 42} if 42 in memberships[pid] else None
+
+        task = dict(gitlabProjectId=70, gitlabUserId=42, username='course-project', group='cohort-two')
+        with patch.object(worker, 'gl', api):
+            with self.assertRaises(worker.StepError):
+                worker.remove_project_member(dict(task, gitlabProjectId=60))
+            worker.remove_project_member(task)
+            worker.remove_project_member(task)
+        self.assertEqual(memberships, {60: {42}, 70: set()})
 
 
 if __name__ == '__main__':

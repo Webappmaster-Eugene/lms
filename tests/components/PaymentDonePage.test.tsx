@@ -41,4 +41,10 @@ describe('возврат с оплаты', () => {
     await show({ ...paid, kind: 'pending' })
     expect(screen.getByRole('heading', { name: 'Проверяем оплату' })).toBeInTheDocument()
   })
+
+  it('после возврата не предлагает курс и проект из прежнего чека', async () => {
+    await show({ ...paid, kind: 'refunded', leadId: 17 })
+    expect(screen.getByRole('heading', { name: 'Возврат оформлен' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /проект|курс/i })).toBeNull()
+  })
 })

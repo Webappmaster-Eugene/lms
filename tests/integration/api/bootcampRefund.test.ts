@@ -12,6 +12,7 @@ import { POST as reportRoute } from '@/app/api/internal/bootcamp-enrollments/[id
 import { POST as revokedRoute } from '@/app/api/internal/bootcamp-enrollments/[id]/revoked/route'
 import { adminTelegramTransport } from '@/server/admin-telegram'
 import { checkRefunds } from '@/server/bootcamp-refund'
+import { claimEnrollment } from '@/server/bootcamp-enrollment'
 import { noticeSignatureBase, signatureHash } from '@/server/robokassa'
 import type { BootcampLead } from '@/payload-types'
 import { captureEmails, createAdmin, getTestPayload, login, uid, type TestUser } from '../helpers/payload'
@@ -314,6 +315,30 @@ describe('возврат, отмеченный вручную', () => {
 })
 
 describe('исполнитель в VM GitLab закрывает доступ к проекту', () => {
+  it.each(['queued', 'running'] as const)('возврат при повторе или потере связи (%s) требует проверки GitLab даже без отчета', async status => {
+    const lead = await paidManually()
+    const e = await enrollmentOf(lead.id)
+    if (!e) throw new Error('Нет зачисления')
+    await payload.update({ collection: 'bootcamp-enrollments', id: e.id, data: {
+      status, attempts: status === 'queued' ? 0 : 1, startedAt: new Date(Date.now() - 3600_000).toISOString(),
+    } })
+    expect((await act(lead.id, { action: 'mark-refunded', amount: '45000', reason: 'Отмена до получения отчета' })).status).toBe(200)
+    expect((await enrollmentOf(lead.id))?.revokedAt).toBeFalsy()
+    expect((await claimEnrollment(payload)).revoke.some(item => item.id === e.id)).toBe(false)
+    const candidate = (await claimEnrollment(payload, true)).revoke.find(item => item.id === e.id)
+    expect(candidate).toMatchObject({ group: e.streamGroup, gitlabUserId: null, gitlabProjectId: null })
+    const oldRevision = candidate?.revision
+    expect(oldRevision).toBeTruthy()
+    expect((await worker(reportRoute as typeof revokedRoute, e.id, { status: 'running', steps: [], gitlabUserId: 883323 })).status).toBe(409)
+    await worker(revokedRoute, e.id, { ok: true, revision: oldRevision })
+    expect((await enrollmentOf(lead.id))?.revokedAt).toBeFalsy()
+    const next = (await claimEnrollment(payload, true)).revoke.find(item => item.id === e.id)
+    expect(next?.revision).not.toBe(oldRevision)
+    expect(next?.gitlabUserId).toBe(883323)
+    await worker(revokedRoute, e.id, { ok: true, revision: next?.revision })
+    expect((await enrollmentOf(lead.id))?.revokedAt).toBeTruthy()
+  })
+
   async function refundedWithGitlab(gitlabUserId: number) {
     const lead = await paidManually()
     const enrollment = await enrollmentOf(lead.id)
@@ -352,9 +377,9 @@ describe('исполнитель в VM GitLab закрывает доступ к
     expect((await act(lead.id, { action: 'mark-refunded', amount: '45000', reason: 'Отказ' })).status).toBe(200)
     expect((await enrollmentOf(lead.id))?.revokeRequestedAt).toBeTruthy()
     const done = await worker(reportRoute as typeof revokedRoute, enrollment?.id ?? 0, { status: 'done', steps: [], gitlabUserId: 700_000 + Math.floor(Math.random() * 99_999), gitlabProjectUrl: 'https://git.test/nodejs-bootcamp/x' })
-    expect(done.status).toBe(200)
+    expect(done.status).toBe(409)
     expect((await reload(lead.id)).status).toBe('refunded')
-    expect((await claim()).revoke.some((entry) => entry.id === enrollment?.id)).toBe(true)
+    expect((await claimEnrollment(payload, true)).revoke.some(entry => entry.id === enrollment?.id)).toBe(true)
   })
 })
 

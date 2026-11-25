@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 
 import { validTutoringWebhookToken, tutoringWebhookToken } from '@/server/bootcamp-worker-auth'
 import { saveTutoringCharge } from '@/server/tutoring-payments'
-import { claimTutoringProject, queueTutoringProject, recordTutoringVerdict, reportTutoringProject, retryTutoringRevocation, tutoringMergeRequest } from '@/server/tutoring-projects'
+import { claimTutoringProject, queueTutoringProject, recordTutoringGitlabEvent, reportTutoringProject, retryTutoringRevocation, tutoringMergeRequest } from '@/server/tutoring-projects'
 import type { TutoringParticipant, TutoringStream } from '@/payload-types'
 import { createAdmin, createStudent, getTestPayload, login, rest, uid, type TestUser } from '../helpers/payload'
 
@@ -94,16 +94,16 @@ describe('менторство как отдельный продукт', () => 
       object_attributes: { noteable_type: 'MergeRequest', updated_at: '2027-02-17T17:00:00Z',
         note: '<!-- grader:01:5d1444952459 -->\n**Доверенная проверка: неделя 1 - пройдена**\nПрошло проверок: 26 из 26.' },
     }
-    expect(await recordTutoringVerdict(payload, project.id, 'Note Hook', { ...event, user: { id: gradingBot + 1, username: event.user.username } })).toBe(false)
-    expect(await recordTutoringVerdict(payload, project.id, 'Note Hook', event)).toBe(true)
-    expect(await recordTutoringVerdict(payload, project.id, 'Note Hook', event)).toBe(false)
+    expect(await recordTutoringGitlabEvent(payload, project.id, 'Note Hook', { ...event, user: { id: gradingBot + 1, username: event.user.username } })).toBe(false)
+    expect(await recordTutoringGitlabEvent(payload, project.id, 'Note Hook', event)).toBe(true)
+    expect(await recordTutoringGitlabEvent(payload, project.id, 'Note Hook', event)).toBe(false)
     const result = await payload.find({ collection: 'tutoring-checks', where: { project: { equals: project.id } }, limit: 1 })
     expect(result.docs[0]).toMatchObject({ mrIid: 19, stage: 1, verdict: 'passed', passed: 26, total: 26 })
-    expect(await recordTutoringVerdict(payload, project.id, 'Merge Request Hook', {
+    expect(await recordTutoringGitlabEvent(payload, project.id, 'Merge Request Hook', {
       project: event.project,
       object_attributes: { ...event.merge_request, action: 'update', oldrev: 'old', updated_at: '2027-02-17T18:00:00Z' },
     })).toBe(true)
-    expect(await recordTutoringVerdict(payload, project.id, 'Note Hook', event)).toBe(false)
+    expect(await recordTutoringGitlabEvent(payload, project.id, 'Note Hook', event)).toBe(false)
     expect((await payload.findByID({ collection: 'tutoring-checks', id: result.docs[0].id })).verdict).toBe('pending')
     await payload.update({ collection: 'tutoring-streams', id: stream.id, data: { status: 'archived' } })
     await expect(saveIntroductionSubmission(payload, student, stream.id, sample, sample)).rejects.toThrow('открытого потока')
@@ -120,12 +120,14 @@ describe('менторство как отдельный продукт', () => 
     await payload.create({ collection: 'tutoring-projects', data: { student: priorStudent.id, program: 'nodejs', username,
       group: 'nodejs-bootcamp/mentoring-nodejs', courseProject: 'bootcamp/course', gradingProject: 'bootcamp-staff/grading',
       state: 'revoked', gitlabUserId: 891, attempts: 0 } })
-    const program = await payload.create({ collection: 'bootcamp-programs', data: {
+    const [existingProgram] = (await payload.find({ collection: 'bootcamp-programs', where: { key: { equals: 'react-next' } }, depth: 0, limit: 1 })).docs
+    const gitlab = { gitlabStreamGroup: 'react-bootcamp/mass', gitlabCourseProject: 'react-bootcamp/course', gradingProject: 'react-staff/grading',
+      mentoringGitlabGroup: 'react-bootcamp/mentoring', mentoringGraderUserId: gradingBot }
+    const program = existingProgram ? await payload.update({ collection: 'bootcamp-programs', id: existingProgram.id, data: gitlab }) : await payload.create({ collection: 'bootcamp-programs', data: {
       key: 'react-next', title: 'React', shortTitle: 'React', landingUrl: 'https://example.com/react',
       priceKopecks: 10000, paymentDueDays: 7, offerUrl: 'https://example.com/offer', offerVersion: '1', receiptItemName: 'Курс React',
       entryTaskSet: 'rental-js',
-      gitlabStreamGroup: 'react-bootcamp/mass', gitlabCourseProject: 'react-bootcamp/course', gradingProject: 'react-staff/grading',
-      mentoringGitlabGroup: 'react-bootcamp/mentoring', mentoringGraderUserId: gradingBot,
+      ...gitlab,
     } })
     const draft = await payload.create({ collection: 'tutoring-streams', data: {
       program: 'react-next', title: uid('draft'), startsAt: stream.startsAt, status: 'draft', currentMeeting: 1 } })
@@ -148,7 +150,12 @@ describe('менторство как отдельный продукт', () => 
       expect((await payload.find({ collection: 'tutoring-projects', where })).docs.map(row => row.id)).toEqual([projects.docs[0].id])
     } finally {
       await payload.delete({ collection: 'tutoring-streams', id: draft.id })
-      await payload.delete({ collection: 'bootcamp-programs', id: program.id })
+      if (existingProgram) await payload.update({ collection: 'bootcamp-programs', id: program.id, data: {
+        gitlabStreamGroup: existingProgram.gitlabStreamGroup, gitlabCourseProject: existingProgram.gitlabCourseProject,
+        gradingProject: existingProgram.gradingProject, mentoringGitlabGroup: existingProgram.mentoringGitlabGroup ?? null,
+        mentoringGraderUserId: existingProgram.mentoringGraderUserId ?? null,
+      } })
+      else await payload.delete({ collection: 'bootcamp-programs', id: program.id })
       await payload.delete({ collection: 'users', id: priorStudent.id })
     }
   })

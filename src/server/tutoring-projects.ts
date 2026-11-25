@@ -6,23 +6,19 @@ import type { Payload, PayloadRequest } from 'payload'
 
 import { EnrollmentInputError } from '@/lib/bootcamp-enrollment'
 import { parseVerdict } from '@/lib/bootcamp-progress'
-import { isTutoringProgram, TUTORING_GITLAB_ATTEMPTS, tutoringHttpsUrl, type TutoringProgram } from '@/lib/tutoring'
+import { isTutoringProgram, TUTORING_GITLAB_ATTEMPTS, tutoringHttpsUrl } from '@/lib/tutoring'
 import type { User } from '@/payload-types'
 import { adminLink } from '@/server/admin-telegram'
 import { inTransaction, rowsOf, txDb } from '@/server/bootcamp-lead-events'
 import { findProgram } from '@/server/bootcamp-programs'
 import { tutoringWebhookToken } from '@/server/bootcamp-worker-auth'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
+import { mergeRequestHead, tutoringMergeRequestSnapshot, updateTutoringMergeRequest } from '@/server/tutoring-merge-requests'
 import { TutoringProblem } from '@/server/tutoring'
+import { tutoringMergeRequest, tutoringProject } from '@/server/tutoring-student-project'
 import { approvedInviteEmail, automaticTutoringUsername, enqueueMissingTutoringProjects, groupUsedByBootcamp } from '@/server/tutoring-project-queue'
 
-export async function tutoringProject(payload: Payload, req: PayloadRequest, student: number, program: TutoringProgram) {
-  const { docs } = await payload.find({
-    collection: 'tutoring-projects', req, limit: 1, depth: 0, overrideAccess: true,
-    where: { and: [{ student: { equals: student } }, { program: { equals: program } }] },
-  })
-  return docs[0] ?? null
-}
+export { tutoringMergeRequest, tutoringProject }
 
 export async function queueTutoringProject(payload: Payload, actor: User, streamId: number, participant: number, inviteEmail = '') {
   return inTransaction(payload, actor, async req => {
@@ -172,16 +168,6 @@ export async function reportTutoringProject(payload: Payload, id: number, input:
   })
 }
 
-export function tutoringMergeRequest(projectUrl: string, mr: string): number | null {
-  if (!tutoringHttpsUrl(mr)) return null
-  const base = new URL(projectUrl)
-  const url = new URL(mr)
-  const prefix = base.pathname.replace(/\/$/, '') + '/-/merge_requests/'
-  if (base.origin !== url.origin || !url.pathname.startsWith(prefix)) return null
-  const iid = url.pathname.slice(prefix.length)
-  return /^[1-9]\d{0,9}$/.test(iid) ? Number(iid) : null
-}
-
 export async function tutoringVerdict(payload: Payload, req: PayloadRequest, project: number, mrIid: number) {
   const { docs } = await payload.find({
     collection: 'tutoring-checks', req, limit: 1, depth: 0, overrideAccess: true,
@@ -190,18 +176,19 @@ export async function tutoringVerdict(payload: Payload, req: PayloadRequest, pro
   return docs[0] ?? null
 }
 
-export async function recordTutoringVerdict(payload: Payload, id: number, event: string | null, input: unknown) {
+export async function recordTutoringGitlabEvent(payload: Payload, id: number, event: string | null, input: unknown) {
   const body = obj(input)
   const note = obj(body.object_attributes)
-  const pushed = event === 'Merge Request Hook' && note.action === 'update' && typeof note.oldrev === 'string'
-  const mr = pushed ? note : obj(body.merge_request)
+  const mrEvent = event === 'Merge Request Hook'
+  const pushed = mrEvent && note.action === 'update' && typeof note.oldrev === 'string'
+  const mr = mrEvent ? note : obj(body.merge_request)
   const author = obj(body.user)
   const iid = idOf(mr.iid)
   if (!iid) return false
   const trustedNote = event === 'Note Hook' && note.noteable_type === 'MergeRequest'
   const verdict = trustedNote ? parseVerdict(string(note.note)) : null
   const date = new Date(string(note.updated_at || note.created_at))
-  if ((!verdict && !pushed) || !Number.isFinite(date.getTime())) return false
+  if ((!verdict && !mrEvent) || !Number.isFinite(date.getTime())) return false
 
   return inTransaction(payload, null, async req => {
     const db = await txDb(req)
@@ -213,11 +200,25 @@ export async function recordTutoringVerdict(payload: Payload, id: number, event:
       const program = await findProgram(payload, project.program, req)
       if (!program?.mentoringGraderUserId || idOf(author.id) !== program.mentoringGraderUserId) return false
     }
+    const at = date.toISOString()
+    const snapshot = await tutoringMergeRequestSnapshot(payload, req, id, iid)
+    const snapshotChanged = mrEvent && await updateTutoringMergeRequest(payload, req, project, iid, mr, at, snapshot)
+    if (!pushed && !verdict) return snapshotChanged
     const old = await tutoringVerdict(payload, req, id, iid)
-    if (old && Date.parse(old.reportedAt) >= date.getTime()) return false
-    if (!verdict && !old) return false
+    const eventHead = mergeRequestHead(mr)
+    if (pushed && !snapshotChanged && snapshot?.headSha && eventHead && snapshot.headSha !== eventHead && at <= snapshot.eventAt) return false
+    if (!verdict && (!old || (old.commitSha && eventHead?.startsWith(old.commitSha)))) return snapshotChanged
+    const marker = verdict ? /<!--\s*grader:\d{1,2}:([0-9a-f]{7,64})\s*-->/i.exec(string(note.note))?.[1].toLowerCase() : null
+    if (verdict && marker) {
+      if ((eventHead && !eventHead.startsWith(marker)) ||
+          (snapshot?.headSha && !snapshot.headSha.startsWith(marker) &&
+           !(eventHead && Date.parse(string(mr.updated_at)) > Date.parse(snapshot.eventAt)))) return false
+    }
+    const superseded = pushed && snapshotChanged && eventHead && old?.commitSha && snapshot?.headSha?.startsWith(old.commitSha)
+    const confirmsPending = old?.verdict === 'pending' && marker && snapshot?.headSha?.startsWith(marker)
+    if (!superseded && old && (old.reportedAt > at || (old.reportedAt === at && !confirmsPending))) return snapshotChanged
     const data = { project: id, mrIid: iid, stage: verdict?.week ?? old?.stage ?? 0, verdict: verdict?.verdict ?? 'pending',
-      passed: verdict?.checksPassed ?? null, total: verdict?.checksTotal ?? null, reportedAt: date.toISOString() }
+      passed: verdict?.checksPassed ?? null, total: verdict?.checksTotal ?? null, commitSha: marker ?? null, reportedAt: at }
     if (old) await payload.update({ collection: 'tutoring-checks', id: old.id, req, overrideAccess: true, data })
     else await payload.create({ collection: 'tutoring-checks', req, overrideAccess: true, data })
     return true

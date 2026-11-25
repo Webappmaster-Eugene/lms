@@ -69,6 +69,7 @@ export function LeadPathPanel() {
   if (!state) return <div className="enrollment">{error ? <p className="enrollment__error" role="alert">{error}</p> : <p className="enrollment__hint">Загружаем путь заявки…</p>}</div>
 
   const { lead, enrollment } = state
+  const streamOptions = state.defaults.streams ?? [{ group: state.defaults.group, title: state.defaults.group }]
   const draft = state.admission?.enrollment
   const run = async (action: Action, body: Fields = {}) => {
     setBusy(true)
@@ -117,10 +118,15 @@ export function LeadPathPanel() {
     </div>
   )
   const enrollFields = () => <>
+    {form && <label className="enrollment__field"><span>Поток буткемпа</span>
+      <select value={form.fields.group} disabled={busy} onChange={event => setForm({ ...form, fields: { ...form.fields, group: event.target.value } })}>
+        {streamOptions.map(stream => <option key={stream.group} value={stream.group}>{stream.title}</option>)}
+        {!streamOptions.some(stream => stream.group === form.fields.group) && <option value={form.fields.group} disabled>{form.fields.group || 'Нет доступных потоков'}</option>}
+      </select>
+    </label>}
     {input('firstName', 'Имя')}
     {input('lastName', 'Фамилия')}
-    {input('username', 'Логин GitLab', 'Станет путём проекта: поток/логин')}
-    {input('group', 'Группа потока в GitLab', 'Группа программы или прошлого зачисления. Новый поток сначала впишите в программу')}
+    {input('username', 'Имя проекта ученика в GitLab', 'При первой покупке это также предлагаемый логин. Для следующего курса ученик пользуется прежней учетной записью.')}
     {input('accessUntil', 'Курс методичек открыт до', 'Пусто - без срока', 'date')}
   </>
   const enrollDefaults = (): Fields => draft
@@ -266,7 +272,7 @@ export function LeadPathPanel() {
                   ? `Доступы закрыты после возврата денег ${at(enrollment.revokedAt)}.`
                   : enrollment.revokeError
                     ? `Доступ к проекту GitLab закрыть не удалось: ${enrollment.revokeError} Проверьте членство ученика в проекте.`
-                    : 'Возврат денег: исполнитель в VM GitLab блокирует учётку, обычно за полминуты.'}
+                    : 'GitLab проверяет и закрывает доступ к проекту по этой покупке.'}
               </p>
             )}
             {enrollment.status === 'failed' && !refunded && <div className="enrollment__actions">{button(busy ? 'Ставим в очередь…' : 'Повторить шаги GitLab', () => void retry(enrollment.id))}<span className="enrollment__hint">Сделанные шаги исполнитель пропустит.</span></div>}
@@ -275,6 +281,7 @@ export function LeadPathPanel() {
           <p className="enrollment__hint">Деньги возвращены до зачисления: зачислять нельзя.</p>
         ) : paid ? (
           <>
+            {state.identityUserId && <p><Link href={`/admin/learning-access?user=${state.identityUserId}#enrollment-identity`}>Сверить почту ученика для зачисления</Link></p>}
             <p className="enrollment__hint">{testOnly
               ? 'Оплата тестовая: доступы по ней автоматически не выдаются. Если это проверка, зачислите кнопкой, если нет - отмените допуск в шаге «Оплата».'
               : 'Оплата есть, а зачисления нет: автозачисление не стартовало, причина в истории ниже. Проверьте данные и зачислите.'}</p>

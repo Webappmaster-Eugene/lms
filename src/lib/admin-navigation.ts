@@ -59,6 +59,7 @@ export const ADMIN_NAV_GROUPS = [
       { href: '/admin/collections/tutoring-charges', label: 'Оплата встреч' },
       { href: '/admin/collections/tutoring-projects', label: 'Учебные проекты' },
       { href: '/admin/collections/tutoring-checks', label: 'Автопроверки' },
+      { href: '/admin/collections/tutoring-merge-requests', label: 'Работы в GitLab' },
     ],
   },
   {

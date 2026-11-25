@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { sql } from '@payloadcms/db-postgres'
 import type { Payload, PayloadRequest } from 'payload'
 
 import { EnrollmentInputError } from '@/lib/bootcamp-enrollment'
@@ -63,14 +64,22 @@ export async function openProgramLinks(payload: Payload): Promise<{ title: strin
   }
 }
 
-/**
- * Опечатка в группе потока всплыла бы только после оплаты, на шаге исполнителя: LMS в GitLab
- * не ходит. Поэтому принимаем только группы, про которые известно, что они есть: группу
- * программы и группы удачных зачислений этой программы. Новый поток - сначала в программу.
- */
+/** Тот же список используется при показе формы и при записи допуска. */
+export async function admissionStreams(payload: Payload, program: BootcampProgramConfig) {
+  const adapter = payload.db as unknown as { drizzle: { execute(query: ReturnType<typeof sql>): Promise<unknown> } }
+  const result = await adapter.drizzle.execute(sql`
+    select g.name as "group", coalesce(s.title, g.name) as title from (
+      select ${program.gitlabStreamGroup}::text as name
+      union select stream_group from bootcamp_enrollments where program = ${program.key} and status = 'done'
+    ) g left join bootcamp_streams s on s.gitlab_group = g.name
+    where (s.program is null or s.program = ${program.key})
+      and not exists (select 1 from bootcamp_programs t where t.mentoring_gitlab_group = g.name)
+      and not exists (select 1 from tutoring_projects t where t."group" = g.name)
+    order by (g.name = ${program.gitlabStreamGroup}) desc, s.starts_at desc nulls last, g.name`)
+  return (result as { rows: { group: string; title: string }[] }).rows
+}
+
 export async function assertKnownStreamGroup(payload: Payload, program: BootcampProgramConfig, group: string): Promise<void> {
-  if (group === program.gitlabStreamGroup) return
-  const used = await payload.find({ collection: 'bootcamp-enrollments', where: { and: [{ program: { equals: program.key } }, { status: { equals: 'done' } }, { streamGroup: { equals: group } }] }, limit: 1, depth: 0, overrideAccess: true })
-  if (used.docs[0]) return
-  throw new EnrollmentInputError(`Группы «${group}» нет ни в программе «${program.shortTitle}», ни у прошлых зачислений. Проверьте опечатку. Если это новый поток, заведите группу в GitLab и в GRADER_GROUPS, а затем впишите её в программу (CMS, Буткемпы, Программы буткемпов).`, 409)
+  if ((await admissionStreams(payload, program)).some(stream => stream.group === group)) return
+  throw new EnrollmentInputError(`Группы «${group}» нет ни в программе «${program.shortTitle}», ни среди подтвержденных групп этой программы. Проверьте группу GitLab в настройках программы.`, 409)
 }

@@ -13,9 +13,10 @@ export async function POST(request: Request, { params }: Props) {
     const payload = await workerRequest(request)
     const id = routeId((await params).id)
     const body = await readRequestJson(request, 4096)
-    const input = body && typeof body === 'object' && !Array.isArray(body) ? body as { ok?: unknown, error?: unknown } : null
+    const input = body && typeof body === 'object' && !Array.isArray(body) ? body as { ok?: unknown, error?: unknown, revision?: unknown } : null
     if (!input || (input.ok !== true && typeof input.error !== 'string')) throw new EnrollmentInputError('Нужно { ok: true } или { error: текст }')
-    await reportGitlabRevoked(payload, id, input.ok === true ? { ok: true, error: null } : { ok: false, error: String(input.error) })
+    if (input.revision !== undefined && (typeof input.revision !== 'string' || !Number.isFinite(Date.parse(input.revision)))) throw new EnrollmentInputError('Неверная версия отзыва')
+    await reportGitlabRevoked(payload, id, { ok: input.ok === true, error: input.ok === true ? null : String(input.error), revision: input.revision })
     return routeResponse({ ok: true })
   })
 }

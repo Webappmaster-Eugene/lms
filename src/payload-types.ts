@@ -132,6 +132,7 @@ export interface Config {
     'tutoring-charges': TutoringCharge;
     'tutoring-projects': TutoringProject;
     'tutoring-checks': TutoringCheck;
+    'tutoring-merge-requests': TutoringMergeRequest;
     'bootcamp-payments': BootcampPayment;
     'bootcamp-refunds': BootcampRefund;
     'bootcamp-lead-events': BootcampLeadEvent;
@@ -207,6 +208,7 @@ export interface Config {
     'tutoring-charges': TutoringChargesSelect<false> | TutoringChargesSelect<true>;
     'tutoring-projects': TutoringProjectsSelect<false> | TutoringProjectsSelect<true>;
     'tutoring-checks': TutoringChecksSelect<false> | TutoringChecksSelect<true>;
+    'tutoring-merge-requests': TutoringMergeRequestsSelect<false> | TutoringMergeRequestsSelect<true>;
     'bootcamp-payments': BootcampPaymentsSelect<false> | BootcampPaymentsSelect<true>;
     'bootcamp-refunds': BootcampRefundsSelect<false> | BootcampRefundsSelect<true>;
     'bootcamp-lead-events': BootcampLeadEventsSelect<false> | BootcampLeadEventsSelect<true>;
@@ -259,6 +261,7 @@ export interface UserAuthOperations {
  */
 export interface User {
   id: number;
+  enrollmentIdentityEmail?: string | null;
   /**
    * Назначения и исключения задаются в разделе «Доступ к обучению». Видимость каталога настраивается отдельно.
    */
@@ -1973,6 +1976,10 @@ export interface BootcampProgram {
    */
   gitlabStreamGroup: string;
   gradingProject: string;
+  /**
+   * Числовой ID аккаунта GitLab, которым проект проверки этой программы публикует результаты.
+   */
+  bootcampGraderUserId?: number | null;
   mentoringGitlabGroup?: string | null;
   mentoringGraderUserId?: number | null;
   /**
@@ -2172,14 +2179,20 @@ export interface BootcampEnrollment {
   firstName: string;
   lastName: string;
   gitlabUsername: string;
+  needsVerifiedGitlabAccount?: boolean | null;
   streamGroup: string;
   program?: string | null;
+  manualsCourse?: (number | null) | Course;
   courseProject?: string | null;
   gradingProject?: string | null;
   /**
    * Пусто - без срока.
    */
   accessUntil?: string | null;
+  defenseOutcome?: ('passed' | 'revise') | null;
+  defenseUrl?: string | null;
+  defenseRecordedAt?: string | null;
+  defenseMentor?: (number | null) | User;
   status: 'queued' | 'running' | 'done' | 'failed';
   steps?:
     | {
@@ -2259,6 +2272,10 @@ export interface BootcampWeekSubmission {
   title?: string | null;
   mrUrl?: string | null;
   branch?: string | null;
+  headSha?: string | null;
+  headAt?: string | null;
+  verdictSha?: string | null;
+  mergedHeadSha?: string | null;
   /**
    * Последнее открытие: после переоткрытия - его время.
    */
@@ -2350,6 +2367,18 @@ export interface TutoringMeeting {
 export interface TutoringStream {
   id: number;
   title: string;
+  hourlyKopecks?: number | null;
+  creationKey?: string | null;
+  pendingInviteEmails?: string | null;
+  invitesAwaitingIdentity?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   program: 'nodejs' | 'react-next';
   startsAt: string;
   awaitingFirstLecture?: boolean | null;
@@ -2444,6 +2473,7 @@ export interface TutoringCharge {
   amountKopecks: number;
   status: 'due' | 'paid' | 'cancelled';
   paidAt?: string | null;
+  attendedAt?: string | null;
   updatedBy: number | User;
   updatedAt: string;
   createdAt: string;
@@ -2481,10 +2511,27 @@ export interface TutoringCheck {
   project: number | TutoringProject;
   mrIid: number;
   stage: number;
+  commitSha?: string | null;
   verdict: string;
   passed?: number | null;
   total?: number | null;
   reportedAt: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-merge-requests".
+ */
+export interface TutoringMergeRequest {
+  id: number;
+  project: number | TutoringProject;
+  mrIid: number;
+  stage: number;
+  title: string;
+  isOpen: boolean;
+  headSha?: string | null;
+  eventAt: string;
   updatedAt: string;
   createdAt: string;
 }
@@ -2865,6 +2912,7 @@ export interface PayloadMigration {
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
+  enrollmentIdentityEmail?: T;
   learningAccessMode?: T;
   learningCatalogVisibility?: T;
   trainerAccessMode?: T;
@@ -3871,6 +3919,7 @@ export interface BootcampProgramsSelect<T extends boolean = true> {
   gitlabCourseProject?: T;
   gitlabStreamGroup?: T;
   gradingProject?: T;
+  bootcampGraderUserId?: T;
   mentoringGitlabGroup?: T;
   mentoringGraderUserId?: T;
   entryTaskSet?: T;
@@ -3992,11 +4041,17 @@ export interface BootcampEnrollmentsSelect<T extends boolean = true> {
   firstName?: T;
   lastName?: T;
   gitlabUsername?: T;
+  needsVerifiedGitlabAccount?: T;
   streamGroup?: T;
   program?: T;
+  manualsCourse?: T;
   courseProject?: T;
   gradingProject?: T;
   accessUntil?: T;
+  defenseOutcome?: T;
+  defenseUrl?: T;
+  defenseRecordedAt?: T;
+  defenseMentor?: T;
   status?: T;
   steps?: T;
   error?: T;
@@ -4047,6 +4102,10 @@ export interface BootcampWeekSubmissionsSelect<T extends boolean = true> {
   title?: T;
   mrUrl?: T;
   branch?: T;
+  headSha?: T;
+  headAt?: T;
+  verdictSha?: T;
+  mergedHeadSha?: T;
   openedAt?: T;
   lastCommitAt?: T;
   pipelineStatus?: T;
@@ -4133,6 +4192,10 @@ export interface TutoringMeetingsSelect<T extends boolean = true> {
  */
 export interface TutoringStreamsSelect<T extends boolean = true> {
   title?: T;
+  hourlyKopecks?: T;
+  creationKey?: T;
+  pendingInviteEmails?: T;
+  invitesAwaitingIdentity?: T;
   program?: T;
   startsAt?: T;
   awaitingFirstLecture?: T;
@@ -4223,6 +4286,7 @@ export interface TutoringChargesSelect<T extends boolean = true> {
   amountKopecks?: T;
   status?: T;
   paidAt?: T;
+  attendedAt?: T;
   updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -4258,10 +4322,26 @@ export interface TutoringChecksSelect<T extends boolean = true> {
   project?: T;
   mrIid?: T;
   stage?: T;
+  commitSha?: T;
   verdict?: T;
   passed?: T;
   total?: T;
   reportedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutoring-merge-requests_select".
+ */
+export interface TutoringMergeRequestsSelect<T extends boolean = true> {
+  project?: T;
+  mrIid?: T;
+  stage?: T;
+  title?: T;
+  isOpen?: T;
+  headSha?: T;
+  eventAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

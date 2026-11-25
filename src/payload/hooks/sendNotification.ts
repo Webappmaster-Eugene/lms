@@ -1,6 +1,8 @@
 import type { CollectionAfterChangeHook, PayloadRequest } from 'payload'
 import {
   inviteEmail,
+  tutoringStreamInviteEmail,
+  type TutoringWelcome,
   courseCompletedEmail,
   achievementUnlockedEmail,
   roadmapCompletedEmail,
@@ -8,6 +10,7 @@ import {
 import { withSpan, logger } from '@/lib/telemetry'
 import { afterCommit } from '@/server/after-commit'
 import { notifyAdmins } from '@/server/admin-telegram'
+import { recordInvitedEnrollmentIdentity } from '@/payload/hooks/protectEnrollmentIdentity'
 
 type EmailMessage = { to: string; subject: string; html: string; text: string }
 
@@ -24,6 +27,10 @@ function sendAfterCommit(req: PayloadRequest, message: EmailMessage, failure: st
       void notifyAdmins({ title: 'Письмо ученику не ушло', lines: [`Кому: ${message.to}`, `Тема: ${message.subject}`, 'Подробности в журнале приложения'] })
     }
   })
+}
+
+export async function sendExistingTutoringInvite(req: PayloadRequest, to: string, stream: TutoringWelcome) {
+  await sendAfterCommit(req, { to, ...tutoringStreamInviteEmail(stream) }, 'Failed to send tutoring invitation', { 'stream.id': String(stream.id) })
 }
 
 /**
@@ -73,13 +80,16 @@ export const sendInviteEmail: CollectionAfterChangeHook = async ({ doc, operatio
         throw new Error('forgotPassword returned an empty token')
       }
 
-      const { subject, html, text } = inviteEmail(doc.firstName ?? '', doc.email, token, await communityUrl(req))
+      const path = req.context?.tutoringWelcomePath
+      const { subject, html, text } = inviteEmail(req.context?.tutoringUnnamed ? '' : doc.firstName ?? '', doc.email, token,
+        await communityUrl(req), typeof path === 'string' ? path : undefined)
       await sendAfterCommit(req, { to: doc.email, subject, html, text }, 'Failed to send invite email', { 'user.email': doc.email })
     } catch (err) {
       logger.error('Failed to send invite email', err, { 'user.email': doc.email })
       void notifyAdmins({ title: 'Приглашение в LMS не отправлено', lines: [`Кому: ${doc.email}`, 'Учётка создана, но письма со ссылкой для пароля нет. Подробности в журнале приложения'] })
+      return doc
     }
-
+    await recordInvitedEnrollmentIdentity(req, doc.id)
     return doc
   })
 }

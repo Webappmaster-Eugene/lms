@@ -6,6 +6,9 @@ import { PPTX_MIME, TUTORING_DECK_DIRECTORY } from '@/lib/tutoring-file-types'
 
 import { isMoscowTuesday, isTutoringMeeting, isTutoringProgram, scheduledTutoringMeeting, tutoringHttpsUrl, tutoringPrograms, tutoringStatuses } from '@/lib/tutoring'
 import { isAdmin, isAdminField } from '@/payload/access/isAdmin'
+import { hasEnrollmentIdentity } from '@/payload/hooks/protectEnrollmentIdentity'
+import { getAccountFreeze } from '@/server/account-freeze'
+import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
 import { cleanupTutoringParticipant, cleanupTutoringStream } from '@/payload/hooks/cleanupOwnedRelations'
 import { tutoringDeckAccess, tutoringPresentationAccess } from '@/server/tutoring-access'
 import { enqueueMissingTutoringProjects } from '@/server/tutoring-project-queue'
@@ -132,6 +135,11 @@ export const TutoringStreams: CollectionConfig = {
   }] },
   fields: [
     { name: 'title', type: 'text', required: true, maxLength: 120, label: 'Название потока' },
+    { name: 'hourlyKopecks', type: 'number', min: 1, max: 100000000, label: 'Ставка за час в копейках' },
+    { name: 'creationKey', type: 'text', unique: true, maxLength: 36, admin: { hidden: true }, access: { update: () => false } },
+    { name: 'pendingInviteEmails', type: 'textarea', label: 'Адреса для приглашения при открытии потока', admin: { readOnly: true } },
+    { name: 'invitesAwaitingIdentity', type: 'json', label: 'Приглашения до сверки почты', admin: { readOnly: true },
+      access: { create: ({ req }) => req.context.tutoringIdentityQueue === true, update: ({ req }) => req.context.tutoringIdentityQueue === true } },
     { name: 'program', type: 'select', required: true, options: programs, label: 'Программа' },
     { name: 'startsAt', type: 'date', required: true, label: 'Первая встреча', admin: { date: { pickerAppearance: 'dayAndTime' } } },
     { name: 'awaitingFirstLecture', type: 'checkbox', label: 'Открыта только вводная встреча',
@@ -173,13 +181,22 @@ export const TutoringParticipants: CollectionConfig = {
       // Возвращение в поток заменяет доступ выпускника текущим доступом участника.
       data.graduatedThrough = null
     }
-    if (operation !== 'create') return data
-    const student = relId(data.student)
+    const reactivating = operation === 'update' && req.user && originalDoc?.active === false && data.active === true
+    if (operation !== 'create' && !reactivating) return data
+    const student = relId(data.student ?? originalDoc?.student)
     if (typeof student !== 'number') return data
     const db = await txDb(req)
     const [account] = rowsOf<{ email: string }>(await db.execute(sql`select email from users where id = ${student} for share`))
     if (!account || (context.tutoringInviteEmail && context.tutoringInviteEmail !== account.email.toLowerCase())) {
       bad('student', 'Адрес ученика изменился. Проверьте почту и повторите добавление')
+    }
+    if (req.user && data.active !== false) {
+      if ((await getAuthoritativeLearningPolicy(req.payload, student, req)).role !== 'student' || (await getAccountFreeze(req.payload, student, req)).active) {
+        bad('student', 'Проверьте состояние учетной записи в разделе «Ученики и доступы»')
+      }
+      if (!await hasEnrollmentIdentity(req, student, account.email)) {
+        bad('student', 'Сначала сверьте адрес в карточке ученика в разделе «Ученики и доступы»')
+      }
     }
     return { ...data, gitlabInviteEmail: account.email.toLowerCase() }
   }], afterChange: [async ({ req, doc, previousDoc, operation }) => {

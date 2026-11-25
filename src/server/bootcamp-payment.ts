@@ -46,7 +46,7 @@ export async function findLeadByPaymentToken(payload: Payload, token: string): P
 }
 
 export type PaymentPageState = {
-  kind: 'open' | 'paid' | 'expired' | 'closed' | 'unavailable'
+  kind: 'open' | 'paid' | 'refunded' | 'expired' | 'closed' | 'unavailable'
   name: string | null
   program: string
   amount: string
@@ -60,7 +60,7 @@ export type PaymentPageState = {
 export async function paymentPageState(payload: Payload, lead: BootcampLead): Promise<PaymentPageState> {
   const config = robokassaConfig()
   const expired = Boolean(lead.paymentDueAt) && Date.parse(lead.paymentDueAt ?? '') < Date.now()
-  const kind: PaymentPageState['kind'] = lead.paidAt || lead.status === 'paid' || lead.status === 'enrolled'
+  const kind: PaymentPageState['kind'] = lead.status === 'refunded' ? 'refunded' : lead.paidAt || lead.status === 'paid' || lead.status === 'enrolled'
     ? 'paid'
     : lead.status !== 'admitted' ? 'closed' : expired ? 'expired' : config ? 'open' : 'unavailable'
   if (kind === 'open' || kind === 'expired') {
@@ -95,7 +95,7 @@ export async function startCheckout(payload: Payload, token: string, acceptOffer
   if (!lead) throw new EnrollmentInputError('Ссылка на оплату не найдена', 404)
   const state = await paymentPageState(payload, lead)
   if (state.kind === 'paid') throw new EnrollmentInputError('Оплата уже получена, повторно платить не нужно.', 409)
-  if (state.kind === 'closed') throw new EnrollmentInputError('Эта ссылка на оплату больше не действует. Напишите нам на support@mentorcareer.ru.', 409)
+  if (state.kind === 'closed' || state.kind === 'refunded') throw new EnrollmentInputError('Эта ссылка на оплату больше не действует. Напишите нам на support@mentorcareer.ru.', 409)
   if (state.kind === 'expired') throw new EnrollmentInputError('Срок оплаты прошёл. Напишите нам на support@mentorcareer.ru, и мы пришлём новую ссылку.', 409)
   const config = robokassaConfig()
   if (!config) throw new EnrollmentInputError('Оплата временно недоступна. Напишите нам на support@mentorcareer.ru.', 503)
@@ -146,7 +146,7 @@ export async function startCheckout(payload: Payload, token: string, acceptOffer
 
 export type PaidOutcome = 'paid' | 'already' | 'unknown' | 'amount_mismatch' | 'double' | 'stale'
 
-type PaidDetails = { amountKopecks: number, paymentMethod?: string, incCurrLabel?: string, fee?: string, opKey?: string, source: 'robokassa' | 'reconcile' }
+type PaidDetails = { isTest: boolean, amountKopecks: number, paymentMethod?: string, incCurrLabel?: string, fee?: string, opKey?: string, source: 'robokassa' | 'reconcile' }
 
 /**
  * Оплата пришла (уведомление или сверка). Строка платежа блокируется: два одновременных
@@ -155,14 +155,18 @@ type PaidDetails = { amountKopecks: number, paymentMethod?: string, incCurrLabel
 export async function applyPaid(payload: Payload, invId: number, details: PaidDetails): Promise<{ outcome: PaidOutcome, leadId: number | null }> {
   const result = await inTransaction(payload, null, async (req) => {
     const tx = await txDb(req)
-    const [ref] = rowsOf<{ lead_id: number }>(await tx.execute(sql`select lead_id from bootcamp_payments where id = ${invId}`))
+    // Режим берется из конфигурации, которой проверено сообщение. Один и тот же
+    // номер может прийти после переключения магазина между тестовыми и обычными платежами.
+    const invoice = sql`id = ${invId} and method = 'robokassa' and coalesce(is_test, false) = ${details.isTest}`
+    const [ref] = rowsOf<{ lead_id: number }>(await tx.execute(sql`select lead_id from bootcamp_payments where ${invoice}`))
     if (!ref) return { outcome: 'unknown' as const, leadId: null, test: false }
     // Сначала заявка, потом счёт, как у кнопок и отмены допуска: иначе два уведомления по счетам
     // одной заявки или уведомление вместе с кнопкой сцепятся во взаимной блокировке.
     const [lead] = rowsOf<{ id: number, email: string, status: string, paid_at: string | null, admitted_at: string | null, payment_amount_kopecks: string | number | null }>(
       await tx.execute(sql`select id, email, status, paid_at, admitted_at, payment_amount_kopecks from bootcamp_leads where id = ${ref.lead_id} for update`))
     const [payment] = rowsOf<{ id: number, lead_id: number, amount_kopecks: string | number, status: string, processed_at: string | null, is_test: boolean | null, created_at: string }>(
-      await tx.execute(sql`select id, lead_id, amount_kopecks, status, processed_at, is_test, created_at from bootcamp_payments where id = ${invId} for update`))
+      await tx.execute(sql`select id, lead_id, amount_kopecks, status, processed_at, is_test, created_at from bootcamp_payments where ${invoice} for update`))
+    if (!payment) return { outcome: 'unknown' as const, leadId: null, test: false }
     // Колонка numeric: драйвер отдаёт её строкой.
     if (Number(payment.amount_kopecks) !== details.amountKopecks) return { outcome: 'amount_mismatch' as const, leadId: payment.lead_id, test: false }
     if (payment.processed_at) return { outcome: 'already' as const, leadId: payment.lead_id, test: false }
@@ -297,34 +301,36 @@ export async function handleResultNotice(payload: Payload, params: Record<string
     }
     return { status: 400, body: 'bad request' }
   }
-  return paidResponse(payload, checked.notice, 'robokassa')
+  return paidResponse(payload, checked.notice, config.isTest)
 }
 
-async function paidResponse(payload: Payload, notice: RobokassaNotice, source: PaidDetails['source']): Promise<{ status: number, body: string }> {
-  const { outcome, leadId } = await applyPaid(payload, notice.invId, { amountKopecks: notice.amountKopecks, paymentMethod: notice.paymentMethod, incCurrLabel: notice.incCurrLabel, fee: notice.fee, opKey: notice.opKey, source })
+async function paidResponse(payload: Payload, notice: RobokassaNotice, isTest: boolean): Promise<{ status: number, body: string }> {
+  const { outcome, leadId } = await applyPaid(payload, notice.invId, { amountKopecks: notice.amountKopecks, paymentMethod: notice.paymentMethod, incCurrLabel: notice.incCurrLabel, fee: notice.fee, opKey: notice.opKey, isTest, source: 'robokassa' })
   if (outcome === 'unknown' || outcome === 'amount_mismatch') {
     logger.warn('Robokassa notice does not match a payment', { 'robokassa.outcome': outcome, 'robokassa.inv_id': notice.invId })
     if (mismatchAlerts.take('all')) {
-      await journal(payload, { lead: leadId, type: 'payment_alert', message: outcome === 'unknown' ? `Уведомление об оплате несуществующего счёта ${notice.invId}` : `Сумма в уведомлении не совпала со счётом ${notice.invId}`, telegram: { title: 'Робокасса: уведомление не совпало со счётом', lines: [`Счёт ${notice.invId}, ${formatRubles(notice.amountKopecks)}: ${outcome === 'unknown' ? 'такого счёта нет' : 'сумма другая'}`], link: leadAdminLink(leadId) } })
+      await journal(payload, { lead: leadId, type: 'payment_alert', message: outcome === 'unknown' ? `Счет ${notice.invId} не найден для этого режима Робокассы` : `Сумма в уведомлении не совпала со счётом ${notice.invId}`, telegram: { title: 'Робокасса: уведомление не совпало со счётом', lines: [`Счёт ${notice.invId}, ${formatRubles(notice.amountKopecks)}: ${outcome === 'unknown' ? 'в этом режиме такого счета нет' : 'сумма другая'}`], link: leadAdminLink(leadId) } })
     }
     return { status: 400, body: 'bad request' }
   }
   return { status: 200, body: `OK${notice.invId}` }
 }
 
-export type ReturnState = { kind: 'paid' | 'pending' | 'invalid', amount: string | null, invId: number | null, test: boolean, landingUrl: string | null, program: string | null }
+export type ReturnState = { kind: 'paid' | 'refunded' | 'pending' | 'invalid', leadId?: number, amount: string | null, invId: number | null, test: boolean, landingUrl: string | null, program: string | null }
 
 /** SuccessURL: подпись Пароля #1 говорит, что ссылку дала Робокасса, а итог берём из базы. */
 export async function successReturnState(payload: Payload, params: Record<string, string>): Promise<ReturnState> {
   const config = robokassaConfig()
   const checked = config ? verifySuccessReturn(config, params) : null
-  if (!checked?.ok) return { kind: 'invalid', amount: null, invId: null, test: false, ...await candidateLanding(payload) }
+  if (!config || !checked?.ok) return { kind: 'invalid', amount: null, invId: null, test: false, ...await candidateLanding(payload) }
   const payment = await payload.findByID({ collection: 'bootcamp-payments', id: checked.notice.invId, depth: 0, overrideAccess: true, disableErrors: true })
-  if (!payment) return { kind: 'invalid', amount: null, invId: null, test: false, ...await candidateLanding(payload) }
-  const lead = await payload.findByID({ collection: 'bootcamp-leads', id: relationId(payment.lead), depth: 0, overrideAccess: true, disableErrors: true, select: { program: true } })
+  if (!payment || payment.method !== 'robokassa' || (payment.isTest === true) !== config.isTest || payment.amountKopecks !== checked.notice.amountKopecks) {
+    return { kind: 'invalid', amount: null, invId: null, test: false, ...await candidateLanding(payload) }
+  }
+  const lead = await payload.findByID({ collection: 'bootcamp-leads', id: relationId(payment.lead), depth: 0, overrideAccess: true, disableErrors: true, select: { program: true, status: true } })
   const program = await findProgram(payload, lead?.program)
   return {
-    kind: payment.status === 'paid' ? 'paid' : 'pending', amount: formatRubles(payment.amountKopecks), invId: payment.id, test: payment.isTest === true,
+    kind: lead?.status === 'refunded' ? 'refunded' : payment.status === 'paid' ? 'paid' : 'pending', leadId: lead?.id, amount: formatRubles(payment.amountKopecks), invId: payment.id, test: payment.isTest === true,
     landingUrl: program?.landingUrl ?? null, program: program?.shortTitle ?? null,
   }
 }

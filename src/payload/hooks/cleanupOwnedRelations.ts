@@ -107,4 +107,5 @@ export const cleanupTutoringParticipant = cleanupDependents('участник р
 
 export const cleanupTutoringProject = cleanupDependents('проект менторства', [
   { collection: 'tutoring-checks', field: 'project' },
+  { collection: 'tutoring-merge-requests', field: 'project' },
 ])

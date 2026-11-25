@@ -31,6 +31,10 @@ test('в лекции наставник рисует и печатает, уч�
   const student = await browser.newContext({ storageState: storageStateOf('student') })
   try {
     const learner = await json(await student.request.get(`${APP_URL}/api/users/me`, { headers: { Origin: APP_URL } }))
+    const details = await json(await page.request.get(`/api/manage/students/${learner.user.id}`))
+    await json(await page.request.post(`/api/manage/students/${learner.user.id}/enrollment-identity`, {
+      data: { email: learner.user.email, revision: details.enrollmentIdentity.revision },
+    }))
     const stream = await json(await page.request.post('/api/tutoring-streams', { data: {
       program: 'nodejs', title: 'Контроль показа', startsAt: '2027-02-16T17:00:00.000Z', status: 'active', currentMeeting: 1,
     } }))

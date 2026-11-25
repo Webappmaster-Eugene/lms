@@ -1,8 +1,9 @@
+import { confirmEnrollmentIdentity } from '@/server/enrollment-identity'
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { CollectionSlug, Payload } from 'payload'
 
 import type { User } from '@/payload-types'
-import { buildFixtureContext, makeValid, VALID, type FixtureContext } from '../helpers/fixtures'
+import { buildFixtureContext, cleanupTutoringFixture, tutoringFileForCreate, makeValid, VALID, type FixtureContext } from '../helpers/fixtures'
 import { createAdmin, createStudent, createSumTask, getTestPayload, login, rest, uid, type TestUser } from '../helpers/payload'
 
 /**
@@ -34,6 +35,17 @@ const MATRIX: Record<string, Matrix> = {
   'learning-access-grants': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
   // Условия буткемпов (цена, оферта, проекты GitLab) ведёт только админ; публичная форма их не читает.
   'bootcamp-programs': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
+  // Здесь файл еще не прикреплен к лекции. Доступ участника к опубликованному PDF проверяет tutoring.test.ts.
+  'tutoring-deck-files': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
+  'tutoring-introductions': { create: 'nobody', read: 'own', update: 'nobody', delete: 'nobody' },
+  'tutoring-meetings': { create: 'admin', read: 'own', update: 'admin', delete: 'admin' },
+  'tutoring-streams': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
+  'tutoring-participants': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
+  'tutoring-reviews': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
+  'tutoring-calendars': { create: 'nobody', read: 'nobody', update: 'nobody', delete: 'nobody' },
+  'tutoring-charges': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
+  'tutoring-projects': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
+  'tutoring-checks': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   // Заявки с лендинга — персональные данные: публичная форма пишет через свой маршрут, а не REST.
   'bootcamp-leads': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
   // Зачисление создаёт и ведёт только сервер (кнопка в заявке и исполнитель в VM GitLab); удалить может админ.
@@ -43,6 +55,7 @@ const MATRIX: Record<string, Matrix> = {
   'bootcamp-refunds': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'bootcamp-streams': { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
   'bootcamp-week-submissions': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
+  'tutoring-merge-requests': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'bootcamp-lead-events': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'learning-access-audit': { create: 'nobody', read: 'admin', update: 'nobody', delete: 'nobody' },
   'learning-access-policies': { create: 'nobody', read: 'own', update: 'nobody', delete: 'nobody' },
@@ -101,12 +114,23 @@ const PATCH: Record<string, Record<string, unknown>> = {
   'learning-access-grants': { note: 'Обновлено' },
   // Этап админ через REST не меняет (поле только для кнопок пути заявки), заметки - меняет.
   'bootcamp-programs': { title: 'Обновлено' },
+  'tutoring-deck-files': { filename: 'changed.pdf' },
+  'tutoring-introductions': { instructorNotes: 'Новый сценарий' },
+  'tutoring-meetings': { title: 'Схема оплаты' },
+  'tutoring-streams': { title: 'Другой поток' },
+  'tutoring-participants': { active: false },
+  'tutoring-reviews': { feedback: 'Проверьте сумму' },
+  'tutoring-calendars': { failures: 1 },
+  'tutoring-charges': { minutes: 90 },
+  'tutoring-projects': { attempts: 2 },
+  'tutoring-checks': { passed: 2 },
   'bootcamp-leads': { note: 'Обновлено' },
   'bootcamp-enrollments': { error: 'Обновлено' },
   'bootcamp-payments': { comment: 'Обновлено' },
   'bootcamp-refunds': { reason: 'Обновлено' },
   'bootcamp-streams': { title: 'Обновлено' },
   'bootcamp-week-submissions': { title: 'Обновлено' },
+  'tutoring-merge-requests': { title: 'Обновлено' },
   'bootcamp-lead-events': { message: 'Обновлено' },
   'learning-access-audit': { effect: 'deny' },
   'learning-access-policies': { mode: 'all' },
@@ -198,7 +222,8 @@ async function ownedDoc(slug: string, overrides: Record<string, unknown> = {}): 
   if (['user-progress', 'notes', 'comments'].includes(slug)) data.lesson = ctx.lessonId
   // Пара (user, task) уникальна — под каждый документ своя задача.
   if (slug === 'user-trainer-progress') data.task = (await createSumTask(payload)).id
-  const doc = await payload.create({ collection: slug as CollectionSlug, data: data as never, ...(slug === 'learning-access-grants' ? { user: admin } : {}), context: { skipHooks: true, ...(slug === 'auth-session-revocations' ? { syncAuthSessionRevocations: true } : {}), ...(slug === 'account-freezes' ? { syncAccountFreezes: true } : {}), ...(['student-session-telemetry', 'student-learning-events', 'student-activity-days'].includes(slug) ? { syncStudentAnalytics: true } : {}), ...(slug === 'admin-digests' ? { syncAdminDigests: true } : {}), ...(slug === 'bootcamp-week-submissions' ? { syncBootcampSubmissions: true } : {}), ...(slug === 'web-vitals-reports' ? { syncWebVitals: true } : {}) } })
+  const doc = await payload.create({ collection: slug as CollectionSlug, data: data as never, file: tutoringFileForCreate(slug), ...(slug === 'learning-access-grants' ? { user: admin } : {}), context: { skipHooks: true, ...(slug === 'auth-session-revocations' ? { syncAuthSessionRevocations: true } : {}), ...(slug === 'account-freezes' ? { syncAccountFreezes: true } : {}), ...(['student-session-telemetry', 'student-learning-events', 'student-activity-days'].includes(slug) ? { syncStudentAnalytics: true } : {}), ...(slug === 'admin-digests' ? { syncAdminDigests: true } : {}), ...(slug === 'bootcamp-week-submissions' ? { syncBootcampSubmissions: true } : {}), ...(slug === 'web-vitals-reports' ? { syncWebVitals: true } : {}) } })
+  cleanupTutoringFixture(payload, slug, Number(doc.id))
   return doc.id as number
 }
 
@@ -220,6 +245,12 @@ beforeAll(async () => {
   owner = await createStudent(payload)
   other = await createStudent(payload)
   admin = await createAdmin(payload)
+  const stream = await payload.create({ collection: 'tutoring-streams', data: {
+    title: uid('graduated'), program: 'nodejs', startsAt: '2027-02-16T17:00:00Z', status: 'archived', currentMeeting: 32,
+  } })
+  await payload.create({ collection: 'tutoring-participants', data: {
+    student: owner.id, stream: stream.id, active: false, currentMeeting: 32, graduatedThrough: 32,
+  } })
 })
 
 describe('матрица прав покрывает все коллекции', () => {
@@ -266,15 +297,21 @@ describe.each(Object.keys(MATRIX))('права: %s', (slug) => {
     const data = await makeValid(payload, slug, ctx, actor(who)?.id ?? owner.id)
     if (slug === 'user-trainer-progress') data.task = (await createSumTask(payload)).id
     if (slug === 'streaks') data.user = (await createStudent(payload)).id
-    const outcome = await attempt(() =>
-      payload.create({
+    if (slug === 'tutoring-participants' && who === 'admin') {
+      const target = await payload.findByID({ collection: 'users', id: Number(data.student) })
+      await confirmEnrollmentIdentity(payload, admin, target.id, target.email)
+    }
+    const outcome = await attempt(async () => {
+      const doc = await payload.create({
         collection: slug as CollectionSlug,
         data: data as never,
+        file: tutoringFileForCreate(slug),
         user: actor(who),
         overrideAccess: false,
         context: { skipHooks: true },
-      }),
-    )
+      })
+      cleanupTutoringFixture(payload, slug, Number(doc.id))
+    })
     expect(outcome === 'ok').toBe(allowed(rules.create, who))
   })
 

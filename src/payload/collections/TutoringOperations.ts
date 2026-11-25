@@ -21,6 +21,7 @@ export const TutoringCharges: CollectionConfig = {
     { name: 'amountKopecks', type: 'number', min: 0, required: true },
     { name: 'status', type: 'select', options: ['due', 'paid', 'cancelled'], required: true },
     { name: 'paidAt', type: 'date' },
+    { name: 'attendedAt', type: 'date', label: 'Занятие проведено', admin: { readOnly: true } },
     { name: 'updatedBy', type: 'relationship', relationTo: 'users', required: true },
   ],
 }
@@ -61,6 +62,7 @@ export const TutoringChecks: CollectionConfig = {
     { name: 'project', type: 'relationship', relationTo: 'tutoring-projects', required: true },
     { name: 'mrIid', type: 'number', min: 1, required: true },
     { name: 'stage', type: 'number', min: 0, max: 20, required: true },
+    { name: 'commitSha', type: 'text', maxLength: 64, label: 'Коммит проверки' },
     { name: 'verdict', type: 'text', required: true, maxLength: 30 },
     { name: 'passed', type: 'number', min: 0 },
     { name: 'total', type: 'number', min: 0 },

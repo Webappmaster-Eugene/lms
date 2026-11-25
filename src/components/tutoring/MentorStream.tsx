@@ -3,9 +3,11 @@ import { notFound } from 'next/navigation'
 
 import { ManagementHeading, managementLink, managementPrimary } from '@/components/content-management/ManagementHeading'
 import { TutoringMeetingCard } from '@/components/tutoring/TutoringMeetingCard'
+import { PendingTutoringInvitations } from '@/components/tutoring/PendingTutoringInvitations'
 import { MentorProject, ProjectCheck } from '@/components/tutoring/ProjectStatus'
 import { tutoringMergeRequest, tutoringProject, tutoringVerdict } from '@/server/tutoring-projects'
 import { MentorMeetingPayment } from '@/components/tutoring/MeetingPayment'
+import { MeetingAttendance } from '@/components/tutoring/MeetingAttendance'
 import { TutoringSeriesForm } from '@/components/tutoring/TutoringSeriesForm'
 import { managedDocument, relationId } from '@/lib/content-management/pages'
 import { isTutoringMeeting, moscowMeetingInput, scheduledTutoringMeeting, TUTORING_INTRODUCTION_MINUTES, tutoringDateLabel, tutoringPrograms, tutoringStatuses } from '@/lib/tutoring'
@@ -16,6 +18,7 @@ import { getTutoringCalendarSettings } from '@/server/tutoring-calendar-account'
 import { googleCalendarAdminPath, tutoringGoogleConfig } from '@/server/tutoring-google'
 import { tutoringMeeting, tutoringMeetings, tutoringParticipants, tutoringReviewMap, tutoringReviews, tutoringStudentName } from '@/server/tutoring'
 import { tutoringCharge } from '@/server/tutoring-payments'
+import { meetingCharges } from '@/server/tutoring-attendance'
 import { tutoringScheduleRevision } from '@/server/tutoring-schedule'
 
 type Query = { participant?: string; preview?: string; review?: string; schedule?: string; error?: string; saved?: string }
@@ -65,7 +68,16 @@ export async function MentorStream({ context, id, query }: { context: Awaited<Re
   const numbers = Array.from({ length: program.meetings }, (_, i) => i + 1)
   const nameByNumber = new Map(materials.map(material => [material.number, material.title]))
   const meetingOptions = numbers.map(n => <option key={n} value={n}>{n}. {nameByNumber.get(n) ?? 'Материалы готовятся'}</option>)
-  const currentSlot = scheduledTutoringMeeting(stream, stream.currentMeeting)
+  const groupMeeting = members.reduce((current, member) => member.active ? Math.max(current, member.currentMeeting) : current, stream.currentMeeting)
+  const current = isTutoringMeeting(preview, stream.program) ? preview
+    : selected?.active ? Math.max(stream.currentMeeting, selected.currentMeeting) : groupMeeting
+  const currentSlot = scheduledTutoringMeeting(stream, current)
+  const charges = stream.status === 'active' && !stream.awaitingFirstLecture
+    ? await meetingCharges(payload, req, members.map(member => member.id), current) : []
+  const attended = new Set(charges.flatMap(row => {
+    const memberId = relationId(row.participant)
+    return row.attendedAt && memberId !== null ? [memberId] : []
+  }))
 
   return <>
     <Link href={`${base}/streams`} className={focus}>Все потоки репетиторства</Link>
@@ -82,12 +94,14 @@ export async function MentorStream({ context, id, query }: { context: Awaited<Re
           <button className={managementPrimary}>Открыть первую лекцию</button>
         </form>}
       </> : <>
-        <div><h2 id="opened" className="font-semibold">Поток дошёл до встречи {stream.currentMeeting}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{nameByNumber.get(stream.currentMeeting) ?? 'Программа ещё не загружена'}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{tutoringDateLabel(currentSlot.start)}, МСК{currentSlot.moved && ' · Перенесено'}</p></div>
-        {nameByNumber.has(stream.currentMeeting) && <Link className={managementPrimary} href={`${href}?preview=${stream.currentMeeting}#material`}>Открыть материалы встречи</Link>}
+        <div><h2 id="opened" className="font-semibold">Встреча {current}. {nameByNumber.get(current) ?? 'Материалы готовятся'}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{tutoringDateLabel(currentSlot.start)}, МСК{currentSlot.moved && ' · Перенесено'}</p>
+          {stream.meetingUrl && <Link href={stream.meetingUrl} target="_blank" rel="noopener noreferrer" className={focus}>Перейти на созвон</Link>}</div>
+        {nameByNumber.has(current) && <Link className={managementPrimary} href={`${href}?preview=${current}#material`}>Открыть материалы встречи</Link>}
       </>}
     </section>
+    {stream.status === 'active' && !stream.awaitingFirstLecture && <MeetingAttendance stream={stream} meeting={current}
+      members={members} attended={attended} started={currentSlot.start.getTime() <= now} />}
 
     <details id="schedule" open={query.schedule === '1' || undefined} className="rounded-xl border border-border bg-card p-4">
       <summary className="cursor-pointer font-semibold">Календарь и настройки потока</summary>
@@ -98,8 +112,14 @@ export async function MentorStream({ context, id, query }: { context: Awaited<Re
           <option value="draft">Черновик</option><option value="active">Открыт ученикам</option><option value="archived">Архив</option>
         </select></label>
         <label className="grid gap-1 text-sm">Ссылка на созвон<input className={field} name="meetingUrl" type="url" defaultValue={stream.meetingUrl ?? ''} /></label>
+        <label className="grid gap-1 text-sm">Ставка, ₽ за час<input className={field} name="rate" inputMode="decimal" required={!!stream.hourlyKopecks}
+          defaultValue={stream.hourlyKopecks ? String(stream.hourlyKopecks / 100) : ''} /></label>
+        {stream.status === 'draft' && <label className="grid gap-1 text-sm sm:col-span-2">Кого пригласить при открытии
+          <textarea name="pendingInviteEmails" className={field} rows={3} defaultValue={stream.pendingInviteEmails ?? ''} />
+          <span className="text-muted-foreground">Каждый адрес с новой строки.</span>
+        </label>}
         {stream.awaitingFirstLecture ? <input type="hidden" name="current" value={stream.currentMeeting} /> :
-          <label className="grid gap-1 text-sm">Текущая встреча потока<select className={field} name="current" defaultValue={stream.currentMeeting}>{meetingOptions}</select></label>}
+          <label className="grid gap-1 text-sm">Открыть всем материалы по встречу<select className={field} name="current" defaultValue={stream.currentMeeting}>{meetingOptions}</select></label>}
         <div className="sm:col-span-2"><button className={managementPrimary}>Сохранить настройки</button></div>
       </form>
       <section className="mt-5 space-y-2 border-t border-border pt-4">
@@ -159,6 +179,7 @@ export async function MentorStream({ context, id, query }: { context: Awaited<Re
 
     {meeting && <div id="material"><TutoringMeetingCard meeting={meeting} stream={stream} mentor /></div>}
 
+    <PendingTutoringInvitations stream={stream} />
     <section aria-labelledby="students" className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_19rem]">
       <div className="min-w-0">
         <h2 id="students" className="mb-3 text-lg font-semibold">Ученики и успеваемость</h2>
@@ -175,7 +196,7 @@ export async function MentorStream({ context, id, query }: { context: Awaited<Re
       </div>
       <form action={addTutoringParticipant.bind(null, stream.id)} className="grid gap-3 rounded-xl border border-border bg-card p-4">
         <h3 className="font-semibold">Добавить ученика</h3>
-        <label className="grid gap-1 text-sm">Почта аккаунта<input className={field} name="email" type="email" required /></label>
+        <label className="grid gap-1 text-sm">Почта ученика<input className={field} name="email" type="email" required /></label>
         <button className={managementPrimary}>Добавить в поток</button>
       </form>
     </section>
@@ -185,7 +206,7 @@ export async function MentorStream({ context, id, query }: { context: Awaited<Re
       {selected.introSubmissionUrl && <Link className={focus} href={selected.introSubmissionUrl}
         rel="noopener noreferrer" target="_blank">Открыть пробную работу вводной встречи</Link>}
       <MentorProject stream={stream.id} participant={selected.id} project={project} inviteEmail={selected.gitlabInviteEmail} enabled={selected.active && stream.status === 'active'} />
-      {billingMeeting && <MentorMeetingPayment stream={stream.id} participant={selected.id} meeting={billingMeeting} charge={charge} />}
+      {billingMeeting && <MentorMeetingPayment stream={stream.id} participant={selected.id} meeting={billingMeeting} charge={charge} hourlyKopecks={stream.hourlyKopecks} />}
       {selected.graduatedThrough == null && <form action={updateTutoringParticipant.bind(null, stream.id, selected.id)} className="flex flex-wrap items-end gap-3">
         <input type="hidden" name="revision" value={selected.updatedAt} />
         <label className="grid min-w-0 gap-1 text-sm">Текущая встреча ученика<select className={field} name="current" defaultValue={selected.currentMeeting}>{stream.awaitingFirstLecture ? <option value={1}>Вводная встреча</option> : meetingOptions}</select></label>
@@ -207,11 +228,14 @@ export async function MentorStream({ context, id, query }: { context: Awaited<Re
         {selectedReview?.submissionUrl && <Link className={managementLink} href={selectedReview.submissionUrl} target="_blank" rel="noopener noreferrer">Открыть работу ученика</Link>}
         {check && <ProjectCheck check={check} />}
         <input type="hidden" name="updatedAt" value={selectedReview?.updatedAt ?? ''} />
-        <label className="grid gap-1 text-sm">Статус<select className={field} name="status" defaultValue={selectedReview?.status ?? 'assigned'}>
+        {selectedReview?.status !== 'submitted' && <label className="grid gap-1 text-sm">Статус<select className={field} name="status" defaultValue={selectedReview?.status ?? 'assigned'}>
           {Object.entries(tutoringStatuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select></label>
+        </select></label>}
         <label className="grid gap-1 text-sm">Комментарий ученику<textarea className={field} name="feedback" rows={3} maxLength={3000} defaultValue={selectedReview?.feedback ?? ''} /></label>
-        <div><button className={managementPrimary}>Сохранить результат проверки</button></div>
+        {selectedReview?.status === 'submitted' ? <div className="flex flex-wrap items-center gap-3">
+          <button name="status" value="accepted" className={managementPrimary}>Принять работу</button>
+          <button name="status" value="changes" className={managementLink}>Вернуть на доработку</button>
+        </div> : <div><button className={managementPrimary}>Сохранить результат проверки</button></div>}
       </form>}
       {!stream.awaitingFirstLecture && <ul aria-label="Домашние работы ученика" className="divide-y divide-border border-y border-border">
         {materials.map(material => {

@@ -2,6 +2,7 @@ import { APIError, type CollectionConfig, type PayloadRequest } from 'payload'
 import { normalizeTelegram } from '@/lib/profile'
 import { captureProfileCredentials, protectProfileCredentials } from '@/payload/hooks/protectProfileCredentials'
 import { validateStudentAvatar } from '@/payload/hooks/validateStudentAvatar'
+import { protectEnrollmentIdentity } from '@/payload/hooks/protectEnrollmentIdentity'
 import { rejectForeignLoginOrigin } from '@/payload/hooks/rejectForeignLoginOrigin'
 
 import { isAdmin } from '@/payload/access/isAdmin'
@@ -61,7 +62,7 @@ export const Users: CollectionConfig = {
     beforeOperation: [rejectForeignLoginOrigin, captureRawCollectionPatch, captureProfileCredentials, captureLoginPassword, lockSdkAuthOperation],
     beforeLogin: [normalizeLearningLoginIdentity],
     afterLogin: [recordStudentLogin, noteBootcampFirstLogin],
-    beforeChange: [lockLearningModeChange, protectProfileCredentials, validateStudentAvatar],
+    beforeChange: [lockLearningModeChange, protectProfileCredentials, protectEnrollmentIdentity, validateStudentAvatar],
     afterChange: [createLearningAccessPolicy, planFreezeForNewStudent, syncTestStudentFreezes, sendInviteEmail, auditLearningAccessMode],
     afterRead: [reflectLearningAccessPolicy, filterRevokedAuthSessions],
     afterLogout: [revokeAuthenticatedSessions, recordStudentLogout],
@@ -85,6 +86,8 @@ export const Users: CollectionConfig = {
     admin: canAdministerUsers,
   },
   fields: [
+    { name: 'enrollmentIdentityEmail', type: 'email', label: 'Адрес для зачисления', admin: { readOnly: true, hidden: true },
+      access: { read: canAdministerUsers, create: () => false, update: () => false } },
     { name: 'learningAccessAssignments', type: 'ui', admin: { components: { Field: '/components/learning-access/UserLearningAccessLink#UserLearningAccessLink' } } },
     { name: 'studentAnalytics', type: 'ui', admin: { components: { Field: '/components/student-analytics/UserStudentAnalyticsLink#UserStudentAnalyticsLink' } } },
     {

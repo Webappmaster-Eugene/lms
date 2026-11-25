@@ -26,6 +26,7 @@ import { refundAvailability } from '@/server/bootcamp-refund'
 import { actorName, inTransaction, journal, leadAdminLink, recordLeadEvent, rowsOf, txDb } from '@/server/bootcamp-lead-events'
 import { assertKnownStreamGroup, programNames, requireProgram } from '@/server/bootcamp-programs'
 import { contactReplyTo } from '@/server/contact-reply-to'
+import { reserveGitlabIdentity } from '@/server/bootcamp-gitlab-account'
 import { robokassaConfig } from '@/server/robokassa'
 import type { BootcampLead, User } from '@/payload-types'
 
@@ -115,7 +116,8 @@ export type LeadPathState = {
   refund: { available: boolean, viaApi: boolean, left: string, note: string | null }
   offerUrl: string
   enrollment: EnrollmentView | null
-  defaults: { firstName: string, lastName: string, username: string, group: string, amount: string, dueDays: number }
+  identityUserId: number | null
+  defaults: { firstName: string, lastName: string, username: string, group: string, streams: { group: string, title: string }[], amount: string, dueDays: number }
   paymentsEnabled: boolean
   paymentsTest: boolean
   events: LeadPathEvent[]
@@ -125,6 +127,11 @@ export async function leadPathState(payload: Payload, leadId: number): Promise<L
   const lead = await findLead(payload, leadId)
   const program = await requireProgram(payload, lead.program)
   const base = await leadEnrollmentState(payload, leadId)
+  const missingIdentity = lead.paidAt && lead.status !== 'refunded' && !base.enrollment
+    ? rowsOf<{ id: number }>(await db(payload).execute(sql`select u.id from users u left join learning_access_policies p on p.user_id=u.id
+      where u.email=${lead.email.toLowerCase()} and u.is_active is not false and coalesce(p.role::text, u.role::text)='student'
+        and u.enrollment_identity_email is distinct from u.email limit 1`))[0]
+    : null
   const [payments, refunds, refund, events] = await Promise.all([
     payload.find({ collection: 'bootcamp-payments', where: { lead: { equals: leadId } }, sort: '-createdAt', limit: 20, depth: 0, overrideAccess: true }),
     payload.find({ collection: 'bootcamp-refunds', where: { lead: { equals: leadId } }, sort: '-createdAt', limit: 20, depth: 0, overrideAccess: true }),
@@ -185,6 +192,7 @@ export async function leadPathState(payload: Payload, leadId: number): Promise<L
     refund: { available: refund.available, viaApi: refund.viaApi, left: String(refund.leftKopecks / 100), note: refund.note },
     offerUrl: program.offerUrl,
     enrollment: base.enrollment,
+    identityUserId: missingIdentity?.id ?? null,
     defaults: { ...base.defaults, amount: String(program.priceKopecks / 100), dueDays: program.paymentDueDays },
     paymentsEnabled: config !== null,
     paymentsTest: config?.isTest === true,
@@ -241,10 +249,6 @@ export async function admitLead(payload: Payload, admin: User, leadId: number, i
   // Без решения задания допускают только осознанно: кнопка формы говорит об этом прямо.
   if (!lead.entrySubmittedAt && !input.withoutEntryTask) throw new EnrollmentInputError('Кандидат ещё не прислал решение входного задания. Чтобы допустить его без задания, подтвердите это в форме допуска.', 409)
   const { username } = input.enrollment
-  const taken = await payload.find({ collection: 'bootcamp-enrollments', where: { gitlabUsername: { equals: username } }, limit: 1, depth: 0, overrideAccess: true })
-  if (taken.docs[0]) throw new EnrollmentInputError(`Логин ${username} уже у зачисленного ученика (${taken.docs[0].email})`, 409)
-  const reserved = rowsOf<{ email: string }>(await db(payload).execute(sql`select email from bootcamp_leads where id <> ${leadId} and status in ('admitted', 'paid') and admission->'enrollment'->>'username' = ${username} limit 1`))
-  if (reserved[0]) throw new EnrollmentInputError(`Логин ${username} уже отдан при допуске другой заявке (${reserved[0].email})`, 409)
   const program = await requireProgram(payload, lead.program)
   const course = program.manualsCourseId === null ? null : await payload.findByID({ collection: 'courses', id: program.manualsCourseId, depth: 0, overrideAccess: true, disableErrors: true })
   if (!course) throw new EnrollmentInputError(`У программы «${program.shortTitle}» не выбран курс методичек или его нет: после оплаты зачислить будет некуда. Выберите курс в CMS, Буткемпы, Программы буткемпов.`, 409)
@@ -254,6 +258,8 @@ export async function admitLead(payload: Payload, admin: User, leadId: number, i
   const draft: AdmissionDraft = { enrollment: input.enrollment, comment: input.comment }
   const enabled = robokassaConfig() !== null
   await inTransaction(payload, admin, async (req) => {
+    await (await txDb(req)).execute(sql`select id from bootcamp_leads where id = ${leadId} for update`)
+    await reserveGitlabIdentity(req, lead, username, input.enrollment.group)
     changed(await (await txDb(req)).execute(sql`
       update bootcamp_leads set status = 'admitted', admitted_at = now(), admitted_by_id = ${admin.id},
         payment_amount_kopecks = ${input.amountKopecks}, payment_due_at = ${dueAt}, payment_token = ${randomBytes(24).toString('base64url')},

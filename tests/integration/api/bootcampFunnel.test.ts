@@ -18,9 +18,10 @@ const saved = Object.fromEntries(Object.keys(TELEGRAM).map((key) => [key, proces
 type Db = { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }
 const db = () => (payload.db as unknown as { drizzle: Db }).drizzle
 const DAY = 86_400_000
-// В базе бывают программы других файлов тестов: сводки сверяем только по своим.
-const summaries = (title: string) => telegram.filter((text) => text.startsWith(`Буткемп ${title}:`))
-const NODEJS = 'Node.js'
+// Короткое название может совпадать у двух программ. Ссылка в сообщении указывает точную программу.
+const summaries = (key: string, title: string) => telegram.filter(text =>
+  text.startsWith(`Буткемп ${title}:`) && text.endsWith(`/admin/bootcamp-funnel?program=${encodeURIComponent(key)}`))
+const nodeSummaries = () => summaries('nodejs', 'Node.js')
 
 beforeAll(async () => {
   payload = await getTestPayload()
@@ -194,8 +195,8 @@ describe('тестовые заявки', () => {
     await db().execute(sql`update bootcamp_payments set status = 'paid', paid_at = ${inWeek} where id = ${payment.id}`)
 
     expect(await sendWeeklySummary(payload, new Date('2020-03-16T08:00:00Z'))).toBeGreaterThan(0)
-    await vi.waitFor(() => expect(summaries(NODEJS)).toHaveLength(1))
-    expect(summaries(NODEJS)[0].split('\n').slice(1, 6)).toEqual(['Новых заявок: 1', 'Прислали решение: 0', 'Допущены: 0', 'Оплат не было', 'Зачислены: 0'])
+    await vi.waitFor(() => expect(nodeSummaries()).toHaveLength(1))
+    expect(nodeSummaries()[0].split('\n').slice(1, 6)).toEqual(['Новых заявок: 1', 'Прислали решение: 0', 'Допущены: 0', 'Оплат не было', 'Зачислены: 0'])
   })
 })
 
@@ -222,8 +223,8 @@ describe('итоги недели в Telegram', () => {
 
     expect(await sendWeeklySummary(payload, monday)).toBeGreaterThan(0)
     expect(await sendWeeklySummary(payload, new Date(monday.getTime() + 60_000))).toBe(0)
-    await vi.waitFor(() => expect(summaries(NODEJS)).toHaveLength(1))
-    const [text] = summaries(NODEJS)
+    await vi.waitFor(() => expect(nodeSummaries()).toHaveLength(1))
+    const [text] = nodeSummaries()
     expect(text.split('\n').slice(0, 7)).toEqual([
       'Буткемп Node.js: итоги недели 24 февраля - 1 марта',
       'Новых заявок: 2',
@@ -245,11 +246,11 @@ describe('итоги недели в Telegram', () => {
     await db().execute(sql`delete from bootcamp_lead_events where type = 'weekly_summary' and data->>'week' = '2020-03-02'`)
     const results = await Promise.all([sendWeeklySummary(payload, nextMonday), sendWeeklySummary(payload, nextMonday)])
     await vi.waitFor(() => expect(telegram).toHaveLength(results[0] + results[1]))
-    expect(summaries(NODEJS)).toHaveLength(1)
-    expect(summaries(NODEJS)[0]).toContain('Оплат не было')
+    expect(nodeSummaries()).toHaveLength(1)
+    expect(nodeSummaries()[0]).toContain('Оплат не было')
     expect(await sendWeeklySummary(payload, new Date('2020-03-10T08:00:00Z'))).toBe(0)
     expect(await sendWeeklySummary(payload, new Date('2020-03-16T06:59:00Z'))).toBe(0)
-    expect(summaries(NODEJS)).toHaveLength(1)
+    expect(nodeSummaries()).toHaveLength(1)
   })
 })
 
@@ -309,14 +310,14 @@ describe('программы ведутся отдельно', () => {
     await db().execute(sql`update bootcamp_leads set created_at = ${inWeek} where id in (${mine.id}, ${other.id}, ${another.id})`)
 
     expect(await sendWeeklySummary(payload, monday)).toBeGreaterThanOrEqual(2)
-    await vi.waitFor(() => expect(summaries('Rust')).toHaveLength(1))
-    await vi.waitFor(() => expect(summaries(NODEJS)).toHaveLength(1))
-    expect(summaries('Rust')[0].split('\n').slice(0, 2)).toEqual(['Буткемп Rust: итоги недели 30 марта - 5 апреля', 'Новых заявок: 2'])
-    expect(summaries('Rust')[0]).toContain(`/admin/bootcamp-funnel?program=${key}`)
-    expect(summaries(NODEJS)[0].split('\n')[1]).toBe('Новых заявок: 1')
+    await vi.waitFor(() => expect(summaries(key, 'Rust')).toHaveLength(1))
+    await vi.waitFor(() => expect(nodeSummaries()).toHaveLength(1))
+    expect(summaries(key, 'Rust')[0].split('\n').slice(0, 2)).toEqual(['Буткемп Rust: итоги недели 30 марта - 5 апреля', 'Новых заявок: 2'])
+    expect(summaries(key, 'Rust')[0]).toContain(`/admin/bootcamp-funnel?program=${key}`)
+    expect(nodeSummaries()[0].split('\n')[1]).toBe('Новых заявок: 1')
 
     expect(await sendWeeklySummary(payload, new Date(monday.getTime() + 60_000))).toBe(0)
-    expect(summaries('Rust')).toHaveLength(1)
+    expect(summaries(key, 'Rust')).toHaveLength(1)
     const marks = rowsOf<{ program: string }>(await db().execute(sql`select data->>'program' as program from bootcamp_lead_events where type = 'weekly_summary' and data->>'week' = '2020-03-30'`))
     expect(marks.map((row) => row.program)).toEqual(expect.arrayContaining(['nodejs', key]))
     expect(new Set(marks.map((row) => row.program)).size).toBe(marks.length)
@@ -328,13 +329,13 @@ describe('программы ведутся отдельно', () => {
     await db().execute(sql`delete from bootcamp_lead_events where type = 'weekly_summary' and data->>'week' in ('2020-04-13', '2020-04-20')`)
     const key = await program('Архив', { isActive: false })
     await sendWeeklySummary(payload, quietMonday)
-    await vi.waitFor(() => expect(summaries(NODEJS)).toHaveLength(1))
-    expect(summaries('Архив')).toHaveLength(0)
+    await vi.waitFor(() => expect(nodeSummaries()).toHaveLength(1))
+    expect(summaries(key, 'Архив')).toHaveLength(0)
     const late = await lead('summary-closed', key)
     await db().execute(sql`update bootcamp_leads set created_at = ${'2020-04-22T10:00:00Z'}::timestamptz where id = ${late.id}`)
     await sendWeeklySummary(payload, busyMonday)
-    await vi.waitFor(() => expect(summaries('Архив')).toHaveLength(1))
-    expect(summaries('Архив')[0].split('\n')[1]).toBe('Новых заявок: 1')
+    await vi.waitFor(() => expect(summaries(key, 'Архив')).toHaveLength(1))
+    expect(summaries(key, 'Архив')[0].split('\n')[1]).toBe('Новых заявок: 1')
   })
 
   it('отметка без программы, сделанная до разделения, закрывает неделю для всех', async () => {
@@ -357,11 +358,11 @@ describe('программы ведутся отдельно', () => {
     }) as typeof payload.create)
     await sendWeeklySummary(payload, monday)
     failing.mockRestore()
-    await vi.waitFor(() => expect(summaries(NODEJS)).toHaveLength(1))
-    expect(summaries('Сбой')).toHaveLength(0)
+    await vi.waitFor(() => expect(nodeSummaries()).toHaveLength(1))
+    expect(summaries(key, 'Сбой')).toHaveLength(0)
 
     await sendWeeklySummary(payload, new Date(monday.getTime() + 60_000))
-    await vi.waitFor(() => expect(summaries('Сбой')).toHaveLength(1))
-    expect(summaries(NODEJS)).toHaveLength(1)
+    await vi.waitFor(() => expect(summaries(key, 'Сбой')).toHaveLength(1))
+    expect(nodeSummaries()).toHaveLength(1)
   })
 })

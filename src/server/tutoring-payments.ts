@@ -61,7 +61,8 @@ export async function saveTutoringCharge(payload: Payload, actor: User, streamId
       throw new TutoringProblem('Укажите фактические минуты и ставку в рублях за час')
     }
     const data = {
-      participant, meeting, minutes: cancel ? 0 : minutes, hourlyKopecks: cancel ? 0 : rate ?? 0,
+      participant, meeting, minutes: cancel ? current?.minutes ?? 0 : minutes,
+      hourlyKopecks: cancel ? current?.hourlyKopecks ?? 0 : rate ?? 0,
       amountKopecks: cancel ? 0 : Math.round(minutes * (rate ?? 0) / 60),
       status: cancel ? 'cancelled' as const : 'due' as const, paidAt: null, updatedBy: actor.id,
     }

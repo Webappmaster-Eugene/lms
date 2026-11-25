@@ -19,6 +19,13 @@ const mr = (extra: Partial<SubmissionFacts> = {}): SubmissionFacts => ({
   verdict: null, checksPassed: null, checksTotal: null, verdictAt: null, mergedAt: null, closedAt: null, ...extra,
 })
 
+it('показывает историческое слияние с датой и ссылкой, без нового зачета и ложного отставания', () => {
+  const source = mr({ historicalMergedAt: ago(4) })
+  const cell = weekCell(1, [source], ago(6), now)
+  expect(cell).toMatchObject({ state: 'historical-merge', since: ago(4), mrUrl: source.mrUrl, overdue: false, late: false })
+  expect(scheduleLag([cell], now)).toEqual({ planned: 1, accepted: 0, lag: 0 })
+})
+
 it('React + Next ждёт ревью пять дней, Node.js и старые записи — три', () => {
   expect(reviewSlaDays('react-next')).toBe(5)
   expect(reviewSlaDays('nodejs')).toBe(3)
@@ -55,7 +62,7 @@ describe('неделя из ветки и вердикт бота', () => {
   it('время события GitLab читается в обоих форматах', () => {
     expect(gitlabTime('2027-03-01 09:15:00 UTC')).toBe('2027-03-01T09:15:00.000Z')
     expect(gitlabTime('2027-03-01T09:15:00.000Z')).toBe('2027-03-01T09:15:00.000Z')
-    expect(Math.abs(Date.parse(gitlabTime(undefined)) - Date.now())).toBeLessThan(5_000)
+    expect(gitlabTime(undefined)).toBeNull()
   })
 })
 

@@ -6,7 +6,7 @@ import { POST as replacePresentation } from '@/app/api/manage/tutoring/presentat
 import { saveTutoringDeck } from '@/server/tutoring-decks'
 import { writeTutoringReview } from '@/server/tutoring'
 import type { TutoringMeeting, TutoringParticipant, TutoringStream } from '@/payload-types'
-import { blankPDF } from '../helpers/fixtures'
+import { blankPDF, cleanupTutoringFixture } from '../helpers/fixtures'
 import { createAdmin, createStudent, getTestPayload, login, rest, uid, type TestUser } from '../helpers/payload'
 
 let payload: Payload
@@ -66,10 +66,23 @@ describe('репетиторство в LMS', () => {
   })
 
   it('принимает одну сдачу в гонке, защищает чужую и закрытую встречу и возвращает на доработку', async () => {
-    const url = 'https://example.test/work'
+    const { docs: [queued] } = await payload.find({ collection: 'tutoring-projects', where: {
+      student: { equals: student.id }, program: { equals: 'nodejs' },
+    } })
+    const project = queued ?? await payload.create({ collection: 'tutoring-projects', data: {
+      student: student.id, program: 'nodejs', username: uid('student'), group: 'mentoring',
+      courseProject: 'course/starter', gradingProject: 'course/grading', state: 'queued', attempts: 0,
+    } })
+    const projectUrl = 'https://git.test/' + project.group + '/' + project.username
+    const url = projectUrl + '/-/merge_requests/1'
     const submit = (actor: TestUser, number = 1) => writeTutoringReview(payload, stream.id, participant.id, number, { kind: 'submit', actor, url })
     await expect(submit(outsider)).rejects.toThrow('Задание пока недоступно')
     await expect(submit(student, 2)).rejects.toThrow('Задание пока недоступно')
+    await expect(submit(student)).rejects.toThrow('после выдачи проекта GitLab')
+    await payload.update({ collection: 'tutoring-projects', id: project.id, data: { state: 'ready', projectUrl } })
+    await expect(writeTutoringReview(payload, stream.id, participant.id, 1, {
+      kind: 'submit', actor: student, url: 'https://git.test/mentoring/other/-/merge_requests/1',
+    })).rejects.toThrow('своего учебного проекта')
     const parallel = await Promise.allSettled([submit(student), submit(student)])
     expect(parallel.filter(result => result.status === 'fulfilled')).toHaveLength(1)
     const result = parallel.find(candidate => candidate.status === 'fulfilled')
@@ -86,6 +99,9 @@ describe('репетиторство в LMS', () => {
       kind: 'grade', actor: admin, status: 'changes', feedback: 'Добавьте тест', expectedUpdatedAt: first.updatedAt,
     })
     expect(changes.feedback).toBe('Добавьте тест')
+    await expect(writeTutoringReview(payload, stream.id, participant.id, 1, {
+      kind: 'submit', actor: student, url: 'https://example.test/another',
+    })).rejects.toThrow('Исправления нужно сдать в той же работе')
     const second = await submit(student)
     const accepted = await writeTutoringReview(payload, stream.id, participant.id, 1, {
       kind: 'grade', actor: admin, status: 'accepted', feedback: 'Готово', expectedUpdatedAt: second.updatedAt,
@@ -93,6 +109,28 @@ describe('репетиторство в LMS', () => {
     expect(accepted).toMatchObject({ id: first.id, status: 'accepted', feedback: 'Готово' })
     await expect(submit(student)).rejects.toThrow('Эта работа уже принята')
     expect((await rest('GET', `/tutoring-reviews/${accepted.id}`, { token: outsiderToken })).status).not.toBe(200)
+  })
+
+  it('сохраняет ручную сдачу старой программы и прежнюю ссылку при доработке после подключения GitLab', async () => {
+    const { docs: [program] } = await payload.find({ collection: 'bootcamp-programs', where: { key: { equals: 'nodejs' } }, limit: 1 })
+    const learner = await createStudent(payload)
+    try {
+      await payload.update({ collection: 'bootcamp-programs', id: program.id, data: { mentoringGitlabGroup: null } })
+      const member = await payload.create({ collection: 'tutoring-participants', data: { student: learner.id, stream: stream.id, active: true, currentMeeting: 1 } })
+      const url = 'https://example.test/student-project'
+      const submit = () => writeTutoringReview(payload, stream.id, member.id, 1, { kind: 'submit', actor: learner, url })
+      const first = await submit()
+      await writeTutoringReview(payload, stream.id, member.id, 1, {
+        kind: 'grade', actor: admin, status: 'changes', feedback: 'Проверьте срок брони', expectedUpdatedAt: first.updatedAt,
+      })
+      await payload.update({ collection: 'bootcamp-programs', id: program.id, data: { mentoringGitlabGroup: 'mentoring', mentoringGraderUserId: 245 } })
+      expect(await submit()).toMatchObject({ id: first.id, status: 'submitted', submissionUrl: url })
+    } finally {
+      await payload.update({ collection: 'bootcamp-programs', id: program.id, data: {
+        mentoringGitlabGroup: program.mentoringGitlabGroup ?? null, mentoringGraderUserId: program.mentoringGraderUserId ?? null,
+      } })
+      await payload.delete({ collection: 'users', id: learner.id })
+    }
   })
 
   it('публикует пару целиком и сохраняет ручную версию при повторном импорте', async () => {
@@ -187,6 +225,7 @@ describe('репетиторство в LMS', () => {
     const first = await upload(adminToken)
     expect(first.status).toBe(200)
     const { id } = await first.json()
+    cleanupTutoringFixture(payload, 'tutoring-introductions', id)
     expect(await (await upload(adminToken)).json()).toEqual({ id, status: 'unchanged' })
     const saved = await payload.findByID({ collection: 'tutoring-introductions', id, depth: 1 })
     if (typeof saved.deckPdf === 'number' || typeof saved.deckPptx === 'number') throw new Error('Не загружены файлы вводной')

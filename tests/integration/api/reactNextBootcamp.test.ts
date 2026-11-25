@@ -5,6 +5,7 @@ import { REACT_NEXT_BOOTCAMP, setupReactNextBootcamp, type BootcampSetupApi } fr
 import { entryTaskSetForLead } from '@/server/bootcamp-entry-task'
 import { getLearningAccess } from '@/server/learning-access'
 import { paymentPageState } from '@/server/bootcamp-payment'
+import { confirmEnrollmentIdentity } from '@/server/enrollment-identity'
 import { POST as pathAction } from '@/app/api/bootcamp/leads/[id]/path/route'
 import { createAdmin, createCourseTree, createStudent, getTestPayload, login, rest, uid, type CourseTree, type TestUser } from '../helpers/payload'
 
@@ -89,6 +90,7 @@ describe('React + Next.js как отдельная платная програ�
 
   it('допуск берёт условия React + Next.js, а только подтверждённая оплата открывает его курс', async () => {
     const candidate = await createStudent(payload)
+    await confirmEnrollmentIdentity(payload, admin, candidate.id, candidate.email)
     const lead = await payload.create({
       collection: 'bootcamp-leads',
       data: {

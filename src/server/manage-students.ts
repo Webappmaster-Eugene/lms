@@ -6,13 +6,14 @@ import { revokeUserSessions } from '@/payload/hooks/authSessionRevocations'
 import { addMoscowMonths, FREEZE_TERMS, freezeReasons, moscowDayStart, type FreezeReason, type FreezeTerm } from '@/lib/account-freeze'
 import { createFreeze, deletePlannedFreezes, endActiveFreezes, getAccountFreeze, planAutomaticFreeze } from '@/server/account-freeze'
 import { lockLearningAccess, transactionDb } from '@/payload/hooks/learningAccessLock'
+import { lastConfirmedEnrollmentEmail } from '@/payload/hooks/protectEnrollmentIdentity'
 import { generateStudentPassword } from '@/server/student-password'
 import type { User } from '@/payload-types'
 
 type StudentFields = { email?: string; firstName?: string; lastName?: string; telegram?: string | null; isActive?: boolean; isTestStudent?: boolean }
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const select = { email: true, firstName: true, lastName: true, telegram: true, isActive: true, isTestStudent: true, role: true, totalPoints: true } as const
-type StudentDoc = Pick<User, 'id' | 'email' | 'firstName' | 'lastName' | 'telegram' | 'isActive' | 'isTestStudent' | 'role' | 'totalPoints'>
+const select = { email: true, firstName: true, lastName: true, telegram: true, isActive: true, isTestStudent: true, role: true, totalPoints: true, enrollmentIdentityEmail: true, updatedAt: true } as const
+type StudentDoc = Pick<User, 'id' | keyof typeof select>
 
 function name(value: unknown, label: string): string {
   if (typeof value !== 'string' || !value.trim() || value.trim().length > 100) throw new AssignmentInputError(`Укажите ${label} длиной до 100 символов`)
@@ -134,7 +135,8 @@ async function studentImpact(payload: Payload, id: number, points: number): Prom
 export async function studentDetails(payload: Payload, user: User, headers: Headers, id: number): Promise<StudentDetails> {
   const req = await createLocalReq({ user, req: { headers } }, payload)
   const doc = await readStudent(payload, id, req)
-  return { student: await profile(payload, doc, req), impact: await studentImpact(payload, id, doc.totalPoints ?? 0) }
+  return { student: await profile(payload, doc, req), impact: await studentImpact(payload, id, doc.totalPoints ?? 0),
+    enrollmentIdentity: { confirmed: doc.enrollmentIdentityEmail === doc.email.toLowerCase() && await lastConfirmedEnrollmentEmail(req, id) === doc.enrollmentIdentityEmail, revision: doc.updatedAt } }
 }
 
 export async function updateStudent(payload: Payload, user: User, headers: Headers, id: number, raw: unknown): Promise<StudentProfile> {

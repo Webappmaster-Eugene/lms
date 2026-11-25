@@ -120,11 +120,12 @@ async function reviewAlerts(payload: Payload): Promise<number> {
 async function reconcile(payload: Payload): Promise<number> {
   const config = robokassaConfig()
   if (!config || config.isTest) return 0
+  const store = sql`method = 'robokassa' and coalesce(is_test, false) = ${config.isTest}`
   const pending = rowsOf<{ id: number, amount_kopecks: string | number }>(await db(payload).execute(sql`
     update bootcamp_payments set checked_at = now(), updated_at = now()
-    where id in (
+    where ${store} and id in (
       select id from bootcamp_payments
-      where method = 'robokassa' and coalesce(is_test, false) = false and (
+      where ${store} and (
         (status in ('pending', 'cancelled') and processed_at is null and created_at < now() - make_interval(mins => ${RECONCILE_AFTER_MIN}) and created_at > now() - make_interval(days => ${RECONCILE_WINDOW_DAYS}))
         or (status = 'paid' and op_key is null and checked_at is null)
       ) and (checked_at is null or checked_at < now() - make_interval(mins => ${RECONCILE_EVERY_MIN}))
@@ -135,14 +136,15 @@ async function reconcile(payload: Payload): Promise<number> {
   for (const { id, amount_kopecks: invoiceKopecks } of pending) {
     try {
       const state = await fetchOperationState(config, id)
-      if (state.opKey) await db(payload).execute(sql`update bootcamp_payments set op_key = coalesce(op_key, ${state.opKey}) where id = ${id}`)
+      const invoice = sql`id = ${id} and ${store}`
+      if (state.opKey) await db(payload).execute(sql`update bootcamp_payments set op_key = coalesce(op_key, ${state.opKey}) where ${invoice}`)
       if (state.state === 'paid') {
         // Сумму счёта задаёт наша подпись в ссылке; в Info/OutSum Робокасса может вернуть сумму за вычетом комиссии.
-        const { outcome } = await applyPaid(payload, id, { amountKopecks: Number(invoiceKopecks), incCurrLabel: state.incCurrLabel, opKey: state.opKey, source: 'reconcile' })
+        const { outcome } = await applyPaid(payload, id, { isTest: config.isTest, amountKopecks: Number(invoiceKopecks), incCurrLabel: state.incCurrLabel, opKey: state.opKey, source: 'reconcile' })
         if (outcome === 'paid') paid += 1
         else if (outcome !== 'already') logger.warn('Robokassa reconciliation found a payment that did not move the lead', { 'robokassa.inv_id': id, 'robokassa.outcome': outcome })
       } else if (state.state === 'cancelled') {
-        await db(payload).execute(sql`update bootcamp_payments set status = 'cancelled', updated_at = now() where id = ${id} and status = 'pending'`)
+        await db(payload).execute(sql`update bootcamp_payments set status = 'cancelled', updated_at = now() where ${invoice} and status = 'pending'`)
       }
     } catch (error) {
       logger.warn('Robokassa reconciliation failed', { 'robokassa.inv_id': id, error: error instanceof Error ? error.message : String(error) })

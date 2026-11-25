@@ -14,6 +14,10 @@ const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) 
   if (method !== 'GET') requests.push({ url: String(url), method, body: init?.body ? JSON.parse(String(init.body)) : undefined })
   if (failure && method !== 'GET') return Response.json({ error: failure.error }, { status: failure.status })
   if (String(url).endsWith('/password')) return Response.json({ credentials: { email: 'rost@example.test', password: 'Pass2word345abc' } })
+  if (String(url).endsWith('/enrollment-identity') && current.enrollmentIdentity) {
+    current = { ...current, enrollmentIdentity: { ...current.enrollmentIdentity, confirmed: true } }
+    return Response.json({ confirmed: true })
+  }
   if (method === 'POST') return Response.json({ student: { ...details.student, id: 8 }, credentials: { email: 'new@example.test', password: 'Pass2word345abc' } }, { status: 201 })
   if (method === 'DELETE') return Response.json({ deleted: true })
   if (method === 'PATCH') return Response.json({ student: current.student })
@@ -71,6 +75,19 @@ describe('логин и пароль', () => {
 })
 
 describe('карточка ученика', () => {
+  it('показывает какой адрес сверяет наставник и сохраняет его для конкретного ученика', async () => {
+    const user = userEvent.setup()
+    const revision = '2026-11-25T13:00:00.000Z'
+    current = { ...details, enrollmentIdentity: { confirmed: false, revision } }
+    card()
+    await user.click(await screen.findByRole('button', { name: 'Сверить адрес для зачисления' }))
+    expect(screen.getByText(/Уточните у ученика/)).toHaveTextContent('rost@example.test')
+    expect(screen.getByText(/Уточните у ученика/)).toHaveTextContent('№7')
+    expect(requests).toHaveLength(0)
+    await user.click(screen.getByRole('button', { name: 'Подтвердить адрес ученика' }))
+    expect(requests).toEqual([{ url: '/api/manage/students/7/enrollment-identity', method: 'POST', body: { email: 'rost@example.test', revision } }])
+    expect(await screen.findByText('Адрес для зачисления подтвержден.')).toBeVisible()
+  })
   const card = (overrides: Partial<Parameters<typeof StudentCard>[0]> = {}) => {
     const props = { userId: 7, disabled: false, onChanged: vi.fn(), onDeleted: vi.fn(), onCredentials: vi.fn(), ...overrides }
     render(<StudentCard {...props} />)

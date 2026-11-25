@@ -17,22 +17,28 @@ test('администратор видит недели потока по со�
   let streamId: number | undefined
   let leadId: number | undefined
   let enrollmentId: number | undefined
+  const gitlabUserId = 110000 + Math.floor(Math.random() * 100000)
+  const gitlabProjectId = 700000 + Math.floor(Math.random() * 100000)
+  const project = { id: gitlabProjectId, path_with_namespace: group + '/' + username, web_url: 'https://git.test/' + group + '/' + username }
+  const head = '5d144495245925e03934d5445e6f059c9b19c79d'
+  const [{ previous }] = await query<{ previous: number | null }>("select bootcamp_grader_user_id as previous from bootcamp_programs where key = 'nodejs'")
+  const bot = previous ?? 4813
   try {
+    await query("update bootcamp_programs set bootcamp_grader_user_id = $1 where key = 'nodejs'", [bot])
     const now = Date.now()
     const stream = await admin.request.post(`${APP_URL}/api/bootcamp-streams`, { data: { title: `Поток e2e ${suffix}`, program: 'nodejs', gitlabGroup: group, startsAt: new Date(now - 14 * DAY).toISOString(), weeks: [{ week: 1, dueAt: new Date(now - 3 * DAY).toISOString() }, { week: 2, dueAt: new Date(now + 4 * DAY).toISOString() }] } })
     expect(stream.status()).toBe(201)
     streamId = (await stream.json()).doc.id as number
     // Зачисление заводит исполнитель в VM GitLab: у теста этого канала нет, поэтому строки - прямо в базе.
     ;[{ id: leadId }] = await query<{ id: number }>(`insert into bootcamp_leads (email, name, program, status, consent_version, consent_at) values ($1, 'Ева Сдающая', 'nodejs', 'enrolled', '2026-10-26', now()) returning id`, [`${username}@mail.test`])
-    ;[{ id: enrollmentId }] = await query<{ id: number }>(`insert into bootcamp_enrollments (lead_id, email, first_name, last_name, gitlab_username, stream_group, status, gitlab_project_id) values ($1, $2, 'Ева', 'Сдающая', $3, $4, 'done', $5) returning id`, [leadId, `${username}@mail.test`, username, group, 700_000 + Math.floor(Math.random() * 100_000)])
+    ;[{ id: enrollmentId }] = await query<{ id: number }>(`insert into bootcamp_enrollments (lead_id, email, first_name, last_name, gitlab_username, stream_group, status, gitlab_project_id, gitlab_user_id, gitlab_project_url) values ($1, $2, 'Ева', 'Сдающая', $3, $4, 'done', $5, $6, $7) returning id`, [leadId, `${username}@mail.test`, username, group, gitlabProjectId, gitlabUserId, project.web_url])
 
-    const project = { path_with_namespace: `${group}/${username}`, web_url: `https://git.test/${group}/${username}` }
-    const mr = { iid: 1, title: 'Этап 1', url: `${project.web_url}/-/merge_requests/1`, source_branch: 'week-01' }
+    const mr = { iid: 1, title: 'Этап 1', url: `${project.web_url}/-/merge_requests/1`, source_branch: 'week-01', author_id: gitlabUserId, source_project_id: gitlabProjectId, target_project_id: gitlabProjectId, target_branch: 'main', state: 'opened', last_commit: { id: head } }
     const token = createHmac('sha256', E2E_SECRET).update('lms-gitlab-webhook-v1').digest('hex')
     const hook = (event: string, data: unknown) => admin.request.post(`${APP_URL}/api/bootcamp/gitlab-events`, { headers: { 'X-Gitlab-Event': event, 'X-Gitlab-Token': token }, data })
-    expect((await hook('Merge Request Hook', { project, user: { username }, object_attributes: { ...mr, action: 'open', target_branch: 'main', created_at: gitlabDate(now - 6 * DAY) } })).status()).toBe(200)
+    expect((await hook('Merge Request Hook', { project, user: { id: gitlabUserId, username }, object_attributes: { ...mr, action: 'open', target_branch: 'main', created_at: gitlabDate(now - 6 * DAY) } })).status()).toBe(200)
     const note = '<!-- grader:01:5d144495245925e03934d5445e6f059c9b19c79d -->\n**Доверенная проверка: неделя 1 - пройдена**\n\nКоммит `5d1444952459`, попытка 1. Прошло проверок: 26 из 26.'
-    expect((await hook('Note Hook', { project, user: { username: 'group_5_bot_e2e', name: 'grader-bot' }, merge_request: mr, object_attributes: { noteable_type: 'MergeRequest', note, created_at: gitlabDate(now - 5 * DAY), updated_at: gitlabDate(now - 5 * DAY) } })).status()).toBe(200)
+    expect((await hook('Note Hook', { project, user: { id: bot, username: 'group_5_bot_e2e', name: 'grader-bot' }, merge_request: mr, object_attributes: { noteable_type: 'MergeRequest', note, created_at: gitlabDate(now - 5 * DAY), updated_at: gitlabDate(now - 5 * DAY) } })).status()).toBe(200)
 
     const page = await admin.newPage()
     await page.goto(`/admin/bootcamp-progress?stream=${streamId}`)
@@ -56,6 +62,7 @@ test('администратор видит недели потока по со�
     await page.locator('.bootcamp-progress').screenshot({ path: testInfo.outputPath('bootcamp-progress.png') })
     expect((await student.request.get(`${APP_URL}/api/manage/bootcamp-progress`)).status()).toBe(403)
   } finally {
+    await query("update bootcamp_programs set bootcamp_grader_user_id = $1 where key = 'nodejs' and bootcamp_grader_user_id = $2", [previous, bot])
     if (enrollmentId) await admin.request.delete(`${APP_URL}/api/bootcamp-enrollments/${enrollmentId}`)
     if (leadId) await admin.request.delete(`${APP_URL}/api/bootcamp-leads/${leadId}`)
     if (streamId) await admin.request.delete(`${APP_URL}/api/bootcamp-streams/${streamId}`)

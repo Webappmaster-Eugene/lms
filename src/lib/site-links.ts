@@ -8,5 +8,7 @@ export const AUTHOR_URL = 'https://nadtocheev.ru'
 /** Инструкция по платформе. */
 export const GUIDE_URL = 'https://info.mentorcareer.ru'
 
+export const BOOTCAMP_GITLAB_ORIGIN = 'https://git.mentorcareer.ru'
+
 /** Лендинг буткемпа: что это за поток и форма записи. Ученику без буткемпа ведём сюда. */
 export const BOOTCAMP_LANDING_URL = `${GUIDE_URL}/bootcamp/nodejs/`

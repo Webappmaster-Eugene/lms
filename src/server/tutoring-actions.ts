@@ -1,11 +1,13 @@
 'use server'
 
+import { randomUUID } from 'node:crypto'
 import type { Payload, PayloadRequest } from 'payload'
+import { revalidatePath } from 'next/cache'
 import { notFound, redirect } from 'next/navigation'
 
 import { relationId } from '@/lib/content-management/pages'
 import { logger } from '@/lib/telemetry'
-import { isMoscowTuesday, isTutoringMeeting, isTutoringStatus, parseMoscowMeetingTime, tutoringHttpsUrl, tutoringPrograms, type TutoringProgram } from '@/lib/tutoring'
+import { isMoscowTuesday, isTutoringMeeting, isTutoringStatus, parseMoscowMeetingTime, tutoringHttpsUrl, type TutoringProgram } from '@/lib/tutoring'
 import { introductionScheduleError, parseMoscowScheduleInput } from '@/lib/tutoring-schedule'
 import { getLearningRequest } from '@/server/learning-request'
 import { getAuthoritativeLearningPolicy } from '@/server/learning-access-policy'
@@ -13,12 +15,14 @@ import { tutoringPath } from '@/server/tutoring-bootcamps'
 import { tutoringBootcamps } from '@/server/tutoring-curriculum'
 import { setTutoringStreamCalendar } from '@/server/tutoring-calendar-account'
 import { tutoringGoogleConfig } from '@/server/tutoring-google'
-import { queueTutoringProject, retryTutoringRevocation, tutoringMergeRequest, tutoringProject } from '@/server/tutoring-projects'
-import { saveTutoringCharge } from '@/server/tutoring-payments'
+import { queueTutoringProject, retryTutoringRevocation } from '@/server/tutoring-projects'
+import { parseTutoringRate, saveTutoringCharge } from '@/server/tutoring-payments'
+import { finishTutoringMeeting } from '@/server/tutoring-attendance'
+import { addTutoringInvite, removeWaitingTutoringInvite, repeatTutoringInvitations, saveNewTutoringStream, saveTutoringStreamSettings } from '@/server/tutoring-invitations'
 import { tutoringMemberships } from '@/server/tutoring-access'
 import { saveIntroductionSubmission } from '@/server/tutoring-intro-practice'
 import { changeTutoringEnrollment } from '@/server/tutoring-graduation'
-import { tutoringMeetings, TutoringProblem, writeTutoringReview } from '@/server/tutoring'
+import { TutoringProblem, writeTutoringReview } from '@/server/tutoring'
 import { changeTutoringSchedule, moveTutoringMeeting, openFirstTutoringLecture, scheduleTutoringIntroduction, writeTutoringStream } from '@/server/tutoring-schedule'
 
 const value = (form: FormData, key: string) => String(form.get(key) ?? '').trim()
@@ -83,12 +87,16 @@ function streamDetails(form: FormData) {
   return { title, meetingUrl }
 }
 
-export async function createTutoringStream(program: TutoringProgram, form: FormData) {
+type CreationError = { failureId: string; message: string; fields: Record<string, string> }
+
+export async function createTutoringStream(program: TutoringProgram, _previous: CreationError | null, form: FormData): Promise<CreationError | null> {
   const { payload, user, req } = await actor(true)
   const course = (await tutoringBootcamps(payload, req)).find(item => item.program === program)
   if (!course) notFound()
   const base = `${tutoringPath(course.program)}/streams`
-  await run(base, 'Поток создан', async () => {
+  const open = value(form, 'intent') === 'open'
+  let id: number
+  try {
     const templateId = value(form, 'calendar')
     const template = /^[1-9]\d*$/.test(templateId) ? await payload.findByID({
       collection: 'bootcamp-streams', id: Number(templateId), req, depth: 0, overrideAccess: false, disableErrors: true,
@@ -102,12 +110,20 @@ export async function createTutoringStream(program: TutoringProgram, form: FormD
       const error = introductionScheduleError(introductionStartsAt, [Date.parse(startsAt)])
       if (error) throw new TutoringProblem(error)
     }
-    const document = await payload.create({
-      collection: 'tutoring-streams', req, user, overrideAccess: false,
-      data: { ...streamDetails(form), startsAt, introductionStartsAt, awaitingFirstLecture: true, program, status: 'draft', currentMeeting: 1 },
-    })
-    return `${base}/${document.id}`
-  })
+    const rawRate = value(form, 'rate')
+    const hourlyKopecks = rawRate ? parseTutoringRate(rawRate) : null
+    if (rawRate && hourlyKopecks === null) throw new TutoringProblem('Укажите стоимость часа в рублях')
+    id = await saveNewTutoringStream(payload, user, {
+      ...streamDetails(form), program, startsAt, introductionStartsAt, hourlyKopecks,
+    }, value(form, 'creationKey'), value(form, 'inviteEmails'), open)
+  } catch (error) {
+    if (!(error instanceof TutoringProblem)) logger.error('Tutoring stream creation failed', error)
+    const fields = Object.fromEntries(['title', 'calendar', 'date', 'time', 'introductionStartsAt', 'meetingUrl', 'rate', 'inviteEmails']
+      .map(key => [key, value(form, key)]))
+    return { failureId: randomUUID(), fields, message: error instanceof TutoringProblem ? error.message : 'Не удалось создать поток. Проверьте данные и попробуйте снова.' }
+  }
+  revalidatePath(base)
+  return finish(`${base}/${id}`, 'saved', open ? 'Поток открыт' : 'Черновик сохранен')
 }
 
 export async function rescheduleTutoringIntroduction(streamId: number, form: FormData) {
@@ -149,17 +165,14 @@ export async function updateTutoringStream(streamId: number, form: FormData) {
       if (stream.updatedAt !== value(form, 'updatedAt')) throw new TutoringProblem('Настройки уже изменились. Обновите страницу')
       const status = value(form, 'status')
       const currentMeeting = Number(value(form, 'current'))
+      const submittedRate = value(form, 'rate')
+      const hourlyKopecks = submittedRate ? parseTutoringRate(submittedRate) : stream.hourlyKopecks
+      if (submittedRate && hourlyKopecks == null) throw new TutoringProblem('Укажите стоимость часа в рублях')
       if (status !== 'active' && status !== 'draft' && status !== 'archived') throw new TutoringProblem('Выберите доступ к потоку')
       if (!isTutoringMeeting(currentMeeting, stream.program)) throw new TutoringProblem('Выберите встречу потока')
       if (stream.awaitingFirstLecture && currentMeeting !== 1) throw new TutoringProblem('Сначала откройте первую лекцию потоку')
-      if (status === 'active') {
-        const meetings = await tutoringMeetings(payload, req, stream.program)
-        if (meetings.length !== tutoringPrograms[stream.program].meetings || meetings.some(meeting => !meeting.filename && !meeting.deckPdf)) {
-          throw new TutoringProblem('Сначала загрузите полный комплект презентаций и домашних заданий программы')
-        }
-      }
-      await payload.update({ collection: 'tutoring-streams', id: stream.id, req, user, overrideAccess: false,
-        data: { ...streamDetails(form), status, currentMeeting } })
+      await saveTutoringStreamSettings(req, stream, { ...streamDetails(form), status, currentMeeting, hourlyKopecks },
+        form.has('pendingInviteEmails') ? value(form, 'pendingInviteEmails') : undefined)
     }, true)
   })
 }
@@ -188,25 +201,27 @@ export async function toggleTutoringStreamCalendar(streamId: number, form: FormD
 
 export async function addTutoringParticipant(streamId: number, form: FormData) {
   const { payload, user, req } = await actor(true)
+  const { stream, href } = await managedStream(payload, req, streamId)
+  await run(href, stream.status === 'draft' ? 'Адрес сохранен для приглашения' : 'Приглашение обработано', async () => {
+    const member = await addTutoringInvite(payload, user, streamId, value(form, 'email'))
+    return member ? `${href}?participant=${member}#project` : (stream.status === 'active' ? href + '#pending-invitations' : href)
+  })
+}
+
+export async function retryTutoringInvitations(streamId: number) {
+  const { payload, user, req } = await actor(true)
   const { href } = await managedStream(payload, req, streamId)
-  await run(href, 'Ученик добавлен', async () => {
-    const email = value(form, 'email').toLowerCase()
-    if (!email || email.length > 254 || !email.includes('@')) throw new TutoringProblem('Введите почту ученика')
-    const { docs: [student] } = await payload.find({
-      collection: 'users', req, user, overrideAccess: false, depth: 0, limit: 1, where: { email: { equals: email } },
-    })
-    if (!student || student.isActive === false || (await getAuthoritativeLearningPolicy(payload, student.id, req)).role !== 'student') {
-      throw new TutoringProblem('Активный ученик с таким адресом не найден')
-    }
-    const { docs: [existing] } = await payload.find({
-      collection: 'tutoring-participants', req, user, overrideAccess: false, depth: 0, limit: 1,
-      where: { and: [{ student: { equals: student.id } }, { stream: { equals: streamId } }] },
-    })
-    if (existing) throw new TutoringProblem('Ученик уже в списке потока. Его доступ можно открыть в журнале')
-    const member = await payload.create({ collection: 'tutoring-participants', req, user, overrideAccess: false,
-      context: { tutoringInviteEmail: email },
-      data: { stream: streamId, student: student.id, active: true, currentMeeting: 1 } })
-    return `${href}?participant=${member.id}`
+  await run(href + '#pending-invitations', 'Приглашения проверены', async () => {
+    const result = await repeatTutoringInvitations(payload, user, streamId)
+    return href + (result.waiting.length ? '#pending-invitations' : '#students')
+  })
+}
+
+export async function cancelWaitingTutoringInvite(streamId: number, studentId: number, email: string) {
+  const { payload, user, req } = await actor(true)
+  const { href } = await managedStream(payload, req, streamId)
+  await run(href, 'Приглашение отменено', async () => {
+    await removeWaitingTutoringInvite(payload, user, streamId, studentId, email)
   })
 }
 
@@ -257,13 +272,7 @@ export async function submitTutoringHomework(streamId: number, meeting: number, 
   if (!membership || relationId(membership.member.student) !== user.id) notFound()
   const href = await streamHref(payload, req, membership.stream.program, streamId)
   await run(`${href}?meeting=${meeting}#homework`, 'Работа отправлена на проверку', async () => {
-    const submission = value(form, 'submission')
-    if (!tutoringHttpsUrl(submission)) throw new TutoringProblem('Введите HTTPS-ссылку на работу')
-    const project = await tutoringProject(payload, req, user.id, membership.stream.program)
-    if (project?.state === 'ready' && project.projectUrl && !tutoringMergeRequest(project.projectUrl, submission)) {
-      throw new TutoringProblem('Вставьте ссылку на merge request своего учебного проекта')
-    }
-    await writeTutoringReview(payload, streamId, membership.member.id, meeting, { kind: 'submit', actor: user, url: submission })
+    await writeTutoringReview(payload, streamId, membership.member.id, meeting, { kind: 'submit', actor: user, url: value(form, 'submission') })
   })
 }
 
@@ -273,6 +282,17 @@ export async function recordTutoringCharge(streamId: number, memberId: number, m
   await run(`${href}?participant=${memberId}&review=${meeting}#payment`, 'Оплата встречи сохранена', async () => {
     await saveTutoringCharge(payload, user, streamId, memberId, meeting, {
       minutes: value(form, 'minutes'), rate: value(form, 'rate'), action: value(form, 'intent'), revision: value(form, 'revision'),
+    })
+  })
+}
+
+export async function completeTutoringMeeting(streamId: number, meeting: number, streamRevision: string, form: FormData) {
+  const { payload, user, req } = await actor(true)
+  const { href } = await managedStream(payload, req, streamId)
+  await run(`${href}?preview=${meeting}#attendance`, 'Встреча завершена', async () => {
+    await finishTutoringMeeting(payload, user, streamId, {
+      meeting, streamRevision, minutes: Number(value(form, 'minutes')),
+      present: form.getAll('participant').map(id => Number(id)),
     })
   })
 }

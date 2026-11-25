@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 
 import { CandidateFrame } from '@/components/bootcamp/CandidateFrame'
+import { BuyerAccess } from '@/components/bootcamp/BuyerAccess'
 import { PaymentStatusRefresh } from '@/components/bootcamp/PaymentStatusRefresh'
 import { getPayload } from '@/lib/payload'
 import { successReturnState } from '@/server/bootcamp-payment'
@@ -25,14 +26,16 @@ export default async function PaymentDonePage({ searchParams }: Props) {
   return (
     <CandidateFrame landingUrl={state.landingUrl} program={state.program}>
     <article className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{state.kind !== 'paid' ? 'Проверяем оплату' : state.test ? 'Тестовая оплата прошла' : 'Оплата получена'}</h1>
+      <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{state.kind === 'refunded' ? 'Возврат оформлен' : state.kind !== 'paid' ? 'Проверяем оплату' : state.test ? 'Тестовая оплата прошла' : 'Оплата получена'}</h1>
       <div className="rounded-xl border border-border bg-card px-5 py-4 text-base leading-relaxed" aria-live="polite">
         {state.kind === 'paid' && state.test && (
           <p>Тестовая оплата {state.amount} прошла, номер заказа {state.invId}. Деньги не списаны, доступы автоматически не открываются.</p>
         )}
         {state.kind === 'paid' && !state.test && (
-          <p>Спасибо! Оплата {state.amount} получена, номер заказа {state.invId}. В течение нескольких минут на почту придут письма с доступом к учебному кабинету и GitLab курса. Начните с методички недели 0.</p>
+          <><p>Оплата {state.amount} получена, номер заказа {state.invId}. Для новых учетных записей придут письма с доступом. Если уже учились у нас, войдите со своим паролем.</p>
+          {state.leadId && <BuyerAccess scope={{ leadId: state.leadId }} />}</>
         )}
+        {state.kind === 'refunded' && <p>По этой заявке оформлен возврат. Доступ к буткемпу закрыт.</p>}
         {state.kind === 'pending' && (
           <>
             <p>Ждём подтверждения от Робокассы, обычно это меньше минуты. Страница обновится сама.</p>

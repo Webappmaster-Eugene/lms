@@ -19,6 +19,7 @@ const dueLabel = (value: string) => dateFormat.format(new Date(Date.parse(value)
 /** Короткая метка ячейки; полный текст - в подсказке и для читалки экрана. */
 function code(cell: WeekCell, now: number): string {
   switch (cell.state) {
+    case 'historical-merge': return 'арх.'
     case 'accepted': return '✓'
     case 'review': return cell.since ? `${Math.max(0, Math.floor((now - Date.parse(cell.since)) / DAY_MS))} дн` : 'ревью'
     case 'failed-check': return '✗'
@@ -33,6 +34,7 @@ function code(cell: WeekCell, now: number): string {
 function describe(cell: WeekCell, now: number, reviewDays: number): string {
   const parts = [`Этап ${cell.week}: ${WEEK_STATE_LABELS[cell.state]}`]
   if (cell.state === 'accepted' && cell.since) parts.push(`слита ${fullDate.format(new Date(cell.since))}`)
+  if (cell.state === 'historical-merge' && cell.since) parts.push(fullDate.format(new Date(cell.since)))
   if (cell.state === 'review' && cell.since) parts.push(`ждёт ${daysLabel(Math.max(0, Math.floor((now - Date.parse(cell.since)) / DAY_MS)))}`)
   if (cell.checks) parts.push(`проверок ${cell.checks}`)
   if (cell.dueAt) parts.push(`срок ${dueLabel(cell.dueAt)}${cell.late ? (cell.state === 'accepted' ? ', принята после срока' : ', срок прошёл') : ''}`)
@@ -42,6 +44,7 @@ function describe(cell: WeekCell, now: number, reviewDays: number): string {
 
 const LEGEND: { state: WeekState; text: string; late?: boolean; overdue?: boolean }[] = [
   { state: 'accepted', text: '✓ принята: наставник слил MR' },
+  { state: 'historical-merge', text: 'арх. - в прежнем журнале отмечено слияние' },
   { state: 'review', text: 'N дн - проверка пройдена, ждёт ревью столько дней' },
   { state: 'checking', text: '… новые коммиты, ждут проверки бота' },
   { state: 'failed-check', text: '✗ проверка не пройдена' },
@@ -79,10 +82,13 @@ export function BootcampProgressManager({ initialStream = null }: { initialStrea
     return () => abort.abort()
   }, [key, stream, withTest])
   const loading = result?.key !== key
-  const data = result?.data ?? null
+  const data = loading ? null : result?.data ?? null
   const reviewDays = reviewSlaDays(data?.stream?.program)
   const weeks = Array.from({ length: BOOTCAMP_PROGRAM_WEEKS }, (_, index) => index + 1)
   const dues = new Map((data?.students[0]?.weeks ?? []).map((cell) => [cell.week, cell.dueAt]))
+  const reviews = (data?.students ?? []).flatMap(student => student.weeks
+    .filter(cell => cell.state === 'review' && cell.mrUrl)
+    .map(cell => ({ student, cell }))).sort((a, b) => (a.cell.since ?? '').localeCompare(b.cell.since ?? ''))
   return <div className="student-analytics bootcamp-progress">
     <header><h1>Учёба буткемпа</h1><p>Сдачи этапов по событиям GitLab: этап принят, когда наставник слил MR из ветки week-NN. Сроки этапов - из календаря потока, ответ на сдачу - в течение {reviewDays} дней.</p></header>
     <div className="student-analytics__controls learning-analytics__controls">
@@ -99,6 +105,23 @@ export function BootcampProgressManager({ initialStream = null }: { initialStrea
       ? <p>Потоков пока нет. Создайте поток в CMS: «Буткемпы» → «Потоки буткемпа», укажите группу GitLab и сроки этапов.</p>
       : <p>Такого потока нет: возможно, его удалили. Выберите поток в списке.</p>)}
     {data?.stream && <>
+      {data.failedEnrollments.length > 0 && <section aria-label="Проблемы с зачислением">
+        <h2>Проблемы с зачислением</h2>
+        <ul>{data.failedEnrollments.map(item => <li key={item.leadId}>
+          <Link href={`/admin/collections/bootcamp-leads/${item.leadId}`}>{item.title} · Проверить выдачу доступа</Link>
+        </li>)}</ul>
+      </section>}
+      {reviews.length > 0 && <section aria-label="Работы на проверке">
+        <h2>На проверке ({reviews.length})</h2>
+        <ul>{reviews.slice(0, 3).map(({ student, cell }) => <li key={`${student.enrollmentId}-${cell.week}`}>
+          <a href={cell.mrUrl ?? undefined} target="_blank" rel="noopener noreferrer">{student.title} · Этап {cell.week}</a>
+        </li>)}</ul>
+        {reviews.length > 3 && <details><summary>Остальные работы ({reviews.length - 3})</summary>
+          <ul>{reviews.slice(3).map(({ student, cell }) => <li key={`${student.enrollmentId}-${cell.week}`}>
+            <a href={cell.mrUrl ?? undefined} target="_blank" rel="noopener noreferrer">{student.title} · Этап {cell.week}</a>
+          </li>)}</ul>
+        </details>}
+      </section>}
       <dl className="student-analytics__summary" aria-label="Итоги потока">
         <div><dt>Учеников</dt><dd>{data.summary.students}</dd></div>
         <div><dt>Идут по плану</dt><dd>{data.summary.onPlan}</dd></div>
@@ -121,8 +144,12 @@ export function BootcampProgressManager({ initialStream = null }: { initialStrea
               <small>{student.projectUrl ? <a href={student.projectUrl} target="_blank" rel="noopener noreferrer">{student.gitlabUsername}</a> : student.gitlabUsername}</small>
               {(student.frozen || student.isTest) && <span className="student-analytics__badges">{student.frozen && <span data-tone="frozen">Заморожен</span>}{student.isTest && <span data-tone="muted">Тестовый</span>}</span>}
               {student.userId && <small><Link href={`/admin/student-analytics?user=${student.userId}`}>Карточка ученика</Link></small>}
+              <small><Link href={`/admin/collections/bootcamp-enrollments/${student.enrollmentId}#defense`}>Защита проекта</Link></small>
             </th>
-            <td>{student.planned}</td><td>{student.accepted}</td>
+            <td>{student.planned}</td><td>{student.accepted}
+              {student.weeks.some(cell => cell.state === 'historical-merge') &&
+                <small>В прежнем журнале: {student.weeks.filter(cell => cell.state === 'historical-merge').length}</small>}
+            </td>
             <td data-lag={student.lag > 1 ? 'more' : student.lag === 1 ? 'one' : 'none'}>{student.lag === 0 ? 'нет' : student.lag}</td>
             <td>{student.lastGitlabAt ? shortDate(student.lastGitlabAt) : '-'}</td>
             <td>{student.lastLmsAt ? shortDate(student.lastLmsAt) : '-'}</td>

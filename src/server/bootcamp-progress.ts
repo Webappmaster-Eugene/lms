@@ -16,6 +16,7 @@ import { collectAllPages } from '@/lib/paginate'
 import { logger } from '@/lib/telemetry'
 import { adminLink, notifyAdmins, notifyAdminsAfterCommit } from '@/server/admin-telegram'
 import { inTransaction, txDb } from '@/server/bootcamp-lead-events'
+import { enrollmentProjectUrl } from '@/server/bootcamp-submissions'
 import { studentRows } from '@/server/learning-analytics'
 
 type Db = { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }
@@ -28,17 +29,26 @@ const intArray = (ids: Iterable<number>) => `{${[...ids].filter((id) => Number.i
 export const PROGRESS_ADMIN_PATH = '/admin/bootcamp-progress'
 
 type StreamDoc = { id: number; title: string; program: string; gitlabGroup: string; startsAt: string; weeks?: { week: number; dueAt: string }[] | null }
-type EnrollmentRow = { id: number; lead_id: number; first_name: string; last_name: string; gitlab_username: string; gitlab_project_url: string | null; lms_user_id: number | null; is_test: boolean }
-type SubmissionRow = { enrollment_id: number; week: number; mr_iid: number; mr_url: string | null; opened_at: string | null; last_commit_at: string | null; pipeline_status: 'success' | 'failed' | null; pipeline_at: string | null; verdict: SubmissionFacts['verdict']; checks_passed: number | null; checks_total: number | null; verdict_at: string | null; merged_at: string | null; closed_at: string | null }
+type EnrollmentRow = { id: number; lead_id: number; first_name: string; last_name: string; gitlab_username: string; gitlab_project_url: string | null; lms_user_id: number | null; is_test: boolean; manuals_course_id: number | null; status: 'done' | 'failed' }
+type SubmissionRow = { head_sha: string | null; verdict_sha: string | null; merged_head_sha: string | null; enrollment_id: number; week: number; mr_iid: number; mr_url: string | null; opened_at: string | null; last_commit_at: string | null; pipeline_status: 'success' | 'failed' | null; pipeline_at: string | null; verdict: SubmissionFacts['verdict']; checks_passed: number | null; checks_total: number | null; verdict_at: string | null; merged_at: string | null; closed_at: string | null }
 
 async function streams(payload: Payload, req?: PayloadRequest): Promise<StreamDoc[]> {
   return await collectAllPages(({ page, limit }) => payload.find({ collection: 'bootcamp-streams', sort: '-startsAt', depth: 0, page, limit, overrideAccess: true, ...(req ? { req } : {}) }), { label: 'потоки буткемпа' }) as StreamDoc[]
 }
 
-const facts = (row: SubmissionRow): SubmissionFacts => ({
-  mrIid: Number(row.mr_iid), mrUrl: row.mr_url, openedAt: iso(row.opened_at), lastCommitAt: iso(row.last_commit_at), pipelineStatus: row.pipeline_status, pipelineAt: iso(row.pipeline_at),
-  verdict: row.verdict, checksPassed: num(row.checks_passed), checksTotal: num(row.checks_total), verdictAt: iso(row.verdict_at), mergedAt: iso(row.merged_at), closedAt: iso(row.closed_at),
-})
+const facts = (row: SubmissionRow, projectUrl: string | null): SubmissionFacts => {
+  const verified = Boolean(row.head_sha && row.head_sha === row.verdict_sha)
+  const merged = Boolean(row.head_sha && row.head_sha === row.merged_head_sha)
+  return {
+    verifiedHead: Boolean(row.head_sha),
+    mrIid: Number(row.mr_iid), mrUrl: projectUrl ? projectUrl + '/-/merge_requests/' + Number(row.mr_iid) : null,
+    openedAt: iso(row.opened_at), lastCommitAt: iso(row.last_commit_at),
+    pipelineStatus: row.head_sha ? row.pipeline_status : null, pipelineAt: row.head_sha ? iso(row.pipeline_at) : null,
+    verdict: verified ? row.verdict : null, checksPassed: verified ? num(row.checks_passed) : null, checksTotal: verified ? num(row.checks_total) : null,
+    verdictAt: verified ? iso(row.verdict_at) : null, mergedAt: merged ? iso(row.merged_at) : null,
+    historicalMergedAt: row.head_sha === null ? iso(row.merged_at) : null, closedAt: iso(row.closed_at),
+  }
+}
 
 /**
  * Учёба потока: ученики из зачислений с группой потока (зачисление завершено, доступ не закрыт),
@@ -49,37 +59,61 @@ export async function bootcampProgress(payload: Payload, req: PayloadRequest, qu
   const stream = (query.stream === null ? all[0] : all.find((item) => item.id === query.stream)) ?? null
   const empty = { students: 0, onPlan: 0, lagOne: 0, lagMore: 0, waitingReview: 0, overdueReview: 0, medianReviewHours: null }
   const list = all.map(({ id, title }) => ({ id, title }))
-  if (!stream) return { streams: list, stream: null, summary: empty, students: [] }
-  const enrollments = rowsOf<EnrollmentRow>(await db(payload).execute(sql`
-    select e.id, e.lead_id, e.first_name, e.last_name, e.gitlab_username, e.gitlab_project_url, e.lms_user_id, coalesce(l.is_test, false) as is_test
+  if (!stream) return { streams: list, stream: null, summary: empty, students: [], failedEnrollments: [] }
+  const records = rowsOf<EnrollmentRow>(await db(payload).execute(sql`
+    select e.id, e.lead_id, e.first_name, e.last_name, e.gitlab_username, e.gitlab_project_url, e.lms_user_id, e.manuals_course_id, e.status, coalesce(l.is_test, false) as is_test
     from bootcamp_enrollments e left join bootcamp_leads l on l.id = e.lead_id
-    where e.stream_group = ${stream.gitlabGroup} and coalesce(e.program, 'nodejs') = ${stream.program} and e.status = 'done' and e.revoked_at is null
+    where e.stream_group = ${stream.gitlabGroup} and coalesce(e.program, 'nodejs') = ${stream.program}
+      and e.status in ('done', 'failed') and e.revoked_at is null and e.revoke_requested_at is null
     order by e.last_name, e.first_name, e.id`)).filter((row) => query.withTest || !row.is_test)
+  const enrollments = records.filter(row => row.status === 'done')
+  const failedEnrollments = records.filter(row => row.status === 'failed').map(row => ({
+    leadId: Number(row.lead_id), title: `${row.first_name} ${row.last_name}`.trim() || row.gitlab_username,
+  }))
+  const awaitingEnrollment = rowsOf<{ id: number; title: string }>(await db(payload).execute(sql`
+    select l.id, coalesce(nullif(l.name, ''), l.email) as title
+    from bootcamp_leads l
+    where l.paid_at is not null and l.status = 'paid' and coalesce(l.program, 'nodejs') = ${stream.program}
+      and l.admission->'enrollment'->>'group' = ${stream.gitlabGroup}
+      and (${query.withTest} or not coalesce(l.is_test, false))
+      and not exists (select 1 from bootcamp_enrollments e where e.lead_id = l.id)
+    order by l.paid_at, l.id
+  `))
+  failedEnrollments.push(...awaitingEnrollment.map(row => ({ leadId: Number(row.id), title: row.title })))
   const ids = enrollments.map((row) => Number(row.id))
   const userIds = enrollments.flatMap((row) => row.lms_user_id ? [Number(row.lms_user_id)] : [])
-  const [submissions, gitlabEvents, lms, program] = await Promise.all([
+  const [submissions, gitlabEvents, lms] = await Promise.all([
     db(payload).execute(sql`select * from bootcamp_week_submissions where enrollment_id = any(${intArray(ids)}::int[])`).then((result) => rowsOf<SubmissionRow>(result)),
     db(payload).execute(sql`select lead_id, max(created_at) as at from bootcamp_lead_events where type = 'gitlab_event' and lead_id = any(${intArray(enrollments.map((row) => Number(row.lead_id)))}::int[]) group by 1`).then((result) => rowsOf<{ lead_id: number; at: string }>(result)),
     userIds.length ? studentRows(payload, req, { period: 30, userIds, withCourses: false }, now) : Promise.resolve([]),
-    payload.find({ collection: 'bootcamp-programs', where: { key: { equals: stream.program } }, select: { manualsCourse: true }, depth: 0, limit: 1, overrideAccess: true, req }).then((result) => result.docs[0] ?? null),
   ])
-  const manualsCourse = program?.manualsCourse ? Number(relationKey(program.manualsCourse)) : null
-  const manualLessons = manualsCourse ? await loadPublishedProgrammeLessons(req, [manualsCourse]) : []
-  const manualDone = manualsCourse && userIds.length ? rowsOf<{ user_id: number; done: string | number }>(await db(payload).execute(sql`
-    select p.user_id, count(*) as done from user_progress p where p.is_completed and p.user_id = any(${intArray(userIds)}::int[])
-      and p.lesson_id = any(${intArray(manualLessons.map((lesson) => lesson.id))}::int[]) group by 1`)) : []
+  const courseIds = new Set(enrollments.map(row => row.manuals_course_id).filter((id): id is number => id !== null))
+  const manualLessons = await loadPublishedProgrammeLessons(req, [...courseIds])
+  const lessonTotals = new Map<number, number>()
+  for (const lesson of manualLessons) {
+    const courseId = Number(relationKey(lesson.course))
+    lessonTotals.set(courseId, (lessonTotals.get(courseId) ?? 0) + 1)
+  }
+  const manualDone = userIds.length && manualLessons.length ? rowsOf<{ user_id: number; course_id: number; done: number }>(await db(payload).execute(sql`
+    select p.user_id, l.course_id, count(*)::int as done
+    from user_progress p join lessons l on l.id = p.lesson_id
+    where p.is_completed and p.user_id = any(${intArray(userIds)}::int[])
+      and p.lesson_id = any(${intArray(manualLessons.map(lesson => lesson.id))}::int[])
+    group by p.user_id, l.course_id`)) : []
   const dueByWeek = new Map((stream.weeks ?? []).map((item) => [Number(item.week), item.dueAt]))
   const byEnrollment = new Map<number, SubmissionRow[]>()
   for (const row of submissions) byEnrollment.set(Number(row.enrollment_id), [...(byEnrollment.get(Number(row.enrollment_id)) ?? []), row])
   const lastGitlab = new Map(gitlabEvents.map((row) => [Number(row.lead_id), iso(row.at)]))
   const lmsRows = new Map(lms.map((row) => [row.id, row]))
-  const manuals = new Map(manualDone.map((row) => [Number(row.user_id), Number(row.done)]))
+  const manuals = new Map(manualDone.map(row => [`${row.user_id}-${row.course_id}`, row.done]))
 
   const students: ProgressStudent[] = enrollments.map((row) => {
+    const manualsCourse = row.manuals_course_id
     const items = byEnrollment.get(Number(row.id)) ?? []
+    const projectUrl = enrollmentProjectUrl({ streamGroup: stream.gitlabGroup, gitlabUsername: row.gitlab_username, gitlabProjectUrl: row.gitlab_project_url })
     const weeks = Array.from({ length: BOOTCAMP_PROGRAM_WEEKS }, (_, index) => {
       const week = index + 1
-      return weekCell(week, items.filter((item) => Number(item.week) === week).map(facts), dueByWeek.get(week) ?? null, now, reviewSlaDays(stream.program))
+      return weekCell(week, items.filter((item) => Number(item.week) === week).map(item => facts(item, projectUrl)), dueByWeek.get(week) ?? null, now, reviewSlaDays(stream.program))
     })
     const lag = scheduleLag(weeks, now)
     const submissionTimes = items.flatMap((item) => [item.opened_at, item.last_commit_at, item.pipeline_at, item.verdict_at, item.merged_at].flatMap((value) => iso(value) ?? []))
@@ -89,7 +123,7 @@ export async function bootcampProgress(payload: Payload, req: PayloadRequest, qu
       enrollmentId: Number(row.id), userId: row.lms_user_id ? Number(row.lms_user_id) : null,
       title: `${row.first_name} ${row.last_name}`.trim() || row.gitlab_username, gitlabUsername: row.gitlab_username, projectUrl: row.gitlab_project_url,
       isTest: row.is_test === true, frozen: lmsRow?.freeze != null, lastGitlabAt, lastLmsAt: lmsRow?.lastActivityAt ?? null,
-      manuals: manualsCourse ? { done: row.lms_user_id ? manuals.get(Number(row.lms_user_id)) ?? 0 : 0, total: manualLessons.length } : null,
+      manuals: manualsCourse ? { done: row.lms_user_id ? manuals.get(`${row.lms_user_id}-${manualsCourse}`) ?? 0 : 0, total: lessonTotals.get(manualsCourse) ?? 0 } : null,
       ...lag, weeks,
     }
   })
@@ -98,12 +132,13 @@ export async function bootcampProgress(payload: Payload, req: PayloadRequest, qu
   const reviewHours = submissions.flatMap((row) => {
     const verdictAt = row.verdict === 'passed' && row.verdict_at ? Date.parse(row.verdict_at) : NaN
     const mergedAt = row.merged_at ? Date.parse(row.merged_at) : NaN
-    const fresh = !row.last_commit_at || Date.parse(row.last_commit_at) <= verdictAt
+    const fresh = row.head_sha && row.head_sha === row.verdict_sha && row.head_sha === row.merged_head_sha
     return fresh && mergedAt >= verdictAt ? [(mergedAt - verdictAt) / 3_600_000] : []
   })
   const medianHours = median(reviewHours)
   return {
     streams: list,
+    failedEnrollments,
     stream: { id: stream.id, title: stream.title, program: stream.program, startsAt: stream.startsAt, gitlabGroup: stream.gitlabGroup },
     summary: {
       students: students.length,
@@ -131,8 +166,8 @@ export async function submissionReviewAlerts(payload: Payload): Promise<number> 
     from bootcamp_enrollments e left join bootcamp_leads l on l.id = e.lead_id
     where s.enrollment_id = e.id and not coalesce(l.is_test, false)
       and s.verdict = 'passed' and s.merged_at is null and s.closed_at is null and s.review_alert_at is null
+      and s.head_sha is not null and s.head_sha = s.verdict_sha
       and s.verdict_at < now() - make_interval(days => case when e.program = 'react-next' then ${reviewSlaDays('react-next')}::int else ${REVIEW_SLA_DAYS}::int end)
-      and (s.last_commit_at is null or s.last_commit_at <= s.verdict_at)
     returning s.id, s.week, s.mr_url, s.verdict_at, e.gitlab_username, e.first_name, e.last_name, e.lead_id, e.program`))
   for (const row of due) {
     await notifyAdmins({

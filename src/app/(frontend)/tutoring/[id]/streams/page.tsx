@@ -1,18 +1,18 @@
+import { randomUUID } from 'node:crypto'
 import Link from 'next/link'
 
-import { ManagementHeading, managementPrimary } from '@/components/content-management/ManagementHeading'
+import { ManagementHeading } from '@/components/content-management/ManagementHeading'
+import { TutoringWorkQueue } from '@/components/tutoring/TutoringWorkQueue'
 import { notFound } from 'next/navigation'
 import { requireTutoringProgram } from '@/server/tutoring-bootcamps'
 import { collectAllPages } from '@/lib/paginate'
-import { isMoscowTuesday, scheduledTutoringMeeting, TUTORING_INTRODUCTION_MINUTES, tutoringDateLabel, tutoringPrograms } from '@/lib/tutoring'
-import { createTutoringStream } from '@/server/tutoring-actions'
+import { isMoscowTuesday, scheduledTutoringMeeting, tutoringDateLabel, tutoringPrograms } from '@/lib/tutoring'
+import { TutoringStreamForm } from '@/components/tutoring/TutoringStreamForm'
 
 export const metadata = { title: 'Потоки репетиторства' }
 const labels = { draft: 'Черновик', active: 'Открыт', archived: 'Архив' }
-const field = 'min-h-11 w-full min-w-0 rounded-md border border-input bg-background p-2'
-const label = 'grid min-w-0 grid-cols-1 gap-1 text-sm'
 
-export default async function TutoringManagePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> }) {
+export default async function TutoringManagePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; tasks?: string; page?: string }> }) {
   const { payload, user, req, isAdmin, course, base } = await requireTutoringProgram((await params).id)
   if (!isAdmin) notFound()
   const [streams, calendars, query] = await Promise.all([
@@ -26,6 +26,7 @@ export default async function TutoringManagePage({ params, searchParams }: { par
 
   return <>
     <ManagementHeading title="Потоки репетиторства" description="Назначайте встречи и проверяйте домашние работы учеников." />
+    <TutoringWorkQueue program={course.program} streams={streams} kind={query.tasks} page={query.page} />
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <section aria-label="Список потоков" className="min-w-0">
         {streams.length === 0 ? <p className="border-y border-border py-6 text-muted-foreground">Потоков пока нет. Создайте первый поток и добавьте учеников.</p> :
@@ -40,27 +41,10 @@ export default async function TutoringManagePage({ params, searchParams }: { par
             </li>)}
           </ul>}
       </section>
-      <form action={createTutoringStream.bind(null, course.program)} aria-labelledby="create-stream-heading" className="@container grid h-fit min-w-0 grid-cols-1 gap-4 rounded-xl border border-border bg-card p-5">
-        <h2 id="create-stream-heading" className="text-lg font-semibold">Создать поток</h2>
-        {query.error && <p role="alert" className="wrap-anywhere text-sm text-destructive">{query.error}</p>}
-        <label className={label}>Название<input className={field} name="title" required maxLength={120} /></label>
-        <div className="grid grid-cols-1 gap-2 @min-[18rem]:grid-cols-[minmax(0,1fr)_7.5rem]">
-          <label className={label}>Первый вторник<input className={field} name="date" type="date" /></label>
-          <label className={label}>Время МСК<input className={field} name="time" type="time" defaultValue="20:00" required /></label>
-        </div>
-        {calendars.some(item => isMoscowTuesday(item.startsAt)) && <label className={label}>Взять календарь буткемпа
-          <select name="calendar" className={field}>
-            <option value="">Своя дата начала</option>
-            {calendars.filter(item => isMoscowTuesday(item.startsAt)).map(item => <option key={item.id} value={item.id}>{item.title} · {tutoringDateLabel(new Date(item.startsAt))}</option>)}
-          </select>
-        </label>}
-        <label className={label}>Вводная встреча, МСК
-          <input className={field} name="introductionStartsAt" type="datetime-local" aria-describedby="introduction-time-hint" />
-          <span id="introduction-time-hint" className="text-xs text-muted-foreground">{TUTORING_INTRODUCTION_MINUTES} минут, бесплатно. Можно назначить позже.</span>
-        </label>
-        <label className={label}>Ссылка на созвон<input className={field} name="meetingUrl" type="url" maxLength={1000} /></label>
-        <button className={managementPrimary}>Создать черновик</button>
-      </form>
+      <TutoringStreamForm program={course.program} creationKey={randomUUID()} initialError={query.error}
+        calendars={calendars.filter(item => isMoscowTuesday(item.startsAt)).map(item => ({
+          id: item.id, label: `${item.title} · ${tutoringDateLabel(new Date(item.startsAt))}`,
+        }))} />
     </div>
   </>
 }

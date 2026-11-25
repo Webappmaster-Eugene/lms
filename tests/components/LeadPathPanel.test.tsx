@@ -23,7 +23,7 @@ const state = (extra: Record<string, unknown> = {}, leadExtra: Record<string, un
   admission: null,
   payments: [],
   enrollment: null,
-  defaults: { firstName: 'Иван', lastName: 'Петров', username: 'ivan', group: 'nodejs-bootcamp', amount: '45000', dueDays: 7 },
+  defaults: { firstName: 'Иван', lastName: 'Петров', username: 'ivan', group: 'nodejs-bootcamp', streams: [{ group: 'nodejs-bootcamp', title: 'Ноябрь' }, { group: 'nodejs-dec', title: 'Декабрь' }], amount: '45000', dueDays: 7 },
   paymentsEnabled: true,
   paymentsTest: false,
   refunds: [],
@@ -50,9 +50,12 @@ describe('панель «Путь заявки»', () => {
     expect(screen.getByText('Решение входного задания: 19 из 19 тестов')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Допустить' }))
-    const username = screen.getByLabelText(/Логин GitLab/)
+    const username = screen.getByLabelText(/Имя проекта ученика в GitLab/)
     expect(username).toHaveValue('ivan')
     expect(screen.getByLabelText(/Сумма к оплате/)).toHaveValue('45000')
+    const stream = screen.getByRole('combobox', { name: 'Поток буткемпа' })
+    expect(stream).toHaveValue('nodejs-bootcamp')
+    await userEvent.selectOptions(stream, 'nodejs-dec')
     await userEvent.clear(username)
     await userEvent.type(username, 'ivan-p')
     expect(screen.getByText(/уйдёт письмо с личной ссылкой на оплату/)).toBeInTheDocument()
@@ -61,7 +64,7 @@ describe('панель «Путь заявки»', () => {
     expect(await screen.findByText('Путь заявки: Допущен, ждёт оплаты')).toBeInTheDocument()
     const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit]
     expect(url).toBe('/api/bootcamp/leads/5/path')
-    expect(JSON.parse(String(init.body))).toMatchObject({ action: 'admit', username: 'ivan-p', amount: '45000', dueDays: '7', group: 'nodejs-bootcamp' })
+    expect(JSON.parse(String(init.body))).toMatchObject({ action: 'admit', username: 'ivan-p', amount: '45000', dueDays: '7', group: 'nodejs-dec' })
     expect(screen.getByRole('link', { name: 'https://learn.test/pay/x' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Отметить оплату вручную' })).toBeInTheDocument()
   })
@@ -120,7 +123,7 @@ describe('панель «Путь заявки»', () => {
       { status: 'paid', statusLabel: 'Оплачен', admittedAt: at, paidAt: at, amount: '45 000 ₽' })))
     render(<LeadPathPanel />)
     await userEvent.click(await screen.findByRole('button', { name: 'Зачислить' }))
-    expect(screen.getByLabelText(/Логин GitLab/)).toHaveValue('ivan-p')
+    expect(screen.getByLabelText(/Имя проекта ученика в GitLab/)).toHaveValue('ivan-p')
   })
 
   it('возврат: сумма из остатка, причина обязательна в форме, ссылка на оферту и список возвратов', async () => {

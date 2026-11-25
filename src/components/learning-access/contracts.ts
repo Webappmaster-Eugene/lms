@@ -29,7 +29,7 @@ export type StudentFreeze = { active: boolean; since: string | null; endsAt: str
 export type StudentProfile = { id: number; email: string; firstName: string; lastName: string; telegram: string | null; isActive: boolean; isTestStudent: boolean; freeze: StudentFreeze }
 /** blockers: почему удаление запрещено. Остальное показывается как последствия удаления. */
 export type StudentImpact = { progress: number; certificates: number; comments: number; notes: number; rules: number; points: number; blockers: string[] }
-export type StudentDetails = { student: StudentProfile; impact: StudentImpact }
+export type StudentDetails = { student: StudentProfile; impact: StudentImpact; enrollmentIdentity?: { confirmed: boolean; revision: string } }
 export type StudentCredentials = { email: string; password: string }
 export type CreatedStudent = { student: StudentProfile; credentials: StudentCredentials }
 

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { BootcampTabs } from '@/components/tutoring/BootcampTabs'
-import { bootcampLectureArea } from '@/server/tutoring-bootcamps'
+import { bootcampArea, bootcampLectureArea } from '@/server/tutoring-bootcamps'
+import { BuyerAccess } from '@/components/bootcamp/BuyerAccess'
 import { routeSlug } from '@/lib/route-slug'
 import { CourseDetail, courseDetailTitle } from '@/components/course/CourseDetail'
 
@@ -14,9 +15,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function BootcampDetailPage({ params }: Props) {
   const slug = routeSlug((await params).slug)
-  const area = await bootcampLectureArea(slug)
-  return CourseDetail({ slug, area: 'bootcamp', navigation: area ? <BootcampTabs label="Разделы буткемпа" items={[
+  const [area, { manuals, isAdmin }] = await Promise.all([bootcampLectureArea(slug), bootcampArea()])
+  const course = manuals.find(item => item.slug === slug)
+  return CourseDetail({ slug, area: 'bootcamp', navigation: <>{area && <BootcampTabs label="Разделы буткемпа" items={[
     { href: `/bootcamp/${encodeURIComponent(slug)}`, label: 'Методички', active: true },
     { href: area.base, label: 'Лекции', active: false },
-  ]} /> : undefined })
+  ]} />}{course && !isAdmin && <BuyerAccess scope={{ courseId: course.id }} />}</> })
 }

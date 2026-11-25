@@ -1,5 +1,6 @@
 import { absoluteBroadcastUrl, broadcastPlainText, parseBroadcastBody, type BroadcastInline } from '@/lib/broadcast-markup'
 import { BRAND_COLORS } from '@/lib/brand-mark'
+import type { TutoringProgram } from '@/lib/tutoring'
 
 const BASE_URL = (process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000').replace(/\/+$/, '')
 const BRAND_NAME = 'MentorCareer LMS'
@@ -166,10 +167,24 @@ function safeCommunityUrl(value: string | undefined): string | undefined {
   }
 }
 
-export function inviteEmail(firstName: string, address: string, token: string, communityUrl?: string): EmailContent {
+export type TutoringWelcome = { id: number; program: TutoringProgram; title: string }
+
+const tutoringStreamUrl = (stream: TutoringWelcome) => `${BASE_URL}/tutoring/${stream.program}/streams/${stream.id}`
+
+export function tutoringStreamInviteEmail(stream: TutoringWelcome): EmailContent {
+  const url = tutoringStreamUrl(stream)
+  return email(
+    'Приглашение на занятия в MentorCareer', stream.title, 'Наставник пригласил вас на занятия',
+    `${paragraph(escapeHtml(stream.title))}${paragraph('Войдите в свой кабинет MentorCareer. В потоке вас ждут вводные материалы, расписание и учебный проект.')}${button('Открыть поток', url)}${fallbackLink(url)}`,
+    `Наставник пригласил вас в поток «${stream.title}». Войдите в свой кабинет MentorCareer и откройте материалы: ${url}`,
+  )
+}
+
+export function inviteEmail(firstName: string, address: string, token: string, communityUrl?: string, tutoringPath?: string): EmailContent {
   const url = passwordSetupUrl(token)
   const community = safeCommunityUrl(communityUrl)
   const steps = ['Задайте пароль по ссылке из этого письма.', 'Войдите на платформу с вашим email и новым паролем.', 'Откройте доступные вам материалы и выберите первый урок.']
+  const streamLink = tutoringPath && /^\/tutoring\/(nodejs|react-next)\/streams\/[1-9]\d*$/.test(tutoringPath) ? BASE_URL + tutoringPath : undefined
   return email(
     `Доступ к ${BRAND_NAME}`,
     'Ваш аккаунт готов. Задайте пароль и начните обучение. Ссылка действует 7 дней.',
@@ -179,12 +194,13 @@ export function inviteEmail(firstName: string, address: string, token: string, c
     ${notice(`<strong style="color:${C.strong};">Ваш логин</strong><br><span style="word-break:break-all;">${escapeHtml(address)}</span>`)}
     <ol style="margin:0 0 18px;padding-left:22px;font-size:15px;line-height:1.7;color:${C.body};">${steps.map(step => `<li style="padding:0 0 8px 4px;">${escapeHtml(step)}</li>`).join('')}</ol>
     ${button('Задать пароль', url)}
+    ${streamLink ? paragraph(`После входа ${link('откройте вашу вводную встречу', streamLink)}.`) : ''}
     ${paragraph('<strong>Ссылка действует 7 дней и используется один раз.</strong> Выберите пароль, который не используете в других сервисах.')}
     ${fallbackLink(url)}
     ${paragraph(`Ссылка устарела? ${link('Запросите новую', `${BASE_URL}/forgot-password`)}. Уже задали пароль? ${link('Войдите в аккаунт', `${BASE_URL}/login`)}.`)}
     ${community ? paragraph(`Вопросы по задачам, разборы и общение с другими учениками - в нашем чате. ${link('Вступить в чат учеников в Telegram', community)}.`) : ''}
     ${notice('Если вы не ожидали приглашения, уточните его у администратора, который выдал доступ. Не пересылайте это письмо: ссылка позволяет задать пароль к вашему аккаунту.')}`,
-    `${greeting(firstName)}\n\nАдминистратор создал для вас аккаунт MentorCareer.\nВаш логин: ${address}\n\n${steps.map((step, index) => `${index + 1}. ${step}`).join('\n')}\n\nЗадать пароль по ссылке:\n${url}\n\nСсылка действует 7 дней и используется один раз. Выберите пароль, который не используете в других сервисах.\n\nСсылка устарела? Запросите новую: ${BASE_URL}/forgot-password\nУже задали пароль? Войти: ${BASE_URL}/login\n\n${community ? `Чат учеников в Telegram - вопросы по задачам, разборы и общение:\n${community}\n\n` : ''}Если вы не ожидали приглашения, уточните его у администратора, который выдал доступ. Не пересылайте это письмо: ссылка позволяет задать пароль к вашему аккаунту.`,
+    `${greeting(firstName)}\n\nАдминистратор создал для вас аккаунт MentorCareer.\nВаш логин: ${address}\n\n${steps.map((step, index) => `${index + 1}. ${step}`).join('\n')}\n\nЗадать пароль по ссылке:\n${url}\n\nСсылка действует 7 дней и используется один раз. Выберите пароль, который не используете в других сервисах.\n\nСсылка устарела? Запросите новую: ${BASE_URL}/forgot-password\nУже задали пароль? Войти: ${BASE_URL}/login\n\n${streamLink ? `После входа откройте вашу вводную встречу: ${streamLink}\n\n` : ''}${community ? `Чат учеников в Telegram - вопросы по задачам, разборы и общение:\n${community}\n\n` : ''}Если вы не ожидали приглашения, уточните его у администратора, который выдал доступ. Не пересылайте это письмо: ссылка позволяет задать пароль к вашему аккаунту.`,
   )
 }
 

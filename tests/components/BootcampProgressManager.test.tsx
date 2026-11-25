@@ -11,6 +11,7 @@ const cell = (week: number, extra: Partial<WeekCell> = {}): WeekCell => ({ week,
 const weeks = (cells: WeekCell[]) => Array.from({ length: 20 }, (_, index) => cells.find((item) => item.week === index + 1) ?? cell(index + 1))
 
 const report: BootcampProgressReport = {
+  failedEnrollments: [],
   streams: [{ id: 1, title: 'Поток 1, февраль 2027' }, { id: 2, title: 'Поток 2, май 2027' }],
   stream: { id: 1, title: 'Поток 1, февраль 2027', program: 'nodejs', startsAt: '2027-02-12T21:00:00.000Z', gitlabGroup: 'nodejs-bootcamp' },
   summary: { students: 2, onPlan: 1, lagOne: 1, lagMore: 0, waitingReview: 1, overdueReview: 1, medianReviewHours: 30 },

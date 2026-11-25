@@ -79,6 +79,9 @@ export const BootcampPrograms: CollectionConfig = {
         { name: 'gitlabCourseProject', type: 'text', required: true, defaultValue: 'bootcamp/course', maxLength: 200, label: 'Репозиторий курса в GitLab', validate: gitlabPath, admin: { description: 'Из него создаётся проект ученика.' } },
         { name: 'gitlabStreamGroup', type: 'text', required: true, maxLength: 100, label: 'Группа потока по умолчанию', validate: gitlabPath, admin: { description: 'Подставляется в форму допуска. Группа должна быть в GitLab и в GRADER_GROUPS проекта проверки.' } },
         { name: 'gradingProject', type: 'text', required: true, defaultValue: 'bootcamp-staff/grading', maxLength: 200, label: 'Проект автоматической проверки', validate: gitlabPath },
+        { name: 'bootcampGraderUserId', type: 'number', min: 1, label: 'ID бота проверки буткемпа',
+          admin: { description: 'Числовой ID аккаунта GitLab, которым проект проверки этой программы публикует результаты.' },
+          validate: (value: unknown) => value == null || (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) || 'Укажите положительный числовой ID GitLab' },
       ],
     },
     {

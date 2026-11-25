@@ -7,6 +7,7 @@ import { tutoringLibraryMemberships, tutoringMemberships } from '@/server/tutori
 import { changeTutoringEnrollment } from '@/server/tutoring-graduation'
 import { saveTutoringDeck, saveTutoringIntroduction } from '@/server/tutoring-decks'
 import { writeTutoringReview } from '@/server/tutoring'
+import { studentMeetingCharges } from '@/server/tutoring-student-payments'
 
 import { blankPDF } from '../helpers/fixtures'
 import { createAdmin, createStudent, getTestPayload, login, rest, uid } from '../helpers/payload'
@@ -24,7 +25,15 @@ it('сохраняет границу чтения при выпуске, зак
   const enroll = (id: number) => payload.create({ collection: 'tutoring-participants',
     data: { stream: stream.id, student: id, currentMeeting: 19, active: true } })
   const member = await enroll(student.id)
-  await enroll(classmate.id)
+  const neighbor = await enroll(classmate.id)
+  const invoice = (participant: number, meeting: number, status: 'paid' | 'due') => payload.create({
+    collection: 'tutoring-charges', data: { participant, meeting, minutes: 60, hourlyKopecks: 180000, amountKopecks: 180000, status, updatedBy: admin.id },
+  })
+  await Promise.all([invoice(member.id, 1, 'paid'), invoice(member.id, 2, 'due'), invoice(member.id, 22, 'due'), invoice(neighbor.id, 3, 'due')])
+  const ownInvoices = async () => (await studentMeetingCharges(payload, req,
+    await tutoringLibraryMemberships(payload, req, student.id))).map(row => [row.meeting, row.status, row.canOpenMeeting])
+  const expectedInvoices = [[22, 'due', false], [2, 'due', true], [1, 'paid', true]]
+  expect(await ownInvoices()).toEqual(expectedInvoices)
   const data = blankPDF()
   const lesson = (number: number) => payload.create({
     collection: 'tutoring-meetings',
@@ -54,6 +63,7 @@ it('сохраняет границу чтения при выпуске, зак
     .rejects.toThrow('Доступ к материалам меняет наставник')
   const graduate = await changeTutoringEnrollment(payload, admin, stream.id, member.id, member.updatedAt, { kind: 'graduate' })
   expect(graduate).toMatchObject({ active: false, graduatedThrough: 21 })
+  expect(await ownInvoices()).toEqual(expectedInvoices)
   await expect(changeTutoringEnrollment(payload, admin, stream.id, member.id, member.updatedAt, { kind: 'update', active: true, currentMeeting: 22 }))
     .rejects.toThrow('Доступ уже изменился')
   await expect(writeTutoringReview(payload, stream.id, member.id, open.number, { kind: 'submit', actor: student, url: 'https://example.test/work' }))
@@ -72,6 +82,7 @@ it('сохраняет границу чтения при выпуске, зак
   expect([403, 404]).toContain((await rest('GET', '/tutoring-deck-files/file/' + onboarding.deckPptx.filename, { token })).status)
   expect((await rest('GET', '/tutoring-introductions/' + onboarding.id, { token })).json).not.toHaveProperty('instructorNotes')
   await changeTutoringEnrollment(payload, admin, stream.id, member.id, graduate.updatedAt, { kind: 'revoke' })
+  expect(await ownInvoices()).toEqual([])
   expect([403, 404]).toContain((await rest('GET', introURL, { token: returningToken })).status)
   expect([403, 404]).toContain((await rest('GET', slidesURL, { token })).status)
   expect([403, 404]).toContain((await getFile(open.filename, token)).status)

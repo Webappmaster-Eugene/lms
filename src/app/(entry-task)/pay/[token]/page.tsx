@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 
 import { CandidateFrame } from '@/components/bootcamp/CandidateFrame'
 import { PaymentCheckout } from '@/components/bootcamp/PaymentCheckout'
+import { BuyerAccess } from '@/components/bootcamp/BuyerAccess'
 import { getPayload } from '@/lib/payload'
 import { findLeadByPaymentToken, paymentPageState } from '@/server/bootcamp-payment'
 
@@ -44,7 +45,7 @@ export default async function PaymentPage({ params }: Props) {
           <div className={card}>
             <p>Сумма: <strong>{state.amount}</strong> за весь поток.</p>
             <p className="mt-2 text-muted-foreground">Оплата проходит на странице платёжного сервиса Робокасса: картой, через СБП или в рассрочку от банка-партнёра без переплаты. Чек придёт на email из приложения «Мой налог».</p>
-            <p className="mt-2 text-muted-foreground">Сразу после оплаты на почту придут два письма: приглашение в учебный кабинет MentorCareer и ссылка для пароля в GitLab курса.</p>
+            <p className="mt-2 text-muted-foreground">После оплаты вы получите доступ к курсу и своему проекту GitLab. Для новых учетных записей придут приглашения. Если уже учились у нас, используйте прежний пароль.</p>
             {state.test && <p className="mt-2 font-medium">Магазин работает в тестовом режиме: деньги не списываются.</p>}
           </div>
           <PaymentCheckout token={token} amount={state.amount} offerUrl={state.offerUrl ?? ''} />
@@ -52,9 +53,11 @@ export default async function PaymentPage({ params }: Props) {
       )}
       {state.kind === 'paid' && (
         <div className={card}>
-          <p>Оплата получена, спасибо! Письма с доступом к учебному кабинету и GitLab курса уже должны быть на вашей почте. Если их нет, проверьте папку «Спам» и напишите нам на {support}.</p>
+          <p>Оплата получена. Войдите в кабинет с почтой, которую указали в заявке. Если ждете приглашение, проверьте папку «Спам» или напишите на {support}.</p>
+          <BuyerAccess scope={{ leadId: lead.id }} />
         </div>
       )}
+      {state.kind === 'refunded' && <p className={card}>По этой заявке оформлен возврат. Доступ к буткемпу закрыт.</p>}
       {state.kind === 'expired' && (
         <div className={card}>
           <p>Срок оплаты прошёл {state.dueDate} Напишите нам на {support}: если в потоке ещё есть места, мы пришлём новую ссылку.</p>

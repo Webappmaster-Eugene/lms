@@ -5,7 +5,7 @@ import type { Payload } from 'payload'
 import { relationId } from '@/lib/relation-id'
 import { adminLink, excerpt, notifyAdmins, type AdminEvent } from '@/server/admin-telegram'
 import { journal } from '@/server/bootcamp-lead-events'
-import { recordSubmission } from '@/server/bootcamp-submissions'
+import { enrollmentProjectUrl, recordSubmission } from '@/server/bootcamp-submissions'
 import type { BootcampEnrollment } from '@/payload-types'
 
 /**
@@ -19,20 +19,19 @@ type Json = Record<string, unknown>
 const obj = (value: unknown): Json => value && typeof value === 'object' && !Array.isArray(value) ? value as Json : {}
 const str = (value: unknown): string => typeof value === 'string' ? value : typeof value === 'number' ? String(value) : ''
 
-// Бот группы GitLab (через него грейдер пишет вердикт) получает логин вида group_5_bot_<хеш>.
-const isBot = (user: Json) => /^group_\d+_bot_/.test(str(user.username)) || /bot$/i.test(str(user.name))
-
 async function enrollmentOfProject(payload: Payload, project: Json): Promise<BootcampEnrollment | null> {
-  const id = Number(project.id)
-  if (Number.isSafeInteger(id) && id > 0) {
-    const byId = await payload.find({ collection: 'bootcamp-enrollments', where: { gitlabProjectId: { equals: id } }, limit: 1, depth: 0, overrideAccess: true })
-    if (byId.docs[0]) return byId.docs[0]
-  }
-  // Отчёт исполнителя с id проекта мог ещё не дойти: тогда узнаём проект по пути «группа/логин».
-  const [group, username, ...rest] = str(project.path_with_namespace).split('/')
-  if (!group || !username || rest.length > 0) return null
-  const byPath = await payload.find({ collection: 'bootcamp-enrollments', where: { and: [{ streamGroup: { equals: group } }, { gitlabUsername: { equals: username } }] }, limit: 1, depth: 0, overrideAccess: true })
-  return byPath.docs[0] ?? null
+  const id = project.id
+  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0) return null
+  const { docs } = await payload.find({ collection: 'bootcamp-enrollments', where: {
+    gitlabProjectId: { equals: id }, status: { equals: 'done' }, revokedAt: { exists: false }, revokeRequestedAt: { exists: false },
+  }, limit: 2, depth: 0, overrideAccess: true })
+  if (docs.length !== 1) return null
+  const enrollment = docs[0]
+  const expectedPath = enrollment.streamGroup + '/' + enrollment.gitlabUsername
+  const url = enrollmentProjectUrl(enrollment)
+  if (!enrollment.gitlabUserId || !url || (project.path_with_namespace !== undefined && project.path_with_namespace !== expectedPath) ||
+      (project.web_url !== undefined && project.web_url !== url)) return null
+  return enrollment
 }
 
 function mergeRequestEvent(student: string, body: Json): AdminEvent | null {
@@ -41,7 +40,7 @@ function mergeRequestEvent(student: string, body: Json): AdminEvent | null {
   const ref = `!${str(mr.iid)} «${str(mr.title)}»`
   const branches = `из ветки ${str(mr.source_branch)} в ${str(mr.target_branch)}`
   const who = str(author.username) || 'кто-то'
-  const link = str(mr.url) || null
+  const link = str(obj(body.project).web_url) + '/-/merge_requests/' + str(mr.iid)
   switch (str(mr.action)) {
     case 'open': return { title: `${student} открыл MR`, lines: [ref, branches], link }
     case 'reopen': return { title: `${student}: MR снова открыт`, lines: [ref, `Открыл: ${who}`], link }
@@ -59,7 +58,7 @@ function pipelineEvent(student: string, body: Json): AdminEvent | null {
   const status = str(pipeline.status)
   if (!['success', 'failed'].includes(status) || !mr.iid) return null
   const project = obj(body.project)
-  const link = str(project.web_url) && str(pipeline.id) ? `${str(project.web_url)}/-/pipelines/${str(pipeline.id)}` : str(mr.url) || null
+  const link = str(project.web_url) + '/-/merge_requests/' + str(mr.iid)
   return { title: `${student}: CI MR ${status === 'success' ? 'прошёл' : 'упал'}`, lines: [`!${str(mr.iid)} «${str(mr.title)}», ветка ${str(pipeline.ref)}`], link }
 }
 
@@ -72,28 +71,27 @@ export function verdictSummary(note: string): string {
   return `${headline.replace(/[—–]/g, '-')}${passed ? `, прошло ${passed}` : ''}`
 }
 
-function noteEvent(student: string, enrollment: BootcampEnrollment, body: Json): AdminEvent | null {
+function noteEvent(student: string, body: Json, verdict: boolean): AdminEvent | null {
   const note = obj(body.object_attributes)
   if (str(note.noteable_type) !== 'MergeRequest') return null
-  const author = obj(body.user)
   const mr = obj(body.merge_request)
   const ref = `MR !${str(mr.iid)} «${str(mr.title)}»`
-  const link = str(note.url) || null
-  if (isBot(author)) return { title: `${student}: вердикт проверки`, lines: [verdictSummary(str(note.note)), ref], link }
-  if (str(author.username) === enrollment.gitlabUsername) return { title: `${student}: комментарий в MR`, lines: [ref, excerpt(str(note.note), 900)], link }
-  return null
+  const link = str(obj(body.project).web_url) + '/-/merge_requests/' + str(mr.iid)
+  if (verdict) return { title: `${student}: вердикт проверки`, lines: [verdictSummary(str(note.note)), ref], link }
+  return { title: `${student}: комментарий в MR`, lines: [ref, excerpt(str(note.note), 900)], link }
 }
 
 export async function handleGitlabEvent(payload: Payload, event: string | null, body: unknown): Promise<'notified' | 'ignored'> {
-  const data = obj(body)
-  const enrollment = await enrollmentOfProject(payload, obj(data.project))
+  const raw = obj(body)
+  const enrollment = await enrollmentOfProject(payload, obj(raw.project))
   if (!enrollment) return 'ignored'
+  const data = { ...raw, project: { ...obj(raw.project), web_url: enrollmentProjectUrl(enrollment) } }
   const student = enrollment.gitlabUsername
-  const note = obj(data.object_attributes)
-  await recordSubmission(payload, enrollment, event, data, event === 'Note Hook' && str(note.noteable_type) === 'MergeRequest' && isBot(obj(data.user)))
+  const kind = await recordSubmission(payload, enrollment, event, data)
+  if (!kind) return 'ignored'
   const message = event === 'Merge Request Hook' ? mergeRequestEvent(student, data)
     : event === 'Pipeline Hook' ? pipelineEvent(student, data)
-      : event === 'Note Hook' ? noteEvent(student, enrollment, data)
+      : event === 'Note Hook' ? noteEvent(student, data, kind === 'verdict')
         : null
   if (!message) return 'ignored'
   await journal(payload, { lead: relationId(enrollment.lead), type: 'gitlab_event', message: [message.title, message.lines?.find((line) => typeof line === 'string' && line)].filter(Boolean).join(': '), data: { event } })
