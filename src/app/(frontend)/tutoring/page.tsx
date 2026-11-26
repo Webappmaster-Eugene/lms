@@ -8,7 +8,7 @@ export const metadata = { title: 'Менторство' }
 export default async function TutoringPage() {
   const { isAdmin, tutoring, memberships } = await tutoringArea()
   return <section className="mx-auto max-w-4xl space-y-6">
-    <ManagementHeading title="Менторство" />
+    {isAdmin ? <ManagementHeading title="Менторство" /> : <h1 className="text-2xl font-semibold">Менторство</h1>}
     {isAdmin ? <ul className="divide-y divide-border border-y border-border">
       {tutoring.map(({ program }) => <li key={program} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-5">
         <p className="font-semibold">{tutoringPrograms[program].label}</p>
