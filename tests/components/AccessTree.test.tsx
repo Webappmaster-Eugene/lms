@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useEffect, useState } from 'react'
+import { Profiler, useEffect, useState } from 'react'
 import { AccessTree } from '@/components/learning-access/AccessTree'
 import type { AssignmentRule } from '@/components/learning-access/contracts'
 import type { AccessCatalog, AccessMode, CatalogLesson } from '@/lib/learning-access-edit'
@@ -89,8 +89,13 @@ describe('дерево доступа', () => {
   })
 
   it('карта, частичная только из-за платного курса, не предлагает пустое «Закрыть»', async () => {
-    render(<Harness initial={[rule('courses', 13)]} />)
-    expect((await mark('Backend') as HTMLInputElement).indeterminate).toBe(true)
+    let firstVisibleState: boolean | undefined
+    render(<Profiler id="tree" onRender={() => {
+      const checkbox = screen.queryByRole<HTMLInputElement>('checkbox', { name: 'Backend' })
+      if (checkbox && firstVisibleState === undefined) firstVisibleState = checkbox.indeterminate
+    }}><Harness initial={[rule('courses', 13)]} /></Profiler>)
+    expect(await mark('Backend')).toBePartiallyChecked()
+    expect(firstVisibleState).toBe(true)
     expect(screen.queryByRole('button', { name: 'Закрыть целиком: Backend' })).not.toBeInTheDocument()
   })
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { AssignmentRule } from './contracts'
 import { result } from './request'
 import { apiFetch } from '@/lib/http-client'
@@ -12,9 +12,11 @@ const stateNames: Record<AccessState, string> = { full: 'Открыт', partial:
 type Pending = { target: TreeTarget; want: 'full' | 'closed'; special: AssignmentRule[] }
 
 function Mark({ title, state, disabled, onToggle }: { title: string; state: AccessState; disabled: boolean; onToggle: () => void }) {
-  const box = useRef<HTMLInputElement>(null)
-  useEffect(() => { if (box.current) box.current.indeterminate = state === 'partial' }, [state])
-  return <label className="access-tree__mark"><input ref={box} type="checkbox" checked={state === 'full'} disabled={disabled} onChange={onToggle} /><span>{title}</span></label>
+  return <label className="access-tree__mark">
+    <input type="checkbox" checked={state === 'full'} disabled={disabled} onChange={onToggle}
+      ref={box => { if (box) box.indeterminate = state === 'partial' }} />
+    <span>{title}</span>
+  </label>
 }
 
 function Row({ title, state, disabled, expanded, onExpand, onToggle, onClose, closable = state === 'partial', note, children }: { title: string; state: AccessState; disabled: boolean; expanded?: boolean; onExpand?: () => void; onToggle: () => void; onClose: () => void; closable?: boolean; note?: ReactNode; children?: ReactNode }) {
