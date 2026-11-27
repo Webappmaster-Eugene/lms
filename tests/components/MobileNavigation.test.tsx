@@ -176,6 +176,25 @@ describe('мобильные панели', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('ручной выбор ширины панели сохраняется при переходе между разделами', async () => {
+    const content = () => <SidebarProvider><Sidebar /><BottomNav /></SidebarProvider>
+    const { rerender } = render(content())
+    const toggle = screen.getByRole('button', { name: 'Развернуть меню' })
+    await userEvent.click(toggle)
+    expect(toggle).toHaveAccessibleName('Свернуть меню')
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+
+    current.pathname = '/courses'
+    rerender(content())
+    expect(toggle).toHaveFocus()
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    const menu = screen.getByRole('navigation', { name: 'Меню платформы' })
+    expect(within(menu).getByRole('link', { name: 'Курсы' })).toHaveAttribute('aria-current', 'page')
+    await userEvent.keyboard('{Enter}')
+    expect(toggle).toHaveAccessibleName('Развернуть меню')
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  })
+
   it('«Ещё» открывает отдельное модальное меню и закрывает его при переходе', async () => {
     render(<SidebarProvider><Sidebar guidesEnabled /><BottomNav /></SidebarProvider>)
     const more = screen.getByRole('button', { name: 'Ещё' })

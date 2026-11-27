@@ -12,6 +12,23 @@ test.use({ storageState: storageStateOf('doer') })
 
 const TASK_URL = `/trainer/${CONTENT.topic.slug}/${CONTENT.task.slug}`
 
+test('редактор сохраняет код при смене ширины бокового меню', async ({ page }) => {
+  await page.setViewportSize({ width: 480, height: 800 })
+  await page.goto(TASK_URL)
+  await setCode(page, SUM_SOLUTION)
+  const editor = page.locator('.monaco-editor').first()
+  const before = await editor.boundingBox()
+  await page.getByRole('button', { name: 'Развернуть меню' }).click()
+  await expect.poll(async () => (await editor.boundingBox())?.width ?? Infinity).toBeLessThan(before?.width ?? 0)
+  await expect(editor.locator('.view-lines')).toContainText(SUM_SOLUTION.split('\n')[1].trim())
+  for (const button of ['Запустить', 'Отправить', 'Сбросить']) {
+    await page.getByRole('button', { name: button, exact: true }).click({ trial: true })
+  }
+  await page.getByRole('button', { name: 'Свернуть меню' }).click()
+  await expect.poll(async () => (await editor.boundingBox())?.width).toBe(before?.width)
+  await expect(editor.locator('.view-lines')).toContainText(SUM_SOLUTION.split('\n')[1].trim())
+})
+
 test('каталог и тема ведут к задаче с условием и тестами', async ({ page }) => {
   await page.goto('/trainer')
   await expect(page.getByRole('heading', { name: 'Тренажёр кода' })).toBeVisible()

@@ -114,7 +114,7 @@ export function CompletionButton({
         <div
           role="dialog"
           aria-label="Видео досмотрено"
-          className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] z-40 mx-auto flex max-w-md items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-xl lg:inset-x-auto lg:right-6 lg:bottom-6"
+          className="platform-bottom-notice fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] z-40 mx-auto flex max-w-md items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-xl lg:inset-x-auto lg:right-6 lg:bottom-6"
         >
           <div className="min-w-0 flex-1 text-sm">
             {completed && next ? (

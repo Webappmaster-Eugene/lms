@@ -33,7 +33,7 @@ export async function Footer({ trainerEnabled = true, bootcampEnabled = false }:
   ).filter((item, index, links) => links.findIndex((link) => link.href === item.href) === index)
 
   return (
-    <footer className="border-t border-border bg-card/40 pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] pb-[calc(5rem+env(safe-area-inset-bottom,0px))] pt-5 text-sm lg:px-8 lg:pb-8 lg:pt-8">
+    <footer className="border-t border-border bg-card/40 pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] pb-[calc(5rem+env(safe-area-inset-bottom,0px))] pt-5 text-sm min-[480px]:pb-[max(1.25rem,env(safe-area-inset-bottom,0px))] lg:px-8 lg:pb-8 lg:pt-8">
       <div className="mx-auto hidden w-full max-w-5xl gap-8 lg:grid lg:grid-cols-3">
         <div className="space-y-2">
           <p className="font-semibold text-foreground">MentorCareer</p>

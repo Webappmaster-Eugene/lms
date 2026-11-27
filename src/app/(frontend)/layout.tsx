@@ -1,5 +1,6 @@
 import '@/app/globals.css'
 import '@/app/fonts.css'
+import './platform-shell.css'
 import { FontPreloads } from '@/components/layout/FontPreloads'
 import type { Viewport } from 'next'
 import { ThemeProvider } from '@/components/layout/ThemeProvider'
@@ -56,7 +57,6 @@ export default async function FrontendLayout({ children }: { children: React.Rea
       <body>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           <ToastProvider>
-            <PwaProvider />
             <VideoViewportRecovery />
             <ErrorReportingUser userId={user.id} />
             <Suspense fallback={null}><StudentActivityBridge userId={user.id} /></Suspense>
@@ -65,23 +65,22 @@ export default async function FrontendLayout({ children }: { children: React.Rea
               <KeyboardShortcuts trainerEnabled={trainerEnabled} />
             </Suspense>
             <SidebarProvider>
-              <div className="flex min-h-dvh overflow-x-hidden">
+              <PwaProvider />
+              <div className="contents print:hidden">
+                <Sidebar isAdmin={isAdmin} trainerEnabled={trainerEnabled} guidesEnabled={guidesEnabled} bootcampEnabled={bootcampEnabled} tutoringEnabled={tutoringEnabled} />
+              </div>
+              <div className="platform-content flex min-w-0 flex-1 flex-col min-[1024px]:ml-64 print:ml-0">
                 <div className="contents print:hidden">
-                  <Sidebar isAdmin={isAdmin} trainerEnabled={trainerEnabled} guidesEnabled={guidesEnabled} bootcampEnabled={bootcampEnabled} tutoringEnabled={tutoringEnabled} />
+                  <Header trainerEnabled={trainerEnabled} />
+                  {freezeNotice && <FreezeBanner startsAt={freezeNotice} />}
                 </div>
-                <div className="flex min-w-0 flex-1 flex-col lg:ml-64 print:ml-0">
-                  <div className="contents print:hidden">
-                    <Header trainerEnabled={trainerEnabled} />
-                    {freezeNotice && <FreezeBanner startsAt={freezeNotice} />}
-                  </div>
-                  <main className="flex-1 overflow-x-hidden px-[max(1rem,env(safe-area-inset-left),env(safe-area-inset-right))] py-6 lg:px-8">{children}</main>
-                  <div className="contents print:hidden">
-                    <Footer trainerEnabled={trainerEnabled} bootcampEnabled={bootcampEnabled} />
-                  </div>
-                </div>
+                <main className="flex-1 overflow-x-hidden px-[max(1rem,env(safe-area-inset-left),env(safe-area-inset-right))] py-6 lg:px-8">{children}</main>
                 <div className="contents print:hidden">
-                  <BottomNav bootcampEnabled={bootcampEnabled} tutoringEnabled={tutoringEnabled} />
+                  <Footer trainerEnabled={trainerEnabled} bootcampEnabled={bootcampEnabled} />
                 </div>
+              </div>
+              <div className="contents print:hidden">
+                <BottomNav bootcampEnabled={bootcampEnabled} tutoringEnabled={tutoringEnabled} />
               </div>
             </SidebarProvider>
           </ToastProvider>

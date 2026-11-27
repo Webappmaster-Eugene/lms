@@ -202,7 +202,7 @@ export default async function DashboardPage() {
   const resume = hasStarted ? coursesWithProgress.find((c) => c.next && c.completedCount < c.totalLessons) : undefined
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className="dashboard mx-auto max-w-5xl space-y-8">
       {/* Приветствие */}
       <div>
         <h1 className="text-xl font-bold text-foreground sm:text-2xl">
@@ -274,7 +274,7 @@ export default async function DashboardPage() {
         role="region"
         aria-label="Статистика обучения"
         tabIndex={0}
-        className="flex gap-3 overflow-x-auto rounded-xl pb-2 scrollbar-hide focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:grid sm:grid-cols-5 sm:gap-4 sm:overflow-visible sm:pb-0"
+        className="dashboard-stats flex gap-3 overflow-x-auto rounded-xl pb-2 scrollbar-hide focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:grid sm:grid-cols-5 sm:gap-4 sm:overflow-visible sm:pb-0"
       >
         <StatCard icon={BookOpen} color="info" value={completedLessons} label="Уроков" />
         <StatCard icon={Star} color="warning" value={user.totalPoints ?? 0} label="Баллов" />
@@ -295,7 +295,7 @@ export default async function DashboardPage() {
               Все курсы
             </Link>
           </div>
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+          <div className="dashboard-cards mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
             {coursesWithProgress.map((course) => (
               <Link
                 key={course.id}
@@ -342,7 +342,7 @@ export default async function DashboardPage() {
       {/* Роадмапы */}
       <div>
         <h2 className="text-lg font-semibold text-foreground">Роадмапы</h2>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="dashboard-roadmaps mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {roadmapDocs.filter((roadmap) => policy.canBrowseRoadmap(roadmap.id)).map((roadmap) => (
             <Link
               key={roadmap.id}
@@ -368,7 +368,7 @@ export default async function DashboardPage() {
       {achievementsData.docs.length > 0 && (
         <div>
           <h2 className="text-lg font-semibold text-foreground">Последние достижения</h2>
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="dashboard-cards mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {achievementsData.docs.map((ua) => {
               const achievement =
                 typeof ua.achievement === 'object' ? ua.achievement : null

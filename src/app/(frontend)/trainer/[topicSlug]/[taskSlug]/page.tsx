@@ -183,7 +183,7 @@ export default async function TaskPage({ params }: Props) {
           <TaskMetadata task={task} className="mt-3" />
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2 min-[480px]:max-lg:max-w-full min-[480px]:max-lg:flex-wrap">
           <Link href={`/trainer/interview/new?taskId=${clientTask.id}`}
             className="inline-flex min-h-[38px] items-center rounded-lg border border-border px-3 text-sm font-medium transition-colors hover:bg-accent">
             На собеседовании

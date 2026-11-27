@@ -12,12 +12,13 @@ type Props = {
   children: ReactNode
   id?: string
   returnFocusRef?: RefObject<HTMLElement | null>
+  closeAtWidth?: 480 | 1024
   initialFocusSelector?: string
 }
 
 /** Native modal makes the background inert; explicit Tab wrapping also keeps
  * external mobile keyboards from briefly moving focus to browser chrome. */
-export function MobileSheet({ open, onClose, title, closeLabel, children, id, returnFocusRef, initialFocusSelector }: Props) {
+export function MobileSheet({ open, onClose, title, closeLabel, children, id, returnFocusRef, initialFocusSelector, closeAtWidth = 1024 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const closeRef = useRef(onClose)
   const titleId = useId()
@@ -27,7 +28,7 @@ export function MobileSheet({ open, onClose, title, closeLabel, children, id, re
     if (!open) return
     const dialog = dialogRef.current
     if (!dialog) return
-    const desktop = window.matchMedia('(min-width: 1024px)')
+    const desktop = window.matchMedia(`(min-width: ${closeAtWidth}px)`)
     if (desktop.matches) {
       closeRef.current()
       return
@@ -49,7 +50,7 @@ export function MobileSheet({ open, onClose, title, closeLabel, children, id, re
         previousFocus.focus({ preventScroll: true })
       }
     }
-  }, [open, returnFocusRef, initialFocusSelector])
+  }, [open, returnFocusRef, initialFocusSelector, closeAtWidth])
 
   if (!open) return null
 

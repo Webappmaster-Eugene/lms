@@ -35,7 +35,7 @@ export function BottomNav({ bootcampEnabled = false, tutoringEnabled = false }: 
     ? TUTORING_TABS : bootcampEnabled ? BOOTCAMP_TABS : TABS
 
   return (
-    <nav aria-label="Основная навигация" className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur-md lg:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+    <nav aria-label="Основная навигация" className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur-md min-[480px]:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       <div
         className="mx-auto flex h-16 max-w-lg items-stretch justify-around"
       >

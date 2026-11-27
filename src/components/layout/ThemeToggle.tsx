@@ -19,6 +19,7 @@ export function ThemeToggle() {
       type="button"
       className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
       aria-label="Переключить тему"
+      title="Переключить тему"
     >
       {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
     </button>

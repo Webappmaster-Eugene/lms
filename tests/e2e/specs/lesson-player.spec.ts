@@ -301,6 +301,21 @@ test.describe('плеер урока из нескольких частей', ()
     await context.close()
   })
 
+  test('сворачивание меню расширяет играющее видео и сохраняет полноэкранный режим', async ({ browser }) => {
+    const viewport = { width: 800, height: 720 }
+    const { context, page, videos } = await openLesson(browser, { viewport })
+    const frame = page.locator('[data-lesson-video]').first()
+    await frame.scrollIntoViewIfNeeded()
+    await videos.first().evaluate((video: HTMLVideoElement) => video.play())
+    const before = await frame.boundingBox()
+    await page.getByRole('button', { name: 'Свернуть меню' }).click()
+    await expect.poll(async () => (await frame.boundingBox())?.width ?? 0).toBeGreaterThan(before?.width ?? 0)
+    await expect.poll(() => framePlaying(page)).toEqual([true, false, false])
+    await frame.getByRole('button', { name: 'Во весь экран' }).click()
+    await expect.poll(() => targetRect(page)).toEqual({ x: 0, y: 0, ...viewport })
+    await context.close()
+  })
+
   test('широкий экран: плеер не растягивается на всю ширину, а во весь экран занимает весь экран', async ({ browser }) => {
     const wide = { width: 2560, height: 1440 }
     const { context, page } = await openLesson(browser, { viewport: wide })

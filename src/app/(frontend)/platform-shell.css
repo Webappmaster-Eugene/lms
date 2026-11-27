@@ -1,0 +1,165 @@
+/* Начальный размер известен до гидратации. Ручной выбор живёт в общем layout. */
+@media screen and (480px <= width < 1024px) {
+  .platform-shell {
+    --sidebar-size: clamp(176px, 25vw, 256px);
+    --sidebar-width: calc(var(--sidebar-size) + env(safe-area-inset-left, 0px));
+  }
+
+  @media (width < 768px) {
+    .platform-shell:not([data-sidebar-expanded="true"]) {
+      --sidebar-size: 64px;
+    }
+  }
+
+  .platform-shell[data-sidebar-expanded="false"] {
+    --sidebar-size: 64px;
+  }
+
+  .platform-sidebar {
+    container: platform-sidebar / inline-size;
+    width: var(--sidebar-width);
+    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+    overflow-y: auto;
+  }
+
+  .platform-content {
+    margin-left: var(--sidebar-width);
+  }
+
+  .platform-sidebar-brand {
+    gap: 6px;
+    padding-inline: 9px;
+  }
+
+  .platform-sidebar-brand button {
+    margin-left: auto;
+  }
+
+  .platform-sidebar nav {
+    min-height: 48px;
+    padding-inline: 9px;
+    scrollbar-width: thin;
+  }
+
+  .platform-nav-link {
+    gap: 8px;
+    padding-inline: 8px;
+    overflow-wrap: anywhere;
+  }
+
+  .platform-sidebar-footer {
+    padding: 8px 9px;
+  }
+
+  .platform-sidebar-actions {
+    padding-inline: 0;
+    flex-wrap: wrap;
+  }
+
+  .platform-sidebar-actions button {
+    min-width: 44px;
+    justify-content: center;
+  }
+
+  .platform-bottom-notice {
+    left: calc(var(--sidebar-width) + 1rem);
+    bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .dashboard {
+    container: dashboard / inline-size;
+  }
+
+  .dashboard-cards {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 13.5rem), 1fr));
+  }
+
+  .dashboard-roadmaps {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  }
+
+  @container dashboard (width < 32rem) {
+    .dashboard-stats {
+      display: flex;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+    }
+
+    .dashboard-stats > div {
+      flex: 0 0 auto;
+    }
+  }
+
+  @container dashboard (32rem <= width < 50rem) {
+    .dashboard-stats {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 0.5rem;
+    }
+
+    .dashboard-stats > div {
+      min-width: 0;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+      padding: 0.625rem;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .platform-sidebar { transition: width 180ms ease-in-out; }
+    .platform-content { transition: margin-left 180ms ease-in-out; }
+    .platform-bottom-notice { transition: left 180ms ease-in-out; }
+  }
+}
+
+@container platform-sidebar (160px <= width < 205px) {
+  .platform-sidebar-brand > svg:first-child { display: none; }
+  .platform-sidebar-actions .platform-nav-label {
+    position: absolute;
+    clip-path: inset(50%);
+  }
+}
+
+/* Контейнер есть только у боковой панели в промежуточном диапазоне.
+   Подписи остаются доступными для скринридера, пока видны только иконки. */
+@container platform-sidebar (width < 160px) {
+  .platform-sidebar-brand > svg { display: none; }
+  .platform-sidebar-brand button { margin-inline: auto; }
+
+  #platform-sidebar-nav { padding-inline: 5px; }
+
+  .platform-nav-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .platform-nav-link,
+  .platform-sidebar-footer > a {
+    justify-content: center;
+    gap: 0;
+    padding-inline: 0;
+  }
+
+  .platform-nav-lock {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    background-color: hsl(var(--card));
+    color: hsl(var(--muted-foreground));
+  }
+
+  .platform-sidebar-actions,
+  .platform-sidebar-actions > div {
+    flex-direction: column;
+    gap: 0;
+  }
+}

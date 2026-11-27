@@ -118,6 +118,48 @@ test('мобильный поиск принимает ввод сразу и в
   await expect(search).toBeFocused()
 })
 
+test('границы боковой навигации и ручной выбор при переходах', async ({ page }) => {
+  const resize = (width: number) => page.setViewportSize({ width, height: 800 })
+  await resize(479)
+  await page.goto('/')
+  const more = page.getByRole('button', { name: 'Ещё', exact: true })
+  const open = page.getByRole('button', { name: 'Развернуть меню', exact: true })
+  const close = page.getByRole('button', { name: 'Свернуть меню', exact: true })
+  const sidebar = page.locator('aside').filter({ has: page.getByRole('navigation', { name: 'Меню платформы' }) })
+  await more.click()
+  await expect(page.getByRole('dialog', { name: 'Меню платформы' })).toBeVisible()
+  for (const width of [480, 767, 768, 1023, 1024]) {
+    await resize(width)
+    await expect(page.getByRole('dialog', { name: 'Меню платформы' })).toHaveCount(0)
+    await expect(more).toBeHidden()
+    const expectedWidth = width < 768 ? 64 : width / 4
+    await expect.poll(async () => (await sidebar.boundingBox())?.width ?? 0).toBeCloseTo(expectedWidth, 1)
+    await expect.poll(async () => (await page.locator('main').boundingBox())?.x ?? 0).toBeCloseTo(expectedWidth, 1)
+    if (width < 1024) await expect(width < 768 ? open : close).toBeVisible()
+    else await expect(close).toBeHidden()
+  }
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe('')
+
+  await resize(480)
+  await open.focus()
+  await page.keyboard.press('Enter')
+  await expect(close).toBeFocused()
+  await expect(close).toHaveAttribute('aria-expanded', 'true')
+  await expect.poll(async () => (await page.locator('main').boundingBox())?.x).toBe(176)
+  await sidebar.getByRole('link', { name: 'Курсы', exact: true }).click()
+  await expect(page).toHaveURL(/\/courses$/)
+  await expect(close).toBeVisible()
+  await close.click()
+  await resize(1024)
+  await expect(sidebar).toHaveCSS('width', '256px')
+  await resize(900)
+  await expect(sidebar).toHaveCSS('width', '64px')
+  await page.reload()
+  await expect(close).toBeVisible()
+  await resize(479)
+  await expect(more).toBeVisible()
+})
+
 test('изменение ориентации до desktop закрывает мобильное меню', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')

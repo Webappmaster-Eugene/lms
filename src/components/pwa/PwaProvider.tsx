@@ -131,7 +131,7 @@ export function PwaProvider() {
   return (
     <>
       <InstallExplanation paused={offline || Boolean(waiting) || registrationError} />
-      {(offline || waiting || registrationError) && <div className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-lg rounded-2xl border border-border bg-card p-4 text-sm shadow-lg print:hidden lg:bottom-6" role="status">
+      {(offline || waiting || registrationError) && <div className="platform-bottom-notice fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-lg rounded-2xl border border-border bg-card p-4 text-sm shadow-lg print:hidden lg:bottom-6" role="status">
         {offline ? <p>Нет подключения. Для переходов и синхронизации нужен интернет.</p> : waiting ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p>Доступно обновление приложения</p>
