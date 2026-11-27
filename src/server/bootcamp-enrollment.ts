@@ -236,7 +236,7 @@ export async function startEnrollment(payload: Payload, admin: User, leadId: num
     throw error
   }
 
-  void notifyAdmins({
+  await notifyAdmins(payload, {
     title: `Зачисление начато: ${lead.email}`,
     lines: [
       `${fullName(input)}, логин GitLab ${input.username}, поток ${input.group}`,
@@ -261,7 +261,7 @@ export async function retryEnrollment(payload: Payload, admin: User, id: number)
   }
   const doc = await payload.findByID({ collection: 'bootcamp-enrollments', id, depth: 0, overrideAccess: true })
   const actor = [admin.firstName, admin.lastName].filter(Boolean).join(' ') || admin.email
-  void notifyAdmins({ title: `Зачисление: повтор шагов GitLab для ${doc.email}`, lines: [`Запустил: ${actor}`], link: leadLink(doc.lead) })
+  await notifyAdmins(payload, { title: `Зачисление: повтор шагов GitLab для ${doc.email}`, lines: [`Запустил: ${actor}`], link: leadLink(doc.lead) })
   return enrollmentView(doc)
 }
 
@@ -431,7 +431,7 @@ export async function reportEnrollment(payload: Payload, id: number, report: Wor
   const updated = await inTransaction(payload, null, req => saveWorkerReport(req, id, report))
   if (updated.revokeRequestedAt) throw new EnrollmentInputError('Выдача остановлена после возврата. Доступ поставлен на проверку.', 409)
   if (report.status === 'done') {
-    void notifyAdmins({
+    await notifyAdmins(payload, {
       title: `Зачислен: ${updated.email}`,
       lines: [
         `${fullName(updated)}, логин GitLab ${updated.gitlabUsername}, поток ${updated.streamGroup}`,
@@ -449,7 +449,7 @@ async function notifyFailure(payload: Payload, id: number): Promise<void> {
   const doc = await payload.findByID({ collection: 'bootcamp-enrollments', id, depth: 0, overrideAccess: true })
   const failed = readSteps(doc.steps).find((step) => step.state === 'failed')
   await journal(payload, { lead: relationId(doc.lead), type: 'enrollment_failed', message: `Зачисление не удалось${failed ? ` на шаге «${stepLabel(failed.key)}»` : ''}: ${doc.error ?? 'причина не указана'}` })
-  void notifyAdmins({
+  await notifyAdmins(payload, {
     title: `Зачисление не удалось: ${doc.email}`,
     lines: [failed ? `Шаг: ${stepLabel(failed.key)}` : null, doc.error, 'Исправьте причину и нажмите «Повторить» в заявке'],
     link: leadLink(doc.lead),
@@ -463,5 +463,5 @@ export async function reportGitlabSignIn(payload: Payload, id: number, at: strin
   if (updated.length === 0) return
   const doc = await payload.findByID({ collection: 'bootcamp-enrollments', id, depth: 0, overrideAccess: true })
   await journal(payload, { lead: relationId(doc.lead), type: 'gitlab_signed_in', message: `Первый вход в GitLab: ${doc.gitlabUsername}` })
-  void notifyAdmins({ title: `Ученик впервые вошёл в GitLab: ${doc.gitlabUsername}`, lines: [fullName(doc), doc.email], link: doc.gitlabProjectUrl ?? leadLink(doc.lead) })
+  await notifyAdmins(payload, { title: `Ученик впервые вошёл в GitLab: ${doc.gitlabUsername}`, lines: [fullName(doc), doc.email], link: doc.gitlabProjectUrl ?? leadLink(doc.lead) })
 }

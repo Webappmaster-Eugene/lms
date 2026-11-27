@@ -3,6 +3,16 @@ import type { CollectionConfig } from 'payload'
 const closed = { create: () => false, read: () => false, update: () => false, delete: () => false }
 const infrastructure = { hidden: true, group: 'Коммуникация' }
 
+export const AdminTelegramDeliveries: CollectionConfig = {
+  slug: 'admin-telegram-deliveries', lockDocuments: false, admin: infrastructure, access: closed,
+  fields: [
+    { name: 'chat', type: 'text', required: true },
+    { name: 'message', type: 'textarea', required: true },
+    { name: 'nextAttemptAt', type: 'date', required: true, index: true },
+    { name: 'attempts', type: 'number', required: true, defaultValue: 0, min: 0 },
+  ],
+}
+
 export const NotificationPreferences: CollectionConfig = {
   slug: 'notification-preferences', lockDocuments: false, admin: infrastructure, access: closed,
   fields: [

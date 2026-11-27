@@ -7,9 +7,9 @@ import { recordLearningAccess, withLearningSpan } from '@/lib/learning-observabi
 import { MEDIA_SOURCE_HEADER } from '@/lib/media-source-status'
 import { YandexDiskError } from '@/lib/yandex-disk'
 import { LessonVideoAccessError, resolveLessonVideoSource } from '@/server/lesson-video-access'
-import { localLearningMedia, mediaError } from '@/server/learning-media-response'
+import { localLearningMedia, mediaError, PRIVATE_MEDIA_HEADERS } from '@/server/learning-media-response'
 import { LearningStreamLimitError } from '@/server/learning-stream-limits'
-import { isDiskFailure, LearningUpstreamError, upstreamLearningMedia } from '@/server/learning-upstream'
+import { isDiskFailure, LearningUpstreamError, LearningViewerAbort, upstreamLearningMedia } from '@/server/learning-upstream'
 
 export async function lessonMediaRoute(request: Request, allowMaterial = false): Promise<Response> {
   return withLearningSpan('media', 'stream', async () => {
@@ -30,6 +30,9 @@ export async function lessonMediaRoute(request: Request, allowMaterial = false):
       recordLearningAccess({ resource: 'media', outcome: response.ok ? 'allow' : 'error', reason: response.ok ? 'assigned' : 'upstream_error', userId: user.id, durationMs: performance.now() - started })
       return response
     } catch (error) {
+      if (error instanceof LearningViewerAbort) {
+        return new Response(null, { status: 499, headers: PRIVATE_MEDIA_HEADERS })
+      }
       if (error instanceof LessonVideoAccessError) {
         recordLearningAccess({ resource: 'media', outcome: 'deny', reason: error.status === 400 ? 'invalid_request' : 'unassigned', userId: user.id })
         return mediaError(error.message, error.status)

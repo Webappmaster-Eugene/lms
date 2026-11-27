@@ -41,7 +41,7 @@ export async function recordLeadEvent(payload: Payload, req: PayloadRequest | un
   })
   if (!input.telegram) return
   if (req) await notifyAdminsAfterCommit(req, input.telegram)
-  else void notifyAdmins(input.telegram)
+  else await notifyAdmins(payload, input.telegram)
 }
 
 /** Для событий, которые сопровождают уже сделанное действие: сбой журнала не отменяет действие. */

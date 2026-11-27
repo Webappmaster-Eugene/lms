@@ -170,7 +170,7 @@ export async function submissionReviewAlerts(payload: Payload): Promise<number> 
       and s.verdict_at < now() - make_interval(days => case when e.program = 'react-next' then ${reviewSlaDays('react-next')}::int else ${REVIEW_SLA_DAYS}::int end)
     returning s.id, s.week, s.mr_url, s.verdict_at, e.gitlab_username, e.first_name, e.last_name, e.lead_id, e.program`))
   for (const row of due) {
-    await notifyAdmins({
+    await notifyAdmins(payload, {
       title: `Сдача ждёт ревью больше ${reviewSlaDays(row.program)} дней: ${row.first_name} ${row.last_name}`.trim(),
       lines: [`Неделя ${Number(row.week)}, проверка пройдена ${formatFreezeDate(row.verdict_at)}`, `GitLab: ${row.gitlab_username}`],
       link: row.mr_url ?? adminLink(PROGRESS_ADMIN_PATH),

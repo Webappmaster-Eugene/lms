@@ -1,6 +1,10 @@
 import { createServer } from 'node:http'
+import type { Payload } from 'payload'
 import type { AddressInfo } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const execute = vi.hoisted(() => vi.fn())
+const payload = { db: { drizzle: { execute } } } as unknown as Payload
 
 const logger = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }))
 vi.mock('@/lib/telemetry', () => ({ logger }))
@@ -34,29 +38,22 @@ describe('уведомления администратору в Telegram', () =
     expect(excerpt('а'.repeat(10), 5)).toBe('аааа…')
   })
 
-  it('шлёт в каждый чат из списка', async () => {
-    const send = vi.spyOn(adminTelegramTransport, 'send').mockResolvedValue()
-    await notifyAdmins({ title: 'Событие' })
-    expect(send.mock.calls.map(([, chat, text]) => [chat, text])).toEqual([['42', 'Событие'], ['-100500', 'Событие']])
-  })
-
   it('без токена или чата молчит', async () => {
     const send = vi.spyOn(adminTelegramTransport, 'send').mockResolvedValue()
     vi.stubEnv('TELEGRAM_ADMIN_CHAT_ID', '')
-    await notifyAdmins({ title: 'Событие' })
+    await notifyAdmins(payload, { title: 'Событие' })
     vi.stubEnv('TELEGRAM_ADMIN_CHAT_ID', '42')
     vi.stubEnv('TELEGRAM_BOT_TOKEN', 'not-a-token')
-    await notifyAdmins({ title: 'Событие' })
+    await notifyAdmins(payload, { title: 'Событие' })
     expect(send).not.toHaveBeenCalled()
+    expect(execute).not.toHaveBeenCalled()
   })
 
-  it('сбой доставки не бросает, а токен в журнал не попадает', async () => {
-    vi.spyOn(adminTelegramTransport, 'send').mockRejectedValue(new Error(`connect failed for /bot${TOKEN}/sendMessage`))
-    await expect(notifyAdmins({ title: 'Событие' })).resolves.toBeUndefined()
-    expect(logger.error).toHaveBeenCalled()
-    const logged = JSON.stringify(logger.error.mock.calls.map(([message, error]) => [message, (error as Error).message]))
-    expect(logged).not.toContain(TOKEN)
-    expect(logged).toContain('/bot<token>/sendMessage')
+  it('сбой записи в очередь не раскрывает содержимое сообщения в логе', async () => {
+    execute.mockRejectedValueOnce(new Error('Частный текст сообщения'))
+    await expect(notifyAdmins(payload, { title: 'Частный текст сообщения' })).resolves.toBeUndefined()
+    expect(logger.error).toHaveBeenCalledOnce()
+    expect(JSON.stringify(logger.error.mock.calls)).not.toContain('Частный текст')
   })
 
   it('с прокси TLS к Telegram идёт внутри CONNECT, а не напрямую', async () => {
@@ -84,11 +81,4 @@ describe('уведомления администратору в Telegram', () =
     }
   })
 
-  it('больше 40 сообщений в минуту не отправляет', async () => {
-    vi.stubEnv('TELEGRAM_ADMIN_CHAT_ID', '42')
-    const send = vi.spyOn(adminTelegramTransport, 'send').mockResolvedValue()
-    for (let index = 0; index < 45; index += 1) await notifyAdmins({ title: `Событие ${index}` })
-    expect(send).toHaveBeenCalledTimes(40)
-    expect(logger.warn).toHaveBeenCalledTimes(5)
-  })
 })

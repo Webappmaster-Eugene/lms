@@ -33,7 +33,7 @@ import { Bookmarks } from '@/payload/collections/Bookmarks'
 import { Notes } from '@/payload/collections/Notes'
 import { Comments } from '@/payload/collections/Comments'
 import { Notifications } from '@/payload/collections/Notifications'
-import { NotificationPreferences, PushSubscriptions, NotificationDeliveries, NotificationJobState } from '@/payload/collections/NotificationInfrastructure'
+import { AdminTelegramDeliveries, NotificationPreferences, PushSubscriptions, NotificationDeliveries, NotificationJobState } from '@/payload/collections/NotificationInfrastructure'
 import { EmailBroadcasts, EmailBroadcastDeliveries } from '@/payload/collections/EmailBroadcasts'
 import { bootstrapInterviewDirections } from '@/server/interviews/bootstrap'
 import { bootstrapDefaultAchievements } from '@/lib/default-achievements'
@@ -167,6 +167,7 @@ export default buildConfig({
     NotificationPreferences,
     PushSubscriptions,
     NotificationDeliveries,
+    AdminTelegramDeliveries,
     NotificationJobState,
     EmailBroadcasts,
     EmailBroadcastDeliveries,

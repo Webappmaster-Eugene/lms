@@ -108,7 +108,7 @@ export async function POST(request: Request) {
   }
 
   logger.info(`Support message from user ${user.id}: "${subject}"`)
-  void notifyAdmins({
+  await notifyAdmins(payload, {
     title: `Обращение ученика: ${subject.trim()}`,
     lines: [`${userName}, ${user.email}`, excerpt(message, 1500)],
     link: adminLink(userLink),

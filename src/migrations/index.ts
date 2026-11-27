@@ -68,6 +68,7 @@ import * as migration_20261124_115020_tutoring_gitlab_invitation from './2026112
 import * as migration_20261124_200121_mentoring_student_library from './20261124_200121_mentoring_student_library';
 import * as migration_20261125_141549_learning_workflows from './20261125_141549_learning_workflows';
 import * as migration_20261125_141551_purchased_course_history from './20261125_141551_purchased_course_history';
+import * as migration_20261127_071436_admin_telegram_deliveries from './20261127_071436_admin_telegram_deliveries';
 
 export const migrations = [
   {
@@ -418,6 +419,11 @@ export const migrations = [
   {
     up: migration_20261125_141551_purchased_course_history.up,
     down: migration_20261125_141551_purchased_course_history.down,
-    name: '20261125_141551_purchased_course_history'
+    name: '20261125_141551_purchased_course_history',
+  },
+  {
+    up: migration_20261127_071436_admin_telegram_deliveries.up,
+    down: migration_20261127_071436_admin_telegram_deliveries.down,
+    name: '20261127_071436_admin_telegram_deliveries'
   },
 ];

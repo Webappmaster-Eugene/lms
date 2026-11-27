@@ -21,7 +21,7 @@ export const noteBootcampFirstLogin: CollectionAfterLoginHook<User> = async ({ u
     const result = await db.execute(sql`update bootcamp_enrollments set lms_signed_in_at = now(), updated_at = now() where lms_user_id = ${user.id} and lms_signed_in_at is null returning id, email, first_name, last_name, gitlab_username, lead_id`)
     for (const row of (result as { rows?: Record<string, unknown>[] }).rows ?? []) {
       await journal(req.payload, { lead: relationId(row.lead_id), type: 'lms_signed_in', message: `Первый вход в LMS: ${String(row.email)}` })
-      void notifyAdmins({
+      await notifyAdmins(req.payload, {
         title: `Ученик впервые вошёл в LMS: ${String(row.email)}`,
         lines: [`${String(row.first_name)} ${String(row.last_name)}, логин GitLab ${String(row.gitlab_username)}`],
         link: adminLink(`/admin/collections/bootcamp-leads/${relationId(row.lead_id)}`),

@@ -3,7 +3,8 @@ import { request as httpRequest } from 'node:http'
 import { request as httpsRequest } from 'node:https'
 import type { Socket } from 'node:net'
 import { connect as tlsConnect } from 'node:tls'
-import type { PayloadRequest } from 'payload'
+import { sql } from '@payloadcms/db-postgres'
+import type { Payload, PayloadRequest } from 'payload'
 
 import { logger } from '@/lib/telemetry'
 import { afterCommit } from '@/server/after-commit'
@@ -21,6 +22,7 @@ const TIMEOUT_MS = 8_000
 const ATTEMPTS = 3
 // Предел Telegram - 4096 знаков; запас на ссылку.
 const MAX_TEXT = 3800
+const CLAIM_SECONDS = 120
 // Сбой почты или наплыв заявок не должен превращаться в сотни сообщений.
 const MAX_PER_MINUTE = 40
 
@@ -46,7 +48,7 @@ function config(): AdminTelegramConfig | null {
       return null
     }
   }
-  return { token, chats, proxy }
+  return { token, chats: [...new Set(chats)], proxy }
 }
 
 export function adminLink(path: string): string {
@@ -57,8 +59,10 @@ export function adminLink(path: string): string {
 export function formatAdminEvent(event: AdminEvent): string {
   const lines = (event.lines ?? []).filter((line): line is string => typeof line === 'string' && line.trim() !== '')
   const body = [event.title, ...lines].join('\n')
-  const cut = body.length > MAX_TEXT ? `${body.slice(0, MAX_TEXT - 1)}…` : body
-  return event.link ? `${cut}\n${event.link}` : cut
+  const link = event.link && event.link.length < 4094 ? `\n${event.link}` : ''
+  const limit = Math.min(MAX_TEXT, 4096 - link.length)
+  const cut = body.length > limit ? `${body.slice(0, limit - 1)}…` : body
+  return cut + link
 }
 
 const WINDOW = Symbol.for('lms.adminTelegram.sent')
@@ -71,9 +75,9 @@ function takeSlot(now = Date.now()): boolean {
   return true
 }
 
-function tunnel(proxy: URL): Promise<Socket> {
+function tunnel(proxy: URL, signal: AbortSignal): Promise<Socket> {
   return new Promise((resolve, reject) => {
-    const req = httpRequest({ host: proxy.hostname, port: Number(proxy.port || 80), method: 'CONNECT', path: `${API_HOST}:443`, headers: { host: `${API_HOST}:443` }, timeout: TIMEOUT_MS })
+    const req = httpRequest({ host: proxy.hostname, port: Number(proxy.port || 80), method: 'CONNECT', signal, path: `${API_HOST}:443`, headers: { host: `${API_HOST}:443` }, timeout: TIMEOUT_MS })
     req.once('connect', (response, socket) => {
       if (response.statusCode === 200) resolve(socket)
       else {
@@ -91,12 +95,14 @@ type Reply = { status: number, body: string }
 
 async function post(cfg: AdminTelegramConfig, method: string, payload: unknown): Promise<Reply> {
   const body = JSON.stringify(payload)
-  const socket = cfg.proxy ? await tunnel(cfg.proxy) : null
+  const signal = AbortSignal.timeout(TIMEOUT_MS)
+  const socket = cfg.proxy ? await tunnel(cfg.proxy, signal) : null
   return new Promise((resolve, reject) => {
     const req = httpsRequest({
       host: API_HOST,
       port: 443,
       method: 'POST',
+      signal,
       path: `/bot${cfg.token}/${method}`,
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
       timeout: TIMEOUT_MS,
@@ -112,6 +118,10 @@ async function post(cfg: AdminTelegramConfig, method: string, payload: unknown):
     req.once('error', reject)
     req.end(body)
   })
+}
+
+class TelegramRateLimit extends Error {
+  constructor(readonly seconds: number) { super('Telegram ограничил частоту отправки') }
 }
 
 /** Отправка одного текста в один чат. Вынесено в объект, чтобы тесты подменяли доставку. */
@@ -135,9 +145,8 @@ export const adminTelegramTransport = {
       }
       failure = new Error(`Telegram answered ${reply.status}: ${parsed.description ?? 'no description'}`)
       const wait = parsed.parameters?.retry_after
-      if (reply.status === 429 && typeof wait === 'number' && wait <= 10) {
-        await new Promise((resolve) => setTimeout(resolve, wait * 1000))
-        continue
+      if (reply.status === 429 && typeof wait === 'number' && Number.isSafeInteger(wait) && wait > 0) {
+        throw new TelegramRateLimit(wait)
       }
       // 4xx кроме 429 - неверный токен или чат: повтор не поможет.
       if (reply.status < 500) break
@@ -152,32 +161,72 @@ function scrub(error: unknown, token: string): Error {
   return new Error(message.split(token).join('<token>'))
 }
 
-/** Никогда не бросает: уведомление вторично к действию, которое его вызвало. */
-export async function notifyAdmins(event: AdminEvent): Promise<void> {
+/** По одной записи на адресата. Планировщик отправляет их независимо друг от друга. */
+export async function notifyAdmins(payload: Payload, event: AdminEvent): Promise<void> {
   const cfg = config()
   if (!cfg) return
-  if (!takeSlot()) {
-    logger.warn('Admin Telegram notification dropped: per-minute limit reached', { 'telegram.title': event.title.slice(0, 80) })
-    return
-  }
-  const text = formatAdminEvent(event)
-  for (const chat of cfg.chats) {
-    try {
-      await adminTelegramTransport.send(cfg, chat, text)
-    } catch (error) {
-      logger.error('Admin Telegram notification failed', scrub(error, cfg.token), { 'telegram.title': event.title.slice(0, 80) })
+  try {
+    const message = formatAdminEvent(event)
+    const recipients = cfg.chats.map(chat => {
+      // Зарезервированную первую попытку можно отправить сразу после записи в БД.
+      const immediate = takeSlot()
+      return sql`(${chat}, ${message}, now() + ${immediate ? CLAIM_SECONDS : 0} * interval '1 second', ${immediate ? 1 : 0})`
+    })
+    const result = await payload.db.drizzle.execute<ClaimedDelivery>(sql`INSERT INTO admin_telegram_deliveries
+      (chat, message, next_attempt_at, attempts) VALUES ${sql.join(recipients, sql`, `)}
+      RETURNING id, chat, message, attempts::integer AS attempts`)
+    for (const job of result.rows) {
+      if (job.attempts === 0) continue
+      void deliverClaimed(payload, cfg, job).catch(() => {
+        logger.error('Не удалось обновить очередь Telegram', undefined, { 'delivery.id': job.id })
+      })
     }
+  } catch {
+    // Ошибка драйвера может содержать параметры запроса, включая текст сообщения.
+    logger.error('Не удалось сохранить уведомление для Telegram')
   }
 }
 
-/**
- * Из хука: уходит только после фиксации транзакции, иначе при откате пришло бы сообщение
- * о несуществующем. Отправку не ждём: медленный Telegram не должен держать сохранение.
- */
 export function notifyAdminsAfterCommit(req: PayloadRequest, event: AdminEvent): Promise<void> {
-  return afterCommit(req, async () => {
-    void notifyAdmins(event)
-  })
+  return afterCommit(req, () => notifyAdmins(req.payload, event))
+}
+
+type ClaimedDelivery = { id: number; chat: string; message: string; attempts: number }
+
+async function deliverClaimed(payload: Payload, cfg: AdminTelegramConfig, job: ClaimedDelivery): Promise<void> {
+  const db = payload.db.drizzle
+  const claim = sql`id = ${job.id} AND attempts = ${job.attempts}`
+  if (cfg.chats.includes(job.chat)) {
+    try {
+      await adminTelegramTransport.send(cfg, job.chat, job.message)
+    } catch (error) {
+      const backoff = Math.min(6 * 3600, 60 * 2 ** Math.min(job.attempts - 1, 9))
+      const seconds = error instanceof TelegramRateLimit ? Math.max(error.seconds, backoff) : backoff
+      await db.execute(sql`UPDATE admin_telegram_deliveries SET next_attempt_at = now() + ${seconds} * interval '1 second',
+        updated_at = now() WHERE ${claim}`)
+      logger.error('Admin Telegram notification deferred', scrub(error, cfg.token), { 'delivery.id': job.id, 'delivery.attempt': job.attempts })
+      return
+    }
+  }
+  // После изменения списка чатов старый адресат больше не получает сообщения.
+  await db.execute(sql`DELETE FROM admin_telegram_deliveries WHERE ${claim}`)
+}
+
+export async function runAdminTelegramJobs(payload: Payload, deadline: number): Promise<void> {
+  const cfg = config()
+  if (!cfg) return
+  const db = payload.db.drizzle
+  while (Date.now() + ATTEMPTS * TIMEOUT_MS < deadline && takeSlot()) {
+    // Если процесс остановится после захвата, через две минуты запись снова доступна.
+    const result = await db.execute<ClaimedDelivery>(sql`UPDATE admin_telegram_deliveries
+      SET next_attempt_at = now() + ${CLAIM_SECONDS} * interval '1 second', attempts = attempts + 1, updated_at = now()
+      WHERE id = (SELECT id FROM admin_telegram_deliveries WHERE next_attempt_at <= now()
+        ORDER BY next_attempt_at, id LIMIT 1 FOR UPDATE SKIP LOCKED)
+      RETURNING id, chat, message, attempts::integer AS attempts`)
+    const job = result.rows[0]
+    if (!job) return
+    await deliverClaimed(payload, cfg, job)
+  }
 }
 
 /** Короткая выдержка из текста пользователя: без переводов строк по краям и не длиннее limit. */

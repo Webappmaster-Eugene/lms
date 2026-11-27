@@ -133,7 +133,7 @@ export async function saveBootcampLead(payload: Payload, input: BootcampLeadInpu
         // Задание не уходит само: сначала анкету читает владелец (решение от 05.11.2026).
         notification: notifyTeam(payload, created, program, resumeLost).then(async () => {
           await journal(payload, { lead: created.id, type: 'lead_created', message: 'Заявка с лендинга, ждёт проверки анкеты' })
-          await notifyAdmins(leadEvent(created, program, 1, 'not-sent', true, resumeLost))
+          await notifyAdmins(payload, leadEvent(created, program, 1, 'not-sent', true, resumeLost))
         }),
       }
     } catch (error) {
@@ -159,8 +159,8 @@ export async function saveBootcampLead(payload: Payload, input: BootcampLeadInpu
   // Пока владелец его не отправил, повтор заявки выдать задание не может.
   const sent = Boolean(lead.entryTaskSentAt)
   const notification = sent && entryTaskResendDue(lead)
-    ? sendEntryTask(payload, lead).then((dueAt) => notifyAdmins(leadEvent(repeated, program, count, dueAt === null ? 'failed' : dueAt, answered, resumeLost)))
-    : notifyAdmins(leadEvent(repeated, program, count, sent ? 'not-due' : 'not-sent', answered, resumeLost))
+    ? sendEntryTask(payload, lead).then((dueAt) => notifyAdmins(payload, leadEvent(repeated, program, count, dueAt === null ? 'failed' : dueAt, answered, resumeLost)))
+    : notifyAdmins(payload, leadEvent(repeated, program, count, sent ? 'not-due' : 'not-sent', answered, resumeLost))
   return { outcome: 'repeat', notification }
 }
 
@@ -250,6 +250,6 @@ async function notifyTeam(payload: Payload, lead: BootcampLead, program: Bootcam
     await markLeadTeamNotified(payload, lead.id)
   } catch (error) {
     logger.error('Bootcamp lead notification failed', error, { 'lead.id': lead.id })
-    await notifyAdmins({ title: 'Письмо команде о заявке на буткемп не ушло', lines: [lead.email, 'Заявка сохранена, подробности в журнале приложения'], link: adminLink(`/admin/collections/bootcamp-leads/${lead.id}`) })
+    await notifyAdmins(payload, { title: 'Письмо команде о заявке на буткемп не ушло', lines: [lead.email, 'Заявка сохранена, подробности в журнале приложения'], link: adminLink(`/admin/collections/bootcamp-leads/${lead.id}`) })
   }
 }

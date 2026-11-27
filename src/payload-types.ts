@@ -96,6 +96,7 @@ export interface Config {
     'notification-preferences': NotificationPreference;
     'push-subscriptions': PushSubscription;
     'notification-deliveries': NotificationDelivery;
+    'admin-telegram-deliveries': AdminTelegramDelivery;
     'notification-job-state': NotificationJobState;
     'email-broadcasts': EmailBroadcast;
     'email-broadcast-deliveries': EmailBroadcastDelivery;
@@ -172,6 +173,7 @@ export interface Config {
     'notification-preferences': NotificationPreferencesSelect<false> | NotificationPreferencesSelect<true>;
     'push-subscriptions': PushSubscriptionsSelect<false> | PushSubscriptionsSelect<true>;
     'notification-deliveries': NotificationDeliveriesSelect<false> | NotificationDeliveriesSelect<true>;
+    'admin-telegram-deliveries': AdminTelegramDeliveriesSelect<false> | AdminTelegramDeliveriesSelect<true>;
     'notification-job-state': NotificationJobStateSelect<false> | NotificationJobStateSelect<true>;
     'email-broadcasts': EmailBroadcastsSelect<false> | EmailBroadcastsSelect<true>;
     'email-broadcast-deliveries': EmailBroadcastDeliveriesSelect<false> | EmailBroadcastDeliveriesSelect<true>;
@@ -1507,6 +1509,19 @@ export interface NotificationDelivery {
   nextAttemptAt: string;
   claimToken?: string | null;
   lastStatusCode?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "admin-telegram-deliveries".
+ */
+export interface AdminTelegramDelivery {
+  id: number;
+  chat: string;
+  message: string;
+  nextAttemptAt: string;
+  attempts: number;
   updatedAt: string;
   createdAt: string;
 }
@@ -3508,6 +3523,18 @@ export interface NotificationDeliveriesSelect<T extends boolean = true> {
   nextAttemptAt?: T;
   claimToken?: T;
   lastStatusCode?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "admin-telegram-deliveries_select".
+ */
+export interface AdminTelegramDeliveriesSelect<T extends boolean = true> {
+  chat?: T;
+  message?: T;
+  nextAttemptAt?: T;
+  attempts?: T;
   updatedAt?: T;
   createdAt?: T;
 }

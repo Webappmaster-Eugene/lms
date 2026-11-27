@@ -21,6 +21,10 @@ export class LearningUpstreamError extends Error {
   constructor(readonly reason: 'upstream_timeout' | 'invalid_source') { super(reason) }
 }
 
+export class LearningViewerAbort extends DOMException {
+  constructor() { super('Viewer disconnected', 'AbortError') }
+}
+
 export function safeLearningUpstream(raw: string): URL {
   let url: URL
   try { url = new URL(raw) } catch { throw new LearningUpstreamError('invalid_source') }
@@ -140,10 +144,6 @@ function sourceError(message: string, status: number, source: MediaSourceStatus)
   const response = mediaError(message, status)
   response.headers.set(MEDIA_SOURCE_HEADER, source)
   return response
-}
-
-function isViewerAbort(request: Request, timedOut: boolean): boolean {
-  return request.signal.aborted && !timedOut
 }
 
 /** Отказ Диска, а не адрес вне списка и не отсутствующий файл. */
@@ -283,7 +283,8 @@ export async function upstreamLearningMedia(request: Request, userId: number, re
     return new Response(body, { status: upstream.status, headers })
   } catch (error) {
     // Ответ на брошенную ошибку собирает маршрут; здесь только отметка для проверки плеера.
-    if (!isViewerAbort(request, timedOut) && isDiskFailure(error)) rememberSourceFailure(ref)
+    if (request.signal.aborted && !timedOut) throw new LearningViewerAbort()
+    if (isDiskFailure(error)) rememberSourceFailure(ref)
     if (timedOut) throw new LearningUpstreamError('upstream_timeout')
     throw error
   } finally {

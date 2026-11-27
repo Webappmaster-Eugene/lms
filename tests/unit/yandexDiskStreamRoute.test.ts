@@ -97,6 +97,45 @@ describe('проверка параметров', () => {
 })
 
 describe('защищённый поток без CDN capability', () => {
+  it('перемотка во время загрузки не помечает Диск как недоступный', async () => {
+    const viewer = new AbortController()
+    const request = new Request(streamRequest(uniqueVideoUrl()), { signal: viewer.signal })
+    const errorLog = vi.spyOn(console, 'error')
+    try {
+      upstream.mockImplementationOnce((_url: URL, init: RequestInit) => {
+        viewer.abort()
+        return Promise.reject(init.signal?.reason)
+      })
+      const response = await GET(request)
+      expect(upstream).toHaveBeenCalledOnce()
+      expect(response.status).toBe(499)
+      expect(response.headers.get('X-Media-Source')).toBeNull()
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+      expect(errorLog.mock.calls.flat().join(' ')).not.toContain('upstream_error')
+    } finally {
+      errorLog.mockRestore()
+    }
+  })
+
+  it('дедлайн хранилища при открытом плеере остается ошибкой источника', async () => {
+    vi.useFakeTimers()
+    try {
+      const started = Promise.withResolvers<void>()
+      upstream.mockImplementationOnce((_url: URL, init: RequestInit) => new Promise((_resolve, reject) => {
+        started.resolve()
+        init.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true })
+      }))
+      const result = GET(streamRequest(uniqueVideoUrl()))
+      await started.promise
+      await vi.advanceTimersByTimeAsync(15_000)
+      const response = await result
+      expect(response.status).toBe(502)
+      expect(response.headers.get('X-Media-Source')).toBe('unavailable')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('отдаёт байты сервера и запрещает кеширование', async () => {
     const response = await GET(streamRequest(uniqueVideoUrl()))
 

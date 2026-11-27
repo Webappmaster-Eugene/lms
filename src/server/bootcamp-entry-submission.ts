@@ -127,7 +127,7 @@ export async function submitEntrySolutions(payload: Payload, lead: BootcampLead,
   }
   await journal(payload, { lead: lead.id, type: 'solution_submitted', message: `Решение входного задания: ${summary.passed} из ${summary.total} тестов, отправка ${count} из ${ENTRY_TASK_MAX_SUBMISSIONS}` })
   void notifyTeam(payload, lead, summary)
-  void notifyAdmins({
+  await notifyAdmins(payload, {
     title: `Решение входного задания: ${lead.email}, ${summary.passed} из ${summary.total} тестов`,
     lines: [
       `Отправка ${count} из ${ENTRY_TASK_MAX_SUBMISSIONS}${count >= ENTRY_TASK_MAX_SUBMISSIONS ? ', больше отправок не будет' : ''}`,
@@ -161,6 +161,6 @@ async function notifyTeam(payload: Payload, lead: BootcampLead, summary: EntrySu
     for (const to of recipients) await payload.sendEmail({ to, ...content })
   } catch (error) {
     logger.error('Entry task solution notification failed', error, { 'lead.id': lead.id })
-    await notifyAdmins({ title: 'Письмо команде о решении входного задания не ушло', lines: [lead.email, 'Решение сохранено в заявке, подробности в журнале приложения'], link: adminLink(`/admin/collections/bootcamp-leads/${lead.id}`) })
+    await notifyAdmins(payload, { title: 'Письмо команде о решении входного задания не ушло', lines: [lead.email, 'Решение сохранено в заявке, подробности в журнале приложения'], link: adminLink(`/admin/collections/bootcamp-leads/${lead.id}`) })
   }
 }

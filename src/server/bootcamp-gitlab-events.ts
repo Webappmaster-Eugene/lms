@@ -95,6 +95,6 @@ export async function handleGitlabEvent(payload: Payload, event: string | null, 
         : null
   if (!message) return 'ignored'
   await journal(payload, { lead: relationId(enrollment.lead), type: 'gitlab_event', message: [message.title, message.lines?.find((line) => typeof line === 'string' && line)].filter(Boolean).join(': '), data: { event } })
-  void notifyAdmins({ ...message, link: message.link ?? adminLink(`/admin/collections/bootcamp-leads/${relationId(enrollment.lead)}`) })
+  await notifyAdmins(payload, { ...message, link: message.link ?? adminLink(`/admin/collections/bootcamp-leads/${relationId(enrollment.lead)}`) })
   return 'notified'
 }

@@ -24,7 +24,7 @@ function sendAfterCommit(req: PayloadRequest, message: EmailMessage, failure: st
       await req.payload.sendEmail(message)
     } catch (err) {
       logger.error(failure, err, attributes)
-      void notifyAdmins({ title: 'Письмо ученику не ушло', lines: [`Кому: ${message.to}`, `Тема: ${message.subject}`, 'Подробности в журнале приложения'] })
+      await notifyAdmins(req.payload, { title: 'Письмо ученику не ушло', lines: [`Кому: ${message.to}`, `Тема: ${message.subject}`, 'Подробности в журнале приложения'] })
     }
   })
 }
@@ -86,7 +86,7 @@ export const sendInviteEmail: CollectionAfterChangeHook = async ({ doc, operatio
       await sendAfterCommit(req, { to: doc.email, subject, html, text }, 'Failed to send invite email', { 'user.email': doc.email })
     } catch (err) {
       logger.error('Failed to send invite email', err, { 'user.email': doc.email })
-      void notifyAdmins({ title: 'Приглашение в LMS не отправлено', lines: [`Кому: ${doc.email}`, 'Учётка создана, но письма со ссылкой для пароля нет. Подробности в журнале приложения'] })
+      await notifyAdmins(req.payload, { title: 'Приглашение в LMS не отправлено', lines: [`Кому: ${doc.email}`, 'Учётка создана, но письма со ссылкой для пароля нет. Подробности в журнале приложения'] })
       return doc
     }
     await recordInvitedEnrollmentIdentity(req, doc.id)

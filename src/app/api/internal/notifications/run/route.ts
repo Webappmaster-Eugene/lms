@@ -1,4 +1,5 @@
 import { getPayload } from '@/lib/payload'
+import { runAdminTelegramJobs } from '@/server/admin-telegram'
 import { runNotificationJobs } from '@/server/notification-service'
 import { validNotificationJobKey } from '@/server/notification-job-auth'
 import { logger } from '@/lib/telemetry'
@@ -26,6 +27,11 @@ export async function POST(request: Request) {
     logger.error('Notification scheduler failed', error)
     return Response.json({ error: 'Задача уведомлений не выполнена' }, { status: 500, headers: { 'Cache-Control': 'no-store' } })
   }
+
+  // Telegram работает параллельно с остальными заданиями и соблюдает общий срок запроса.
+  const telegram = runAdminTelegramJobs(payload, startedAt + ROUTE_BUDGET_MS).catch(() => {
+    logger.error('Admin Telegram scheduler failed')
+  })
 
   try {
     await runTutoringCalendarJobs(payload)
@@ -75,6 +81,7 @@ export async function POST(request: Request) {
     emails = { error: 'Задача рассылок не выполнена' }
   }
 
+  await telegram
   if (!result) return Response.json({ error: 'Задача уведомлений не выполнена', emails }, { status: 500, headers: { 'Cache-Control': 'no-store' } })
   return Response.json({ ...result, emails }, { headers: { 'Cache-Control': 'no-store' } })
 }
