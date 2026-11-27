@@ -6,6 +6,7 @@ import { adminTelegramTransport, notifyAdmins, notifyAdminsAfterCommit, runAdmin
 import { logger } from '@/lib/telemetry'
 import { getTestPayload } from '../helpers/payload'
 
+const recipients = { chat: { in: ['42', '43'] } }
 const TOKEN = '123456:abcdefghijklmnopqrstuvwxyz'
 const run = () => runAdminTelegramJobs(payload, Date.now() + 60_000)
 let payload: Payload
@@ -20,7 +21,7 @@ beforeEach(() => {
 afterEach(async () => {
   vi.restoreAllMocks()
   vi.unstubAllEnvs()
-  await payload.delete({ collection: 'admin-telegram-deliveries', where: { chat: { in: ['42', '43'] } }, overrideAccess: true })
+  await payload.delete({ collection: 'admin-telegram-deliveries', where: recipients, overrideAccess: true })
 })
 
 describe('очередь Telegram для ментора', () => {
@@ -33,7 +34,7 @@ describe('очередь Telegram для ментора', () => {
     await Promise.all([run(), run()])
     expect(send.mock.calls.map(([, chat]) => chat).sort()).toEqual(['42', '43'])
     await vi.waitFor(() => expect(log).toHaveBeenCalledOnce())
-    const { docs } = await payload.find({ collection: 'admin-telegram-deliveries', overrideAccess: true })
+    const { docs } = await payload.find({ collection: 'admin-telegram-deliveries', where: recipients, overrideAccess: true })
     expect(docs).toHaveLength(1)
     expect(docs[0]).toMatchObject({ chat: '43', attempts: 1, message: 'Заявка\nНужен ответ' })
     expect(Date.parse(docs[0].nextAttemptAt)).toBeGreaterThan(Date.now())
@@ -46,7 +47,7 @@ describe('очередь Telegram для ментора', () => {
     await Promise.all([run(), run()])
     expect(send.mock.calls.map(([, chat, text]) => [chat, text]).at(-1)).toEqual(['43', 'Заявка\nНужен ответ'])
     expect(send).toHaveBeenCalledTimes(3)
-    expect((await payload.count({ collection: 'admin-telegram-deliveries' })).totalDocs).toBe(0)
+    expect((await payload.count({ collection: 'admin-telegram-deliveries', where: recipients })).totalDocs).toBe(0)
   })
 
   it('не отправляет накопленное сообщение в чат, удаленный из настроек', async () => {
@@ -59,7 +60,7 @@ describe('очередь Telegram для ментора', () => {
     vi.stubEnv('TELEGRAM_ADMIN_CHAT_ID', '43')
     await run()
     expect(send.mock.calls.map(([, chat]) => chat)).toEqual(['43'])
-    expect((await payload.count({ collection: 'admin-telegram-deliveries' })).totalDocs).toBe(0)
+    expect((await payload.count({ collection: 'admin-telegram-deliveries', where: recipients })).totalDocs).toBe(0)
   })
 
   it('выдает сообщение только после фиксации действия и скрывает очередь от клиентов', async () => {
@@ -87,6 +88,6 @@ describe('очередь Telegram для ментора', () => {
     await Promise.all(Array.from({ length: 42 }, (_, index) => notifyAdmins(payload, { title: `Заявка ${index}` })))
     await run()
     expect(send).toHaveBeenCalledTimes(40)
-    await vi.waitFor(async () => expect((await payload.count({ collection: 'admin-telegram-deliveries' })).totalDocs).toBe(2))
+    await vi.waitFor(async () => expect((await payload.count({ collection: 'admin-telegram-deliveries', where: recipients })).totalDocs).toBe(2))
   })
 })

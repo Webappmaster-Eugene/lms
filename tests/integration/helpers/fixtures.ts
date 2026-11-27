@@ -75,6 +75,7 @@ export const VALID: Record<string, (ctx: FixtureContext) => Data> = {
   'notification-preferences': (ctx) => ({ user: ctx.studentId, timezone: 'Europe/Moscow', reminderHour: 18 }),
   'push-subscriptions': (ctx) => ({ user: ctx.studentId, endpointHash: createHash('sha256').update(uid('push')).digest('hex'), endpoint: 'https://fcm.googleapis.com/fcm/send/fixture', p256dh: 'fixture-public-key', auth: 'fixture-auth-key', sessionHash: createHash('sha256').update(uid('sid')).digest('hex') }),
   'notification-deliveries': (ctx) => ({ user: ctx.studentId, notification: 0, subscription: 0, status: 'pending', attempts: 0, nextAttemptAt: new Date().toISOString() }),
+  'admin-telegram-deliveries': () => ({ chat: '99', message: 'Тестовая заявка', nextAttemptAt: '2099-01-01T00:00:00.000Z' }),
   'notification-job-state': () => ({ key: uid('job'), leaseUntil: new Date().toISOString(), claimToken: uid('claim') }),
   'email-broadcasts': (ctx) => ({ subject: `Рассылка ${uid()}`, body: 'Текст фикстуры', audience: 'all', status: 'draft', createdBy: ctx.userId }),
   // Отменённая доставка: фоновая задача рассылок в других тестах её не возьмёт.
